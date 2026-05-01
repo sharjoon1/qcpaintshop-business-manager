@@ -254,6 +254,7 @@ billingRoutes.setPointsEngine(require('./services/painter-points-engine'));
 vendorRoutes.setPool(pool);
 painterScheduler.setPool(pool);
 dataRetentionService.setPool(pool);
+require('./services/audit-log').setPool(pool);
 leadAutoAssignScheduler.setPool(pool);
 leadReminderScheduler.init(pool, notificationService);
 aiScheduler.setSessionManager(whatsappSessionManager);
@@ -418,12 +419,14 @@ app.post('/api/auth/login', authLimiter, async (req, res) => {
         }
 
         const sessionToken = crypto.randomBytes(32).toString('hex');
+        const sessionTokenHash = crypto.createHash('sha256').update(sessionToken).digest('hex');
         const expiresAt = new Date();
         expiresAt.setHours(expiresAt.getHours() + (remember ? 720 : 24));
 
+        // Dual-write raw + hash so a code rollback still finds new sessions; reads use hash.
         await pool.query(
-            'INSERT INTO user_sessions (user_id, session_token, ip_address, user_agent, expires_at) VALUES (?, ?, ?, ?, ?)',
-            [user.id, sessionToken, req.ip, req.get('User-Agent'), expiresAt]
+            'INSERT INTO user_sessions (user_id, session_token, token_hash, ip_address, user_agent, expires_at) VALUES (?, ?, ?, ?, ?, ?)',
+            [user.id, sessionToken, sessionTokenHash, req.ip, req.get('User-Agent'), expiresAt]
         );
 
         await pool.query('UPDATE users SET last_login = NOW() WHERE id = ?', [user.id]);
@@ -462,7 +465,7 @@ app.get('/api/auth/verify', async (req, res) => {
             `SELECT s.*, u.id as user_id, u.username, u.full_name, u.email, u.role, u.branch_id, u.phone, u.profile_image_url, b.name as branch_name
              FROM user_sessions s JOIN users u ON s.user_id = u.id
              LEFT JOIN branches b ON u.branch_id = b.id
-             WHERE s.session_token = ? AND s.expires_at > NOW() AND u.status = 'active'`,
+             WHERE s.token_hash = LOWER(SHA2(?, 256)) AND s.expires_at > NOW() AND u.status = 'active'`,
             [token]
         );
 
@@ -504,7 +507,7 @@ app.get('/api/auth/me', async (req, res) => {
             `SELECT s.*, u.id as user_id, u.username, u.full_name, u.email, u.role, u.branch_id, u.phone, u.profile_image_url, b.name as branch_name
              FROM user_sessions s JOIN users u ON s.user_id = u.id
              LEFT JOIN branches b ON u.branch_id = b.id
-             WHERE s.session_token = ? AND s.expires_at > NOW() AND u.status = 'active'`,
+             WHERE s.token_hash = LOWER(SHA2(?, 256)) AND s.expires_at > NOW() AND u.status = 'active'`,
             [token]
         );
 
@@ -573,7 +576,7 @@ app.post('/api/auth/logout', async (req, res) => {
     try {
         const token = req.headers.authorization?.replace('Bearer ', '');
         if (token) {
-            await pool.query('DELETE FROM user_sessions WHERE session_token = ?', [token]);
+            await pool.query('DELETE FROM user_sessions WHERE token_hash = LOWER(SHA2(?, 256))', [token]);
         }
         res.json({ success: true });
     } catch (error) {
@@ -1103,12 +1106,13 @@ app.post('/api/auth/register', async (req, res) => {
         );
 
         const sessionToken = crypto.randomBytes(32).toString('hex');
+        const sessionTokenHash = crypto.createHash('sha256').update(sessionToken).digest('hex');
         const expiresAt = new Date();
         expiresAt.setHours(expiresAt.getHours() + 24);
 
         await pool.query(
-            'INSERT INTO user_sessions (user_id, session_token, expires_at) VALUES (?, ?, ?)',
-            [result.insertId, sessionToken, expiresAt]
+            'INSERT INTO user_sessions (user_id, session_token, token_hash, expires_at) VALUES (?, ?, ?, ?)',
+            [result.insertId, sessionToken, sessionTokenHash, expiresAt]
         );
 
         res.status(201).json({
@@ -3779,7 +3783,7 @@ io.use(async (socket, next) => {
         const [sessions] = await pool.query(
             `SELECT s.*, u.id as user_id, u.username, u.role, u.full_name
              FROM user_sessions s JOIN users u ON s.user_id = u.id
-             WHERE s.session_token = ? AND s.expires_at > NOW() AND u.status = 'active'`,
+             WHERE s.token_hash = LOWER(SHA2(?, 256)) AND s.expires_at > NOW() AND u.status = 'active'`,
             [token]
         );
 

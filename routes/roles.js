@@ -6,6 +6,7 @@
 const express = require('express');
 const router = express.Router();
 const { requirePermission, requireAuth } = require('../middleware/permissionMiddleware');
+const audit = require('../services/audit-log');
 
 let pool;
 
@@ -199,6 +200,14 @@ router.post('/', requirePermission('roles', 'manage'), async (req, res) => {
             user_type === 'customer' ? (default_discount_percent || 0) : 0
         ]);
 
+        await audit.record(req, {
+            action: 'role.create',
+            entity_type: 'role',
+            entity_id: result.insertId,
+            before: null,
+            after: { id: result.insertId, name, display_name, user_type, status: status || 'active', price_markup_percent, default_discount_percent }
+        });
+
         res.status(201).json({
             success: true,
             message: 'Role created successfully',
@@ -314,9 +323,21 @@ router.delete('/:id', requirePermission('roles', 'manage'), async (req, res) => 
             });
         }
 
+        // Capture full role row + perm count for audit before deletion
+        const [beforeRoles] = await pool.query('SELECT * FROM roles WHERE id = ?', [id]);
+        const [permCount] = await pool.query('SELECT COUNT(*) AS c FROM role_permissions WHERE role_id = ?', [id]);
+
         // Delete role permissions first, then role
         await pool.query('DELETE FROM role_permissions WHERE role_id = ?', [id]);
         await pool.query('DELETE FROM roles WHERE id = ?', [id]);
+
+        await audit.record(req, {
+            action: 'role.delete',
+            entity_type: 'role',
+            entity_id: id,
+            before: { ...beforeRoles[0], permissions_revoked: permCount[0].c },
+            after: null
+        });
 
         res.json({
             success: true,

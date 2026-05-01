@@ -11,6 +11,7 @@ const { requireAuth, requireRole, requirePermission } = require('../middleware/p
 const zohoAPI = require('../services/zoho-api');
 const notificationService = require('../services/notification-service');
 const { idempotent, setPool: setIdempotencyPool } = require('../middleware/idempotency');
+const audit = require('../services/audit-log');
 
 let pool = null;
 let io = null;
@@ -569,6 +570,14 @@ router.put('/requests/:id/approve', requirePermission('credit_limits', 'manage')
             });
         } catch (notifErr) { console.error('[CreditLimits] Notify error:', notifErr.message); }
 
+        await audit.record(req, {
+            action: 'credit_limit.request.approve',
+            entity_type: 'credit_limit_request',
+            entity_id: requestId,
+            before: { ...r, zoho_customer_previous_limit: previousLimit },
+            after: { request_id: requestId, customer_map_id: r.zoho_customer_map_id, approved_amount: finalAmount, review_notes: review_notes || null }
+        });
+
         res.json({ success: true, approved_amount: finalAmount, zoho_synced: zohoSync.synced });
     } catch (e) {
         await conn.rollback();
@@ -696,6 +705,14 @@ router.post('/:customerId/set-limit', requirePermission('credit_limits', 'manage
 
         // Best-effort Zoho sync
         const zohoSync = await syncLimitToZoho(customerId);
+
+        await audit.record(req, {
+            action: 'credit_limit.set',
+            entity_type: 'zoho_customer_map',
+            entity_id: customerId,
+            before: { credit_limit: previousLimit, zoho_outstanding: Number(current[0].zoho_outstanding) },
+            after: { credit_limit: Number(credit_limit), reason: reason || null }
+        });
 
         res.json({
             success: true,

@@ -21,6 +21,7 @@ const { generatePainterEstimatePDF } = require('./painter-estimate-pdf-generator
 const attendanceService = require('../services/painter-attendance-service');
 const { idempotent, setPool: setIdempotencyPool } = require('../middleware/idempotency');
 const { otpLimiter } = require('../middleware/rateLimiter');
+const audit = require('../services/audit-log');
 
 let pool;
 let io;
@@ -147,7 +148,7 @@ async function requirePainterAuth(req, res, next) {
 
     try {
         const [sessions] = await pool.query(
-            'SELECT ps.painter_id, p.status, p.full_name FROM painter_sessions ps JOIN painters p ON ps.painter_id = p.id WHERE ps.token = ? AND ps.expires_at > NOW()',
+            'SELECT ps.painter_id, p.status, p.full_name FROM painter_sessions ps JOIN painters p ON ps.painter_id = p.id WHERE ps.token_hash = LOWER(SHA2(?, 256)) AND ps.expires_at > NOW()',
             [token]
         );
         if (!sessions.length) return res.status(401).json({ success: false, message: 'Invalid or expired session' });
@@ -169,7 +170,7 @@ async function requirePainterSession(req, res, next) {
 
     try {
         const [sessions] = await pool.query(
-            'SELECT ps.painter_id, p.status, p.full_name FROM painter_sessions ps JOIN painters p ON ps.painter_id = p.id WHERE ps.token = ? AND ps.expires_at > NOW()',
+            'SELECT ps.painter_id, p.status, p.full_name FROM painter_sessions ps JOIN painters p ON ps.painter_id = p.id WHERE ps.token_hash = LOWER(SHA2(?, 256)) AND ps.expires_at > NOW()',
             [token]
         );
         if (!sessions.length) return res.status(401).json({ success: false, message: 'Invalid or expired session' });
@@ -270,9 +271,11 @@ router.post('/send-otp', otpLimiter, async (req, res) => {
 
         await pool.query('DELETE FROM painter_sessions WHERE painter_id = ? AND expires_at < NOW()', [painter.id]);
 
+        // Dual-write raw token + hash so a code rollback can still find this row; reads use hash.
+        const tokenHash = crypto.createHash('sha256').update(token).digest('hex');
         await pool.query(
-            'INSERT INTO painter_sessions (painter_id, token, otp, otp_expires_at, expires_at) VALUES (?, ?, ?, DATE_ADD(NOW(), INTERVAL 10 MINUTE), DATE_ADD(NOW(), INTERVAL 30 DAY))',
-            [painter.id, token, otp]
+            'INSERT INTO painter_sessions (painter_id, token, token_hash, otp, otp_expires_at, expires_at) VALUES (?, ?, ?, ?, DATE_ADD(NOW(), INTERVAL 10 MINUTE), DATE_ADD(NOW(), INTERVAL 30 DAY))',
+            [painter.id, token, tokenHash, otp]
         );
 
         // Send OTP via SMS (primary) + WhatsApp (secondary)
@@ -3842,12 +3845,20 @@ router.put('/withdrawals/:id', requirePermission('painters', 'points'), async (r
         const { action, payment_reference, notes } = req.body;
         if (!action) return res.status(400).json({ success: false, message: 'Action required (approve/reject/paid)' });
 
-        // Get withdrawal details before processing (for notification)
-        const [wRows] = await pool.query('SELECT painter_id, pool, amount FROM painter_withdrawals WHERE id = ?', [req.params.id]);
+        // Get withdrawal details before processing (for notification + audit before-snapshot)
+        const [wRows] = await pool.query('SELECT painter_id, pool, amount, status FROM painter_withdrawals WHERE id = ?', [req.params.id]);
         const withdrawal = wRows[0];
 
         const result = await pointsEngine.processWithdrawal(parseInt(req.params.id), action, req.user.id, payment_reference, notes);
         res.json({ success: true, message: `Withdrawal ${action}d`, ...result });
+
+        await audit.record(req, {
+            action: `painter.withdrawal.${action}`,
+            entity_type: 'painter_withdrawal',
+            entity_id: req.params.id,
+            before: withdrawal,
+            after: { ...withdrawal, status: action === 'paid' ? 'paid' : (action === 'approve' ? 'approved' : 'rejected'), payment_reference, notes }
+        });
 
         // Send notification to painter
         if (withdrawal) {
@@ -6010,7 +6021,7 @@ router.post('/:id/activate', async (req, res) => {
         const painterToken = req.headers['x-painter-token'];
         if (painterToken) {
             const [ps] = await pool.query(
-                `SELECT painter_id FROM painter_sessions WHERE token = ? AND expires_at > NOW() LIMIT 1`,
+                `SELECT painter_id FROM painter_sessions WHERE token_hash = LOWER(SHA2(?, 256)) AND expires_at > NOW() LIMIT 1`,
                 [painterToken]
             );
             if (ps.length && ps[0].painter_id === painterId) authorized = true;
@@ -6022,7 +6033,7 @@ router.post('/:id/activate', async (req, res) => {
             if (adminToken) {
                 const [sessions] = await pool.query(
                     `SELECT u.role FROM user_sessions s JOIN users u ON s.user_id = u.id
-                     WHERE s.session_token = ? AND s.expires_at > NOW() AND u.status='active' LIMIT 1`,
+                     WHERE s.token_hash = LOWER(SHA2(?, 256)) AND s.expires_at > NOW() AND u.status='active' LIMIT 1`,
                     [adminToken]
                 );
                 if (sessions.length) {
@@ -6132,7 +6143,15 @@ router.put('/:id/approve', requirePermission('painters', 'manage'), async (req, 
     try {
         const { action } = req.body;
         const status = action === 'approve' ? 'approved' : 'rejected';
+        const [beforeRows] = await pool.query('SELECT id, status, full_name, phone FROM painters WHERE id = ?', [req.params.id]);
         await pool.query('UPDATE painters SET status = ?, approved_by = ?, approved_at = NOW() WHERE id = ?', [status, req.user.id, req.params.id]);
+        await audit.record(req, {
+            action: `painter.${status}`,
+            entity_type: 'painter',
+            entity_id: req.params.id,
+            before: beforeRows[0],
+            after: { ...beforeRows[0], status, approved_by: req.user.id }
+        });
 
         if (action === 'approve') {
             await pool.query('UPDATE painter_referrals SET status = "active" WHERE referred_id = ?', [req.params.id]);
@@ -6161,8 +6180,18 @@ router.put('/:id/approve', requirePermission('painters', 'manage'), async (req, 
 router.put('/:id/credit', requirePermission('painters', 'manage'), async (req, res) => {
     try {
         const { credit_enabled, credit_limit } = req.body;
+        const [beforeRows] = await pool.query('SELECT id, credit_enabled, credit_limit FROM painters WHERE id = ?', [req.params.id]);
+        const newEnabled = credit_enabled ? 1 : 0;
+        const newLimit = parseFloat(credit_limit) || 0;
         await pool.query('UPDATE painters SET credit_enabled = ?, credit_limit = ? WHERE id = ?',
-            [credit_enabled ? 1 : 0, parseFloat(credit_limit) || 0, req.params.id]);
+            [newEnabled, newLimit, req.params.id]);
+        await audit.record(req, {
+            action: 'painter.credit.set',
+            entity_type: 'painter',
+            entity_id: req.params.id,
+            before: beforeRows[0],
+            after: { ...beforeRows[0], credit_enabled: newEnabled, credit_limit: newLimit }
+        });
         res.json({ success: true, message: 'Credit settings updated' });
     } catch (error) {
         res.status(500).json({ success: false, message: 'Failed to update credit' });
@@ -6188,6 +6217,7 @@ router.post('/:id/points/adjust', requirePermission('painters', 'points'), async
         if (!pointPool || !amount) return res.status(400).json({ success: false, message: 'Pool and amount required' });
 
         const amt = parseFloat(amount);
+        const beforeBalance = await pointsEngine.getBalance(parseInt(req.params.id));
         if (amt > 0) {
             await pointsEngine.addPoints(parseInt(req.params.id), pointPool, amt, 'admin_adjustment', null, null, description || 'Admin adjustment', req.user.id);
         } else if (amt < 0) {
@@ -6195,6 +6225,13 @@ router.post('/:id/points/adjust', requirePermission('painters', 'points'), async
         }
 
         const balance = await pointsEngine.getBalance(parseInt(req.params.id));
+        await audit.record(req, {
+            action: 'painter.points.adjust',
+            entity_type: 'painter',
+            entity_id: req.params.id,
+            before: { pool: pointPool, balance: beforeBalance },
+            after: { pool: pointPool, balance, delta: amt, description: description || 'Admin adjustment' }
+        });
         res.json({ success: true, message: 'Points adjusted', balance });
     } catch (error) {
         res.status(400).json({ success: false, message: error.message });

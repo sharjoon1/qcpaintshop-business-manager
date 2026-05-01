@@ -961,7 +961,7 @@ async function authenticateRequest(req) {
     const [sessions] = await pool.query(
         `SELECT s.*, u.id as user_id, u.username, u.role, u.full_name
          FROM user_sessions s JOIN users u ON s.user_id = u.id
-         WHERE s.session_token = ? AND s.expires_at > NOW() AND u.status = 'active'`,
+         WHERE s.token_hash = LOWER(SHA2(?, 256)) AND s.expires_at > NOW() AND u.status = 'active'`,
         [token]
     );
     return sessions.length > 0 ? sessions[0] : null;

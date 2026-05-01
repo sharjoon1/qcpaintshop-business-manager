@@ -35,7 +35,7 @@ function requirePermission(module, action) {
                 `SELECT s.*, u.id as user_id, u.username, u.role, u.full_name, u.email, u.branch_id
                  FROM user_sessions s
                  JOIN users u ON s.user_id = u.id
-                 WHERE s.session_token = ? AND s.expires_at > NOW() AND u.status = 'active'`,
+                 WHERE s.token_hash = LOWER(SHA2(?, 256)) AND s.expires_at > NOW() AND u.status = 'active'`,
                 [token]
             );
 
@@ -118,7 +118,7 @@ function requireAnyPermission(permissionsNeeded) {
                 `SELECT s.*, u.id as user_id, u.username, u.role, u.full_name, u.email, u.branch_id
                  FROM user_sessions s
                  JOIN users u ON s.user_id = u.id
-                 WHERE s.session_token = ? AND s.expires_at > NOW() AND u.status = 'active'`,
+                 WHERE s.token_hash = LOWER(SHA2(?, 256)) AND s.expires_at > NOW() AND u.status = 'active'`,
                 [token]
             );
 
@@ -210,7 +210,7 @@ async function requireAuth(req, res, next) {
             `SELECT s.*, u.id as user_id, u.username, u.role, u.full_name, u.email, u.branch_id
              FROM user_sessions s
              JOIN users u ON s.user_id = u.id
-             WHERE s.session_token = ? AND s.expires_at > NOW() AND u.status = 'active'`,
+             WHERE s.token_hash = LOWER(SHA2(?, 256)) AND s.expires_at > NOW() AND u.status = 'active'`,
             [token]
         );
 
@@ -265,7 +265,7 @@ function requireRole(...roles) {
                 `SELECT s.*, u.id as user_id, u.username, u.role, u.full_name, u.email, u.branch_id
                  FROM user_sessions s
                  JOIN users u ON s.user_id = u.id
-                 WHERE s.session_token = ? AND s.expires_at > NOW() AND u.status = 'active'`,
+                 WHERE s.token_hash = LOWER(SHA2(?, 256)) AND s.expires_at > NOW() AND u.status = 'active'`,
                 [token]
             );
 
@@ -326,7 +326,7 @@ async function getUserPermissions(req, res) {
             `SELECT s.*, u.id as user_id, u.role, u.full_name
              FROM user_sessions s
              JOIN users u ON s.user_id = u.id
-             WHERE s.session_token = ? AND s.expires_at > NOW()`,
+             WHERE s.token_hash = LOWER(SHA2(?, 256)) AND s.expires_at > NOW()`,
             [token]
         );
 

@@ -566,7 +566,7 @@ router.get('/registrations/:id/offer-letter', async (req, res) => {
         const [sessions] = await pool.query(
             `SELECT s.*, u.id as user_id, u.role FROM user_sessions s
              JOIN users u ON s.user_id = u.id
-             WHERE s.session_token = ? AND s.expires_at > NOW() AND u.status = 'active'`,
+             WHERE s.token_hash = LOWER(SHA2(?, 256)) AND s.expires_at > NOW() AND u.status = 'active'`,
             [token]
         );
         if (sessions.length === 0) {
