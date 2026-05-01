@@ -20,6 +20,7 @@ const notificationService = require('../services/notification-service');
 const { generatePainterEstimatePDF } = require('./painter-estimate-pdf-generator');
 const attendanceService = require('../services/painter-attendance-service');
 const { idempotent, setPool: setIdempotencyPool } = require('../middleware/idempotency');
+const { otpLimiter } = require('../middleware/rateLimiter');
 
 let pool;
 let io;
@@ -198,9 +199,10 @@ router.post('/register', async (req, res) => {
         }
 
         let myReferralCode = pointsEngine.generateReferralCode(full_name);
-        const [codeCheck] = await pool.query('SELECT id FROM painters WHERE referral_code = ?', [myReferralCode]);
-        if (codeCheck.length > 0) {
-            myReferralCode = pointsEngine.generateReferralCode(full_name) + Math.floor(Math.random() * 10);
+        for (let attempt = 0; attempt < 5; attempt++) {
+            const [codeCheck] = await pool.query('SELECT id FROM painters WHERE referral_code = ?', [myReferralCode]);
+            if (codeCheck.length === 0) break;
+            myReferralCode = pointsEngine.generateReferralCode(full_name) + Math.floor(Math.random() * 100);
         }
 
         let referredBy = null;
@@ -250,7 +252,7 @@ router.post('/register', async (req, res) => {
 });
 
 // Send OTP
-router.post('/send-otp', async (req, res) => {
+router.post('/send-otp', otpLimiter, async (req, res) => {
     try {
         const { phone } = req.body;
         if (!phone) return res.status(400).json({ success: false, message: 'Phone is required' });
@@ -273,7 +275,9 @@ router.post('/send-otp', async (req, res) => {
         );
 
         // Send OTP via SMS (primary) + WhatsApp (secondary)
-        console.log(`[Painter OTP] Phone: ${phone}, OTP: ${otp}`);
+        if (process.env.NODE_ENV !== 'production') {
+            console.log(`[Painter OTP] Phone: ${phone}, OTP: ${otp}`);
+        }
 
         if (!isTestAccount) {
             // 1. SMS — always send (reliable)
@@ -317,7 +321,7 @@ router.post('/send-otp', async (req, res) => {
 });
 
 // Verify OTP
-router.post('/verify-otp', async (req, res) => {
+router.post('/verify-otp', otpLimiter, async (req, res) => {
     try {
         const { phone, otp } = req.body;
         if (!phone || !otp) return res.status(400).json({ success: false, message: 'Phone and OTP are required' });
@@ -1130,21 +1134,23 @@ router.get('/me/checkin-history', requirePainterAuth, async (req, res) => {
 // ═══════════════════════════════════════════
 
 // Helper: generate estimate number PE + YYYYMMDD + 4-digit seq
+// Atomic: uses painter_estimate_sequence row-lock so concurrent requests can't collide.
 async function generateEstimateNumber() {
     const now = new Date();
     const y = now.getFullYear();
     const m = String(now.getMonth() + 1).padStart(2, '0');
     const d = String(now.getDate()).padStart(2, '0');
     const prefix = `PE${y}${m}${d}`;
-    const [rows] = await pool.query(
-        "SELECT estimate_number FROM painter_estimates WHERE estimate_number LIKE ? ORDER BY id DESC LIMIT 1",
-        [prefix + '%']
+    await pool.query(
+        `INSERT INTO painter_estimate_sequence (date_prefix, last_seq) VALUES (?, 1)
+         ON DUPLICATE KEY UPDATE last_seq = last_seq + 1`,
+        [prefix]
     );
-    let seq = 1;
-    if (rows.length) {
-        const last = rows[0].estimate_number;
-        seq = parseInt(last.substring(prefix.length)) + 1;
-    }
+    const [rows] = await pool.query(
+        'SELECT last_seq FROM painter_estimate_sequence WHERE date_prefix = ?',
+        [prefix]
+    );
+    const seq = rows.length ? parseInt(rows[0].last_seq) : 1;
     return prefix + String(seq).padStart(4, '0');
 }
 
@@ -4831,8 +4837,11 @@ router.post('/estimates/:estimateId/push-zoho', requirePermission('painters', 'e
         if ((estimate.points_awarded || 0) === 0) {
             try {
                 const invoiceForPoints = {
-                    invoice_id: invoiceId,
-                    invoice_number: invoiceNumber,
+                    // Canonical dedup key for estimate-originated invoices.
+                    // Matches the confirm-payment path so a retried push-to-zoho
+                    // can't double-award points if confirm-payment partially succeeded.
+                    invoice_id: `EST-${estimate.id}`,
+                    invoice_number: invoiceNumber || estimate.estimate_number || `EST-${estimate.id}`,
                     date: new Date().toISOString().split('T')[0],
                     total: parseFloat(estimate.grand_total),
                     line_items: items.map(i => ({
@@ -5368,10 +5377,12 @@ router.get('/me/leaderboard', requirePainterAuth, async (req, res) => {
         }
 
         const [leaderboard] = await pool.query(
-            `SELECT p.id, p.full_name, p.profile_photo, p.total_lifetime_points,
-                    COALESCE(SUM(pt.points), 0) as month_points
+            `SELECT p.id, p.full_name, p.profile_photo,
+                    (COALESCE(p.total_earned_regular, 0) + COALESCE(p.total_earned_annual, 0)) AS total_lifetime_points,
+                    COALESCE(SUM(pt.amount), 0) as month_points
              FROM painters p
              LEFT JOIN painter_point_transactions pt ON pt.painter_id = p.id
+                AND pt.type = 'earn'
                 AND pt.created_at >= ? AND pt.created_at <= ?
              WHERE p.status = 'approved'${branchFilter}
              GROUP BY p.id
@@ -5382,7 +5393,7 @@ router.get('/me/leaderboard', requirePainterAuth, async (req, res) => {
 
         // Calculate levels and ranks
         const ranked = leaderboard.map((entry, idx) => {
-            const lp = entry.total_lifetime_points || 0;
+            const lp = parseFloat(entry.total_lifetime_points) || 0;
             let lvl = 'bronze';
             if (lp >= 10000) lvl = 'diamond';
             else if (lp >= 5000) lvl = 'gold';
@@ -5395,16 +5406,16 @@ router.get('/me/leaderboard', requirePainterAuth, async (req, res) => {
         if (!myRank) {
             // Painter not in top 20, calculate their rank
             const [myPoints] = await pool.query(
-                `SELECT COALESCE(SUM(points), 0) as month_points FROM painter_point_transactions
-                 WHERE painter_id = ? AND created_at >= ? AND created_at <= ?`,
+                `SELECT COALESCE(SUM(amount), 0) as month_points FROM painter_point_transactions
+                 WHERE painter_id = ? AND type = 'earn' AND created_at >= ? AND created_at <= ?`,
                 [req.painter.id, monthStart, monthEnd]
             );
             const mp = myPoints[0].month_points;
             const [rankResult] = await pool.query(
                 `SELECT COUNT(*) + 1 as rank FROM (
-                    SELECT painter_id, SUM(points) as total
+                    SELECT painter_id, SUM(amount) as total
                     FROM painter_point_transactions
-                    WHERE created_at >= ? AND created_at <= ?
+                    WHERE type = 'earn' AND created_at >= ? AND created_at <= ?
                     GROUP BY painter_id
                     HAVING total > ?
                 ) ranked`,
@@ -5446,24 +5457,30 @@ router.post('/me/challenges/:id/claim', requirePainterAuth, async (req, res) => 
             return res.status(400).json({ success: false, message: 'Reward already claimed' });
         }
 
-        // Award points to regular pool
-        await pool.query(
-            `INSERT INTO painter_point_transactions (painter_id, amount, pool, type, description, reference_id, created_at)
-             VALUES (?, ?, 'regular', 'challenge_reward', ?, ?, NOW())`,
-            [req.painter.id, challenge.reward_points, `Challenge reward: ${challenge.title}`, `challenge-${challengeId}`]
-        );
-
-        // Update regular balance
-        await pool.query(
-            'UPDATE painters SET regular_points = regular_points + ? WHERE id = ?',
-            [challenge.reward_points, req.painter.id]
-        );
-
-        // Mark as claimed
-        await pool.query(
-            'UPDATE painter_challenge_progress SET claimed = 1, claimed_at = NOW() WHERE challenge_id = ? AND painter_id = ?',
+        // Atomic claim: rejects concurrent duplicate clicks (idempotent at DB level)
+        const [claimRes] = await pool.query(
+            'UPDATE painter_challenge_progress SET claimed = 1, claimed_at = NOW() WHERE challenge_id = ? AND painter_id = ? AND claimed = 0',
             [challengeId, req.painter.id]
         );
+        if (claimRes.affectedRows === 0) {
+            return res.status(400).json({ success: false, message: 'Reward already claimed' });
+        }
+
+        // Award via Points Engine: applies level multiplier, clawback netting,
+        // total_earned_regular update, and level-up notification.
+        try {
+            await pointsEngine.addPointsWithMultiplier(
+                req.painter.id, 'regular', parseFloat(challenge.reward_points), 'challenge_reward',
+                `challenge-${challengeId}`, 'challenge', `Challenge reward: ${challenge.title}`, null
+            );
+        } catch (awardErr) {
+            // Roll back claim so painter can retry.
+            await pool.query(
+                'UPDATE painter_challenge_progress SET claimed = 0, claimed_at = NULL WHERE challenge_id = ? AND painter_id = ?',
+                [challengeId, req.painter.id]
+            );
+            throw awardErr;
+        }
 
         res.json({ success: true, message: `Claimed ${challenge.reward_points} points!`, points: challenge.reward_points });
     } catch (error) {
@@ -5842,7 +5859,7 @@ router.post('/me/location-report', requirePainterAuth, async (req, res) => {
         // Emit live update to admin map room
         if (io) {
             const [[painter]] = await pool.query(
-                'SELECT p.name, p.level, b.name AS branch FROM painters p LEFT JOIN branches b ON b.id = p.branch_id WHERE p.id = ?',
+                'SELECT p.full_name AS name, p.level, b.name AS branch FROM painters p LEFT JOIN branches b ON b.id = p.branch_id WHERE p.id = ?',
                 [painterId]
             );
             io.to('admin_painters_live').emit('painter_location_update', {
@@ -5869,7 +5886,7 @@ router.post('/me/location-report', requirePainterAuth, async (req, res) => {
 router.get('/locations/live', requireAuth, requirePermission('painters', 'view'), async (req, res) => {
     try {
         const [online] = await pool.query(`
-            SELECT ple.painter_id, p.name, p.level, b.name AS branch,
+            SELECT ple.painter_id, p.full_name AS name, p.level, b.name AS branch,
                    ple.latitude, ple.longitude, ple.accuracy_m, ple.recorded_at,
                    TIMESTAMPDIFF(SECOND, ple.recorded_at, NOW()) AS seconds_ago,
                    'online' AS status
@@ -5882,11 +5899,11 @@ router.get('/locations/live', requireAuth, requirePermission('painters', 'view')
             ) latest_online ON latest_online.painter_id = ple.painter_id AND latest_online.latest = ple.recorded_at
             JOIN painters p ON p.id = ple.painter_id
             LEFT JOIN branches b ON b.id = p.branch_id
-            ORDER BY p.name
+            ORDER BY p.full_name
         `);
 
         const [offline] = await pool.query(`
-            SELECT ple.painter_id, p.name, p.level, b.name AS branch,
+            SELECT ple.painter_id, p.full_name AS name, p.level, b.name AS branch,
                    ple.latitude, ple.longitude, ple.accuracy_m, ple.recorded_at,
                    TIMESTAMPDIFF(SECOND, ple.recorded_at, NOW()) AS seconds_ago,
                    'offline' AS status
@@ -5902,7 +5919,7 @@ router.get('/locations/live', requireAuth, requirePermission('painters', 'view')
             ) latest_offline ON latest_offline.painter_id = ple.painter_id AND latest_offline.latest = ple.recorded_at
             JOIN painters p ON p.id = ple.painter_id
             LEFT JOIN branches b ON b.id = p.branch_id
-            ORDER BY p.name
+            ORDER BY p.full_name
         `);
 
         res.json({ success: true, locations: [...online, ...offline] });

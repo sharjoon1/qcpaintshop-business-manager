@@ -251,9 +251,9 @@ async function processInvoice(painterId, invoice, billingType, createdBy) {
             invoice.invoice_id, 'invoice', `Invoice ${invoice.invoice_number || invoice.invoice_id}`, createdBy);
     }
 
-    // Award daily bonus points if applicable
+    // Award daily bonus points if applicable (apply level multiplier so Gold/Diamond painters keep their tier bonus)
     if (dailyBonusPoints > 0) {
-        await addPoints(painterId, 'regular', dailyBonusPoints, 'daily_bonus',
+        await addPointsWithMultiplier(painterId, 'regular', dailyBonusPoints, 'daily_bonus',
             invoice.invoice_id, 'invoice', 'Daily bonus product multiplier', createdBy);
     }
 
@@ -509,6 +509,15 @@ async function processWithdrawal(withdrawalId, action, adminId, paymentRef, note
 // ═══════════════════════════════════════════
 
 async function awardAttendancePoints(painterId, attendanceId) {
+    // Idempotency guard: skip if a transaction for this attendance already exists.
+    // Prevents double-credit if the caller (admin attendance recorder, cron retry, etc.) fires twice.
+    const [existing] = await pool.query(
+        `SELECT id FROM painter_point_transactions
+         WHERE painter_id = ? AND source = 'attendance' AND reference_id = ? LIMIT 1`,
+        [painterId, String(attendanceId)]
+    );
+    if (existing.length) return 0;
+
     const [config] = await pool.query("SELECT config_value FROM ai_config WHERE config_key = 'painter_attendance_points'");
     const points = config.length ? parseFloat(config[0].config_value) : 5;
 
