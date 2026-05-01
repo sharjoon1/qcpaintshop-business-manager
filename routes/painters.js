@@ -262,9 +262,10 @@ router.post('/send-otp', otpLimiter, async (req, res) => {
 
         const painter = painters[0];
 
-        // Play Store test account — fixed OTP bypass (no WhatsApp needed)
-        const isTestAccount = (phone === '9999999999' || phone === '+919999999999');
-        const otp = isTestAccount ? '123456' : String(Math.floor(100000 + Math.random() * 900000));
+        // Play Store test account — fixed OTP bypass, never honored in production
+        const allowTestBypass = process.env.NODE_ENV !== 'production';
+        const isTestAccount = allowTestBypass && (phone === '9999999999' || phone === '+919999999999');
+        const otp = isTestAccount ? '123456' : String(crypto.randomInt(100000, 1000000));
         const token = crypto.randomBytes(32).toString('hex');
 
         await pool.query('DELETE FROM painter_sessions WHERE painter_id = ? AND expires_at < NOW()', [painter.id]);
@@ -282,7 +283,7 @@ router.post('/send-otp', otpLimiter, async (req, res) => {
         if (!isTestAccount) {
             // 1. SMS — always send (reliable)
             if (process.env.SMS_USER && process.env.SMS_PASSWORD) {
-                const http = require('http');
+                const https = require('https');
                 const querystring = require('querystring');
                 // Must use DLT-registered template (same as customer OTP)
                 const smsText = `Your verification OTP for Quality Colours registration is ${otp}. Please enter this code at https://qcpaintshop.com/ to complete setup. - QUALITY COLOURS.`;
@@ -295,7 +296,7 @@ router.post('/send-otp', otpLimiter, async (req, res) => {
                     number: cleanPhone.startsWith('91') ? cleanPhone : '91' + cleanPhone,
                     text: smsText, route: '4'
                 });
-                http.get(`http://retailsms.nettyfish.com/api/mt/SendSMS?${smsParams}`, (smsRes) => {
+                https.get(`https://retailsms.nettyfish.com/api/mt/SendSMS?${smsParams}`, (smsRes) => {
                     let data = '';
                     smsRes.on('data', chunk => { data += chunk; });
                     smsRes.on('end', () => console.log(`[Painter OTP] SMS response for ${phone}:`, data));

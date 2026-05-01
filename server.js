@@ -66,6 +66,7 @@ const adminNotificationsRoutes = require('./routes/admin-notifications');
 const billingRoutes = require('./routes/billing');
 const vendorRoutes = require('./routes/vendors');
 const painterScheduler = require('./services/painter-scheduler');
+const dataRetentionService = require('./services/data-retention-service');
 const leadReminderScheduler = require('./services/lead-reminder-scheduler');
 const leadAutoAssignScheduler = require('./services/lead-auto-assign-scheduler');
 const appMetadataCollector = require('./services/app-metadata-collector');
@@ -114,6 +115,14 @@ console.error = function(...args) {
 // ========================================
 // MIDDLEWARE SETUP
 // ========================================
+
+// Helmet sets security headers (X-Content-Type-Options, X-Frame-Options, etc.).
+// CSP is intentionally disabled here — it is configured separately once the
+// Tailwind CDN migration is complete (see chore/upgrade-2026-05-01 Task 6).
+app.use(require('helmet')({ contentSecurityPolicy: false }));
+
+// gzip / br response compression for /api/*
+app.use(require('compression')());
 
 // CORS: fail-safe — never fall back to wildcard
 const allowedOrigins = (() => {
@@ -244,6 +253,7 @@ billingRoutes.setPool(pool);
 billingRoutes.setPointsEngine(require('./services/painter-points-engine'));
 vendorRoutes.setPool(pool);
 painterScheduler.setPool(pool);
+dataRetentionService.setPool(pool);
 leadAutoAssignScheduler.setPool(pool);
 leadReminderScheduler.init(pool, notificationService);
 aiScheduler.setSessionManager(whatsappSessionManager);
@@ -581,31 +591,40 @@ app.post('/api/auth/forgot-password', authLimiter, async (req, res) => {
         message: 'If an account exists with this email, a password reset link has been sent.'
     };
 
-    try {
-        const { email } = req.body || {};
-        if (!email || typeof email !== 'string') {
-            return res.status(400).json({ success: false, message: 'Email is required.' });
-        }
+    const { email } = req.body || {};
+    if (!email || typeof email !== 'string') {
+        return res.status(400).json({ success: false, message: 'Email is required.' });
+    }
 
-        const [users] = await pool.query(
-            'SELECT id, full_name, username, email FROM users WHERE email = ? AND status = ?',
-            [email, 'active']
-        );
-        if (users.length === 0) return res.json(genericResponse);
+    // Respond identically before doing any DB lookup or SMTP work so the
+    // response time can't be used to enumerate which emails are registered.
+    res.json(genericResponse);
 
-        const user = users[0];
+    const requestIp = req.ip;
+    const requestUa = (req.get('User-Agent') || '').slice(0, 255);
 
-        const rawToken = crypto.randomBytes(32).toString('hex');
-        const tokenHash = crypto.createHash('sha256').update(rawToken).digest('hex');
-        const expiresAt = new Date(Date.now() + 60 * 60 * 1000); // 1 hour
+    setImmediate(async () => {
+        try {
+            const [users] = await pool.query(
+                'SELECT id, full_name, username, email FROM users WHERE email = ? AND status = ?',
+                [email, 'active']
+            );
+            if (users.length === 0) return;
 
-        await pool.query(
-            `INSERT INTO password_reset_tokens (user_id, token_hash, expires_at, requested_ip, requested_ua)
-             VALUES (?, ?, ?, ?, ?)`,
-            [user.id, tokenHash, expiresAt, req.ip, (req.get('User-Agent') || '').slice(0, 255)]
-        );
+            const user = users[0];
 
-        if (process.env.SMTP_HOST) {
+            const rawToken = crypto.randomBytes(32).toString('hex');
+            const tokenHash = crypto.createHash('sha256').update(rawToken).digest('hex');
+            const expiresAt = new Date(Date.now() + 60 * 60 * 1000); // 1 hour
+
+            await pool.query(
+                `INSERT INTO password_reset_tokens (user_id, token_hash, expires_at, requested_ip, requested_ua)
+                 VALUES (?, ?, ?, ?, ?)`,
+                [user.id, tokenHash, expiresAt, requestIp, requestUa]
+            );
+
+            if (!process.env.SMTP_HOST) return;
+
             const baseUrl = process.env.APP_PUBLIC_URL || 'https://act.qcpaintshop.com';
             const resetLink = `${baseUrl}/reset-password.html?token=${rawToken}`;
 
@@ -640,13 +659,10 @@ app.post('/api/auth/forgot-password', authLimiter, async (req, res) => {
                     </div>
                 `
             });
+        } catch (error) {
+            console.error('Forgot password background error:', error.message);
         }
-
-        res.json(genericResponse);
-    } catch (error) {
-        console.error('Forgot password error:', error);
-        res.json(genericResponse); // never leak existence/state
-    }
+    });
 });
 
 // Validate a reset token without consuming it (used by the reset page on load)
@@ -782,7 +798,7 @@ app.post('/api/otp/send', otpLimiter, async (req, res) => {
             [mobile, purpose]
         );
 
-        const otpCode = String(Math.floor(100000 + Math.random() * 900000));
+        const otpCode = String(crypto.randomInt(100000, 1000000));
         const expiresAt = new Date(Date.now() + 5 * 60 * 1000);
 
         const [result] = await pool.query(
@@ -792,7 +808,7 @@ app.post('/api/otp/send', otpLimiter, async (req, res) => {
 
         // Send SMS via configured provider (DLT-registered templates)
         if (process.env.SMS_USER && process.env.SMS_PASSWORD) {
-            const http = require('http');
+            const https = require('https');
             const querystring = require('querystring');
 
             // DLT-registered template (single verified template for all OTP purposes)
@@ -810,9 +826,9 @@ app.post('/api/otp/send', otpLimiter, async (req, res) => {
                 route: '4'
             });
 
-            const smsUrl = `http://retailsms.nettyfish.com/api/mt/SendSMS?${params}`;
+            const smsUrl = `https://retailsms.nettyfish.com/api/mt/SendSMS?${params}`;
 
-            http.get(smsUrl, (smsRes) => {
+            https.get(smsUrl, (smsRes) => {
                 let data = '';
                 smsRes.on('data', chunk => { data += chunk; });
                 smsRes.on('end', () => {
@@ -957,7 +973,7 @@ app.post('/api/otp/resend', otpLimiter, async (req, res) => {
             [mobile, purpose]
         );
 
-        const otpCode = String(Math.floor(100000 + Math.random() * 900000));
+        const otpCode = String(crypto.randomInt(100000, 1000000));
         const expiresAt = new Date(Date.now() + 5 * 60 * 1000);
 
         const [result] = await pool.query(
@@ -967,7 +983,7 @@ app.post('/api/otp/resend', otpLimiter, async (req, res) => {
 
         // Send SMS (DLT-registered templates)
         if (process.env.SMS_USER && process.env.SMS_PASSWORD) {
-            const http = require('http');
+            const https = require('https');
             const querystring = require('querystring');
 
             // DLT-registered template (single verified template for all OTP purposes)
@@ -980,7 +996,7 @@ app.post('/api/otp/resend', otpLimiter, async (req, res) => {
                 channel: 'Trans', DCS: '0', flashsms: '0',
                 number: '91' + mobile, text: message, route: '4'
             });
-            http.get(`http://retailsms.nettyfish.com/api/mt/SendSMS?${params}`, (smsRes) => {
+            https.get(`https://retailsms.nettyfish.com/api/mt/SendSMS?${params}`, (smsRes) => {
                 let data = '';
                 smsRes.on('data', chunk => { data += chunk; });
                 smsRes.on('end', () => { console.log('[SMS] Resend response:', data); });
@@ -3143,7 +3159,7 @@ app.post('/api/products/bulk-delete', requirePermission('products', 'delete'), a
 
 // Customer OTP uses DB (otp_verifications table) so OTPs survive server restarts
 
-app.post('/api/customer/auth/send-otp', async (req, res) => {
+app.post('/api/customer/auth/send-otp', otpLimiter, async (req, res) => {
     try {
         const { phone } = req.body;
         if (!phone || !/^[6-9]\d{9}$/.test(phone)) {
@@ -3180,7 +3196,7 @@ app.post('/api/customer/auth/send-otp', async (req, res) => {
         );
 
         // Generate 6-digit OTP and store in DB
-        const otp = String(Math.floor(100000 + Math.random() * 900000));
+        const otp = String(crypto.randomInt(100000, 1000000));
         const expiresAt = new Date(Date.now() + 5 * 60 * 1000);
         await pool.query(
             'INSERT INTO otp_verifications (phone, otp, purpose, expires_at) VALUES (?, ?, ?, ?)',
@@ -3191,7 +3207,7 @@ app.post('/api/customer/auth/send-otp', async (req, res) => {
         console.log(`[Customer OTP] Phone: ${phone}, OTP: ${otp}`);
 
         if (process.env.SMS_USER && process.env.SMS_PASSWORD) {
-            const httpModule = require('http');
+            const httpsModule = require('https');
             const querystring = require('querystring');
 
             const message = `Your verification OTP for Quality Colours registration is ${otp}. Please enter this code at https://qcpaintshop.com/ to complete setup. - QUALITY COLOURS.`;
@@ -3208,9 +3224,9 @@ app.post('/api/customer/auth/send-otp', async (req, res) => {
                 route: '4'
             });
 
-            const smsUrl = `http://retailsms.nettyfish.com/api/mt/SendSMS?${params}`;
+            const smsUrl = `https://retailsms.nettyfish.com/api/mt/SendSMS?${params}`;
 
-            httpModule.get(smsUrl, (smsRes) => {
+            httpsModule.get(smsUrl, (smsRes) => {
                 let data = '';
                 smsRes.on('data', chunk => { data += chunk; });
                 smsRes.on('end', () => {
@@ -3228,7 +3244,7 @@ app.post('/api/customer/auth/send-otp', async (req, res) => {
     }
 });
 
-app.post('/api/customer/auth/verify-otp', async (req, res) => {
+app.post('/api/customer/auth/verify-otp', otpLimiter, async (req, res) => {
     try {
         const { phone, otp } = req.body;
         if (!phone || !otp) {
@@ -3910,6 +3926,7 @@ server.listen(PORT, () => {
     syncScheduler.setAutomationRegistry(automationRegistry);
     aiScheduler.setAutomationRegistry(automationRegistry);
     painterScheduler.setAutomationRegistry(automationRegistry);
+    dataRetentionService.setAutomationRegistry(automationRegistry);
     leadAutoAssignScheduler.setAutomationRegistry(automationRegistry);
     autoClockout.setAutomationRegistry(automationRegistry);
     attendanceReport.setAutomationRegistry(automationRegistry);
@@ -4056,6 +4073,7 @@ server.listen(PORT, () => {
         waCampaignEngine.start();
         aiScheduler.start();
         painterScheduler.start();
+        dataRetentionService.start();
         leadAutoAssignScheduler.start();
         console.log('Background services started: sync-scheduler, whatsapp-processor, whatsapp-sessions, wa-campaign-engine, auto-clockout, ai-scheduler, painter-scheduler');
         systemHealthService.startAutoHealthChecks(300000); // every 5 min
