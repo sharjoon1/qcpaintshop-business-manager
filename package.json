@@ -12,7 +12,8 @@
     "test:watch": "jest --watch",
     "test:coverage": "jest --coverage",
     "build:css": "tailwindcss -i ./src/tailwind-input.css -o ./public/css/tailwind.css --minify",
-    "watch:css": "tailwindcss -i ./src/tailwind-input.css -o ./public/css/tailwind.css --watch"
+    "watch:css": "tailwindcss -i ./src/tailwind-input.css -o ./public/css/tailwind.css --watch",
+    "postinstall": "npm run build:css || echo '[postinstall] build:css failed (non-fatal)'"
   },
   "keywords": [],
   "author": "",

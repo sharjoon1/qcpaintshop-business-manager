@@ -116,10 +116,45 @@ console.error = function(...args) {
 // MIDDLEWARE SETUP
 // ========================================
 
-// Helmet sets security headers (X-Content-Type-Options, X-Frame-Options, etc.).
-// CSP is intentionally disabled here — it is configured separately once the
-// Tailwind CDN migration is complete (see chore/upgrade-2026-05-01 Task 6).
-app.use(require('helmet')({ contentSecurityPolicy: false }));
+// Helmet sets security headers (X-Content-Type-Options, X-Frame-Options, etc.)
+// plus a permissive Content-Security-Policy that whitelists the third-party
+// CDNs in active use across the public/ pages. Stricter CSP (drop
+// 'unsafe-inline' / 'unsafe-eval', narrow connect-src) is a follow-up that
+// requires migrating remaining inline-script handlers first.
+app.use(require('helmet')({
+    contentSecurityPolicy: {
+        useDefaults: true,
+        directives: {
+            "default-src": ["'self'"],
+            "script-src": [
+                "'self'", "'unsafe-inline'", "'unsafe-eval'",
+                "https://cdn.jsdelivr.net",
+                "https://cdnjs.cloudflare.com",
+                "https://unpkg.com",
+                "https://cdn.quilljs.com",
+                "https://www.googletagmanager.com",
+                "https://www.youtube.com"
+            ],
+            "style-src": [
+                "'self'", "'unsafe-inline'",
+                "https://fonts.googleapis.com",
+                "https://cdnjs.cloudflare.com",
+                "https://cdn.jsdelivr.net",
+                "https://cdn.quilljs.com",
+                "https://unpkg.com"
+            ],
+            "font-src": ["'self'", "data:", "https://fonts.gstatic.com", "https://cdnjs.cloudflare.com"],
+            "img-src": ["'self'", "data:", "blob:", "https:"],
+            "media-src": ["'self'", "blob:", "https:"],
+            "connect-src": ["'self'", "wss:", "https:"],
+            "frame-src": ["'self'", "https://www.youtube.com", "https://wa.me"],
+            "frame-ancestors": ["'self'"],
+            "object-src": ["'none'"],
+            "base-uri": ["'self'"],
+            "upgrade-insecure-requests": []
+        }
+    }
+}));
 
 // gzip / br response compression for /api/*
 app.use(require('compression')());
