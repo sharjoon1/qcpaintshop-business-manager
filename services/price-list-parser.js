@@ -1134,6 +1134,31 @@ function stripDuplicateSkuPrefix(name, sku) {
     return tokens.join(' ');
 }
 
+// Build the canonical Birla Opus proposed name.
+// Routes to emulsion vs enamel format based on category.
+// Returns null if `sku` or `packFormatted` is empty (caller falls back to base output).
+function buildBirlaName({ sku, pdfProduct, category, packFormatted }) {
+    if (!sku || !packFormatted) return null;
+    const skuU = String(sku).toUpperCase();
+    const brand = 'BIRLA OPUS';
+
+    let body;
+    if (isEnamelCategory(category)) {
+        const { productName, color } = extractEnamelProductAndColor(pdfProduct);
+        const cleanedProduct = stripDuplicateSkuPrefix(productName, skuU);
+        body = color
+            ? `${cleanedProduct} ENAMEL ${color}`
+            : `${cleanedProduct} ENAMEL`;
+    } else {
+        // Emulsion (default): also covers any non-enamel category for now
+        const productName = extractEmulsionProductName(pdfProduct);
+        body = stripDuplicateSkuPrefix(productName, skuU);
+    }
+
+    // Collapse any accidental whitespace runs and assemble final string.
+    return `${skuU} ${body} ${brand} ${packFormatted}`.replace(/\s+/g, ' ').trim();
+}
+
 // ============ MATCH WITH ZOHO ITEMS ============
 function matchWithZohoItems(parsedItems, zohoItems) {
     const matched = [];
@@ -1588,6 +1613,7 @@ module.exports = {
     extractEmulsionProductName,
     extractEnamelProductAndColor,
     stripDuplicateSkuPrefix,
+    buildBirlaName,
     // DPL import helpers
     computeProposedFields,
     brandKeyFromName,
