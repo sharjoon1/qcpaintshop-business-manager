@@ -194,7 +194,7 @@
 
     <!-- Bulk Update Modal -->
     <div id="bulkModal" class="hidden modal-overlay" onclick="closeBulkModalBackdrop(event)">
-        <div class="bg-white rounded-lg shadow-xl max-w-lg w-full max-h-[90vh] overflow-y-auto" onclick="event.stopPropagation()">
+        <div class="bg-white rounded-lg shadow-xl max-w-lg w-full max-h-[90vh] overflow-y-auto modal-safe-pb" onclick="event.stopPropagation()">
             <!-- Modal Header -->
             <div class="sticky top-0 bg-white border-b px-6 py-4 flex justify-between items-center z-10">
                 <h3 class="text-lg font-bold text-gray-800">Bulk Update Items</h3>
@@ -510,7 +510,7 @@
             // Prev button
             html += '<button onclick="goToPage(' + (currentPage - 1) + ')" ' +
                     (currentPage <= 1 ? 'disabled' : '') +
-                    ' class="px-3 py-1.5 rounded-lg text-sm font-medium transition ' +
+                    ' class="px-3 py-1.5 pag-mob rounded-lg text-sm font-medium transition' +
                     (currentPage <= 1 ? 'bg-gray-100 text-gray-400 cursor-not-allowed' : 'bg-white border border-gray-300 text-gray-700 hover:bg-gray-50') +
                     '">Prev</button>';
 
@@ -519,7 +519,7 @@
             var endPage = Math.min(totalPages, currentPage + 2);
 
             if (startPage > 1) {
-                html += '<button onclick="goToPage(1)" class="px-3 py-1.5 rounded-lg text-sm font-medium bg-white border border-gray-300 text-gray-700 hover:bg-gray-50 transition">1</button>';
+                html += '<button onclick="goToPage(1)" class="px-3 py-1.5 pag-mob rounded-lg text-sm font-medium bg-white border border-gray-300 text-gray-700 hover:bg-gray-50 transition">1</button>';
                 if (startPage > 2) {
                     html += '<span class="px-2 text-gray-400">...</span>';
                 }
@@ -527,9 +527,9 @@
 
             for (var i = startPage; i <= endPage; i++) {
                 if (i === currentPage) {
-                    html += '<button class="px-3 py-1.5 rounded-lg text-sm font-medium bg-indigo-600 text-white">' + i + '</button>';
+                    html += '<button class="px-3 py-1.5 pag-mob rounded-lg text-sm font-medium bg-indigo-600 text-white">' + i + '</button>';
                 } else {
-                    html += '<button onclick="goToPage(' + i + ')" class="px-3 py-1.5 rounded-lg text-sm font-medium bg-white border border-gray-300 text-gray-700 hover:bg-gray-50 transition">' + i + '</button>';
+                    html += '<button onclick="goToPage(' + i + ')" class="px-3 py-1.5 pag-mob rounded-lg text-sm font-medium bg-white border border-gray-300 text-gray-700 hover:bg-gray-50 transition">' + i + '</button>';
                 }
             }
 
@@ -537,13 +537,13 @@
                 if (endPage < totalPages - 1) {
                     html += '<span class="px-2 text-gray-400">...</span>';
                 }
-                html += '<button onclick="goToPage(' + totalPages + ')" class="px-3 py-1.5 rounded-lg text-sm font-medium bg-white border border-gray-300 text-gray-700 hover:bg-gray-50 transition">' + totalPages + '</button>';
+                html += '<button onclick="goToPage(' + totalPages + ')" class="px-3 py-1.5 pag-mob rounded-lg text-sm font-medium bg-white border border-gray-300 text-gray-700 hover:bg-gray-50 transition">' + totalPages + '</button>';
             }
 
             // Next button
             html += '<button onclick="goToPage(' + (currentPage + 1) + ')" ' +
                     (currentPage >= totalPages ? 'disabled' : '') +
-                    ' class="px-3 py-1.5 rounded-lg text-sm font-medium transition ' +
+                    ' class="px-3 py-1.5 pag-mob rounded-lg text-sm font-medium transition' +
                     (currentPage >= totalPages ? 'bg-gray-100 text-gray-400 cursor-not-allowed' : 'bg-white border border-gray-300 text-gray-700 hover:bg-gray-50') +
                     '">Next</button>';
 

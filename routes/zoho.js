@@ -329,7 +329,8 @@ router.get('/dashboard/drilldown', requirePermission('zoho', 'view'), async (req
                     total: counts.total,
                     page: parseInt(page),
                     limit: parseInt(limit),
-                    pages: Math.ceil(counts.total / parseInt(limit))
+                    pages: Math.ceil(counts.total / parseInt(limit)),
+                    totalPages: Math.ceil(counts.total / parseInt(limit))
                 },
                 summary: { total_amount: counts.total_amount, count: counts.total }
             });
@@ -371,7 +372,8 @@ router.get('/dashboard/drilldown', requirePermission('zoho', 'view'), async (req
                     total: counts.total,
                     page: parseInt(page),
                     limit: parseInt(limit),
-                    pages: Math.ceil(counts.total / parseInt(limit))
+                    pages: Math.ceil(counts.total / parseInt(limit)),
+                    totalPages: Math.ceil(counts.total / parseInt(limit))
                 },
                 summary: { total_amount: counts.total_amount, count: counts.total }
             });
@@ -701,14 +703,24 @@ router.get('/invoices', requirePermission('zoho', 'invoices'), async (req, res) 
             LIMIT ? OFFSET ?
         `, [...params, parseInt(limit), offset]);
 
+        const [statsRows] = await pool.query(
+            `SELECT COUNT(*) AS total,
+             SUM(CASE WHEN status='paid' THEN 1 ELSE 0 END) AS paid,
+             SUM(CASE WHEN status='sent' THEN 1 ELSE 0 END) AS sent,
+             SUM(CASE WHEN status='overdue' THEN 1 ELSE 0 END) AS overdue,
+             SUM(CASE WHEN status='partially_paid' THEN 1 ELSE 0 END) AS partially_paid
+             FROM zoho_invoices zi ${where}`, params);
+
         res.json({
             success: true,
             data: invoices,
+            stats: statsRows[0],
             pagination: {
                 total,
                 page: parseInt(page),
                 limit: parseInt(limit),
-                pages: Math.ceil(total / parseInt(limit))
+                pages: Math.ceil(total / parseInt(limit)),
+                totalPages: Math.ceil(total / parseInt(limit))
             }
         });
     } catch (error) {
@@ -805,7 +817,8 @@ router.get('/payments', requirePermission('zoho', 'view'), async (req, res) => {
                 total,
                 page: parseInt(page),
                 limit: parseInt(limit),
-                pages: Math.ceil(total / parseInt(limit))
+                pages: Math.ceil(total / parseInt(limit)),
+                totalPages: Math.ceil(total / parseInt(limit))
             }
         });
     } catch (error) {
@@ -886,7 +899,7 @@ router.get('/customers', requirePermission('zoho', 'view'), async (req, res) => 
         res.json({
             success: true,
             data: customers,
-            pagination: { total, page: parseInt(page), limit: parseInt(limit), pages: Math.ceil(total / parseInt(limit)) }
+            pagination: { total, page: parseInt(page), limit: parseInt(limit), pages: Math.ceil(total / parseInt(limit)), totalPages: Math.ceil(total / parseInt(limit)) }
         });
     } catch (error) {
         res.status(500).json({ success: false, message: error.message });
@@ -1010,7 +1023,14 @@ router.get('/config', requirePermission('zoho', 'manage'), async (req, res) => {
             ORDER BY zc.config_key
         `);
 
-        res.json({ success: true, data: config });
+        const maskedConfig = config.map(row => {
+            if (row.config_key === 'whatsapp_api_key') {
+                const { config_value, ...rest } = row;
+                return { ...rest, is_set: !!config_value };
+            }
+            return row;
+        });
+        res.json({ success: true, data: maskedConfig });
     } catch (error) {
         res.status(500).json({ success: false, message: error.message });
     }
@@ -1503,7 +1523,7 @@ router.get('/stock/by-location', requirePermission('zoho', 'view'), async (req, 
         res.json({
             success: true,
             data: rows,
-            pagination: { total, page: parseInt(page), limit: parseInt(limit), pages: Math.ceil(total / parseInt(limit)) }
+            pagination: { total, page: parseInt(page), limit: parseInt(limit), pages: Math.ceil(total / parseInt(limit)), totalPages: Math.ceil(total / parseInt(limit)) }
         });
     } catch (error) {
         res.status(500).json({ success: false, message: error.message });
@@ -1547,7 +1567,7 @@ router.get('/stock/history', requirePermission('zoho', 'view'), async (req, res)
         res.json({
             success: true,
             data: rows,
-            pagination: { total, page: parseInt(page), limit: parseInt(limit), pages: Math.ceil(total / parseInt(limit)) }
+            pagination: { total, page: parseInt(page), limit: parseInt(limit), pages: Math.ceil(total / parseInt(limit)), totalPages: Math.ceil(total / parseInt(limit)) }
         });
     } catch (error) {
         res.status(500).json({ success: false, message: error.message });
@@ -1643,6 +1663,19 @@ router.post('/inventory-adjustments', requirePermission('zoho', 'manage'), async
 
         // Zoho API uses location_id, not warehouse_id - accept either for backward compat
         const zohoLocationId = location_id || warehouse_id;
+
+        // D8 — Branch isolation: non-admins can only adjust stock for their own branch
+        const _zRole = (req.user && req.user.role || '').toLowerCase();
+        const _zIsAdmin = ['admin','administrator','super_admin'].includes(_zRole);
+        if (req.user && !_zIsAdmin && req.user.branch_id && zohoLocationId) {
+            const [locRows] = await pool.query(
+                `SELECT local_branch_id FROM zoho_locations_map WHERE zoho_location_id = ? LIMIT 1`,
+                [zohoLocationId]
+            );
+            if (locRows.length > 0 && locRows[0].local_branch_id && locRows[0].local_branch_id !== req.user.branch_id) {
+                return res.status(403).json({ success: false, message: 'You can only adjust stock for your own branch' });
+            }
+        }
 
         const adjustmentData = {
             adjustment_type,
@@ -1774,7 +1807,7 @@ router.get('/items', requirePermission('zoho', 'view'), async (req, res) => {
         res.json({
             success: true,
             data: items,
-            pagination: { total, page: parseInt(page), limit: parseInt(limit), pages: Math.ceil(total / parseInt(limit)) }
+            pagination: { total, page: parseInt(page), limit: parseInt(limit), pages: Math.ceil(total / parseInt(limit)), totalPages: Math.ceil(total / parseInt(limit)) }
         });
     } catch (error) {
         res.status(500).json({ success: false, message: error.message });
@@ -2643,7 +2676,8 @@ router.post('/items/bulk-edit', requirePermission('zoho', 'manage'), async (req,
             label_rate: 'zoho_label_rate',
             unit: 'zoho_unit', hsn_or_sac: 'zoho_hsn_or_sac',
             tax_percentage: 'zoho_tax_percentage', brand: 'zoho_brand',
-            category_name: 'zoho_category_name', manufacturer: 'zoho_manufacturer',
+            category_name: 'zoho_category_name', category: 'zoho_category_name',
+            manufacturer: 'zoho_manufacturer',
             reorder_level: 'zoho_reorder_level', description: 'zoho_description',
             cf_product_name: 'zoho_cf_product_name', status: 'zoho_status'
         };
@@ -2825,7 +2859,7 @@ router.get('/transactions/daily', requirePermission('zoho', 'view'), async (req,
         res.json({
             success: true,
             data: transactions,
-            pagination: { total, page: parseInt(page), limit: parseInt(limit), pages: Math.ceil(total / parseInt(limit)) }
+            pagination: { total, page: parseInt(page), limit: parseInt(limit), pages: Math.ceil(total / parseInt(limit)), totalPages: Math.ceil(total / parseInt(limit)) }
         });
     } catch (error) {
         res.status(500).json({ success: false, message: error.message });
@@ -2979,7 +3013,7 @@ router.get('/reorder/config', requirePermission('zoho', 'view'), branchScope, as
         res.json({
             success: true,
             data: configs,
-            pagination: { total, page: parseInt(page), limit: parseInt(limit), pages: Math.ceil(total / parseInt(limit)) }
+            pagination: { total, page: parseInt(page), limit: parseInt(limit), pages: Math.ceil(total / parseInt(limit)), totalPages: Math.ceil(total / parseInt(limit)) }
         });
     } catch (error) {
         res.status(500).json({ success: false, message: error.message });
@@ -3601,6 +3635,13 @@ router.get('/purchase-suggestions/branch-allocations', requirePermission('zoho',
 router.put('/purchase-suggestions/branch-allocations', requirePermission('zoho', 'reorder'), async (req, res) => {
     try {
         const { allocations } = req.body;
+        if (!Array.isArray(allocations) || allocations.length === 0) {
+            return res.status(400).json({ success: false, message: 'allocations array required' });
+        }
+        const sum = allocations.reduce((s, a) => s + parseFloat(a.percentage || 0), 0);
+        if (Math.abs(sum - 100) > 0.1) {
+            return res.status(400).json({ success: false, message: `Allocations must sum to 100% (currently ${sum.toFixed(1)}%)` });
+        }
         const result = await purchaseSuggestion.updateBranchAllocations(allocations);
         res.json({ success: true, data: result });
     } catch (error) {
@@ -3939,7 +3980,7 @@ router.get('/reorder/vendor-mapping', requirePermission('zoho', 'reorder'), asyn
         res.json({
             success: true,
             data: rows,
-            pagination: { total, page, limit, pages: Math.ceil(total / limit) }
+            pagination: { total, page, limit, pages: Math.ceil(total / limit), totalPages: Math.ceil(total / limit) }
         });
     } catch (e) {
         console.error('[VendorMapping][list]', e);
@@ -4218,6 +4259,7 @@ router.post('/reorder/create-po', requirePermission('zoho', 'reorder'), async (r
  */
 const { uploadPriceList } = require('../config/uploads');
 const priceListParser = require('../services/price-list-parser');
+const http = require('http');
 
 router.post('/items/parse-price-list', requirePermission('zoho', 'manage'), uploadPriceList.single('pdf'), async (req, res) => {
     try {
@@ -4230,7 +4272,9 @@ router.post('/items/parse-price-list', requirePermission('zoho', 'manage'), uplo
         // If requested, match against existing Zoho items
         if (req.body.match !== 'false') {
             const [zohoItems] = await pool.query(
-                `SELECT zoho_item_id, zoho_item_name AS name, zoho_sku AS sku, zoho_rate AS rate, zoho_cf_dpl AS cf_dpl, zoho_unit AS unit, zoho_brand AS brand
+                `SELECT zoho_item_id, zoho_item_name AS name, zoho_sku AS sku, zoho_rate AS rate,
+                        zoho_cf_dpl AS cf_dpl, zoho_unit AS unit, zoho_brand AS brand,
+                        zoho_category_name AS category, zoho_description AS description
                  FROM zoho_items_map WHERE zoho_status = 'active'`
             );
             const matchResult = priceListParser.matchWithZohoItems(result.items, zohoItems);
@@ -4776,10 +4820,17 @@ router.post('/items/apply-price-list', requirePermission('zoho', 'manage'), asyn
 
         let updated = 0;
         for (const item of items) {
-            if (!item.zoho_item_id || item.cf_dpl === undefined) continue;
+            if (!item.zoho_item_id) continue;
+            const sets = ['dpl_updated_at = NOW()'];
+            const vals = [];
+            if (item.cf_dpl != null)    { sets.push('zoho_cf_dpl = ?');      vals.push(item.cf_dpl); }
+            if (item.name)              { sets.push('zoho_item_name = ?');    vals.push(item.name); }
+            if (item.sku)               { sets.push('zoho_sku = ?');          vals.push(item.sku); }
+            if (item.description != null){ sets.push('zoho_description = ?'); vals.push(item.description); }
+            if (item.rate != null)      { sets.push('zoho_rate = ?');         vals.push(item.rate); }
+            vals.push(item.zoho_item_id);
             const [result] = await pool.query(
-                `UPDATE zoho_items_map SET zoho_cf_dpl = ?, dpl_updated_at = NOW() WHERE zoho_item_id = ?`,
-                [item.cf_dpl, item.zoho_item_id]
+                `UPDATE zoho_items_map SET ${sets.join(', ')} WHERE zoho_item_id = ?`, vals
             );
             if (result.affectedRows > 0) updated++;
         }
@@ -4787,7 +4838,7 @@ router.post('/items/apply-price-list', requirePermission('zoho', 'manage'), asyn
         res.json({
             success: true,
             data: { updated, total: items.length },
-            message: `Updated DPL for ${updated} of ${items.length} items`
+            message: `Updated ${updated} of ${items.length} items`
         });
     } catch (error) {
         res.status(500).json({ success: false, message: error.message });
@@ -4830,6 +4881,586 @@ router.get('/dpl-match-report', requireAuth, async (req, res) => {
         res.json({ success: true, summary, items, generated_at: new Date().toISOString() });
     } catch (err) {
         res.status(500).json({ success: false, error: err.message });
+    }
+});
+
+// ── AI Parse Job Store ────────────────────────────────────────────────────────
+// Background jobs for DPL PDF extraction (avoids 100s proxy timeouts).
+// Jobs expire after 30 min to prevent memory leaks.
+const _aiParseJobs = new Map(); // jobId → { status, data, error, progress, startedAt }
+function _aiParseCleanup() {
+    const cutoff = Date.now() - 30 * 60 * 1000;
+    for (const [id, job] of _aiParseJobs) {
+        if (job.startedAt < cutoff) _aiParseJobs.delete(id);
+    }
+}
+
+// GET /api/zoho/items/ai-parse-job/:id — poll for job result
+router.get('/items/ai-parse-job/:id', requirePermission('zoho', 'manage'), (req, res) => {
+    const job = _aiParseJobs.get(req.params.id);
+    if (!job) return res.status(404).json({ success: false, message: 'Job not found or expired (30 min limit)' });
+    return res.json({ success: true, status: job.status, progress: job.progress, data: job.data || null, error: job.error || null });
+});
+
+/**
+ * POST /api/zoho/items/ai-parse-price-list
+ * Starts a background AI extraction job. Returns { job_id } immediately.
+ * Poll GET /items/ai-parse-job/:id for status ("running" | "done" | "error").
+ */
+router.post('/items/ai-parse-price-list', requirePermission('zoho', 'manage'), uploadPriceList.single('pdf'), async (req, res) => {
+    if (!req.file) {
+        return res.status(400).json({ success: false, message: 'PDF file is required' });
+    }
+
+    // Return job_id immediately so the browser doesn't time out
+    _aiParseCleanup();
+    const crypto = require('crypto');
+    const jobId  = crypto.randomBytes(8).toString('hex');
+    _aiParseJobs.set(jobId, { status: 'running', progress: 'Reading PDF...', startedAt: Date.now() });
+    res.json({ success: true, job_id: jobId });
+
+    // ── Run extraction in background (after response sent) ──────────────────
+    const _pdfBuffer   = req.file.buffer;
+    const _pdfFilename = req.file.originalname || '';
+
+    setImmediate(async () => {
+    try {
+        // ── 1. Extract PDF text ────────────────────────────────────────────
+        const pdfParse = require('pdf-parse');
+        const pdfData  = await pdfParse(_pdfBuffer);
+        const fullText = pdfData.text || '';
+        const pages    = pdfData.numpages || 0;
+        _aiParseJobs.get(jobId).progress = `PDF read (${pages} pages, ${fullText.length} chars). Starting AI extraction...`;
+
+        // ── 2. Detect brand ────────────────────────────────────────────────
+        const detectedBrand = priceListParser.detectBrand(fullText, _pdfFilename);
+
+        // ── 3. Helpers ───────────────────────────────────────────────────────
+        function parseRawJson(raw) {
+            try {
+                let t = (raw || '').trim()
+                    .replace(/^```(?:json)?\s*/i, '').replace(/\s*```\s*$/i, '');
+                const a = t.indexOf('['), b = t.lastIndexOf(']');
+                if (a !== -1 && b > a) t = t.slice(a, b + 1);
+                const arr = JSON.parse(t);
+                return Array.isArray(arr) ? arr : [];
+            } catch { return []; }
+        }
+
+        // Hermes call — single configurable request
+        function callHermes(promptText, maxTok = 16000) {
+            return new Promise((resolve, reject) => {
+                const body = JSON.stringify({
+                    model: 'claude-sonnet-4-6',
+                    messages: [{ role: 'user', content: promptText }],
+                    max_tokens: maxTok,
+                    temperature: 0.1
+                });
+                const options = {
+                    hostname: '127.0.0.1', port: 8317,
+                    path: '/v1/chat/completions', method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': 'Bearer local',
+                        'Content-Length': Buffer.byteLength(body)
+                    }
+                };
+                const req2 = http.request(options, (res2) => {
+                    let data = '';
+                    res2.on('data', c => { data += c; });
+                    res2.on('end', () => {
+                        try {
+                            const parsed = JSON.parse(data);
+                            if (parsed.error) return reject(new Error(parsed.error.message || JSON.stringify(parsed.error)));
+                            resolve(parsed.choices?.[0]?.message?.content || '[]');
+                        } catch (e) { reject(new Error('Hermes parse error: ' + e.message)); }
+                    });
+                });
+                req2.on('error', reject);
+                req2.setTimeout(240000, () => { req2.destroy(); reject(new Error('hermes timeout')); });
+                req2.write(body);
+                req2.end();
+            });
+        }
+
+        // Build the extraction prompt (used for both full-text and per-chunk calls)
+        function buildPrompt(textSection, isFullDoc = true) {
+            return `Extract EVERY product item from this paint brand Dealer Price List PDF${isFullDoc ? '' : ' section'}.
+
+Return ONLY a JSON array — no markdown, no explanation, nothing else:
+[{"p":"PRODUCT NAME","s":"1L","d":189,"c":"EXTERIOR EMULSION"},...]
+
+KEY: p=product name (include variant e.g. "- White", "- Pink"), s=pack size, d=DPL dealer price (NUMBER), c=category
+
+CATEGORY — use the SECTION HEADING from the PDF (the actual paint type, NOT tier like LUXURY/PREMIUM):
+• Interior emulsion / distemper / acrylic  → "INTERIOR EMULSION"
+• Exterior emulsion / weather coat / shield → "EXTERIOR EMULSION"
+• Interior undercoat / primer              → "INTERIOR PRIMER"
+• Exterior primer                          → "EXTERIOR PRIMER"
+• Wood primer / wood sealer                → "WOOD PRIMER"
+• Metal primer / rust guard                → "METAL PRIMER"
+• Metal & wood primer                      → "METAL & WOOD PRIMER"
+• Putty / wall putty                       → "WALL PUTTY"
+• Waterproofing / damp proof               → "WATERPROOFING"
+• Wood polish / PU / varnish / lacquer     → "WOOD FINISH"
+• Enamel / synthetic enamel                → "ENAMEL"
+• Distemper                                → "DISTEMPER"
+• Construction chemicals / admixture       → "CONSTRUCTION CHEMICALS"
+• Colorant / tint                          → "COLORANT"
+
+PACK SIZES: "1L","4L","9L","10L","18L","20L","500ml","200ml","1Kg","4Kg","20Kg","1No","0.9L"
+
+RULES:
+1. Each product × each pack size = ONE separate row (e.g. 1L, 4L, 10L, 20L = 4 rows)
+2. d = DPL/dealer/trade price (SMALLER number). NOT MRP/customer price (larger number)
+3. Extract ALL product families: ONE, CALISTA, ALLWOOD, SPARKLE, PROTEK, STYLE, ALLGUARD, VEGA, CSWT, ALLOVER, OPUS, etc.
+4. Skip: company name lines, column headers ("Base Code / Name..."), page numbers, footnotes
+5. If a product has multiple base variants (White, Pastel, Base 1, Base 2) — include all variants as separate rows with their own prices
+6. Section headings in the PDF tell you the category — track the current section carefully
+
+PDF TEXT:
+${textSection}`;
+        }
+
+        // ── 4. Strategy A: Traditional regex parser (Birla Opus format) ──────
+        // Fast, deterministic — catches products AI might miss due to unusual formatting.
+        // Returns items with _prices arrays; we convert to individual rows.
+        const tradDebug = { items: 0, error: null };
+        const tradRawItems = [];
+        try {
+            const parseFn = priceListParser.parseBirlaOpus || (() => []);
+            const rawTrad = parseFn(fullText);
+            // Map tier-based categories to real paint categories
+            const TIER_TO_CAT = {
+                LUXURY: 'INTERIOR EMULSION', PREMIUM: 'INTERIOR EMULSION',
+                ECONOMY: 'INTERIOR EMULSION', STANDARD: 'INTERIOR EMULSION',
+                'ULTRA PREMIUM': 'EXTERIOR EMULSION', SPECIALITY: 'INTERIOR EMULSION',
+                DESIGNER: 'INTERIOR EMULSION', UNDERCOATS: 'INTERIOR PRIMER',
+                OTHERS: ''
+            };
+            // Typical Birla Opus ascending pack sizes for mapping _prices
+            const TYPICAL_PACKS = ['200ml', '0.9L', '1L', '4L', '9L', '10L', '18L', '20L'];
+            for (const item of rawTrad) {
+                const cat = TIER_TO_CAT[item.category] || item.category || '';
+                if (Array.isArray(item._prices) && item._prices.length > 0) {
+                    const sorted = item._prices.slice().sort((a, b) => a - b);
+                    sorted.forEach((price, i) => {
+                        tradRawItems.push({ p: item.product, s: TYPICAL_PACKS[Math.min(i + 2, TYPICAL_PACKS.length - 1)], d: price, c: cat });
+                    });
+                } else if (item.dpl) {
+                    tradRawItems.push({ p: item.product, s: item.packSize || '?', d: item.dpl, c: cat });
+                }
+            }
+            tradDebug.items = tradRawItems.length;
+        } catch (e) {
+            tradDebug.error = e.message;
+        }
+
+        // ── 5. Strategy B: AI extraction — single call if text fits ──────────
+        // Claude 200K context; even a 300-page DPL PDF is typically < 150K chars.
+        const SINGLE_CALL_MAX = 140000; // chars — safe limit for one Claude call
+        const LARGE_CHUNK_SIZE = 70000; // chars per chunk when PDF is too large
+        const LARGE_CHUNK_OVERLAP = 3000;
+
+        const aiRawItems = [];
+        const extractionDebug = [];
+
+        if (fullText.length <= SINGLE_CALL_MAX) {
+            // ── SINGLE FULL-TEXT CALL (preferred) ────────────────────────────
+            _aiParseJobs.get(jobId).progress = `Sending full PDF text to AI (${fullText.length} chars, single call)...`;
+            try {
+                const raw = await callHermes(buildPrompt(fullText, true), 32000);
+                const parsed = parseRawJson(raw);
+                extractionDebug.push({ method: 'single-full-text', chars: fullText.length, extracted: parsed.length });
+                aiRawItems.push(...parsed);
+                _aiParseJobs.get(jobId).progress = `AI extracted ${parsed.length} items. Matching with Zoho...`;
+            } catch (e) {
+                extractionDebug.push({ method: 'single-full-text', error: e.message });
+                _aiParseJobs.get(jobId).progress = `AI error: ${e.message}. Using traditional parser...`;
+            }
+        } else {
+            // ── LARGE-CHUNK FALLBACK: 70K chars with 3K overlap ──────────────
+            const bigChunks = [];
+            for (let i = 0; i < fullText.length; i += LARGE_CHUNK_SIZE - LARGE_CHUNK_OVERLAP) {
+                bigChunks.push(fullText.slice(i, i + LARGE_CHUNK_SIZE));
+                if (i + LARGE_CHUNK_SIZE >= fullText.length) break;
+            }
+            for (let i = 0; i < bigChunks.length; i++) {
+                _aiParseJobs.get(jobId).progress = `Processing chunk ${i+1}/${bigChunks.length}...`;
+                try {
+                    const raw = await callHermes(buildPrompt(bigChunks[i], false), 16000);
+                    const parsed = parseRawJson(raw);
+                    extractionDebug.push({ method: 'large-chunk', chunk: i + 1, total: bigChunks.length, chars: bigChunks[i].length, extracted: parsed.length });
+                    aiRawItems.push(...parsed);
+                } catch (e) {
+                    extractionDebug.push({ method: 'large-chunk', chunk: i + 1, error: e.message });
+                }
+            }
+        }
+
+        // ── 6. Merge AI + Traditional (AI takes priority, trad fills gaps) ──
+        // Use normalised (product|packSize) key for deduplication.
+        const mergedMap = new Map();
+        const normKey = it =>
+            String(it.p || it.product || '').toUpperCase().replace(/\s+/g, ' ').trim() + '|' +
+            String(it.s || it.packSize || '').toUpperCase().replace(/\s+/g, '').trim();
+
+        for (const it of aiRawItems) {
+            const k = normKey(it);
+            if (k !== '|') mergedMap.set(k, it);
+        }
+        // Traditional items only fill gaps the AI missed
+        for (const it of tradRawItems) {
+            const k = normKey(it);
+            if (k !== '|' && !mergedMap.has(k)) mergedMap.set(k, it);
+        }
+
+        // ── 7. Sanitise merged items ─────────────────────────────────────────
+        // Fix doubled product names from AI extraction:
+        // "One Pure Elegance One Pure Elegance - Mid Tone" → "One Pure Elegance - Mid Tone"
+        function fixDoubledName(name) {
+            // Pattern: "X X - Y" where X is repeated
+            const m = name.match(/^(.+?)\s+\1(\s*-\s*.+)$/i);
+            if (m) return (m[1] + m[2]).replace(/\s{2,}/g, ' ').trim();
+            return name;
+        }
+
+        const cleanItems = [];
+        for (const it of mergedMap.values()) {
+            if (!it || typeof it !== 'object') continue;
+            const product  = fixDoubledName(String(it.p || it.product || '').trim());
+            const packSize = String(it.s || it.packSize || it.pack || '').trim();
+            const dplNum   = parseFloat(it.d != null ? it.d : it.dpl);
+            const category = String(it.c || it.category || '').toUpperCase().trim();
+            if (!product || !packSize || !isFinite(dplNum) || dplNum <= 0) continue;
+            cleanItems.push({ product, packSize, dpl: dplNum, category, brand: detectedBrand });
+        }
+
+        // ── 8. Fetch ALL active Zoho items ───────────────────────────────────
+        const [zohoItems] = await pool.query(
+            `SELECT zoho_item_id, zoho_item_name AS name, zoho_sku AS sku,
+                    zoho_rate AS rate, zoho_cf_dpl AS cf_dpl,
+                    zoho_brand AS brand, zoho_category_name AS category, zoho_description AS description,
+                    dpl_updated_at
+             FROM zoho_items_map
+             WHERE zoho_status = 'active'
+             ORDER BY zoho_item_name ASC`
+        );
+
+        // ── 9. Auto-match ────────────────────────────────────────────────────
+        // Keep brand so matchWithZohoItems can scope to same-brand Zoho items only
+        const cleanItemsForMatch = cleanItems;
+        const matchResult = priceListParser.matchWithZohoItems(cleanItemsForMatch, zohoItems);
+        const matchedByKey = new Map();
+        for (const m of matchResult.matched) {
+            const key = (m.product || '') + '|' + (m.packSize || '');
+            if (!matchedByKey.has(key)) matchedByKey.set(key, m);
+        }
+
+        // ── 10. Build output ─────────────────────────────────────────────────
+        const itemsOut = cleanItems.map(it => {
+            const key = it.product + '|' + it.packSize;
+            const m = matchedByKey.get(key);
+            const out = { product: it.product, packSize: it.packSize, dpl: it.dpl, category: it.category };
+            if (m && m.zoho_item_id) {
+                out.auto_match = {
+                    zoho_item_id:           m.zoho_item_id,
+                    zoho_item_name:         m.zoho_item_name,
+                    proposed_name:          m.proposed_name          || null,
+                    proposed_sku:           m.proposed_sku           || null,
+                    proposed_description:   m.proposed_description   || null,
+                    proposed_rate:          m.proposed_rate          || null,
+                    current_sku:            m.current_sku            || null,
+                    current_description:    m.current_description    || null,
+                    current_rate:           m.currentRate            || null,
+                    current_dpl:            m.currentDpl             || null,
+                    warning:                m._warning               || null
+                };
+            }
+            return out;
+        });
+
+        // Filter Zoho items to same brand so client dropdown doesn't show other-brand items.
+        // Fallback: check item name for brand keywords when the brand column is empty.
+        const pdfBrandNorm = priceListParser.normalizeBrand(detectedBrand || '');
+        const sameBrandZoho = pdfBrandNorm ? zohoItems.filter(z => {
+            let zb = priceListParser.normalizeBrand(z.brand || '');
+            if (!zb) {
+                const nm = (z.name || '').toUpperCase();
+                zb = (nm.includes('BIRLA') || nm.includes('OPUS')) ? 'BIRLAOPUS'
+                   : nm.includes('ASIAN')  ? 'ASIANPAINTS'
+                   : nm.includes('BERGER') ? 'BERGERPAINTS'
+                   : nm.includes('NIPPON') ? 'NIPPON'
+                   : nm.includes('JSW')    ? 'JSW'
+                   : '';
+            }
+            if (!zb) return true; // still unknown brand — keep
+            return zb === pdfBrandNorm || zb.includes(pdfBrandNorm) || pdfBrandNorm.includes(zb);
+        }) : zohoItems;
+
+        const zohoItemsOut = sameBrandZoho.map(z => ({
+            zoho_item_id: z.zoho_item_id,
+            name:    z.name,
+            sku:     z.sku,
+            rate:    parseFloat(z.rate    || 0),
+            cf_dpl:  parseFloat(z.cf_dpl  || 0),
+            category:    z.category    || '',
+            description: z.description || '',
+            brand:       z.brand       || '',
+            dpl_updated_at: z.dpl_updated_at ? new Date(z.dpl_updated_at).toISOString() : null
+        }));
+
+        // ── Store completed result ─────────────────────────────────────────
+        _aiParseJobs.set(jobId, {
+            status: 'done',
+            startedAt: _aiParseJobs.get(jobId)?.startedAt,
+            data: {
+                brand:          detectedBrand || 'unknown',
+                pages,
+                totalExtracted: cleanItems.length,
+                autoMatched:    matchedByKey.size,
+                items:          itemsOut,
+                zohoItems:      zohoItemsOut,
+                ai: {
+                    provider:      'claude/hermes',
+                    model:         'claude-sonnet-4-6',
+                    textLength:    fullText.length,
+                    method:        fullText.length <= SINGLE_CALL_MAX ? 'single-full-text' : 'large-chunks',
+                    aiExtracted:   aiRawItems.length,
+                    tradExtracted: tradDebug.items,
+                    tradError:     tradDebug.error,
+                    extractionDebug
+                }
+            }
+        });
+    } catch (error) {
+        console.error('AI price list parse error:', error);
+        _aiParseJobs.set(jobId, { status: 'error', error: error.message, startedAt: _aiParseJobs.get(jobId)?.startedAt });
+    }
+    }); // end setImmediate
+});
+
+/**
+ * GET /api/zoho/items/propose-naming
+ *
+ * Auto-Propose Naming — reads existing items from DB (no PDF needed) and
+ * applies brand naming rules to generate proposed Name / SKU / Description /
+ * Rate. Returns a review list the frontend uses for bulk approve + push.
+ *
+ * Query params:
+ *   brand — currently only 'birlaopus' is fully supported (default)
+ *
+ * Response: { success, data: { brand, total, withChanges, items: [...] } }
+ */
+router.get('/items/propose-naming', requirePermission('zoho', 'manage'), async (req, res) => {
+    try {
+        const brandKey = String(req.query.brand || 'birlaopus').toLowerCase();
+        if (brandKey !== 'birlaopus') {
+            return res.status(400).json({
+                success: false,
+                message: 'Only brand=birlaopus is supported at this time'
+            });
+        }
+
+        const [rows] = await pool.query(`
+            SELECT zoho_item_id,
+                   zoho_item_name AS name,
+                   zoho_sku       AS sku,
+                   zoho_rate      AS rate,
+                   zoho_cf_dpl    AS cf_dpl,
+                   zoho_brand     AS brand,
+                   zoho_category_name AS category,
+                   zoho_description   AS description
+            FROM zoho_items_map
+            WHERE zoho_status = 'active'
+              AND (zoho_brand IN ('BIRLA OPUS','Birla Opus','BIRLAOPUS')
+                   OR UPPER(REPLACE(zoho_brand,' ',''))='BIRLAOPUS')
+            ORDER BY zoho_item_name ASC
+        `);
+
+        // ─── Helpers (self-contained, mirror price-list-parser semantics) ───
+        const BRAND_DISPLAY = 'BIRLA OPUS';
+
+        // Decode pack code suffix (e.g. "04", "20", "50M", "01K") to canonical
+        // pack size like "4L", "20L", "500ml", "1Kg". Returns null if unparseable.
+        function decodePackCode(pc) {
+            if (!pc) return null;
+            const s = String(pc).toUpperCase().trim();
+            const ml = s.match(/^(\d{1,2})M$/);          // "20M"→200ml, "50M"→500ml
+            if (ml) return (parseInt(ml[1], 10) * 10) + 'ml';
+            const kg = s.match(/^(\d{1,2})K$/);          // "01K"→1Kg, "20K"→20Kg
+            if (kg) return parseInt(kg[1], 10) + 'Kg';
+            const lt = s.match(/^(\d{1,3})$/);           // "01"→1L, "20"→20L
+            if (lt) return parseInt(lt[1], 10) + 'L';
+            return null;
+        }
+
+        // Format pack size for the display tail in item names.
+        // "1L"→"01 L", "4L"→"04 L", "10L"→"10 L", "500ml"→"500 ML", "1Kg"→"01 KG"
+        function formatPackDisplay(packSize) {
+            if (!packSize) return null;
+            const s = String(packSize).toUpperCase().replace(/\s+/g, '');
+            const ml = s.match(/^(\d+(?:\.\d+)?)ML$/);
+            if (ml) return ml[1] + ' ML';
+            const lt = s.match(/^(\d+(?:\.\d+)?)(L|LT|LTR|LITRE|LITER|LITRES)?$/);
+            if (lt) {
+                const n = parseFloat(lt[1]);
+                const i = Math.floor(n);
+                return (i < 10 ? '0' + i : String(i)) + ' L';
+            }
+            const kg = s.match(/^(\d+(?:\.\d+)?)KG$/);
+            if (kg) {
+                const n = parseFloat(kg[1]);
+                const i = Math.floor(n);
+                return (i < 10 ? '0' + i : String(i)) + ' KG';
+            }
+            return null;
+        }
+
+        // Split SKU into letter prefix + numeric/letter suffix.
+        // "PFP04"   → { abbrev: "PFP",   packCode: "04"  }
+        // "CSTBLK01"→ { abbrev: "CSTBLK",packCode: "01"  }
+        // "AWMLS50M"→ { abbrev: "AWMLS", packCode: "50M" }
+        // "OPWF01K" → { abbrev: "OPWF",  packCode: "01K" }
+        function splitSku(sku) {
+            if (!sku) return { abbrev: null, packCode: null };
+            const s = String(sku).toUpperCase().trim();
+            const m = s.match(/^([A-Z]+)(\d{1,3}[A-Z]?)$/);
+            if (!m) return { abbrev: null, packCode: null };
+            return { abbrev: m[1], packCode: m[2] };
+        }
+
+        // Extract the human product-name portion from an existing item name.
+        // Strips: 1) leading SKU token, 2) trailing brand+pack tail.
+        // "PFP04 STYLE PRO FRESH PRIMER BIRLA OPUS 04 L" → "STYLE PRO FRESH PRIMER"
+        // "OPWF01 ALLWOOD WOOD FILLER OPUS 01 KG"        → "ALLWOOD WOOD FILLER"
+        function extractProductName(name, abbrev, packCode) {
+            if (!name) return '';
+            let n = String(name).toUpperCase().trim().replace(/\s+/g, ' ');
+
+            // 1) Strip leading SKU token (e.g. "PFP04 ")
+            if (abbrev && packCode) {
+                const skuTok = abbrev + packCode;
+                if (n.startsWith(skuTok + ' ')) {
+                    n = n.slice(skuTok.length + 1).trim();
+                } else if (n.startsWith(skuTok)) {
+                    n = n.slice(skuTok.length).trim();
+                }
+            }
+
+            // 2) Strip trailing brand + pack tail. Try most specific first.
+            //    Patterns: " BIRLA OPUS 04 L", " OPUS 04 L", " 04 L", " BIRLA OPUS 500 ML", " 01 KG"
+            const tailPatterns = [
+                /\s+BIRLA\s+OPUS\s+\d{1,3}\s*(?:L|ML|KG)\s*$/i,
+                /\s+OPUS\s+\d{1,3}\s*(?:L|ML|KG)\s*$/i,
+                /\s+BIRLA\s+OPUS\s*$/i,
+                /\s+OPUS\s*$/i,
+                /\s+\d{1,3}\s*(?:L|ML|KG)\s*$/i
+            ];
+            for (const re of tailPatterns) {
+                if (re.test(n)) { n = n.replace(re, '').trim(); break; }
+            }
+
+            return n.replace(/\s+/g, ' ').trim();
+        }
+
+        // Strip noisy tokens like brand or "BIRLA OPUS" out of a category for
+        // the description tail. Birla Opus categories are mostly clean already
+        // ("INTERIOR PRIMER", "EXTERIOR EMULSION") so just upper-case + collapse.
+        function categoryShort(cat) {
+            return String(cat || '').toUpperCase().replace(/\s+/g, ' ').trim();
+        }
+
+        let withChanges = 0;
+        const items = rows.map(r => {
+            const currentName        = r.name        || '';
+            const currentSku         = r.sku         || '';
+            const currentDescription = r.description || '';
+            const currentRate        = r.rate != null ? parseFloat(r.rate) : null;
+            const currentDpl         = r.cf_dpl != null ? parseFloat(r.cf_dpl) : null;
+
+            const out = {
+                zoho_item_id: r.zoho_item_id,
+                current_name: currentName,
+                current_sku: currentSku,
+                current_description: currentDescription,
+                current_rate: currentRate,
+                current_dpl: currentDpl,
+                proposed_name: null,
+                proposed_sku: null,
+                proposed_description: null,
+                proposed_rate: null,
+                has_changes: false,
+                skip_reason: null
+            };
+
+            if (!currentSku || !currentSku.trim()) {
+                out.skip_reason = 'blank SKU';
+                return out;
+            }
+
+            const { abbrev, packCode } = splitSku(currentSku);
+            if (!abbrev || !packCode) {
+                out.skip_reason = 'unparseable SKU (no abbrev/packCode split)';
+                return out;
+            }
+
+            const decodedSize = decodePackCode(packCode);
+            if (!decodedSize) {
+                out.skip_reason = `pack code "${packCode}" can't be decoded`;
+                return out;
+            }
+
+            const packFmt = formatPackDisplay(decodedSize);
+            if (!packFmt) {
+                out.skip_reason = `pack format failed for "${decodedSize}"`;
+                return out;
+            }
+
+            const productName = extractProductName(currentName, abbrev, packCode);
+            if (!productName) {
+                out.skip_reason = 'product name extraction yielded empty string';
+                return out;
+            }
+
+            const proposedSku  = (abbrev + packCode).toUpperCase();
+            const proposedName = `${proposedSku} ${productName} ${BRAND_DISPLAY} ${packFmt}`;
+            const catShort     = categoryShort(r.category);
+            const proposedDesc = `${abbrev} ${catShort} ${BRAND_DISPLAY} ${packFmt}`
+                .replace(/\s+/g, ' ').trim();
+            const proposedRate = (currentDpl && currentDpl > 0)
+                ? Math.ceil(currentDpl * 1.18 * 1.10)
+                : null;
+
+            out.proposed_sku  = proposedSku;
+            out.proposed_name = proposedName;
+            out.proposed_description = proposedDesc;
+            out.proposed_rate = proposedRate;
+
+            const nameDiff = proposedName !== currentName.trim();
+            const skuDiff  = proposedSku  !== currentSku.trim().toUpperCase();
+            const descDiff = proposedDesc !== currentDescription.trim();
+            const rateDiff = proposedRate != null && currentRate != null &&
+                Math.abs(proposedRate - currentRate) >= 0.01;
+
+            out.has_changes = nameDiff || skuDiff || descDiff || rateDiff;
+            if (out.has_changes) withChanges++;
+
+            return out;
+        });
+
+        res.json({
+            success: true,
+            data: {
+                brand: brandKey,
+                total: items.length,
+                withChanges,
+                items
+            }
+        });
+    } catch (error) {
+        console.error('Auto-propose naming error:', error);
+        res.status(500).json({ success: false, message: error.message });
     }
 });
 

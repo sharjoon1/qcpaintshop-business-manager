@@ -67,3 +67,6 @@ data/*.db
 
 # SSL challenge
 public/.well-known/
+
+# Temp APK / build artifacts (delivered via Telegram, not git)
+public/temp/

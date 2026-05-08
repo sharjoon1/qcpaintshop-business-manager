@@ -131,8 +131,10 @@ function parseBirlaOpus(text) {
     const lines = text.split('\n').map(l => l.trim()).filter(l => l);
 
     let currentProduct = '';
-    let currentCategory = '';
+    let currentMainCategory = ''; // e.g. "Interior Emulsions", "Exterior Emulsions", "Enamel"
+    let currentSubCategory  = ''; // e.g. "PREMIUM", "LUXURY", "ECONOMY"
     let sizeHeaders = []; // e.g., ['200 ML', '0.9L', '1L', '3.6L', '4L', '9L', '10L', '18L', '20L']
+    let expectMainCat = false;   // true right after a section-number line
 
     for (let i = 0; i < lines.length; i++) {
         const line = lines[i];
@@ -144,13 +146,28 @@ function parseBirlaOpus(text) {
             line.includes('Note:') || line.includes('E.g.,') ||
             line.includes('All samplers') || line.includes('*Available only')) continue;
 
-        // Category header: "01", "02", "Interior Category", "Exterior Category"
-        const catMatch = line.match(/^(\d{2})\s*$/) || line.match(/^(Interior|Exterior)\s+Category\s*$/i);
-        if (catMatch) continue;
+        // Section number: "01", "02", … signals that the next content line is the main category
+        if (line.match(/^(\d{2})\s*$/)) { expectMainCat = true; continue; }
 
-        // Sub-category: LUXURY, PREMIUM, ECONOMY etc.
-        if (line.match(/^(LUXURY|PREMIUM|ECONOMY|STANDARD|ULTRA PREMIUM|SPECIALITY|DESIGNER|UNDERCOATS|OTHERS)\s*$/i)) {
-            currentCategory = line.trim();
+        // Sub-category tier: LUXURY, PREMIUM, ECONOMY etc.
+        if (line.match(/^(LUXURY|PREMIUM|ECONOMY|STANDARD|ULTRA\s+PREMIUM|SPECIALITY|DESIGNER|UNDERCOATS|OTHERS|SUPER\s+PREMIUM|ECONOMY\s+PLUS)\s*$/i)) {
+            currentSubCategory = line.trim().toUpperCase();
+            expectMainCat = false;
+            continue;
+        }
+
+        // Main category line (immediately after a section number)
+        if (expectMainCat) {
+            currentMainCategory = line.trim();
+            currentSubCategory  = '';
+            expectMainCat = false;
+            continue;
+        }
+
+        // Legacy "Interior/Exterior Category" header — treat as main category reset
+        if (line.match(/^(Interior|Exterior)\s+Category\s*$/i)) {
+            currentMainCategory = line.trim();
+            currentSubCategory  = '';
             continue;
         }
 
@@ -210,12 +227,15 @@ function parseBirlaOpus(text) {
             // let the matcher use Zoho's actual SKUs/rates as ground truth to assign
             // prices to sizes by ascending rate-ratio.
             if (prices.length > 0) {
+                const fullCat = currentMainCategory
+                    ? (currentSubCategory ? currentMainCategory + ' - ' + currentSubCategory : currentMainCategory)
+                    : currentSubCategory;
                 results.push({
                     brand: 'Birla Opus',
                     product: currentProduct + ' - ' + baseName,
                     _prices: prices,
                     baseCode: dataMatch[1],
-                    category: currentCategory
+                    category: fullCat
                 });
             }
             continue;
@@ -732,6 +752,7 @@ function cleanZohoName(name) {
         const tok = tokens[i];
         // Drop up to first 2 leading SKU-like tokens (e.g., "OP05" or "OP01 ODE99")
         if (kept.length === 0 && i < 2 && /^[A-Z]{1,4}\d{1,5}[A-Z]*$/.test(tok)) continue;
+        if (kept.length === 0 && /^[A-Z]{2,6}WT$/.test(tok)) continue; // drop WT-base SKU prefix (e.g. "ECWT" after "ECWT01")
         if (noiseWords.has(tok)) continue;
         if (/^\d+(?:\.\d+)?$/.test(tok)) continue;         // pure numeric (pack sizes)
         if (/^\d+ML$/.test(tok)) continue;                  // "200ML"
@@ -781,6 +802,94 @@ function packCodeToSize(pc) {
     const lMatch = s.match(/^(\d+)$/);
     if (lMatch) return parseInt(lMatch[1], 10) + 'L';             // 01 → 1L, 20 → 20L
     return s;
+}
+
+// Format pack size for canonical display in item names: "4L"→"04 L", "500ml"→"500 ML", "20Kg"→"20 KG"
+function formatPackDisplay(packSize) {
+    const s = String(packSize || '').toUpperCase().replace(/\s+/g, '');
+    const ml = s.match(/^(\d+(?:\.\d+)?)ML$/);
+    if (ml) return ml[1] + ' ML';
+    const lt = s.match(/^(\d+(?:\.\d+)?)(L|LT|LTR|LITRE|LITER|LITRES)?$/);
+    if (lt) {
+        const n = parseFloat(lt[1]);
+        const int = Math.floor(n);
+        return (int < 10 ? '0' + int : String(int)) + ' L';
+    }
+    const kg = s.match(/^(\d+(?:\.\d+)?)KG$/);
+    if (kg) {
+        const n = parseFloat(kg[1]);
+        const int = Math.floor(n);
+        return (int < 10 ? '0' + int : String(int)) + ' KG';
+    }
+    return packSize;
+}
+
+// Extract leading alphabetic prefix from a SKU: "PFP04"→"PFP", "CSTBLK01"→"CSTBLK", "PE04"→"PE"
+function extractSkuPrefix(sku) {
+    const m = String(sku || '').toUpperCase().match(/^([A-Z]+)/);
+    return m ? m[1] : null;
+}
+
+const BRAND_DISPLAY_NAMES = {
+    birlaopus: 'BIRLA OPUS',
+    'berger-xp': 'BERGER PAINTS',
+    'berger-nonxp': 'BERGER PAINTS',
+    asian: 'ASIAN PAINTS',
+    nippon: 'NIPPON PAINT',
+    jsw: 'JSW PAINTS',
+    gem: 'GEM PAINTS'
+};
+
+// Map normalized brand name to internal brand key
+function brandKeyFromName(brandName) {
+    const n = normalizeBrand(brandName);
+    if (n.includes('BIRLA') || n === 'OPUS' || n === 'BIRLAOPUS') return 'birlaopus';
+    if (n.includes('BERGER') && (n.includes('XP') || n.includes('EXPRESSPAINTS'))) return 'berger-xp';
+    if (n.includes('BERGER')) return 'berger-nonxp';
+    if (n.includes('ASIAN')) return 'asian';
+    if (n.includes('NIPPON')) return 'nippon';
+    if (n.includes('JSW')) return 'jsw';
+    if (n.includes('GEM') || n.includes('ASTRAL')) return 'gem';
+    return null;
+}
+
+// Compute proposed Name / SKU / Description / Rate based on brand naming rules.
+// Selling Price rule (all brands): ceil(DPL × 1.18 × 1.10)
+// Birla Opus name rule: [ABBREV+PACKCODE] PRODUCT BIRLA OPUS PACK_FORMATTED
+function computeProposedFields(pdfItem, zohoItem, brandKey) {
+    const dpl = parseFloat(pdfItem.dpl || 0);
+    const proposedRate = dpl > 0 ? Math.ceil(dpl * 1.18 * 1.10) : null;
+
+    const currentSku  = String(zohoItem.sku  || '').trim();
+    const currentDesc = String(zohoItem.description || '').trim();
+    const currentCat  = String(zohoItem.category || '').toUpperCase().trim();
+
+    const base = { proposed_rate: proposedRate, current_sku: currentSku, current_description: currentDesc };
+
+    if (brandKey !== 'birlaopus') return base;
+
+    // SKU prefix = everything except last 2 pack-code chars, preserving base indicator
+    // e.g. "ESWT01"→"ESWT", "ES201"→"ES2", "CS9901"→"CS99"
+    const skuUpper  = currentSku.toUpperCase();
+    const skuPrefix = skuUpper.length > 2 ? skuUpper.slice(0, -2) : null;
+    // Normalize near-equivalent pack sizes (0.9L→1L, 9L→10L…) before encoding
+    const normPack  = normalizeBirlaPackSize(pdfItem.packSize);
+    const packCode  = packSizeToCode(normPack);
+    if (!skuPrefix || !packCode) return base;
+
+    const brandDisplay  = BRAND_DISPLAY_NAMES[brandKey] || 'BIRLA OPUS';
+    const packFormatted = formatPackDisplay(normPack);
+    // Strip base-variant suffix from product name ("Ever Stay - Mid Tone" → "EVER STAY")
+    const productNameBase = String(pdfItem.product || '').split(/\s*-\s*/)[0].toUpperCase().trim();
+    // WT-base items use a second short-code token in name (Birla Opus convention)
+    // e.g. "CSWT01 CSWT STYLE COLOR SMART BIRLA OPUS 01 L"
+    const secondToken = /WT$/i.test(skuPrefix) ? (' ' + skuPrefix) : '';
+
+    const proposedSku  = skuPrefix + packCode;
+    const proposedName = `${proposedSku}${secondToken} ${productNameBase} ${brandDisplay} ${packFormatted}`;
+    const proposedDescription = `${skuPrefix} ${currentCat} ${brandDisplay} ${packFormatted}`.replace(/\s+/g, ' ').trim();
+
+    return { ...base, proposed_name: proposedName, proposed_sku: proposedSku, proposed_description: proposedDescription };
 }
 
 // Normalize a PDF pack-size string to our 2-char pack code.
@@ -856,6 +965,94 @@ function normalizeBrand(b) {
     return String(b || '').toUpperCase().replace(/[^A-Z]/g, '');
 }
 
+// Birla Opus non-standard pack sizes map to canonical sizes for matching:
+// 0.9L or 900ml ≈ 1L, 3.6L ≈ 4L, 9L ≈ 10L, 18L ≈ 20L
+function normalizeBirlaPackSize(sz) {
+    const s = String(sz || '').replace(/\s+/g, '').toUpperCase();
+    const ml = s.match(/^(\d+(?:\.\d+)?)ML$/);
+    if (ml) {
+        const v = parseFloat(ml[1]);
+        if (v >= 800 && v <= 1050) return '1L';
+    }
+    const lt = s.match(/^(\d+(?:\.\d+)?)(L|LT|LTR|LITRES?|LITERS?)?$/i);
+    if (lt) {
+        const n = parseFloat(lt[1]);
+        if (n >= 0.8 && n <= 1.05) return '1L';
+        if (n > 3.0 && n < 4.5) return '4L';
+        if (n > 8.0 && n < 11.0) return '10L';
+        if (n > 16.0 && n <= 20.0) return '20L';
+    }
+    return sz;
+}
+
+// Check if PDF category and Zoho category are compatible for matching.
+// Prevents cross-category false positives (e.g., EXTERIOR vs INTERIOR EMULSION).
+// Returns false only when BOTH sides have a category AND they share no meaningful word.
+function catCompatible(pdfCat, zohoCat) {
+    if (!pdfCat || !zohoCat) return true;
+    const p = String(pdfCat).toUpperCase();
+    const z = String(zohoCat).toUpperCase();
+    if (p === z) return true;
+    // If pdfCat contains a numeric product code (3+ consecutive digits), it's a product-line
+    // name like "ALLDRY WALLNROOF 10 (936003)" — can't reliably gate on this, pass through.
+    if (/\d{3,}/.test(p)) return true;
+    const pIsIntExtCat = /\b(INTERIOR|EXTERIOR)\s+CATEGORY\b/.test(p);
+    // Use word-set matching so "WALLNROOF" doesn't trigger the "WALL" check.
+    const pWordSet = new Set(p.split(/[\s&,\/\-\(\)]+/).filter(w => w.length >= 3));
+    const zWordSet = new Set(z.split(/[\s&,\/\-\(\)]+/).filter(w => w.length >= 3));
+    const MAIN = ['EMULSION','ENAMEL','PRIMER','PUTTY','WOOD','METAL','PAINT','FINISH','COAT','WALL','CEIL','DISTEMPER','DISTEMPAR'];
+    const pHasMain = MAIN.some(w => pWordSet.has(w)) || pIsIntExtCat;
+    if (!pHasMain) return true; // tier-only (PREMIUM/LUXURY) — no gating
+    const zHasMain = MAIN.some(w => zWordSet.has(w));
+    if (!zHasMain) return true;
+    // Interior/Exterior Category (emulsion) must not match Enamel or Distemper items
+    if (pIsIntExtCat && (zWordSet.has('ENAMEL') || zWordSet.has('DISTEMPAR') || zWordSet.has('DISTEMPER'))) return false;
+    const pWords = p.split(/[\s&,\/\-]+/).filter(w => w.length >= 4);
+    const zWords = z.split(/[\s&,\/\-]+/).filter(w => w.length >= 4);
+    return pWords.some(pw => zWords.includes(pw));
+}
+
+// Map a PDF base variant name to the Zoho SKU base key.
+// Birla Opus: White→"WT", Pastel→"1", Mid Tone→"2",
+//   Clear→"99", Organic Yellow→"5", Organic Red→"6"
+// Returns null for unrecognised variant names (no gating applied).
+function emulsionBaseKey(variantName) {
+    const v = String(variantName || '').toUpperCase();
+    if (/\bWHITE\b/.test(v)) return 'WT';
+    if (/\bPASTEL\b/.test(v)) return '1';
+    if (/\bMID[\s-]*TONE\b/.test(v)) return '2';
+    if (/\bCLEAR\b/.test(v)) return '99';
+    if (/ORGANIC[\s-]*YELLOW|\bYELLOW\b/.test(v)) return '5';
+    if (/ORGANIC[\s-]*RED|\bRED\b/.test(v)) return '6';
+    return null;
+}
+
+// Extract the base indicator from a Zoho SKU.
+// "ESWT01"→"WT", "ES101"→"1", "ES9901"→"99", "ES501"→"5"
+function zohoSkuBase(skuInput) {
+    const s = String(skuInput || '').toUpperCase();
+    if (/^[A-Z]{2,5}WT\d{2}$/.test(s)) return 'WT';
+    const m99 = s.match(/^[A-Z]{2,5}(99)\d{2}$/);
+    if (m99) return '99';
+    const md = s.match(/^[A-Z]{2,5}(\d)\d{2}$/);
+    if (md) return md[1];
+    return null;
+}
+
+// Base-variant gate using the "- Variant" suffix in the PDF product name and the
+// base indicator in the Zoho SKU.  Applied regardless of isEmulsion flag because
+// exterior products (e.g. "Exterior Category - Economy") also carry base variants
+// (White/Pastel/Mid Tone) and the category text may not contain "Emulsion".
+function baseVariantCompatible(pdfProduct, zohoSku, isEmulsion) {
+    const variantM = String(pdfProduct || '').match(/\s*-\s*(.+)$/);
+    if (!variantM) return true; // no base suffix in PDF name — no gating
+    const pdfBase = emulsionBaseKey(variantM[1]);
+    if (!pdfBase) return true; // unrecognised variant — no gating
+    const zohoBase = zohoSkuBase(zohoSku);
+    if (!zohoBase) return true; // SKU doesn't encode base — no gating
+    return pdfBase === zohoBase;
+}
+
 // Detect finish/type keyword in a name — so Glossy items don't match Matte items of same family.
 // Returns one of: 'GLOSS' | 'MATTE' | 'SATIN' | 'SEMIGLOSS' | null
 function detectFinish(name) {
@@ -880,8 +1077,18 @@ function matchWithZohoItems(parsedItems, zohoItems) {
     let scopedZoho = zohoItems;
     if (pdfBrandSet.size > 0) {
         scopedZoho = zohoItems.filter(zi => {
-            const zb = normalizeBrand(zi.brand || zi.zoho_brand);
-            if (!zb) return true; // items with no brand on our side — keep (avoid losing good candidates)
+            let zb = normalizeBrand(zi.brand || zi.zoho_brand);
+            if (!zb) {
+                // Fallback: extract brand from item name (e.g. "... BIRLA OPUS 01 L")
+                const nm = (zi.name || zi.zoho_item_name || '').toUpperCase();
+                zb = (nm.includes('BIRLA') || nm.includes('OPUS')) ? 'BIRLAOPUS'
+                   : nm.includes('ASIAN')  ? 'ASIANPAINTS'
+                   : nm.includes('BERGER') ? 'BERGERPAINTS'
+                   : nm.includes('NIPPON') ? 'NIPPON'
+                   : nm.includes('JSW')    ? 'JSW'
+                   : '';
+            }
+            if (!zb) return true; // truly unknown brand — keep to avoid losing candidates
             // Match if any PDF brand's normalized form is contained or equals
             for (const pb of pdfBrandSet) {
                 if (zb === pb || zb.includes(pb) || pb.includes(zb)) return true;
@@ -919,8 +1126,13 @@ function matchWithZohoItems(parsedItems, zohoItems) {
             // Exact abbrev lookup in family index
             const candidates = abbrev ? (zohoFamilyIndex.get(abbrev) || []) : [];
             const family = [];
+            const isEmulExpand = /EMULSION/i.test(p.category || '');
+            const pdfHasShine = /\bSHINE\b/i.test(p.product);
             for (const ent of candidates) {
+                const entHasShine = /\bSHINE\b/i.test(ent.name || '');
+                if (pdfHasShine !== entHasShine) continue;
                 if (pdfFinish && ent.finish && pdfFinish !== ent.finish) continue;
+                if (!baseVariantCompatible(p.product, ent.zi.sku || ent.zi.zoho_sku || '', isEmulExpand)) continue;
                 family.push({ zi: ent.zi, struct: { packCode: ent.packCode }, rate: ent.rate });
             }
 
@@ -936,14 +1148,22 @@ function matchWithZohoItems(parsedItems, zohoItems) {
                 const SERIES_NOISE = new Set([
                     'BIRLA', 'OPUS', 'ASIAN', 'BERGER', 'NIPPON', 'JSW', 'GEM', 'ASTRAL',
                     'PAINT', 'PAINTS', 'BRAND',
-                    'PREMIUM', 'LUXURY', 'ECONOMY', 'STANDARD', 'ULTRA', 'DESIGNER', 'PROFESSIONAL'
+                    'PREMIUM', 'LUXURY', 'ECONOMY', 'STANDARD', 'ULTRA', 'DESIGNER', 'PROFESSIONAL',
+                    'PRIMER', 'ENAMEL', 'EMULSION'
                 ]);
-                const pdfKeywords = extractKeywords(p.product.toUpperCase())
+                const pdfProductBase = p.product.toUpperCase().split(/\s*-\s*/)[0];
+                const pdfKeywords = extractKeywords(pdfProductBase)
                     .filter(w => w.length >= 3 && !/^\d+$/.test(w) && !SERIES_NOISE.has(w));
+                const pCat = (p.category || '').toUpperCase();
+                const isEmulFb = /EMULSION/i.test(pCat);
                 if (pdfKeywords.length >= 2) {
                     const requiredHits = Math.max(2, Math.ceil(pdfKeywords.length * 0.6));
                     const scored = [];
                     for (const zi of scopedZoho) {
+                        // Category gate: skip cross-category mismatches
+                        if (!catCompatible(pCat, zi.category || zi.zoho_category_name || '')) continue;
+                        // Base variant gate: emulsion White must not match non-White Zoho and vice versa
+                        if (!baseVariantCompatible(p.product, zi.sku || zi.zoho_sku || '', isEmulFb)) continue;
                         const nameText = (zi.name || zi.zoho_item_name || '').toUpperCase();
                         const cleaned = cleanZohoName(nameText);
                         let hits = 0;
@@ -980,10 +1200,12 @@ function matchWithZohoItems(parsedItems, zohoItems) {
             }
 
             if (family.length === 0) {
-                unmatched.push({
-                    ...p, dpl: p._prices[0], packSize: '?',
-                    _reject_reason: `No Zoho family found for abbrev ${abbrev || '(unknown)'}`
-                });
+                for (const price of p._prices) {
+                    unmatched.push({
+                        ...p, dpl: price, packSize: '?',
+                        _reject_reason: `No Zoho family found for abbrev ${abbrev || '(unknown)'}`
+                    });
+                }
                 continue;
             }
             // Rate-anchored assignment: smallest price → smallest-rate family member, ascending.
@@ -1077,20 +1299,31 @@ function matchWithZohoItems(parsedItems, zohoItems) {
         // Strategy 0: SKU-structure match — abbrev + pack + optional base + finish
         if (!match) {
             const pdfAbbrev = extractProductAbbrev(parsed.product);
-            const pdfPack = packSizeToCode(parsed.packSize);
+            const pdfPack = packSizeToCode(normalizeBirlaPackSize(parsed.packSize));
             const pdfBase = extractBase(parsed.product, parsed.baseCode);
 
             if (pdfAbbrev && pdfPack) {
+                const pdfCatStr = (parsed.category || '').toUpperCase();
+                const isEmulS0 = /EMULSION/i.test(pdfCatStr);
                 const strictCandidates = [];
                 const looseCandidates = [];
                 for (const ent of zohoBySku) {
                     if (ent.struct.packCode !== pdfPack) continue;
                     // Finish must agree when both specify it
                     if (pdfFinish && ent.finish && pdfFinish !== ent.finish) continue;
+                    // Category must be compatible (e.g. EXTERIOR can't match INTERIOR EMULSION)
+                    if (!catCompatible(pdfCatStr, ent.item.category || ent.item.zoho_category_name || '')) continue;
                     const a = ent.struct.abbrev, b = pdfAbbrev;
-                    const abbrevMatch = a === b || a.startsWith(b) || b.startsWith(a);
+                    // startsWith only allowed when both sides have ≥3 chars (prevents "OP"↔"OPE" cross-match)
+                    const abbrevMatch = a === b ||
+                        (a.length >= 3 && b.length >= 3 && (a.startsWith(b) || b.startsWith(a)));
                     if (!abbrevMatch) continue;
-                    if (pdfBase && ent.struct.base && pdfBase !== ent.struct.base) continue;
+                    // For emulsions: base variant check (White↔non-White segregation)
+                    if (isEmulS0) {
+                        if (!baseVariantCompatible(parsed.product, ent.sku, true)) continue;
+                    } else {
+                        if (pdfBase && ent.struct.base && pdfBase !== ent.struct.base) continue;
+                    }
                     if (a === b && (!pdfBase || !ent.struct.base || pdfBase === ent.struct.base)) {
                         strictCandidates.push(ent.item);
                     } else {
@@ -1100,20 +1333,57 @@ function matchWithZohoItems(parsedItems, zohoItems) {
                 if (strictCandidates.length === 1) match = strictCandidates[0];
                 else if (strictCandidates.length > 1) match = strictCandidates[0];
                 else if (looseCandidates.length === 1) match = looseCandidates[0];
+
+                // Strategy 0b: zohoFamilyIndex fallback — handles cases where the Zoho SKU
+                // abbreviation is shorter than the PDF abbreviation (e.g. "PE" vs "OPE").
+                // The family index is keyed by the PRODUCT NAME abbreviation (not SKU), so
+                // "OPE" finds PE101/PE104/PE110/PE120 even though their SKU abbrev is "PE".
+                if (!match && pdfAbbrev) {
+                    const famEntries = zohoFamilyIndex.get(pdfAbbrev) || [];
+                    const pdfCatStr0b = (parsed.category || '').toUpperCase();
+                    const isEmul0b = /EMULSION/i.test(pdfCatStr0b);
+                    const hits = [];
+                    for (const ent of famEntries) {
+                        if (ent.packCode !== pdfPack) continue;
+                        if (pdfFinish && ent.finish && pdfFinish !== ent.finish) continue;
+                        if (!catCompatible(pdfCatStr0b, ent.zi.category || ent.zi.zoho_category_name || '')) continue;
+                        if (!baseVariantCompatible(parsed.product, ent.zi.sku || ent.zi.zoho_sku || '', isEmul0b)) continue;
+                        hits.push(ent.zi);
+                    }
+                    if (hits.length === 1) match = hits[0];
+                    else if (hits.length > 1) match = hits[0];
+                }
             }
         }
 
-        // Strategy 2: fallback keyword match — finish enforced, minimum score raised
+        // Strategy 2: fallback keyword match — finish + category enforced, minimum score raised
         if (!match) {
-            const keywords = extractKeywords(productName);
+            const keywords = extractKeywords(productName.split(/\s*-\s*/)[0]);
+            const pdfCatStr2 = (parsed.category || '').toUpperCase();
+            // Numeric size from PDF for approximate unit-mismatch matching (e.g. PDF "4L" ↔ Zoho "05 KG")
+            const pPackNumM = (parsed.packSize || '').match(/^(\d+(?:\.\d+)?)/);
+            const pPackNum  = pPackNumM ? parseFloat(pPackNumM[1]) : null;
             let bestScore = 0;
             let bestMatch = null;
             for (const entry of zohoByWords) {
-                // Hard-require pack size to match (not just substring anywhere)
+                // Hard-require pack size to match (not just substring anywhere).
+                // Fallback: approximate numeric match within 25% handles L↔KG unit mismatch.
                 const hasSize = sizePatterns.some(sp => entry.name.includes(sp));
-                if (!hasSize && sizePatterns.length > 0) continue;
+                if (!hasSize && sizePatterns.length > 0) {
+                    const zNumM = entry.name.match(/\b(\d+(?:\.\d+)?)\s*(?:KGS?|L\b|LT\b|LTR\b|ML\b)/i);
+                    const zNum  = zNumM ? parseFloat(zNumM[1]) : null;
+                    const approxOk = pPackNum && zNum && Math.abs(pPackNum - zNum) / Math.max(pPackNum, zNum) <= 0.25;
+                    if (!approxOk) continue;
+                }
                 // Finish must agree when both sides declare it
                 if (pdfFinish && entry.finish && pdfFinish !== entry.finish) continue;
+                // Category gate: skip if categories are incompatible
+                const ziCat = entry.item.category || entry.item.zoho_category_name || '';
+                if (!catCompatible(pdfCatStr2, ziCat)) continue;
+                // Base variant gate: White must not match non-White Zoho items and vice versa
+                if (!baseVariantCompatible(parsed.product, entry.item.sku || entry.item.zoho_sku || '', false)) continue;
+                // SHINE gate: "Product X" must not match "Product X Shine" and vice versa
+                { const ph = /\bSHINE\b/i.test(parsed.product); const zh = /\bSHINE\b/i.test(entry.name); if (ph !== zh) continue; }
                 let score = 0;
                 for (const kw of keywords) if (entry.name.includes(kw)) score++;
                 // Raise the bar: need ≥3 matching keywords (or all if name short) to avoid cross-family leaks
@@ -1132,12 +1402,15 @@ function matchWithZohoItems(parsedItems, zohoItems) {
             // review panel and uncheck before applying.
             const matchRate = parseFloat(match.rate || 0);
             const parsedDpl = parseFloat(parsed.dpl || 0);
+            const brandKey = brandKeyFromName(parsed.brand || '');
+            const proposed = computeProposedFields(parsed, match, brandKey);
             const out = {
                 ...parsed,
                 zoho_item_id: match.zoho_item_id || match.item_id,
                 zoho_item_name: match.name || match.zoho_item_name,
                 currentDpl: match.cf_dpl || match.zoho_cf_dpl,
-                currentRate: match.rate
+                currentRate: match.rate,
+                ...proposed
             };
             if (matchRate >= 100 && parsedDpl > 0 && parsedDpl < matchRate * 0.25) {
                 out._warning = `DPL ₹${parsedDpl} is <25% of rate ₹${matchRate} — verify before applying`;
@@ -1207,12 +1480,22 @@ function normalizeSizeForMatch(packSize) {
         patterns.push(kgMatch[1] + 'KG', kgMatch[1] + ' KG');
     }
 
+    // Birla Opus near-equivalents: 0.9L≈1L, 9L≈10L, 18L≈20L, 3.6L≈4L
+    const normSz = normalizeBirlaPackSize(packSize);
+    if (normSz !== packSize) {
+        for (const p of normalizeSizeForMatch(normSz)) {
+            if (!patterns.includes(p)) patterns.push(p);
+        }
+    }
+
     return patterns;
 }
 
 function extractKeywords(name) {
+    // PRIMER/ENAMEL/EMULSION identify product TYPE, not the specific product — exclude from matching
     const stopWords = new Set(['THE', 'AND', 'FOR', 'WITH', 'FROM', 'THAT', 'YOUR', 'ALL',
-        'PAINTS', 'PAINT', 'BRAND', 'BASE', 'CODE', 'GROUP', '-', 'IN', 'OF', 'A', 'AN']);
+        'PAINTS', 'PAINT', 'BRAND', 'BASE', 'CODE', 'GROUP', '-', 'IN', 'OF', 'A', 'AN',
+        'PRIMER', 'ENAMEL', 'EMULSION']);
     return name.split(/[\s\-()]+/)
         .filter(w => w.length >= 2 && !stopWords.has(w) && !w.match(/^\d+$/))
         .map(w => w.toUpperCase());
@@ -1229,6 +1512,10 @@ module.exports = {
     extractBase,
     detectFinish,
     normalizeBrand,
+    // DPL import helpers
+    computeProposedFields,
+    brandKeyFromName,
+    formatPackDisplay,
     // Export individual parsers for testing
     parseAsian,
     parseBirlaOpus,

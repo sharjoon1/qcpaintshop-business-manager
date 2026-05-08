@@ -199,7 +199,8 @@ async function checkGeoWarnings() {
              JOIN users u ON a.user_id = u.id
              WHERE a.date = ? AND a.clock_out_time IS NULL
                AND a.geo_warning_started_at IS NOT NULL
-               AND a.geo_warning_started_at <= DATE_SUB(NOW(), INTERVAL 5 MINUTE)`,
+               AND a.geo_warning_started_at <= DATE_SUB(NOW(), INTERVAL 5 MINUTE)
+               AND a.geo_warning_started_at >= DATE_SUB(NOW(), INTERVAL 30 MINUTE)`,
             [today]
         );
 
@@ -325,10 +326,11 @@ async function cleanupStaleAttendance() {
         for (const record of staleRecords) {
             try {
                 const clockIn = new Date(record.clock_in_time);
-                // Clock out at the end of that day (10 PM IST)
-                const recordDate = new Date(record.date);
-                const clockOutTime = new Date(recordDate.getTime() + (22 * 60 + 0) * 60 * 1000); // 10 PM on that date
-                // If clock-in was after 10 PM, just add 10 hours
+                // Clock out at the end of that day (10 PM IST = 16:30 UTC).
+                // record.date is a DATE string (e.g. "2026-05-06"). Appending 'T16:30:00.000Z'
+                // gives midnight UTC + 16.5h = 10 PM IST, regardless of server timezone.
+                const clockOutTime = new Date(record.date + 'T16:30:00.000Z');
+                // If clock-in was after 10 PM IST, just add 10 hours
                 const finalClockOut = clockOutTime > clockIn ? clockOutTime : new Date(clockIn.getTime() + 10 * 60 * 60 * 1000);
 
                 const elapsedMinutes = (finalClockOut - clockIn) / 1000 / 60;

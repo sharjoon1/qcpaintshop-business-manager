@@ -39,7 +39,7 @@ function setPool(dbPool) {
 async function requireSalaryVisibility(req, res, next) {
     try {
         const role = req.user?.role;
-        if (role === 'admin' || role === 'super_admin' || role === 'manager' || role === 'accountant') {
+        if (role === 'admin' || role === 'administrator' || role === 'super_admin' || role === 'manager' || role === 'branch_manager' || role === 'accountant') {
             return next();
         }
         const [rows] = await pool.query(
@@ -70,7 +70,7 @@ async function requireSalaryVisibility(req, res, next) {
 router.get('/my-visibility', requireAuth, async (req, res) => {
     try {
         const role = req.user?.role;
-        const adminBypass = role === 'admin' || role === 'super_admin' || role === 'manager' || role === 'accountant';
+        const adminBypass = role === 'admin' || role === 'administrator' || role === 'super_admin' || role === 'manager' || role === 'branch_manager' || role === 'accountant';
         if (adminBypass) return res.json({ success: true, visible: true, reason: 'admin' });
         const [rows] = await pool.query(
             `SELECT salary_visible_to_staff FROM users WHERE id = ? LIMIT 1`,
@@ -1180,55 +1180,42 @@ router.put('/monthly/:id/approve', requireAuth, requirePermission('salary', 'app
  */
 router.put('/monthly/:id/adjustments', requireAuth, requirePermission('salary', 'manage'), async (req, res) => {
     try {
-        const { other_deduction, deduction_notes, other_allowance } = req.body;
-        
+        const {
+            other_deduction, deduction_notes, other_allowance,
+            transport_allowance, food_allowance, overtime_pay, notes
+        } = req.body;
+
         const updates = [];
         const values = [];
-        
-        if (other_deduction !== undefined) {
-            updates.push('other_deduction = ?');
-            values.push(other_deduction);
-        }
-        
-        if (deduction_notes !== undefined) {
-            updates.push('deduction_notes = ?');
-            values.push(deduction_notes);
-        }
-        
-        if (other_allowance !== undefined) {
-            updates.push('other_allowance = ?');
-            values.push(other_allowance);
-        }
-        
+
+        if (transport_allowance !== undefined) { updates.push('transport_allowance = ?'); values.push(parseFloat(transport_allowance) || 0); }
+        if (food_allowance !== undefined)      { updates.push('food_allowance = ?');      values.push(parseFloat(food_allowance) || 0); }
+        if (other_allowance !== undefined)     { updates.push('other_allowance = ?');     values.push(parseFloat(other_allowance) || 0); }
+        if (overtime_pay !== undefined)        { updates.push('overtime_pay = ?');        values.push(parseFloat(overtime_pay) || 0); }
+        if (other_deduction !== undefined)     { updates.push('other_deduction = ?');     values.push(parseFloat(other_deduction) || 0); }
+        if (deduction_notes !== undefined)     { updates.push('deduction_notes = ?');     values.push(deduction_notes); }
+        if (notes !== undefined)               { updates.push('notes = ?');               values.push(notes); }
+
         if (updates.length === 0) {
-            return res.status(400).json({
-                success: false,
-                message: 'No adjustments provided'
-            });
+            return res.status(400).json({ success: false, message: 'No adjustments provided' });
         }
-        
-        // Recalculate totals
+
+        // Recalculate totals (gross/net_salary are GENERATED columns and update automatically)
         updates.push('total_allowances = transport_allowance + food_allowance + other_allowance');
         updates.push('total_deductions = late_deduction + absence_deduction + leave_deduction + other_deduction');
-        
+
         values.push(req.params.id);
-        
+
         await pool.query(
             `UPDATE monthly_salaries SET ${updates.join(', ')} WHERE id = ?`,
             values
         );
-        
-        res.json({
-            success: true,
-            message: 'Adjustments updated successfully'
-        });
-        
+
+        res.json({ success: true, message: 'Adjustments updated successfully' });
+
     } catch (error) {
         console.error('Error updating adjustments:', error);
-        res.status(500).json({
-            success: false,
-            message: 'Failed to update adjustments'
-        });
+        res.status(500).json({ success: false, message: 'Failed to update adjustments' });
     }
 });
 

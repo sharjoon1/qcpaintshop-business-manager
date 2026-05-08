@@ -6037,7 +6037,7 @@ router.post('/:id/activate', async (req, res) => {
                     [adminToken]
                 );
                 if (sessions.length) {
-                    if (sessions[0].role === 'admin') authorized = true;
+                    if (['admin','administrator','super_admin'].includes((sessions[0].role || '').toLowerCase())) authorized = true;
                     else {
                         const [perms] = await pool.query(
                             `SELECT 1 FROM role_permissions rp

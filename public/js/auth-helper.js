@@ -4,6 +4,25 @@
  */
 
 /**
+ * Roles that grant full admin-level access in the dashboard / navigation.
+ * - 'admin' is canonical; 'administrator' is an alias; 'super_admin' is the
+ *   highest tier. Any of these should see the same admin UI.
+ */
+const FULL_ADMIN_ROLES = ['admin', 'administrator', 'super_admin'];
+/**
+ * Roles that get the manager-level dashboard (admin pages + branch dashboard).
+ * Includes full-admin roles plus manager/branch_manager.
+ */
+const ADMIN_LEVEL_ROLES = ['admin', 'administrator', 'super_admin', 'manager', 'branch_manager'];
+
+function isFullAdminRole(role) {
+    return !!role && FULL_ADMIN_ROLES.includes(String(role).toLowerCase());
+}
+function isAdminLevelRole(role) {
+    return !!role && ADMIN_LEVEL_ROLES.includes(String(role).toLowerCase());
+}
+
+/**
  * Get authentication headers for API requests
  * @returns {Object} Headers object with Authorization token
  */
@@ -271,11 +290,29 @@ function requireAdminOrRedirect() {
         return false;
     }
     const user = getCurrentUser();
-    if (user && !['admin', 'manager', 'super_admin'].includes(user.role)) {
+    if (user && !isAdminLevelRole(user.role)) {
         window.location.href = '/staff/dashboard.html';
         return false;
     }
     // Kick off async server-side validation — hard-redirects if token is stale
+    validateSession();
+    return true;
+}
+
+/**
+ * Strict admin-only gate (admin / administrator / super_admin). Manager and
+ * branch_manager are NOT allowed — they get redirected to the manager dashboard.
+ */
+function requireFullAdminOrRedirect() {
+    if (!isAuthenticated()) {
+        window.location.href = '/login.html';
+        return false;
+    }
+    const user = getCurrentUser();
+    if (user && !isFullAdminRole(user.role)) {
+        window.location.href = isAdminLevelRole(user.role) ? '/dashboard.html' : '/staff/dashboard.html';
+        return false;
+    }
     validateSession();
     return true;
 }
@@ -289,7 +326,12 @@ window.apiRequest = apiRequest;
 window.apiFetch = apiFetch;
 window.checkAuthOrRedirect = checkAuthOrRedirect;
 window.requireAdminOrRedirect = requireAdminOrRedirect;
+window.requireFullAdminOrRedirect = requireFullAdminOrRedirect;
 window.validateSession = validateSession;
 window.isAndroidApp = isAndroidApp;
+window.FULL_ADMIN_ROLES = FULL_ADMIN_ROLES;
+window.ADMIN_LEVEL_ROLES = ADMIN_LEVEL_ROLES;
+window.isFullAdminRole = isFullAdminRole;
+window.isAdminLevelRole = isAdminLevelRole;
 
 console.log('✅ Auth helper loaded');

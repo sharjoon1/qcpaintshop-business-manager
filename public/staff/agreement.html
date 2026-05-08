@@ -1,0 +1,716 @@
+<!DOCTYPE html>
+<html lang="ta">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https: blob:;">
+    <title>வேலை ஒப்பந்தம் - Quality Colours</title>
+    <script src="/js/auth-helper.js"></script>
+    <script>checkAuthOrRedirect();</script>
+    <link rel="stylesheet" href="/css/tailwind.css">
+    <link rel="stylesheet" href="/css/design-system.css">
+    <script src="/universal-nav-loader.js"></script>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #f3f4f6; }
+        .container { max-width: 700px; margin: 0 auto; padding: 16px; }
+        .card { background: #fff; border-radius: 16px; padding: 20px; margin-bottom: 16px; box-shadow: 0 4px 16px rgba(0,0,0,.1); }
+
+        /* ── Agreement document ── */
+        #agreementDoc { font-family: 'Noto Sans Tamil', 'Latha', serif; line-height: 1.75; color: #1a1a1a; }
+
+        /* ── Letterhead header — 3-row design ── */
+        .agr-header {
+            margin-bottom: 18px;
+            border-radius: 10px;
+            overflow: hidden;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.10);
+        }
+        /* Row 1: Brand strip */
+        .agr-lh-top {
+            display: flex;
+            align-items: center;
+            gap: 14px;
+            padding: 14px 18px;
+            background: #fff;
+            border: 1.5px solid #d1fae5;
+            border-bottom: none;
+        }
+        .agr-lh-logo {
+            width: 62px; height: 62px;
+            object-fit: contain;
+            flex-shrink: 0;
+            border-radius: 8px;
+            padding: 4px;
+            background: #f0fdf4;
+            border: 1.5px solid #bbf7d0;
+        }
+        .agr-lh-brand-box { flex: 1; }
+        .agr-lh-brand-name {
+            font-size: 20px; font-weight: 800;
+            color: #14532d; letter-spacing: 0.3px; line-height: 1.2;
+        }
+        .agr-lh-brand-tag {
+            font-size: 12px; color: #6b7280;
+            font-style: italic; margin-top: 3px;
+        }
+        /* Row 2: Contact strip */
+        .agr-lh-contact {
+            background: #f0fdf4;
+            border: 1.5px solid #bbf7d0;
+            border-top: none; border-bottom: none;
+            padding: 7px 18px;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 4px 20px;
+            font-size: 11.5px;
+            color: #374151;
+        }
+        .agr-lh-contact span { display: flex; align-items: center; gap: 5px; }
+        /* Row 3: Title strip */
+        .agr-title-bar {
+            background: linear-gradient(135deg, #14532d 0%, #1B5E3B 55%, #166534 100%);
+            padding: 9px 18px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 10px;
+            border: 1.5px solid #14532d;
+            border-top: none;
+        }
+        .agr-title-main {
+            font-size: 14px; font-weight: 700;
+            color: #fff; font-family: 'Noto Sans Tamil', serif;
+        }
+        .agr-title-ver { font-size: 10px; color: #a7f3d0; white-space: nowrap; flex-shrink: 0; }
+        .agr-info-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; background: #f0fdf4; border-radius: 10px; padding: 12px; margin-bottom: 18px; }
+        .agr-info-item label { font-size: 10px; color: #6b7280; display: block; }
+        .agr-info-item span { font-weight: 700; font-size: 13px; color: #111; }
+        .agr-section { margin-bottom: 16px; }
+        .agr-section h3 { font-size: 14px; font-weight: 700; color: #1B5E3B; border-left: 4px solid #1B5E3B; padding-left: 9px; margin-bottom: 8px; }
+        .agr-section p, .agr-section li { font-size: 13px; color: #333; margin-bottom: 5px; }
+        .agr-section ul, .agr-section ol { padding-left: 18px; }
+        .agr-section li { margin-bottom: 4px; }
+        .highlight-box { background: #fff7ed; border: 1.5px solid #f97316; border-radius: 8px; padding: 10px 14px; margin: 8px 0; }
+        .highlight-box.red { background: #fff1f2; border-color: #f43f5e; }
+        .highlight-box.green { background: #f0fdf4; border-color: #10b981; }
+        .declaration-sign-block { page-break-inside: avoid; break-inside: avoid; }
+        .sign-section { border-top: 2px dashed #d1d5db; margin-top: 16px; padding-top: 16px; display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+        .sign-box { text-align: center; }
+        .sign-line { border-bottom: 1.5px solid #374151; margin: 36px 12px 6px; }
+        .sign-box p { font-size: 11px; color: #6b7280; }
+
+        /* ── Buttons ── */
+        .btn { width: 100%; padding: 14px; border-radius: 12px; font-size: 16px; font-weight: 600; border: none; cursor: pointer; transition: all .2s; }
+        .btn-primary { background: linear-gradient(135deg,#1B5E3B,#10b981); color: #fff; }
+        .btn-secondary { background: #f3f4f6; color: #374151; }
+        .btn-orange { background: linear-gradient(135deg,#f97316,#ea580c); color: #fff; }
+        .btn:active { transform: scale(.97); }
+        .btn:disabled { opacity: .5; cursor: not-allowed; }
+
+        /* ── Status badge ── */
+        .status-badge { display: inline-block; padding: 4px 12px; border-radius: 99px; font-size: 13px; font-weight: 600; }
+        .status-pending  { background: #fef9c3; color: #854d0e; }
+        .status-viewed   { background: #dbeafe; color: #1e40af; }
+        .status-uploaded { background: #dcfce7; color: #166534; }
+
+        /* ── Upload zone ── */
+        .upload-zone { border: 2px dashed #d1d5db; border-radius: 12px; padding: 24px; text-align: center; cursor: pointer; transition: border-color .2s; }
+        .upload-zone:hover { border-color: #10b981; }
+        .upload-zone input { display: none; }
+
+        /* ── Print ── */
+        @page {
+            size: A4;
+            margin: 14mm 12mm 24mm 12mm;
+        }
+        /* Desktop Chrome: @page margin boxes render correctly */
+        @page {
+            @bottom-left {
+                content: "Quality Colours — வேலை ஒப்பந்தம் | Confidential";
+                font-size: 7pt;
+                font-family: -apple-system, BlinkMacSystemFont, sans-serif;
+                color: #9ca3af;
+                padding-top: 4pt;
+                border-top: 0.5pt solid #e5e7eb;
+                vertical-align: top;
+            }
+            @bottom-right {
+                content: "பக்கம் " counter(page) " / " counter(pages);
+                font-size: 7pt;
+                font-family: -apple-system, BlinkMacSystemFont, sans-serif;
+                font-weight: 600;
+                color: #374151;
+                padding-top: 4pt;
+                border-top: 0.5pt solid #e5e7eb;
+                vertical-align: top;
+            }
+        }
+        @media print {
+            * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
+            body { background: #fff; margin: 0; padding: 0; }
+            .no-print { display: none !important; }
+
+            /* Hide ALL injected nav / quickbar elements */
+            .qc-mobile-quickbar, #mobileQuickbar,
+            .qc-sidebar, #qcSidebar,
+            .qc-topbar, #qcTopbar,
+            .qc-subnav, #qcSubnav,
+            nav, header, footer,
+            [class*="quickbar"], [class*="sidebar"],
+            [class*="bottom-bar"], [class*="bottom-nav"],
+            [class*="tab-bar"], [class*="topbar"] {
+                display: none !important;
+                height: 0 !important;
+                overflow: hidden !important;
+            }
+
+            /* JS-injected footer (Chrome Android fallback) */
+            .pn-footer {
+                position: fixed;
+                bottom: 0; left: 0; right: 0;
+                height: 10mm;
+                display: flex !important;
+                align-items: center;
+                justify-content: space-between;
+                padding: 0 12mm;
+                font-size: 7pt;
+                font-family: -apple-system, BlinkMacSystemFont, sans-serif;
+                border-top: 0.5pt solid #e5e7eb;
+                background: #fff;
+            }
+            .pn-footer .pn-left { color: #9ca3af; }
+            .pn-footer .pn-right { color: #374151; font-weight: 600; }
+
+            .container { max-width: 100%; padding: 0; margin: 0; }
+            .card { box-shadow: none; border: none; border-radius: 0; padding: 0; margin: 0; }
+            #agreementCard { display: block !important; }
+            #loadingCard, #actionCard { display: none !important; }
+
+            /* Header: preserve box-shadow in print */
+            .agr-header { box-shadow: none; margin-bottom: 12pt; }
+            .agr-lh-top { border-radius: 6pt 6pt 0 0; }
+
+            /* Document flow */
+            #agreementDoc { font-size: 11pt; line-height: 1.6; position: relative; }
+            .agr-section { margin-bottom: 10pt; orphans: 3; widows: 3; }
+            .agr-section h3 { break-after: avoid; }
+            .highlight-box { break-inside: avoid; border-radius: 4px; padding: 8pt 10pt; }
+            .agr-info-grid { break-inside: avoid; margin-bottom: 12pt; padding: 8pt; border-radius: 4px; }
+            .declaration-sign-block { break-inside: avoid !important; page-break-inside: avoid !important; page-break-before: auto !important; }
+            .sign-section { break-inside: avoid; margin-top: 12pt; }
+            li { break-inside: avoid; }
+            /* Prevent any section from forcing an extra blank page */
+            .agr-section:last-child, .declaration-sign-block:last-child { page-break-after: avoid; }
+
+            /* Absolute page-number stamps — one per page, positioned at bottom of each page */
+            .pn-abs {
+                display: block;
+                position: absolute;
+                right: 0;
+                font-size: 7pt;
+                font-weight: 700;
+                color: #374151;
+                font-family: -apple-system, BlinkMacSystemFont, sans-serif;
+                background: #fff;
+                padding: 0 0 1pt 10pt;
+                line-height: 1;
+                z-index: 10;
+            }
+        }
+
+        @media screen { .pn-abs { display: none; } }
+    </style>
+</head>
+<body data-page="staff-agreement">
+<div class="container" style="margin-top:16px;">
+
+    <!-- Header -->
+    <div class="card no-print">
+        <button onclick="history.back()" style="background:none;border:none;color:#6b7280;display:flex;align-items:center;gap:6px;cursor:pointer;margin-bottom:12px;">
+            <svg style="width:18px;height:18px;" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/></svg>
+            Back
+        </button>
+        <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;">
+            <div>
+                <h1 style="font-size:22px;font-weight:700;color:#1f2937;">📄 வேலை ஒப்பந்தம்</h1>
+                <p style="color:#6b7280;font-size:14px;">Employment Agreement</p>
+            </div>
+            <span id="statusBadge" class="status-badge status-pending">⏳ Pending</span>
+        </div>
+    </div>
+
+    <!-- Loading -->
+    <div id="loadingCard" class="card" style="text-align:center;padding:40px;">
+        <div style="border:3px solid #f3f4f6;border-top:3px solid #1B5E3B;border-radius:50%;width:36px;height:36px;animation:spin 1s linear infinite;margin:0 auto 12px;"></div>
+        <p style="color:#6b7280;">ஒப்பந்தம் ஏற்றுகிறது...</p>
+    </div>
+
+    <!-- Agreement Document -->
+    <div id="agreementCard" class="card" style="display:none;">
+        <div id="agreementDoc">
+
+            <div class="agr-header">
+                <!-- Row 1: Logo + Brand -->
+                <div class="agr-lh-top">
+                    <img src="/uploads/logos/logo-1772487457096-704239188.png"
+                         class="agr-lh-logo" alt="Quality Colours"
+                         onerror="this.style.display='none'">
+                    <div class="agr-lh-brand-box">
+                        <div class="agr-lh-brand-name">Quality Colours</div>
+                        <div class="agr-lh-brand-tag">The Branded Paint Showroom</div>
+                    </div>
+                </div>
+                <!-- Row 2: Contact info -->
+                <div class="agr-lh-contact">
+                    <span>📍 Ramanathapuram, Tamil Nadu, India</span>
+                    <span>📞 +91 74188 31122</span>
+                </div>
+                <!-- Row 3: Document title -->
+                <div class="agr-title-bar">
+                    <span class="agr-title-main">வேலை ஒப்பந்தம் &nbsp;—&nbsp; Employment Agreement</span>
+                    <span id="agrVersion" class="agr-title-ver">Version 1.0</span>
+                </div>
+            </div>
+
+            <div class="agr-info-grid">
+                <div class="agr-info-item"><label>ஊழியர் பெயர்</label><span id="infoName">—</span></div>
+                <div class="agr-info-item"><label>பதவி (Role)</label><span id="infoRole">—</span></div>
+                <div class="agr-info-item"><label>கிளை (Branch)</label><span id="infoBranch">—</span></div>
+                <div class="agr-info-item"><label>சேரும் தேதி</label><span id="infoJoined">—</span></div>
+            </div>
+
+            <!-- Section 1 -->
+            <div class="agr-section">
+                <h3>பிரிவு 1 — வேலையின் தன்மை</h3>
+                <p>நீங்கள் Quality Colours - The Branded Paint Showroom நிறுவனத்தில் <strong id="role1">ஊழியராக</strong> பணியில் அமர்த்தப்படுகிறீர்கள். நிறுவனத்தின் நலனுக்காக உங்கள் கடமைகளை நேர்மையாகவும், உற்சாகமாகவும், முழு அர்ப்பணிப்புடனும் செய்வதற்கு கடமைப்பட்டிருக்கிறீர்கள்.</p>
+            </div>
+
+            <!-- Section 2 -->
+            <div class="agr-section">
+                <h3>பிரிவு 2 — வேலை நேரம் & வருகை</h3>
+                <ul>
+                    <li>வேலை நேரம்: காலை <strong>8:30 மணி</strong> முதல் மாலை <strong>8:30 மணி</strong> வரை (நிர்வாக முடிவுப்படி)</li>
+                    <li>தினமும் Selfie & GPS மூலம் Clock In / Clock Out கட்டாயம்</li>
+                    <li>ஞாயிற்றுக்கிழமை அரை நாள் வேலை</li>
+                    <li>மாதம் அதிகபட்சம் 2 நாட்கள் அனுமதிக்கப்படாத விடுப்பு</li>
+                </ul>
+                <div class="highlight-box" style="margin-top:12px;">
+                    <strong>தாமத அபராதம் (Late Penalty):</strong>
+                    <ul style="margin-top:8px;">
+                        <li>8:30 – 8:45 மணி → சரியான நேரம் (அபராதம் இல்லை)</li>
+                        <li>8:45 – 9:00 மணி → 1 நிமிடம் தாமதம் = <strong>10 நிமிடம்</strong> வருகையிலிருந்து கழிவு</li>
+                        <li>9:00 மணிக்கு பின் → 1 நிமிடம் தாமதம் = <strong>5 நிமிடம்</strong> கூடுதல் கழிவு</li>
+                    </ul>
+                </div>
+            </div>
+
+            <!-- Section 3 -->
+            <div class="agr-section">
+                <h3>பிரிவு 3 — சம்பளம் & சலுகைகள்</h3>
+                <ul>
+                    <li>மாத சம்பளம்: நிர்வாகத்துடன் கலந்தாலோசித்து நிர்ணயிக்கப்படும்</li>
+                    <li>வருடாந்திர ஊதிய உயர்வு: திறனுக்கும் நடத்தைக்கும் ஏற்ப நிர்வாக முடிவுப்படி</li>
+                    <li>பண்டிகை போனஸ் மற்றும் சிறப்பு ஊக்கத்தொகை: தகுதிப்படி</li>
+                    <li>சம்பளம் ஒவ்வொரு மாதமும் நிர்ணயிக்கப்பட்ட தேதியில் வழங்கப்படும்</li>
+                </ul>
+            </div>
+
+            <!-- Section 4 -->
+            <div class="agr-section">
+                <h3>பிரிவு 4 — நடத்தை விதிமுறைகள்</h3>
+                <ul>
+                    <li>வாடிக்கையாளரிடம் எப்போதும் மரியாதையாகவும் சேவை மனப்பான்மையுடனும் நடந்துகொள்ள வேண்டும்</li>
+                    <li>சக ஊழியர்களுடன் ஒத்துழைப்புடன் செயல்பட வேண்டும்</li>
+                    <li>வேலை நேரத்தில் மொபைல் போன் தனி பயன்பாட்டிற்கு உபயோகிக்கக்கூடாது</li>
+                    <li>நிறுவன சீருடை (Uniform) கட்டாயம் அணிய வேண்டும்</li>
+                    <li>கடை வளாகத்தில் புகைப்பிடித்தல், மது அருந்துதல் கூடவே கூடாது</li>
+                </ul>
+            </div>
+
+            <!-- Section 5 -->
+            <div class="agr-section">
+                <h3>பிரிவு 5 — ரகசியத்தன்மை (Confidentiality)</h3>
+                <ul>
+                    <li>வாடிக்கையாளர் தகவல்கள், விலை விவரங்கள், ஸ்டாக் தகவல்கள், வியாபார தந்திரங்கள் எதையும் வெளியாருக்கு தெரிவிக்கக்கூடாது</li>
+                    <li>சமூக வலைதளங்களில் நிறுவனத்தைப் பற்றி அனுமதியின்றி தகவல் பதிவிடக்கூடாது</li>
+                    <li>வேலை விட்டு சென்ற பிறகும் <strong>2 வருடங்களுக்கு</strong> இந்த கடமை நீடிக்கும்</li>
+                </ul>
+            </div>
+
+            <!-- Section 5b: Non-Compete -->
+            <div class="agr-section">
+                <h3>பிரிவு 5அ — போட்டி தொழில் தடை (Non-Compete Clause)</h3>
+                <div class="highlight-box red">
+                    <p style="margin-bottom:10px;"><strong>நிறுவனத்தில் இருந்து விலகிய பின்பும் கீழ்க்கண்ட கட்டுப்பாடுகள் <u>ஆயுட்காலம் முழுவதும்</u> பொருந்தும்:</strong></p>
+                    <ul>
+                        <li style="margin-bottom:8px;">Quality Colours-ல் பணிபுரிந்து கற்றுக்கொண்ட paint விற்பனை அறிவையும் தொழில் அனுபவத்தையும் பயன்படுத்தி, <strong>Quality Colours கிளைகளுக்கு 15 கிலோமீட்டர் சுற்றளவிற்குள்</strong> இதே போன்ற paint விற்பனை தொழிலை தொடங்கவோ, அதில் பங்கு வகிக்கவோ கூடாது</li>
+                        <li style="margin-bottom:8px;">நிறுவனத்தின் வாடிக்கையாளர்களை (நேரடியாகவோ மறைமுகமாகவோ) வேறு எந்த paint நிறுவனத்திற்கும் திசைதிருப்பவோ, அவர்களிடம் தனி வியாபாரம் செய்யவோ கூடாது</li>
+                        <li style="margin-bottom:8px;">வேலையில் இருக்கும்போது அறிந்த எந்த வாடிக்கையாளரையும், நிறுவனத்தின் வியாபாரம் பாதிக்கும் வகையில் <strong>எக்காலத்திலும்</strong> தொடர்பு கொள்ளக்கூடாது</li>
+                        <li>நிறுவனத்தின் வாடிக்கையாளர் பட்டியல், விலை விவரம், contact details எதையும் போட்டியாளர்களிடம் பகிரக்கூடாது</li>
+                    </ul>
+                    <p style="margin-top:10px;color:#dc2626;font-weight:700;">⚠️ மேற்கண்டவற்றை மீறினால் சட்ட நடவடிக்கை எடுக்கப்படும் மற்றும் நட்டஈடு வசூலிக்கப்படும்.</p>
+                </div>
+            </div>
+
+            <!-- Section 6 -->
+            <div class="agr-section">
+                <h3>பிரிவு 6 — குறைந்தபட்ச சேவைக்காலம்</h3>
+                <div class="highlight-box green">
+                    <p>நீங்கள் Quality Colours நிறுவனத்தில் குறைந்தது <strong>இரண்டு (2) வருடங்கள்</strong> தொடர்ந்து பணியாற்றுவதற்கு ஒப்புக்கொள்கிறீர்கள். இந்த காலகட்டத்தில் வேலையை விட்டு செல்ல விரும்பினால், நிர்வாகத்தின் ஒப்புதல் மற்றும் சரியான நோட்டீஸ் காலம் கட்டாயமாகும்.</p>
+                </div>
+            </div>
+
+            <!-- Section 7 -->
+            <div class="agr-section">
+                <h3>பிரிவு 7 — நோட்டீஸ் காலம் (Notice Period)</h3>
+                <div class="highlight-box">
+                    <ul>
+                        <li>வேலையை விட விரும்பினால் குறைந்தது <strong>மூன்று (3) மாதம்</strong> முன்பே எழுத்துப்பூர்வமாக நிர்வாகத்திற்கு தெரிவிக்க வேண்டும்</li>
+                        <li>3 மாத நோட்டீஸ் இல்லாமல் வேலை விட்டு சென்றால் → <strong>ஒரு மாத சம்பளம் பிடித்தம்</strong> செய்யப்படும்</li>
+                        <li>நோட்டீஸ் காலத்தில் முழு கடமையுடன் பணியாற்ற வேண்டும்</li>
+                    </ul>
+                </div>
+            </div>
+
+            <!-- Section 8 -->
+            <div class="agr-section">
+                <h3>பிரிவு 8 — கணக்கு முறைகேடு & நேர்மையின்மை</h3>
+                <div class="highlight-box red">
+                    <p style="margin-bottom:8px;"><strong>பின்வரும் செயல்கள் கடுமையான சட்ட நடவடிக்கைக்கு உள்ளாகும்:</strong></p>
+                    <ul>
+                        <li>நிறுவனத்தின் பணம் அல்லது பொருட்களை திருடுதல் அல்லது தவறாக பயன்படுத்துதல்</li>
+                        <li>கணக்கு வழக்குகளில் (Accounts) முறைகேடு செய்தல், தவறான பரிவர்த்தனை செய்தல்</li>
+                        <li>போலியான ரசீது அல்லது கணக்கு தயாரித்தல்</li>
+                    </ul>
+                    <p style="margin-top:8px;">இவற்றை செய்தால்: <strong>உடனடி பணிநீக்கம் + காவல் துறையில் புகார் + வழக்கு + இழப்பீடு கோரிக்கை</strong></p>
+                </div>
+            </div>
+
+            <!-- Section 9 -->
+            <div class="agr-section">
+                <h3>பிரிவு 9 — விதிமுறை மீறல் & தண்டனை</h3>
+                <p style="margin-bottom:8px;">கீழ்க்காணும் செயல்கள் கடுமையான நடவடிக்கைக்கு உள்ளாகும்:</p>
+                <ol>
+                    <li>தொடர் வருகை தவறுகள் (விடுப்பு அனுமதியின்றி)</li>
+                    <li>வாடிக்கையாளர் அல்லது சக ஊழியரிடம் முறையற்ற நடத்தை</li>
+                    <li>நிறுவனத்தின் நற்பெயருக்கு களங்கம் விளைவிக்கும் செயல்கள்</li>
+                    <li>மோசடி, திருட்டு, கணக்கு முறைகேடு</li>
+                    <li>கடை உபகரணங்கள் மற்றும் பொருட்களை சேதப்படுத்துதல்</li>
+                </ol>
+                <p style="margin-top:8px;color:#dc2626;font-weight:600;">நிறுவனம் சட்ட நடவடிக்கை எடுக்க முழு உரிமை கொண்டது.</p>
+            </div>
+
+            <!-- Section 10 — Rules & Regulations -->
+            <div class="agr-section">
+                <h3>பிரிவு 10 — நிறுவன விதிகள் & சட்டதிட்டங்கள் (Rules & Regulations)</h3>
+                <ol>
+                    <li>வேலை நேரத்தில் மொபைல் போன் தனிப்பட்ட காரணங்களுக்காக பயன்படுத்துவதை குறைக்க வேண்டும்; வேலை தொடர்பான மட்டுமே அனுமதி</li>
+                    <li>கடை வளாகத்தில் புகைப்பிடித்தல், மது பயன்படுத்துதல் கண்டிப்பாக தடை</li>
+                    <li>வாடிக்கையாளர் அல்லது சக ஊழியரிடம் சண்டை, கூச்சல் கூடாது</li>
+                    <li>நிர்வாக அனுமதியின்றி தள்ளுபடி (Discount) அல்லது கடன் (Credit) வழங்கக்கூடாது</li>
+                    <li>பண பரிவர்த்தனை எப்போதும் ரசீது வழங்கி மட்டுமே செய்ய வேண்டும்</li>
+                    <li>விடுப்பு எடுக்கும் முன் குறைந்தது 24 மணி நேரத்திற்கு முன்பே தெரிவிக்க வேண்டும்</li>
+                    <li>தினமும் சீரான உடை (Uniform / Formal) அணிந்து வர வேண்டும்</li>
+                    <li>வாடிக்கையாளர் புகார்களை உடனடியாக நிர்வாகத்திற்கு தெரிவிக்க வேண்டும்</li>
+                    <li>ஸ்டாக், விலை, வாடிக்கையாளர் தகவல் எதையும் வெளியே தெரிவிக்கக்கூடாது</li>
+                    <li>நிறுவனத்தின் கணினி, மென்பொருள், ஆவணங்களை தனி பயன்பாட்டிற்கு எடுக்கக்கூடாது</li>
+                    <li>சமூக வலைதளங்களில் நிறுவன பெயர் அல்லது வாடிக்கையாளர் தகவல் அனுமதியின்றி பதிவிடக்கூடாது</li>
+                    <li>வேலை சம்பந்தமான எந்தவொரு சர்ச்சையையும் முதலில் நிர்வாகத்திடம் தெரிவிக்க வேண்டும், வெளியே போகக்கூடாது</li>
+                </ol>
+
+                <!-- Idle-time rule — highlighted orange -->
+                <div class="highlight-box" style="margin-top:12px;">
+                    <p style="font-weight:700;margin-bottom:8px;color:#92400e;">⏰ வியாபாரம் இல்லாத நேரத்தில் — கட்டாய கடமை</p>
+                    <p style="font-size:13px;color:#78350f;margin-bottom:8px;">கடையில் வாடிக்கையாளர் வராத நேரங்களில் எந்த ஒரு ஊழியரும் சும்மா இருக்கவோ, நேரம் வீணாக்கவோ கூடாது. அந்த நேரத்தை பின்வரும் உற்பத்தி வேலைகளுக்கு பயன்படுத்துவது கட்டாயம்:</p>
+                    <ol style="margin:0;padding-left:18px;font-size:13px;color:#78350f;">
+                        <li style="margin-bottom:5px;"><strong>Marketing:</strong> புதிய வாடிக்கையாளர்களை அணுகுவது, Lead Manager-ல் Follow-up பதிவு செய்வது</li>
+                        <li style="margin-bottom:5px;"><strong>Outstanding Follow-up:</strong> கடன் வசூல் — Credit Management-ல் உள்ள வாடிக்கையாளர்களை தொடர்பு கொள்வது</li>
+                        <li style="margin-bottom:5px;"><strong>பொருள் அமைப்பு:</strong> கடையில் உள்ள paint, material சரியாக, அழகாக அமைத்து வைப்பது</li>
+                        <li style="margin-bottom:5px;"><strong>கடை சுத்தம்:</strong> கடை, shelf, counter தொடர்ந்து சுத்தமாக வைத்திருப்பது</li>
+                        <li><strong>தொடர் Marketing:</strong> Whatsapp, Phone மூலம் வாடிக்கையாளர்களுக்கு offer, product update அனுப்புவது</li>
+                    </ol>
+                    <p style="margin-top:10px;font-weight:700;color:#b45309;">⚠️ வேலை நேரத்தில் எந்தவொரு காரணத்திற்காகவும் செயலற்று இருப்பது கண்டிப்பான நடவடிக்கைக்கு உள்ளாகும். Clock Out செய்வதற்கு முன் இன்றைய வேலை அறிக்கை கட்டாயம் சமர்ப்பிக்க வேண்டும்.</p>
+                </div>
+
+                <!-- Billing & Stock Rules — highlighted separately -->
+                <div class="highlight-box red" style="margin-top:12px;">
+                    <p style="font-weight:700;margin-bottom:8px;color:#b91c1c;">⚠️ விற்பனை, ஸ்டாக் & பில்லிங் — கட்டாய விதிகள்</p>
+                    <ol style="margin:0;padding-left:18px;">
+                        <li style="margin-bottom:7px;"><strong>Invoice இல்லாமல் எந்த பொருளும் கடையை விட்டு வெளியே செல்லவே கூடாது.</strong> ஒவ்வொரு விற்பனையிலும் கம்பெனியின் billing software-ல் invoice உருவாக்கிய பிறகே பொருள் வழங்க வேண்டும். இதை மீறுவது நேரடி பணிநீக்கத்திற்கு வழிவகுக்கும்.</li>
+                        <li style="margin-bottom:7px;"><strong>Vendor-இடமிருந்து பொருள் வரும்போது:</strong> பொருட்களை முறையாக சரிபார்த்து (quantity, quality, damage) உறுதி செய்த பின்பே vendor-இன் delivery receipt-ல் கையொப்மிட வேண்டும். கையொப்பமிட்ட அதே வேலை நாளில் அந்தப் பொருட்களை கம்பெனியின் billing software-ல் stock-ஆக ஏற்ற (inward) வேண்டும். அன்று ஏற்றாவிட்டால் நிர்வாகத்திற்கு உடனடியாக தெரிவிக்க வேண்டும்.</li>
+                        <li><strong>Credit limit இல்லாமல் கடன் விற்பனை கூடாது:</strong> எந்த ஒரு வாடிக்கையாளருக்கும் billing software-ல் credit limit அமைக்கப்படாத வரை பொருட்களை கடனாக (credit) வழங்கவே கூடாது. Credit limit இருந்தாலும் அதை மீறி விற்பனை செய்யக்கூடாது. மீறினால் அந்த தொகைக்கு ஊழியரே பொறுப்பாவார்.</li>
+                    </ol>
+                </div>
+            </div>
+
+            <!-- Declaration + Signature — kept together on same page -->
+            <div class="declaration-sign-block">
+
+                <div class="agr-section" style="margin-bottom:12px;">
+                    <h3>முடிவுரை — ஒப்புக்கொள்கிறேன்</h3>
+                    <div class="highlight-box green">
+                        <p>மேலே கூறப்பட்ட அனைத்து விதிமுறைகளையும் நான் <strong>முழுமையாக படித்து புரிந்துகொண்டேன்</strong>. இந்த ஒப்பந்தத்தை மனதார ஒப்புக்கொண்டு கீழே கையொப்பமிடுகிறேன். இந்த விதிமுறைகளை மீறினால் தகுந்த நடவடிக்கை எடுக்கப்படும் என்று அறிவேன்.</p>
+                    </div>
+                </div>
+
+                <!-- Signature -->
+                <div class="sign-section">
+                    <div class="sign-box">
+                        <div class="sign-line"></div>
+                        <p><strong id="signName">ஊழியர் கையொப்பம்</strong></p>
+                        <p id="signRole" style="font-size:12px;margin-top:2px;"></p>
+                        <p style="font-size:12px;color:#9ca3af;margin-top:4px;">தேதி: ___________</p>
+                    </div>
+                    <div class="sign-box">
+                        <div class="sign-line"></div>
+                        <p><strong>நிர்வாக கையொப்பம்</strong></p>
+                        <p style="font-size:12px;margin-top:2px;">Quality Colours நிர்வாகம்</p>
+                        <p style="font-size:12px;color:#9ca3af;margin-top:4px;">தேதி: ___________</p>
+                    </div>
+                </div>
+
+            </div><!-- /declaration-sign-block -->
+
+        </div><!-- /agreementDoc -->
+    </div>
+
+    <!-- Actions -->
+    <div id="actionCard" class="card no-print" style="display:none;">
+        <p style="font-size:14px;color:#6b7280;margin-bottom:16px;text-align:center;">
+            ஒப்பந்தத்தை பிரிண்ட் எடுத்து கையொப்பமிட்டு, ஸ்கேன் செய்து அப்லோடு செய்யுங்கள்.
+        </p>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px;">
+            <button class="btn btn-secondary" onclick="printAgreement()">🖨️ Print</button>
+            <button class="btn btn-orange" onclick="document.getElementById('uploadSection').style.display='block';this.style.display='none';" id="showUploadBtn">📤 Upload Signed</button>
+        </div>
+
+        <!-- Upload Section -->
+        <div id="uploadSection" style="display:none;">
+            <div class="upload-zone" onclick="document.getElementById('fileInput').click();">
+                <input type="file" id="fileInput" accept=".pdf,.jpg,.jpeg,.png" onchange="handleFileSelect(this)">
+                <div id="uploadPlaceholder">
+                    <div style="font-size:36px;margin-bottom:8px;">📎</div>
+                    <p style="color:#374151;font-weight:600;">கையொப்பமிட்ட ஒப்பந்தம் அப்லோடு</p>
+                    <p style="color:#9ca3af;font-size:13px;margin-top:4px;">PDF, JPG, PNG (Max 20MB)</p>
+                </div>
+                <div id="fileSelected" style="display:none;">
+                    <div style="font-size:36px;margin-bottom:8px;">✅</div>
+                    <p id="fileName" style="color:#059669;font-weight:600;"></p>
+                </div>
+            </div>
+            <button class="btn btn-primary" onclick="uploadDocument()" style="margin-top:12px;" id="uploadBtn" disabled>
+                <span id="uploadBtnText">✓ Submit</span>
+            </button>
+        </div>
+
+        <!-- Uploaded confirmation -->
+        <div id="uploadedMsg" style="display:none;background:#f0fdf4;border-radius:12px;padding:16px;text-align:center;">
+            <div style="font-size:36px;">✅</div>
+            <p style="color:#166534;font-weight:700;margin-top:8px;">கையொப்பமிட்ட ஒப்பந்தம் வெற்றிகரமாக பதிவேற்றப்பட்டது!</p>
+            <p style="color:#6b7280;font-size:13px;margin-top:4px;">நிர்வாகம் சரிபார்ப்பார்கள்.</p>
+        </div>
+    </div>
+
+</div><!-- /container -->
+
+<style>
+@keyframes spin { to { transform: rotate(360deg); } }
+</style>
+
+<script>
+let selectedFile = null;
+
+async function loadAgreement() {
+    try {
+        const token = localStorage.getItem('auth_token');
+        const res = await fetch('/api/agreements/my', { headers: { Authorization: `Bearer ${token}` } });
+        const data = await res.json();
+
+        document.getElementById('loadingCard').style.display = 'none';
+
+        if (!data.success || !data.agreement) {
+            document.getElementById('agreementCard').innerHTML = '<p style="text-align:center;color:#6b7280;padding:30px;">ஒப்பந்தம் இல்லை.</p>';
+            document.getElementById('agreementCard').style.display = 'block';
+            return;
+        }
+
+        const staff = data.staff || {};
+        const record = data.record || {};
+
+        // Fill staff info
+        document.getElementById('infoName').textContent   = staff.full_name || '—';
+        document.getElementById('infoRole').textContent   = staff.role || '—';
+        document.getElementById('infoBranch').textContent = staff.branch_name || '—';
+        document.getElementById('infoJoined').textContent = staff.joined_at
+            ? new Date(staff.joined_at).toLocaleDateString('en-IN', { day:'2-digit', month:'short', year:'numeric', timeZone:'Asia/Kolkata' })
+            : '—';
+        document.getElementById('role1').textContent      = staff.role || 'ஊழியராக';
+        document.getElementById('signName').textContent   = staff.full_name || 'ஊழியர் கையொப்பம்';
+        document.getElementById('signRole').textContent   = staff.role || '';
+        document.getElementById('agrVersion').textContent = 'Version ' + (data.agreement.version || '1.0');
+
+        document.getElementById('agreementCard').style.display = 'block';
+
+        // Status badge
+        const badge = document.getElementById('statusBadge');
+        const status = record.status || 'pending';
+        const labels = { pending:'⏳ Pending', viewed:'👁️ Viewed', uploaded:'✅ Signed & Uploaded' };
+        badge.textContent = labels[status] || status;
+        badge.className = 'status-badge status-' + status;
+
+        // Mark viewed
+        if (status === 'pending') {
+            await fetch('/api/agreements/viewed', { method:'POST', headers: { Authorization:`Bearer ${token}` } });
+            badge.textContent = '👁️ Viewed';
+            badge.className = 'status-badge status-viewed';
+        }
+
+        // Actions
+        const actionCard = document.getElementById('actionCard');
+        actionCard.style.display = 'block';
+        if (status === 'uploaded') {
+            document.getElementById('showUploadBtn').style.display = 'none';
+            document.getElementById('uploadedMsg').style.display = 'block';
+        }
+
+    } catch (err) {
+        console.error(err);
+        document.getElementById('loadingCard').innerHTML = '<p style="color:#dc2626;text-align:center;">ஏற்றுவதில் பிழை. பின்னர் முயற்சிக்கவும்.</p>';
+    }
+}
+
+// ── Print footer (fixed — repeats on every page on Chrome Android) ───────────
+(function () {
+    let footer = null;
+    function inject() {
+        if (footer) return;
+        footer = document.createElement('div');
+        footer.className = 'pn-footer';
+        footer.innerHTML =
+            '<span class="pn-left">Quality Colours — வேலை ஒப்பந்தம் | Confidential</span>' +
+            '<span class="pn-right"></span>';
+        document.body.appendChild(footer);
+    }
+    function cleanup() { if (footer) { footer.remove(); footer = null; } }
+    window.addEventListener('beforeprint', inject);
+    window.addEventListener('afterprint', cleanup);
+})();
+
+// ── Async printAgreement — measures via off-screen clone at print width ───────
+// Chrome Android measures at mobile viewport (~360px) which inflates scrollHeight.
+// Fix: clone the doc into a hidden fixed div at actual print content width (703px),
+// measure there, then insert markers at corresponding positions in original doc.
+async function printAgreement() {
+    const doc = document.getElementById('agreementDoc');
+
+    // Hide nav chrome
+    const navSels = ['.qc-mobile-quickbar','#mobileQuickbar','.qc-sidebar','#qcSidebar','.qc-topbar','#qcTopbar','.qc-subnav','#qcSubnav','[class*="quickbar"]','[class*="sidebar"]'];
+    const hidden = [];
+    navSels.forEach(sel => {
+        document.querySelectorAll(sel).forEach(el => {
+            if (el.style.display !== 'none') {
+                el.dataset.prevDisplay = el.style.display || '';
+                el.style.setProperty('display','none','important');
+                hidden.push(el);
+            }
+        });
+    });
+
+    // Remove leftover stamps
+    document.querySelectorAll('.pn-abs').forEach(el => el.remove());
+
+    // ── Measure print height via off-screen clone at actual print width ──────────
+    // Mobile viewport (~360px) inflates scrollHeight vs print width (~703–726px).
+    // Clone into a hidden fixed div at 703px (≈ A4 content; Letter is 726px).
+    const PRINT_W = 703;
+    // Letter: (279.4mm − 14mm − 24mm) × 96/25.4 = 912px  |  A4: 978px
+    const PAGE_H  = 912;
+
+    const wrapper = document.createElement('div');
+    Object.assign(wrapper.style, {
+        position: 'fixed', left: '-9999px', top: '0',
+        width: PRINT_W + 'px', visibility: 'hidden', pointerEvents: 'none', zIndex: '-1'
+    });
+    const clone = doc.cloneNode(true);
+    clone.querySelectorAll('.pn-abs').forEach(el => el.remove());
+    wrapper.appendChild(clone);
+    document.body.appendChild(wrapper);
+
+    await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
+
+    const H = wrapper.scrollHeight;
+    const N = Math.max(1, Math.ceil(H / PAGE_H));
+    document.body.removeChild(wrapper);
+
+    // ── Insert absolute page-number stamps at the bottom of each page ─────────
+    // position:absolute inside position:relative #agreementDoc.
+    // top = p×PAGE_H − 14  places the stamp 14px above page p's content-area bottom.
+    // Last page uses H−14 so the stamp never exceeds the document height.
+    // Absolute children don't affect normal-flow height → no extra pages.
+    for (let p = 1; p <= N; p++) {
+        const topPx = (p < N) ? (p * PAGE_H - 14) : (H - 14);
+        const stamp = document.createElement('div');
+        stamp.className = 'pn-abs';
+        stamp.style.top = topPx + 'px';
+        stamp.textContent = 'பக்கம் ' + p + ' / ' + N;
+        doc.appendChild(stamp);
+    }
+
+    window.print();
+
+    window.addEventListener('afterprint', function cleanup() {
+        document.querySelectorAll('.pn-abs').forEach(el => el.remove());
+        hidden.forEach(el => { el.style.display = el.dataset.prevDisplay || ''; });
+        window.removeEventListener('afterprint', cleanup);
+    });
+}
+
+function handleFileSelect(input) {
+    if (!input.files || !input.files[0]) return;
+    selectedFile = input.files[0];
+    document.getElementById('uploadPlaceholder').style.display = 'none';
+    document.getElementById('fileSelected').style.display = 'block';
+    document.getElementById('fileName').textContent = selectedFile.name;
+    document.getElementById('uploadBtn').disabled = false;
+}
+
+async function uploadDocument() {
+    if (!selectedFile) return;
+    const btn = document.getElementById('uploadBtn');
+    const btnText = document.getElementById('uploadBtnText');
+    btn.disabled = true;
+    btnText.textContent = 'Uploading...';
+
+    const formData = new FormData();
+    formData.append('document', selectedFile);
+
+    try {
+        const token = localStorage.getItem('auth_token');
+        const res = await fetch('/api/agreements/upload', {
+            method: 'POST',
+            headers: { Authorization: `Bearer ${token}` },
+            body: formData
+        });
+        const data = await res.json();
+        if (data.success) {
+            document.getElementById('uploadSection').style.display = 'none';
+            document.getElementById('uploadedMsg').style.display = 'block';
+            document.getElementById('statusBadge').textContent = '✅ Signed & Uploaded';
+            document.getElementById('statusBadge').className = 'status-badge status-uploaded';
+        } else {
+            alert(data.message || 'Upload failed. Please try again.');
+            btn.disabled = false;
+            btnText.textContent = '✓ Submit';
+        }
+    } catch (err) {
+        alert('Network error. Please try again.');
+        btn.disabled = false;
+        btnText.textContent = '✓ Submit';
+    }
+}
+
+loadAgreement();
+</script>
+</body>
+</html>

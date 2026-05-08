@@ -140,6 +140,39 @@
         .step.complete .step-number {
             background: #10b981;
         }
+        .penalty-warning {
+            background: linear-gradient(135deg, #fff7ed 0%, #ffedd5 100%);
+            border: 2px solid #f97316;
+            border-radius: 16px;
+            padding: 18px 20px;
+            margin-bottom: 16px;
+        }
+        .penalty-warning .pw-title {
+            font-size: 16px;
+            font-weight: 700;
+            color: #9a3412;
+            margin-bottom: 10px;
+        }
+        .penalty-warning .pw-row {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 6px 0;
+            border-bottom: 1px solid #fed7aa;
+            font-size: 14px;
+            color: #7c2d12;
+        }
+        .penalty-warning .pw-row:last-child { border-bottom: none; }
+        .penalty-warning .pw-badge {
+            background: #f97316;
+            color: white;
+            border-radius: 6px;
+            padding: 2px 8px;
+            font-weight: 700;
+            font-size: 13px;
+            white-space: nowrap;
+        }
+        .penalty-warning .pw-badge.green { background: #10b981; }
         .success-icon {
             width: 80px;
             height: 80px;
@@ -167,6 +200,24 @@
             </button>
             <h1 style="font-size: 28px; font-weight: 700; color: #1f2937; margin-bottom: 8px;">Clock In</h1>
             <p style="color: #6b7280;">Take a selfie and enable location to clock in</p>
+        </div>
+
+        <!-- Tamil Late Penalty Warning -->
+        <div class="penalty-warning">
+            <div class="pw-title">⚠️ தாமத அபராதம் (Late Penalty)</div>
+            <div style="font-size:13px; color:#92400e; margin-bottom:10px; font-style:italic;">🎨 காலை நேர வியாபாரம் பெயிண்ட் கடைக்கு மிகவும் முக்கியம் — சரியான நேரத்தில் வாருங்கள்!</div>
+            <div class="pw-row">
+                <span class="pw-badge green">8:30 – 8:45</span>
+                <span>சரியான நேரம் — அபராதம் இல்லை</span>
+            </div>
+            <div class="pw-row">
+                <span class="pw-badge">8:45 – 9:00</span>
+                <span>1 நிமிடம் தாமதம் = 10 நிமிடம் கழிக்கப்படும்</span>
+            </div>
+            <div class="pw-row">
+                <span class="pw-badge">9:00 க்கு பின்</span>
+                <span>1 நிமிடம் தாமதம் = 5 நிமிடம் கழிக்கப்படும்</span>
+            </div>
         </div>
 
         <!-- Steps -->
@@ -258,7 +309,11 @@
         <div class="card" id="successCard" style="display: none; text-align: center;">
             <div class="success-icon">✓</div>
             <h2 style="font-size: 24px; font-weight: 700; color: #1f2937; margin-bottom: 8px;">Successfully Clocked In!</h2>
-            <p style="color: #6b7280; margin-bottom: 24px;" id="successMessage">You clocked in at --:--</p>
+            <p style="color: #6b7280; margin-bottom: 16px;" id="successMessage">You clocked in at --:--</p>
+            <div id="penaltyNotice" style="display:none; background:#fff7ed; border:2px solid #f97316; border-radius:12px; padding:14px; margin-bottom:16px; text-align:left;">
+                <div style="font-weight:700; color:#9a3412; margin-bottom:6px;">⚠️ வருகை நேரம் கழிக்கப்படும்</div>
+                <div style="color:#7c2d12; font-size:15px;" id="penaltyDetail"></div>
+            </div>
             <button class="btn btn-primary" onclick="goToDashboard()">Go to Dashboard</button>
         </div>
     </div>
@@ -509,15 +564,25 @@
 
                     // Show success
                     const clockInTime = new Date(data.data.clock_in_time);
-                    const timeStr = clockInTime.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
-                    
-                    let message = `You clocked in at ${timeStr}`;
-                    if (data.data.is_late) {
-                        message += '. Note: Late arrival detected - permission request created.';
+                    const timeStr = clockInTime.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true, timeZone: 'Asia/Kolkata' });
+
+                    let message = `நீங்கள் ${timeStr} மணிக்கு Clock In செய்தீர்கள்.`;
+                    if (!data.data.is_late) {
+                        message += ' சரியான நேரத்தில் வந்தீர்கள்! 👍';
+                    }
+                    document.getElementById('successMessage').textContent = message;
+
+                    // Show late penalty notice if applicable
+                    if (data.data.is_late && data.data.late_penalty_minutes > 0) {
+                        document.getElementById('penaltyNotice').style.display = 'block';
+                        document.getElementById('penaltyDetail').textContent =
+                            `${data.data.late_minutes} நிமிடம் தாமதம் — உங்கள் வருகை நேரத்திலிருந்து ${data.data.late_penalty_minutes} நிமிடம் கழிக்கப்படும்.`;
+                    } else if (data.data.is_late) {
+                        document.getElementById('penaltyNotice').style.display = 'block';
+                        document.getElementById('penaltyDetail').textContent =
+                            `${data.data.late_minutes} நிமிடம் தாமதம் பதிவு செய்யப்பட்டது. தாமத அனுமதி கோரிக்கை உருவாக்கப்பட்டது.`;
                     }
 
-                    document.getElementById('successMessage').textContent = message;
-                    
                     // Hide all cards
                     document.getElementById('locationCard').style.display = 'none';
                     document.getElementById('cameraCard').style.display = 'none';

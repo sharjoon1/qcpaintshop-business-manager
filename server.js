@@ -22,7 +22,7 @@ require('dotenv').config();
 const { Server: SocketIO } = require('socket.io');
 
 // Import middleware
-const { initPool, requirePermission, requireAnyPermission, requireAuth, requireRole, getUserPermissions } = require('./middleware/permissionMiddleware');
+const { initPool, requirePermission, requireAnyPermission, requireAuth, requireRole, getUserPermissions, isFullAdmin } = require('./middleware/permissionMiddleware');
 
 // Import route modules
 const attendanceRoutes = require('./routes/attendance');
@@ -96,6 +96,7 @@ const itemMasterRoutes = require('./routes/item-master');
 const fcmAdmin = require('./services/fcm-admin');
 const monitoringRoutes = require('./routes/monitoring');
 const photosRoutes = require('./routes/photos');
+const agreementsRoutes = require('./routes/agreements');
 
 const app = express();
 app.set('trust proxy', 1); // Trust first proxy (nginx/aaPanel)
@@ -132,9 +133,11 @@ app.use(require('helmet')({
                 "https://cdnjs.cloudflare.com",
                 "https://unpkg.com",
                 "https://cdn.quilljs.com",
+                "https://cdn.socket.io",
                 "https://www.googletagmanager.com",
                 "https://www.youtube.com"
             ],
+            "script-src-attr": ["'unsafe-inline'"],
             "style-src": [
                 "'self'", "'unsafe-inline'",
                 "https://fonts.googleapis.com",
@@ -317,6 +320,7 @@ activityTrackerRoutes.setReportService(attendanceReport);
 monitoringRoutes.setPool(pool);
 photosRoutes.setPool(pool);
 if (itemMasterRoutes.setPool) itemMasterRoutes.setPool(pool);
+agreementsRoutes.setPool(pool);
 const invoiceLineSync = require('./services/zoho-invoice-line-sync');
 invoiceLineSync.setPool(pool);
 const reorderCompute = require('./services/reorder-compute-service');
@@ -385,6 +389,7 @@ app.use('/api/activity-feed', activityFeedRoutes.router);
 app.use('/api/monitoring', monitoringRoutes.router);
 app.use('/api/photos', photosRoutes.router);
 app.use('/api/item-master', itemMasterRoutes.router);
+app.use('/api/agreements', agreementsRoutes.router);
 
 // Share page routes (serve HTML for public share links)
 app.get('/share/estimate/:token', (req, res) => {
@@ -403,23 +408,6 @@ app.get('/oauth/callback', (req, res) => {
     res.redirect(`/api/zoho/oauth/callback${query ? '?' + query : ''}`);
 });
 
-// Zoho OAuth manual code exchange (direct route for reliability)
-app.post('/api/zoho/oauth/exchange', requireRole('admin'), async (req, res) => {
-    try {
-        const zohoOAuth = require('./services/zoho-oauth');
-        const { code } = req.body;
-        if (!code) {
-            return res.status(400).json({ success: false, message: 'Authorization code is required' });
-        }
-        console.log('[Zoho] Manual code exchange - code:', code.substring(0, 20) + '...');
-        const result = await zohoOAuth.generateTokenFromCode(code.trim());
-        console.log('[Zoho] Code exchange successful! Token expires at:', result.expires_at);
-        res.json({ success: true, message: 'Zoho Books connected successfully!', data: { expires_at: result.expires_at } });
-    } catch (error) {
-        console.error('[Zoho] Manual code exchange error:', error.message);
-        res.status(500).json({ success: false, message: error.message });
-    }
-});
 
 // ========================================
 // AUTHENTICATION ENDPOINTS
@@ -2200,7 +2188,7 @@ app.get('/api/users', requirePermission('staff', 'view'), async (req, res) => {
         const params = [];
 
         if (assignable === '1') {
-            query += " AND role IN ('staff', 'sales_staff', 'branch_manager')";
+            query += " AND role IN ('staff', 'sales_staff', 'branch_manager', 'manager', 'accountant')";
             query += " AND status = 'active'";
         } else {
             if (role) { query += ' AND role = ?'; params.push(role); }
@@ -2240,7 +2228,7 @@ app.get('/api/users', requirePermission('staff', 'view'), async (req, res) => {
 app.get('/api/users/:id', requireAuth, async (req, res) => {
     try {
         // Staff can only view their own profile; admin/manager can view any
-        if (req.params.id != req.user.id && !['admin', 'manager'].includes(req.user.role)) {
+        if (req.params.id != req.user.id && !isFullAdmin(req.user.role) && !['manager', 'branch_manager'].includes(req.user.role)) {
             return res.status(403).json({ success: false, message: 'Access denied' });
         }
         const [rows] = await pool.query(
@@ -2455,33 +2443,43 @@ app.put('/api/users/:id', requirePermission('staff', 'edit'), async (req, res) =
         // Recompute KYC status after update
         await computeKycStatus(userId);
 
-        // Notify user if admin changed their role, status, or branch
+        // Notify user if admin changed their role, status, or branch.
+        // Fire-and-forget so SMTP / push delays never block the API response.
         if ((role !== undefined || status !== undefined || branch_id !== undefined) && parseInt(userId) !== req.user.id) {
-            try {
-                const changes = [];
-                if (role) changes.push(`Role: ${role}`);
-                if (status) changes.push(`Status: ${status}`);
-                if (branch_id) changes.push('Branch updated');
-                const notificationService = require('./services/notification-service');
-                await notificationService.send(parseInt(userId), {
-                    type: 'profile_updated', title: 'Profile Updated',
-                    body: `Your profile has been updated. ${changes.join(', ')}`,
-                    data: { type: 'profile_updated' }
-                });
-                // Send email notification
-                const [updatedUser] = await pool.query('SELECT email, full_name FROM users WHERE id = ?', [userId]);
-                if (updatedUser.length > 0 && updatedUser[0].email) {
-                    const emailService = require('./services/email-service');
-                    await emailService.send(updatedUser[0].email, 'Profile Updated - Quality Colours', `
-                        <h2 style="color: #333;">Hello ${updatedUser[0].full_name},</h2>
-                        <p>Your profile has been updated by an administrator.</p>
-                        <div style="background: white; border-left: 4px solid #667eea; padding: 15px; margin: 20px 0; border-radius: 4px;">
-                            <p style="margin: 0; color: #4b5563;">${changes.join('<br>')}</p>
-                        </div>
-                        <p>If you have any questions, please contact your manager.</p>
-                    `);
+            const changes = [];
+            if (role) changes.push(`Role: ${role}`);
+            if (status) changes.push(`Status: ${status}`);
+            if (branch_id) changes.push('Branch updated');
+
+            setImmediate(async () => {
+                try {
+                    const notificationService = require('./services/notification-service');
+                    await notificationService.send(parseInt(userId), {
+                        type: 'profile_updated', title: 'Profile Updated',
+                        body: `Your profile has been updated. ${changes.join(', ')}`,
+                        data: { type: 'profile_updated' }
+                    });
+                } catch (notifErr) {
+                    console.error('Profile update notification error:', notifErr.message);
                 }
-            } catch (notifErr) { console.error('Profile update notification error:', notifErr.message); }
+
+                try {
+                    const [updatedUser] = await pool.query('SELECT email, full_name FROM users WHERE id = ?', [userId]);
+                    if (updatedUser.length > 0 && updatedUser[0].email) {
+                        const emailService = require('./services/email-service');
+                        await emailService.send(updatedUser[0].email, 'Profile Updated - Quality Colours', `
+                            <h2 style="color: #333;">Hello ${updatedUser[0].full_name},</h2>
+                            <p>Your profile has been updated by an administrator.</p>
+                            <div style="background: white; border-left: 4px solid #667eea; padding: 15px; margin: 20px 0; border-radius: 4px;">
+                                <p style="margin: 0; color: #4b5563;">${changes.join('<br>')}</p>
+                            </div>
+                            <p>If you have any questions, please contact your manager.</p>
+                        `);
+                    }
+                } catch (emailErr) {
+                    console.error('Profile update email error:', emailErr.message);
+                }
+            });
         }
 
         res.json({ success: true, message: 'User updated successfully' });
@@ -2500,8 +2498,10 @@ app.delete('/api/users/:id', requirePermission('staff', 'delete'), async (req, r
             return res.status(404).json({ error: 'User not found' });
         }
 
-        if (user[0].role === 'admin') {
-            const [admins] = await pool.query('SELECT COUNT(*) as count FROM users WHERE role = ?', ['admin']);
+        if (isFullAdmin(user[0].role)) {
+            const [admins] = await pool.query(
+                "SELECT COUNT(*) as count FROM users WHERE role IN ('admin','administrator','super_admin') AND status = 'active'"
+            );
             if (admins[0].count <= 1) {
                 return res.status(400).json({ error: 'Cannot delete the last admin user' });
             }
@@ -3797,14 +3797,14 @@ anomalyDetector.setAlertCallback(async (key, severity, title, message) => {
     // Send WhatsApp to admins for critical anomalies
     if (severity === 'critical' && whatsappSessionManager) {
         try {
-            const [admins] = await pool.query(`SELECT phone FROM users WHERE role = 'admin' AND status = 'active' AND phone IS NOT NULL LIMIT 3`);
+            const [admins] = await pool.query(`SELECT phone FROM users WHERE role IN ('admin','administrator','super_admin') AND status = 'active' AND phone IS NOT NULL LIMIT 3`);
             const alertMsg = `⚠️ [${severity.toUpperCase()}] ${title}\n${message}\nTime: ${new Date().toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' })}`;
             for (const a of admins) await whatsappSessionManager.sendMessage(0, a.phone, alertMsg, { source: 'anomaly_alert' });
         } catch (e) { console.error('[Anomaly Alert] WhatsApp error:', e.message); }
     }
     // In-app notification to admins/managers
     try {
-        const [admins] = await pool.query(`SELECT id FROM users WHERE role IN ('admin','manager') AND status = 'active' LIMIT 10`);
+        const [admins] = await pool.query(`SELECT id FROM users WHERE role IN ('admin','administrator','super_admin','manager','branch_manager') AND status = 'active' LIMIT 10`);
         for (const a of admins) await notificationService.send(a.id, { type: 'system_alert', title: `[${severity}] ${title}`, body: message });
     } catch (e) { console.error('[Anomaly Alert] Notification error:', e.message); }
 });
@@ -3860,21 +3860,21 @@ io.on('connection', async (socket) => {
 
     // Handle explicit room join request from WhatsApp sessions page
     socket.on('join_whatsapp_admin', () => {
-        if (socket.user.role === 'admin') {
+        if (isFullAdmin(socket.user.role)) {
             socket.join('whatsapp_admin');
         }
     });
 
     // WA Marketing admin room
     socket.on('join_wa_marketing_admin', () => {
-        if (socket.user.role === 'admin') {
+        if (isFullAdmin(socket.user.role)) {
             socket.join('wa_marketing_admin');
         }
     });
 
     // WA Chat admin room
     socket.on('join_whatsapp_chat_admin', () => {
-        if (socket.user.role === 'admin') {
+        if (isFullAdmin(socket.user.role)) {
             socket.join('whatsapp_chat_admin');
         }
     });
@@ -3935,9 +3935,9 @@ io.on('connection', async (socket) => {
         }
     });
 
-    // Join live dashboard room (admin/manager only)
+    // Join live dashboard room (admin/administrator/manager/branch_manager/super_admin only)
     socket.on('join_live_dashboard', () => {
-        if (socket.user.role === 'admin' || socket.user.role === 'manager') {
+        if (isFullAdmin(socket.user.role) || socket.user.role === 'manager' || socket.user.role === 'branch_manager') {
             socket.join('live_dashboard_admin');
         }
     });
@@ -4021,7 +4021,7 @@ server.listen(PORT, () => {
                 try {
                     const [userInfo] = await pool.query('SELECT full_name FROM users WHERE id = ?', [rec.user_id]);
                     const staffName = userInfo[0]?.full_name || 'Staff';
-                    const [admins] = await pool.query("SELECT id FROM users WHERE role = 'admin' AND status = 'active'");
+                    const [admins] = await pool.query("SELECT id FROM users WHERE role IN ('admin','administrator','super_admin') AND status = 'active'");
                     for (const admin of admins) {
                         await notificationService.send(admin.id, {
                             type: 'geo_auto_clockout_admin',
@@ -4076,7 +4076,7 @@ server.listen(PORT, () => {
                 try {
                     const [userInfo] = await pool.query('SELECT full_name FROM users WHERE id = ?', [rec.user_id]);
                     const staffName = userInfo[0]?.full_name || 'Staff';
-                    const [admins] = await pool.query("SELECT id FROM users WHERE role = 'admin' AND status = 'active'");
+                    const [admins] = await pool.query("SELECT id FROM users WHERE role IN ('admin','administrator','super_admin') AND status = 'active'");
                     for (const admin of admins) {
                         await notificationService.send(admin.id, {
                             type: 'geo_auto_clockout_admin',

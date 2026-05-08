@@ -5,7 +5,7 @@
 
 const express = require('express');
 const router = express.Router();
-const { requirePermission, requireAuth } = require('../middleware/permissionMiddleware');
+const { requirePermission, requireAuth, isFullAdmin } = require('../middleware/permissionMiddleware');
 
 // Database connection (imported from main app)
 let pool;
@@ -98,7 +98,7 @@ router.get('/stats', requireAuth, async (req, res) => {
     try {
         const today = req.query.date || new Date().toISOString().split('T')[0];
         const branchId = req.query.branch_id;
-        const isAdmin = req.user.role === 'admin';
+        const isAdmin = isFullAdmin(req.user.role);
 
         // Total activities today
         let totalQuery = `
@@ -376,7 +376,7 @@ router.get('/:id', requireAuth, async (req, res) => {
     try {
         const activityId = req.params.id;
         const userId = req.user.id;
-        const isAdmin = req.user.role === 'admin';
+        const isAdmin = isFullAdmin(req.user.role);
 
         const [rows] = await pool.query(
             `SELECT sa.*,
@@ -430,7 +430,7 @@ router.get('/:id', requireAuth, async (req, res) => {
 router.get('/', requireAuth, async (req, res) => {
     try {
         const userId = req.user.id;
-        const isAdmin = req.user.role === 'admin';
+        const isAdmin = isFullAdmin(req.user.role);
         const {
             user_id,
             date,
@@ -659,7 +659,7 @@ router.put('/:id', requireAuth, async (req, res) => {
     try {
         const activityId = req.params.id;
         const userId = req.user.id;
-        const isAdmin = req.user.role === 'admin';
+        const isAdmin = isFullAdmin(req.user.role);
 
         // Check if activity exists
         const [existing] = await pool.query(

@@ -24,33 +24,77 @@
         .brand-card { transition: all 0.2s; cursor: pointer; border: 2px solid transparent; }
         .brand-card:hover { border-color: #667eea; transform: translateY(-2px); box-shadow: 0 4px 12px rgba(0,0,0,0.1); }
         .brand-card.active { border-color: #667eea; background: #f0f4ff; }
-        .match-table { font-size: 0.75rem; }
-        .match-table th { position: sticky; top: 0; z-index: 5; background: #f8fafc; }
-        .match-table td, .match-table th { padding: 6px 8px; border-bottom: 1px solid #f1f5f9; }
-        .match-table tr:hover { background: #f0f4ff; }
-        .match-table tr.row-changed { background: #f0fdf4; }
-        .match-table tr.row-same { opacity: 0.5; }
         .step-badge { width: 28px; height: 28px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 0.75rem; flex-shrink: 0; }
         .step-badge.active { background: #667eea; color: white; }
         .step-badge.done { background: #10b981; color: white; }
         .step-badge.pending { background: #e2e8f0; color: #94a3b8; }
-        .kai-msg { background: linear-gradient(135deg, #667eea11, #764ba211); border: 1px solid #667eea33; border-radius: 12px; padding: 12px 16px; }
         .toast { position: fixed; bottom: 20px; right: 20px; z-index: 9999; padding: 10px 20px; border-radius: 8px; font-size: 0.8rem; font-weight: 500; opacity: 0; transition: opacity 0.3s; pointer-events: none; }
         .toast.show { opacity: 1; pointer-events: auto; }
         .toast-success { background: #10b981; color: white; }
         .toast-error { background: #ef4444; color: white; }
         .toast-info { background: #667eea; color: white; }
+
+        /* Comparison table */
+        .cmp-table { font-size: 0.72rem; border-collapse: separate; border-spacing: 0; width: 100%; }
+        .cmp-table th { position: sticky; top: 0; z-index: 5; background: #f1f5f9; padding: 7px 8px; font-weight: 600; color: #475569; white-space: nowrap; border-bottom: 2px solid #e2e8f0; text-align: left; }
+        .cmp-table td { padding: 5px 8px; border-bottom: 1px solid #f1f5f9; vertical-align: top; }
+        .cmp-table tr:hover td { background: #f8faff; }
+        .cmp-table tr.row-changed td { background: #f0fdf4; }
+        .cmp-table tr.row-same td { opacity: 0.55; }
+
+        /* Field diff cell */
+        .diff-cell { display: flex; flex-direction: column; gap: 2px; }
+        .diff-old { color: #94a3b8; font-size: 0.68rem; text-decoration: line-through; }
+        .diff-new { color: #059669; font-weight: 600; }
+        .diff-same { color: #374151; }
+
+        /* Change tags */
+        .tag-dpl  { background: #dbeafe; color: #1d4ed8; font-size: 0.65rem; padding: 1px 5px; border-radius: 999px; font-weight: 600; white-space: nowrap; }
+        .tag-rate { background: #dcfce7; color: #15803d; font-size: 0.65rem; padding: 1px 5px; border-radius: 999px; font-weight: 600; white-space: nowrap; }
+        .tag-name { background: #fef3c7; color: #92400e; font-size: 0.65rem; padding: 1px 5px; border-radius: 999px; font-weight: 600; white-space: nowrap; }
+        .tag-sku  { background: #ede9fe; color: #5b21b6; font-size: 0.65rem; padding: 1px 5px; border-radius: 999px; font-weight: 600; white-space: nowrap; }
+
+        /* View toggle */
+        .view-btn { padding: 4px 10px; border-radius: 6px; font-size: 0.72rem; font-weight: 600; border: 1px solid #e2e8f0; background: white; color: #64748b; cursor: pointer; transition: all 0.15s; }
+        .view-btn.active { background: #667eea; color: white; border-color: #667eea; }
+
+        /* Mobile responsive */
+        .cmp-table { min-width: 700px; }
+        @media (max-width:639px) {
+            .step-label { display: none; }
+            .mob-action-bar { flex-direction: column; align-items: stretch; }
+            .mob-action-bar > * { width: 100%; justify-content: center; }
+            .mob-btn-group { flex-wrap: wrap; gap: 6px; }
+            .mob-btn-group button, .mob-btn-group a { flex: 1 1 auto; min-width: 0; text-align: center; justify-content: center; }
+        }
+
+        /* Mobile AI card layout */
+        .ai-card { border:1px solid #e5e7eb; border-radius:10px; background:#fff; padding:12px; margin-bottom:10px; }
+        .ai-pushed-row td { background: #f0fdf4 !important; }
+        .ai-card.ai-card-matched { border-color:#a5b4fc; background:#f8faff; }
+        .ai-card.ai-card-fuzzy   { border-color:#fbbf24; background:#fffbeb; }
+        .ai-card-header { display:flex; gap:10px; align-items:flex-start; margin-bottom:10px; }
+        .ai-card-product { flex:1; min-width:0; }
+        .ai-card-name { font-size:14px; font-weight:600; color:#1f2937; word-break:break-word; }
+        .ai-card-meta { font-size:11px; color:#9ca3af; margin-top:3px; }
+        .ai-card-match { margin-bottom:8px; }
+        .ai-card-proposed { margin-top:10px; padding-top:10px; border-top:1px solid #f1f5f9; }
+        .ai-card-field-label { font-size:10px; color:#9ca3af; font-weight:700; text-transform:uppercase; letter-spacing:0.05em; margin-bottom:3px; }
+        .ai-card-row { display:flex; gap:10px; align-items:flex-start; margin-top:8px; }
+        @media (max-width:639px) {
+            .ai-card input[type="text"] { font-size:13px !important; padding:5px 8px !important; }
+        }
     </style>
 </head>
 <body data-page="zoho-dpl" class="bg-gray-50">
     <div id="toast" class="toast"></div>
 
-    <div class="container mx-auto p-4 md:p-6 max-w-6xl">
+    <div class="container mx-auto p-4 md:p-6 max-w-7xl">
         <!-- Page Header -->
         <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 mb-5">
             <div>
                 <h2 class="text-xl md:text-2xl font-bold text-gray-800">DPL Price List Import</h2>
-                <p class="text-xs text-gray-500 mt-1">Upload brand dealer price list PDFs to extract and update DPL values</p>
+                <p class="text-xs text-gray-500 mt-1">Upload brand DPL PDF → match with Zoho items → compare & push to Zoho Books</p>
             </div>
             <div class="flex gap-2">
                 <a href="/admin-zoho-items-edit.html" class="px-3 py-1.5 rounded-lg border border-gray-300 bg-white hover:bg-gray-50 text-xs font-medium text-gray-700 flex items-center gap-1.5 transition">
@@ -64,17 +108,17 @@
         <div class="flex items-center gap-3 mb-5 bg-white rounded-lg shadow-sm p-3">
             <div class="flex items-center gap-2">
                 <div class="step-badge active" id="step1Badge">1</div>
-                <span class="text-xs font-semibold text-gray-700">Upload PDF</span>
+                <span class="text-xs font-semibold text-gray-700 step-label">Upload PDF</span>
             </div>
             <div class="h-px flex-1 bg-gray-200"></div>
             <div class="flex items-center gap-2">
                 <div class="step-badge pending" id="step2Badge">2</div>
-                <span class="text-xs font-semibold text-gray-400" id="step2Label">Review Matches</span>
+                <span class="text-xs font-semibold text-gray-400 step-label" id="step2Label">Compare & Review</span>
             </div>
             <div class="h-px flex-1 bg-gray-200"></div>
             <div class="flex items-center gap-2">
                 <div class="step-badge pending" id="step3Badge">3</div>
-                <span class="text-xs font-semibold text-gray-400" id="step3Label">Apply DPL</span>
+                <span class="text-xs font-semibold text-gray-400 step-label" id="step3Label">Push to Zoho</span>
             </div>
         </div>
 
@@ -85,19 +129,30 @@
                 Upload Brand Price List PDF
             </h3>
 
+            <!-- Naming rules info box -->
+            <div class="bg-indigo-50 border border-indigo-200 rounded-lg p-3 mb-4 text-xs text-indigo-800">
+                <div class="font-bold mb-1">Applied Rules (Birla Opus)</div>
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-1 text-indigo-700">
+                    <div>• <b>Item Name:</b> [SKU] PRODUCT BIRLA OPUS PACK</div>
+                    <div>• <b>SKU:</b> [ABBREV][COLOR?][PACKCODE]</div>
+                    <div>• <b>Description:</b> [ABBREV] [CATEGORY] BIRLA OPUS PACK</div>
+                    <div>• <b>Rate:</b> ceil(DPL × 1.18 × 1.10)</div>
+                </div>
+            </div>
+
             <!-- Supported brands -->
             <div class="grid grid-cols-3 sm:grid-cols-6 gap-2 mb-4">
                 <div class="brand-card rounded-lg p-2 bg-gray-50 text-center">
                     <div class="text-xs font-bold text-gray-700">Asian</div>
                     <div class="text-[10px] text-gray-400">192 pages</div>
                 </div>
+                <div class="brand-card rounded-lg p-2 bg-amber-50 border-amber-300 text-center" style="border: 2px solid #f59e0b;">
+                    <div class="text-xs font-bold text-amber-700">Birla Opus</div>
+                    <div class="text-[10px] text-amber-500">Full rules ✓</div>
+                </div>
                 <div class="brand-card rounded-lg p-2 bg-gray-50 text-center">
                     <div class="text-xs font-bold text-gray-700">Berger</div>
                     <div class="text-[10px] text-gray-400">XP / Non-XP</div>
-                </div>
-                <div class="brand-card rounded-lg p-2 bg-gray-50 text-center">
-                    <div class="text-xs font-bold text-gray-700">Birla Opus</div>
-                    <div class="text-[10px] text-gray-400">14 pages</div>
                 </div>
                 <div class="brand-card rounded-lg p-2 bg-gray-50 text-center">
                     <div class="text-xs font-bold text-gray-700">Gem/Astral</div>
@@ -119,7 +174,7 @@
                  ondragleave="this.classList.remove('border-indigo-400','bg-indigo-50')"
                  ondrop="event.preventDefault(); this.classList.remove('border-indigo-400','bg-indigo-50'); handleDrop(event)">
                 <svg class="mx-auto w-12 h-12 text-gray-300 mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"></path></svg>
-                <p class="text-sm text-gray-500 mb-2">Drag & drop a PDF file here, or</p>
+                <p class="text-sm text-gray-500 mb-2">Drag & drop a DPL PDF here, or</p>
                 <input type="file" id="pdfFileInput" accept=".pdf" class="hidden" onchange="handleFileSelect()">
                 <button onclick="document.getElementById('pdfFileInput').click()" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-xs font-semibold transition">Choose File</button>
                 <p class="text-[10px] text-gray-400 mt-2">Max 10MB PDF</p>
@@ -136,17 +191,138 @@
             </div>
 
             <!-- Parse button -->
-            <div class="mt-4 flex items-center justify-between">
+            <div class="mt-4 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2">
                 <div id="parseStatus" class="text-xs text-gray-500"></div>
-                <button onclick="parsePDF()" id="parseBtn" class="px-5 py-2 bg-gradient-to-r from-indigo-500 to-purple-600 hover:from-indigo-600 hover:to-purple-700 text-white font-semibold rounded-lg text-sm transition flex items-center gap-2 disabled:opacity-50" disabled>
-                    <svg id="parseSpinner" class="hidden w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
-                    Parse & Match
-                </button>
+                <div class="flex gap-2 flex-wrap justify-end">
+                    <button onclick="parsePDF()" id="parseBtn" class="px-4 py-2 border border-gray-300 bg-white hover:bg-gray-50 text-gray-700 font-semibold rounded-lg text-xs transition flex items-center gap-2 disabled:opacity-50" disabled title="Pattern-based parser — fast, but needs brand-specific rules">
+                        <svg id="parseSpinner" class="hidden w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
+                        Quick Parse
+                    </button>
+                    <button onclick="aiParsePDF()" id="aiParseBtn" class="px-5 py-2 bg-gradient-to-r from-indigo-500 to-purple-600 hover:from-indigo-600 hover:to-purple-700 text-white font-semibold rounded-lg text-sm transition flex items-center gap-2 disabled:opacity-50" disabled title="AI parser — works on any brand">
+                        <svg id="aiParseSpinner" class="hidden w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
+                        AI Parse (Smart)
+                    </button>
+                </div>
+            </div>
+
+            <!-- Auto-Propose (No PDF) — Step 0 / alternate path -->
+            <div class="mt-4 border-t pt-4">
+                <div class="bg-emerald-50 border border-emerald-200 rounded-lg p-3 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+                    <div class="flex items-start gap-3">
+                        <svg class="w-5 h-5 text-emerald-600 mt-0.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"/></svg>
+                        <div>
+                            <div class="font-bold text-sm text-emerald-800">Auto-Propose Naming (No PDF)</div>
+                            <div class="text-[11px] text-emerald-700 mt-0.5">Apply Birla Opus naming rules to existing items already in the database — no PDF required. Reviews names, SKUs, descriptions, and recomputes rate from current DPL.</div>
+                        </div>
+                    </div>
+                    <div class="flex items-center gap-2 shrink-0">
+                        <select id="autoProposeBrand" class="px-2 py-1.5 border border-emerald-300 rounded text-xs bg-white focus:border-emerald-500 outline-none">
+                            <option value="birlaopus">Birla Opus</option>
+                        </select>
+                        <button onclick="autoProposeFetch()" id="autoProposeBtn" class="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-bold transition flex items-center gap-2">
+                            <svg id="autoProposeSpinner" class="hidden w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
+                            Auto-Propose (No PDF)
+                        </button>
+                    </div>
+                </div>
             </div>
         </div>
 
-        <!-- Step 2: Results -->
+        <!-- Step 2: Compare & Review -->
         <div id="step2" class="hidden">
+
+            <!-- =============================================================
+                 AI MODE — Excel-like full review table (shown after AI Parse)
+                 ============================================================= -->
+            <div id="step2Ai" class="hidden">
+                <!-- AI summary cards -->
+                <div class="grid grid-cols-2 sm:grid-cols-5 gap-3 mb-4">
+                    <div class="bg-white rounded-lg shadow-sm p-3 text-center">
+                        <div class="text-2xl font-bold text-gray-800" id="aiStatPages">-</div>
+                        <div class="text-[10px] text-gray-400 font-medium">Pages</div>
+                    </div>
+                    <div class="bg-white rounded-lg shadow-sm p-3 text-center">
+                        <div class="text-2xl font-bold text-indigo-600" id="aiStatExtracted">-</div>
+                        <div class="text-[10px] text-gray-400 font-medium">AI Extracted</div>
+                    </div>
+                    <div class="bg-white rounded-lg shadow-sm p-3 text-center">
+                        <div class="text-2xl font-bold text-green-600" id="aiStatMatched">-</div>
+                        <div class="text-[10px] text-gray-400 font-medium">Auto-Matched</div>
+                    </div>
+                    <div class="bg-white rounded-lg shadow-sm p-3 text-center">
+                        <div class="text-2xl font-bold text-amber-500" id="aiStatUnmatched">-</div>
+                        <div class="text-[10px] text-gray-400 font-medium">Needs Review</div>
+                    </div>
+                    <div class="bg-white rounded-lg shadow-sm p-3 text-center">
+                        <div class="text-lg font-bold text-gray-700" id="aiStatBrand">-</div>
+                        <div class="text-[10px] text-gray-400 font-medium">Brand Detected</div>
+                    </div>
+                </div>
+
+                <!-- AI Excel-like table -->
+                <div class="bg-white rounded-lg shadow-sm mb-4">
+                    <div class="px-4 py-3 border-b flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2">
+                        <div class="flex items-center gap-2 flex-wrap">
+                            <h3 class="font-bold text-gray-800 text-sm">AI Review &mdash; Match each PDF row to a Zoho item</h3>
+                            <span id="aiSelectedBadge" class="px-2 py-0.5 bg-indigo-100 text-indigo-700 rounded-full text-[10px] font-bold">0 selected</span>
+                        </div>
+                        <div class="flex items-center gap-2 flex-wrap">
+                            <input type="text" id="aiRowSearch" placeholder="Filter rows..." oninput="renderAiTable()" class="px-2 py-1 border border-gray-300 rounded text-xs w-28 outline-none focus:border-indigo-500">
+                            <select id="aiCatFilter" onchange="renderAiTable()" class="px-2 py-1 border border-gray-300 rounded text-xs outline-none focus:border-indigo-500 bg-white max-w-[160px]">
+                                <option value="">All Categories</option>
+                            </select>
+                            <button onclick="aiSelectAll()" class="px-2 py-1 border border-gray-300 rounded text-xs hover:bg-gray-50">Select All</button>
+                            <button onclick="aiSelectAutoMatched()" class="px-2 py-1 border border-indigo-300 text-indigo-700 rounded text-xs hover:bg-indigo-50">Select Auto-Matched</button>
+                            <button id="aiPushedFilterBtn" onclick="aiCyclePushedFilter()" class="px-2 py-1 border border-gray-300 rounded text-xs hover:bg-gray-50">Filter: All</button>
+                            <button onclick="aiClearAll()" class="px-2 py-1 border border-gray-300 rounded text-xs hover:bg-gray-50">Clear</button>
+                        </div>
+                    </div>
+
+                    <div class="overflow-auto" style="max-height: 65vh; -webkit-overflow-scrolling: touch;" id="aiTableWrap">
+                        <table class="cmp-table" id="aiMatchTable">
+                            <thead>
+                                <tr>
+                                    <th style="width:30px"><input type="checkbox" id="aiSelectAllCb" onchange="aiToggleAll()"></th>
+                                    <th>PDF Product</th>
+                                    <th class="text-right">Pack</th>
+                                    <th class="text-right">DPL</th>
+                                    <th>Zoho Item Match</th>
+                                    <th>Proposed Name</th>
+                                    <th>SKU</th>
+                                    <th class="text-right">Rate</th>
+                                </tr>
+                            </thead>
+                            <tbody id="aiMatchBody"></tbody>
+                        </table>
+                    </div>
+                    <div id="aiCardContainer" style="display:none" class="p-3"></div>
+                </div>
+
+                <!-- AI Action bar -->
+                <div class="bg-white rounded-lg shadow-sm p-4 flex flex-col sm:flex-row items-center justify-between gap-3">
+                    <div class="flex gap-2 flex-wrap mob-btn-group">
+                        <button onclick="backToUpload()" class="px-3 py-2 border border-gray-300 rounded-lg text-xs font-medium text-gray-600 hover:bg-gray-50 transition">&larr; Upload Another</button>
+                        <button onclick="aiSelectAutoMatched()" class="px-3 py-2 border border-indigo-300 text-indigo-700 rounded-lg text-xs font-medium hover:bg-indigo-50 transition">Auto-Matched</button>
+                        <button onclick="aiSelectAll()" class="px-3 py-2 border border-gray-300 rounded-lg text-xs font-medium text-gray-600 hover:bg-gray-50 transition">☑ All</button>
+                        <button onclick="aiClearAll()" class="px-3 py-2 border border-gray-300 rounded-lg text-xs font-medium text-gray-600 hover:bg-gray-50 transition">☐ None</button>
+                    </div>
+                    <div class="flex items-center gap-3 flex-wrap">
+                        <span id="aiSelectedCount" class="text-xs text-gray-500"></span>
+                        <button onclick="aiApplyAndPushToZoho()" id="aiApplyBtn" class="px-5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-sm font-bold transition flex items-center gap-2">
+                            <svg id="aiApplySpinner" class="hidden w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"/></svg>
+                            Apply &amp; Push to Zoho
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- =============================================================
+                 QUICK MODE — pattern-parser legacy view (shown after Quick Parse)
+                 ============================================================= -->
+            <div id="step2Quick">
             <!-- Summary cards -->
             <div class="grid grid-cols-2 sm:grid-cols-5 gap-3 mb-4">
                 <div class="bg-white rounded-lg shadow-sm p-3 text-center">
@@ -171,12 +347,17 @@
                 </div>
             </div>
 
-            <!-- Matched items table -->
+            <!-- Matched items comparison table -->
             <div class="bg-white rounded-lg shadow-sm mb-4">
-                <div class="px-4 py-3 border-b flex items-center justify-between">
-                    <div class="flex items-center gap-2">
+                <div class="px-4 py-3 border-b flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2">
+                    <div class="flex items-center gap-2 flex-wrap">
                         <h3 class="font-bold text-gray-800 text-sm">Matched Items</h3>
                         <span id="matchedCountBadge" class="px-2 py-0.5 bg-green-100 text-green-700 rounded-full text-[10px] font-bold">0</span>
+                        <!-- View toggle -->
+                        <div class="flex gap-1 ml-2">
+                            <button class="view-btn active" id="viewFull" onclick="setView('full')">Full Compare</button>
+                            <button class="view-btn" id="viewDpl" onclick="setView('dpl')">DPL Only</button>
+                        </div>
                     </div>
                     <div class="flex items-center gap-2">
                         <label class="flex items-center gap-1.5 text-xs text-gray-500 cursor-pointer">
@@ -185,20 +366,18 @@
                         <input type="text" id="matchSearch" placeholder="Filter..." oninput="renderMatchedTable()" class="px-2 py-1 border border-gray-300 rounded text-xs w-32 outline-none focus:border-indigo-500">
                     </div>
                 </div>
-                <div style="max-height:500px; overflow-y:auto;" id="matchedTableWrap">
-                    <table class="w-full match-table">
-                        <thead>
-                            <tr>
-                                <th class="text-left w-8"><input type="checkbox" id="selectAllMatched" onchange="toggleAllMatched()" checked></th>
-                                <th class="text-left">Zoho Item Name</th>
-                                <th class="text-left">PDF Product</th>
-                                <th class="text-right">Pack</th>
-                                <th class="text-right">New DPL</th>
-                                <th class="text-right">Current DPL</th>
-                                <th class="text-right">Rate</th>
-                                <th class="text-center">Change</th>
-                            </tr>
-                        </thead>
+
+                <!-- Legend -->
+                <div class="px-4 py-2 bg-gray-50 border-b flex flex-wrap gap-3 text-[10px] text-gray-500">
+                    <span class="flex items-center gap-1"><span class="tag-dpl">DPL</span> = Dealer Price change</span>
+                    <span class="flex items-center gap-1"><span class="tag-rate">RATE</span> = Selling price change</span>
+                    <span class="flex items-center gap-1"><span class="tag-name">NAME</span> = Item name change</span>
+                    <span class="flex items-center gap-1"><span class="tag-sku">SKU</span> = SKU change</span>
+                </div>
+
+                <div style="max-height:560px; overflow:auto; -webkit-overflow-scrolling:touch;" id="matchedTableWrap">
+                    <table class="cmp-table" id="matchedTable">
+                        <thead id="matchedHead"></thead>
                         <tbody id="matchedBody"></tbody>
                     </table>
                 </div>
@@ -212,10 +391,13 @@
                         <span id="unmatchedLabel">Unmatched Items (0)</span>
                     </summary>
                     <div class="px-4 pb-3">
-                        <p class="text-xs text-gray-500 mb-2">These items from the PDF couldn't be auto-matched. Use <b>Send to KAI</b> below for AI-assisted matching.</p>
+                        <p class="text-xs text-gray-500 mb-2">These items from the PDF couldn't be auto-matched. Check item names or add missing items manually.</p>
                         <div style="max-height:300px; overflow-y:auto;">
-                            <table class="w-full match-table">
-                                <thead><tr><th class="text-left">Product Name</th><th class="text-right">Pack Size</th><th class="text-right">DPL</th><th class="text-left">Category</th><th class="text-left">Reason</th></tr></thead>
+                            <table class="w-full cmp-table">
+                                <thead><tr>
+                                    <th>Product Name</th><th class="text-right">Pack</th>
+                                    <th class="text-right">DPL</th><th>Category</th><th>Reason</th>
+                                </tr></thead>
                                 <tbody id="unmatchedBody"></tbody>
                             </table>
                         </div>
@@ -223,29 +405,129 @@
                 </details>
             </div>
 
-            <!-- Action buttons -->
+            <!-- Action bar -->
             <div class="bg-white rounded-lg shadow-sm p-4 flex flex-col sm:flex-row items-center justify-between gap-3">
-                <div class="flex gap-2">
-                    <button onclick="backToUpload()" class="px-3 py-2 border border-gray-300 rounded-lg text-xs font-medium text-gray-600 hover:bg-gray-50 transition">Upload Another PDF</button>
+                <div class="flex gap-2 flex-wrap mob-btn-group">
+                    <button onclick="backToUpload()" class="px-3 py-2 border border-gray-300 rounded-lg text-xs font-medium text-gray-600 hover:bg-gray-50 transition">← Upload Another</button>
+                    <button onclick="bulkCheckAll(true)"  class="px-3 py-2 border border-gray-300 rounded-lg text-xs font-medium text-gray-600 hover:bg-gray-50 transition">☑ All</button>
+                    <button onclick="bulkCheckAll(false)" class="px-3 py-2 border border-gray-300 rounded-lg text-xs font-medium text-gray-600 hover:bg-gray-50 transition">☐ None</button>
+                    <button onclick="selectOnlyChanged()" class="px-3 py-2 border border-gray-300 rounded-lg text-xs font-medium text-gray-600 hover:bg-gray-50 transition">Changed Only</button>
                 </div>
-                <div class="flex gap-2">
-                    <span id="selectedCount" class="text-xs text-gray-500 self-center"></span>
-                    <button onclick="applyDplDirect()" id="applyBtn" class="px-5 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg text-sm font-bold transition flex items-center gap-2 disabled:opacity-50">
+                <div class="flex items-center gap-3 flex-wrap">
+                    <span id="selectedCount" class="text-xs text-gray-500"></span>
+                    <!-- Name/SKU update toggle -->
+                    <label class="flex items-center gap-1.5 text-xs text-gray-600 cursor-pointer select-none border border-amber-300 bg-amber-50 rounded-lg px-3 py-2" title="When checked, Zoho item Name and SKU will also be updated. Uncheck to update DPL/Rate only.">
+                        <input type="checkbox" id="updateNameSku" class="rounded accent-amber-600" checked>
+                        <span>Also update Name &amp; SKU</span>
+                    </label>
+                    <!-- Save to DB only -->
+                    <button onclick="applyToDb()" id="applyDbBtn" class="px-4 py-2 border border-green-600 text-green-700 hover:bg-green-50 rounded-lg text-xs font-semibold transition flex items-center gap-1.5">
+                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4"/></svg>
+                        Save to DB
+                    </button>
+                    <!-- Push to Zoho Books -->
+                    <button onclick="applyAndPushToZoho()" id="applyBtn" class="px-5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-sm font-bold transition flex items-center gap-2">
                         <svg id="applySpinner" class="hidden w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
-                        Apply DPL to Zoho Items
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"/></svg>
+                        Apply &amp; Push to Zoho
                     </button>
                 </div>
             </div>
+            </div><!-- /#step2Quick -->
+
+            <!-- =============================================================
+                 AUTO-PROPOSE MODE — review proposed naming for existing DB items
+                 (no PDF, computed server-side from zoho_items_map)
+                 ============================================================= -->
+            <div id="step2AutoPropose" class="hidden">
+                <!-- Summary cards -->
+                <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-4">
+                    <div class="bg-white rounded-lg shadow-sm p-3 text-center">
+                        <div class="text-2xl font-bold text-gray-800" id="apStatTotal">-</div>
+                        <div class="text-[10px] text-gray-400 font-medium">Total Items</div>
+                    </div>
+                    <div class="bg-white rounded-lg shadow-sm p-3 text-center">
+                        <div class="text-2xl font-bold text-emerald-600" id="apStatChanged">-</div>
+                        <div class="text-[10px] text-gray-400 font-medium">Changed</div>
+                    </div>
+                    <div class="bg-white rounded-lg shadow-sm p-3 text-center">
+                        <div class="text-2xl font-bold text-gray-500" id="apStatSame">-</div>
+                        <div class="text-[10px] text-gray-400 font-medium">Same</div>
+                    </div>
+                    <div class="bg-white rounded-lg shadow-sm p-3 text-center">
+                        <div class="text-2xl font-bold text-amber-500" id="apStatSkipped">-</div>
+                        <div class="text-[10px] text-gray-400 font-medium">Skipped</div>
+                    </div>
+                </div>
+
+                <!-- Filter / action toolbar -->
+                <div class="bg-white rounded-lg shadow-sm mb-4">
+                    <div class="px-4 py-3 border-b flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2">
+                        <div class="flex items-center gap-2 flex-wrap">
+                            <h3 class="font-bold text-gray-800 text-sm">Auto-Propose Review</h3>
+                            <span id="apSelectedBadge" class="px-2 py-0.5 bg-emerald-100 text-emerald-700 rounded-full text-[10px] font-bold">0 selected</span>
+                        </div>
+                        <div class="flex items-center gap-2 flex-wrap">
+                            <input type="text" id="apRowSearch" placeholder="Filter rows..." oninput="apRenderTable()" class="px-2 py-1 border border-gray-300 rounded text-xs w-32 outline-none focus:border-emerald-500">
+                            <div class="flex gap-1">
+                                <button class="view-btn active" id="apFilterChanged" onclick="apSetFilter('changed')">Changed</button>
+                                <button class="view-btn" id="apFilterAll" onclick="apSetFilter('all')">All</button>
+                                <button class="view-btn" id="apFilterSkipped" onclick="apSetFilter('skipped')">Skipped</button>
+                            </div>
+                            <button onclick="apSelectAllChanged()" class="px-2 py-1 border border-emerald-300 text-emerald-700 rounded text-xs hover:bg-emerald-50">Select All Changed</button>
+                            <button onclick="apClearAll()" class="px-2 py-1 border border-gray-300 rounded text-xs hover:bg-gray-50">Clear</button>
+                        </div>
+                    </div>
+
+                    <div class="overflow-auto" style="max-height: 65vh; -webkit-overflow-scrolling: touch;" id="apTableWrap">
+                        <table class="cmp-table" id="apTable">
+                            <thead>
+                                <tr>
+                                    <th style="width:30px"><input type="checkbox" id="apSelectAllCb" onchange="apToggleAll()"></th>
+                                    <th>Current Name</th>
+                                    <th>Current SKU</th>
+                                    <th class="text-right">DPL</th>
+                                    <th>Proposed Name (editable)</th>
+                                    <th>Proposed SKU</th>
+                                    <th>Proposed Desc</th>
+                                    <th class="text-right">Proposed Rate</th>
+                                    <th>Status</th>
+                                </tr>
+                            </thead>
+                            <tbody id="apTableBody"></tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- Action bar -->
+                <div class="bg-white rounded-lg shadow-sm p-4 flex flex-col sm:flex-row items-center justify-between gap-3">
+                    <div class="flex gap-2 flex-wrap">
+                        <button onclick="backToUpload()" class="px-3 py-2 border border-gray-300 rounded-lg text-xs font-medium text-gray-600 hover:bg-gray-50 transition">&larr; Back</button>
+                    </div>
+                    <div class="flex items-center gap-3 flex-wrap">
+                        <span id="apSelectedCount" class="text-xs text-gray-500"></span>
+                        <button onclick="autoProposeApply()" id="apApplyBtn" class="px-5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-sm font-bold transition flex items-center gap-2">
+                            <svg id="apApplySpinner" class="hidden w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"/></svg>
+                            Apply &amp; Push to Zoho
+                        </button>
+                    </div>
+                </div>
+            </div><!-- /#step2AutoPropose -->
         </div>
 
-        <!-- Step 3: Applied -->
+        <!-- Step 3: Done -->
         <div id="step3" class="hidden">
             <div class="bg-white rounded-lg shadow-sm p-6 text-center">
                 <svg class="mx-auto w-16 h-16 text-green-500 mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
-                <h3 class="text-lg font-bold text-gray-800 mb-1" id="doneTitle">DPL Updated!</h3>
+                <h3 class="text-lg font-bold text-gray-800 mb-1" id="doneTitle">Items Updated!</h3>
                 <p class="text-sm text-gray-500 mb-4" id="doneMsg"></p>
-                <div class="flex justify-center gap-3">
+                <div class="flex justify-center gap-3 flex-wrap">
                     <button onclick="backToUpload()" class="px-4 py-2 border border-gray-300 rounded-lg text-xs font-medium text-gray-600 hover:bg-gray-50">Import Another</button>
+                    <a href="/admin-zoho-bulk-jobs.html" id="bulkJobLink" class="hidden px-4 py-2 bg-amber-500 hover:bg-amber-600 text-white rounded-lg text-xs font-semibold transition flex items-center gap-1.5">
+                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/></svg>
+                        View Bulk Job Progress
+                    </a>
                     <a href="/admin-zoho-items-edit.html" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-xs font-semibold transition flex items-center gap-1.5">
                         <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
                         Review in Edit Items
@@ -257,31 +539,40 @@
 
     <script>
     // ============ STATE ============
-    var parseResult = null; // server response data
+    var parseResult = null;
     var selectedFile = null;
+    var currentView = 'full'; // 'full' | 'dpl'
+    // AI parse mode state
+    var aiData = null;       // { brand, pages, totalExtracted, items[], zohoItems[] }
+    var aiZohoOptionsHtml = '';   // kept for compatibility (unused after picker refactor)
 
     // ============ HELPERS ============
-    function showToast(msg, type) { var t = document.getElementById('toast'); t.textContent = msg; t.className = 'toast toast-' + (type || 'info'); t.classList.add('show'); setTimeout(function() { t.classList.remove('show'); }, 3500); }
-    function formatINR(a) { var v = parseFloat(a || 0); return '\u20B9' + v.toLocaleString('en-IN', { minimumFractionDigits: 2 }); }
-    function escapeHtml(s) { if (s == null) return ''; return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
-
-    function getAuthToken() {
-        return localStorage.getItem('auth_token') || '';
+    function showToast(msg, type) {
+        var t = document.getElementById('toast');
+        t.textContent = msg; t.className = 'toast toast-' + (type || 'info'); t.classList.add('show');
+        setTimeout(function() { t.classList.remove('show'); }, 3500);
     }
+    function fmt(a) { var v = parseFloat(a || 0); return '₹' + v.toLocaleString('en-IN', { minimumFractionDigits: 2 }); }
+    function esc(s) { if (s == null) return ''; return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+    function getToken() { return localStorage.getItem('auth_token') || ''; }
 
     function setStep(n) {
-        document.getElementById('step1').classList.toggle('hidden', n !== 1);
-        document.getElementById('step2').classList.toggle('hidden', n !== 2);
-        document.getElementById('step3').classList.toggle('hidden', n !== 3);
-        for (var i = 1; i <= 3; i++) {
+        [1,2,3].forEach(function(i) {
+            document.getElementById('step' + i).classList.toggle('hidden', i !== n);
             var badge = document.getElementById('step' + i + 'Badge');
             badge.className = 'step-badge ' + (i < n ? 'done' : (i === n ? 'active' : 'pending'));
             if (i < n) badge.innerHTML = '<svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>';
             else badge.textContent = i;
-        }
-        var l2 = document.getElementById('step2Label'), l3 = document.getElementById('step3Label');
-        l2.className = 'text-xs font-semibold ' + (n >= 2 ? 'text-gray-700' : 'text-gray-400');
-        l3.className = 'text-xs font-semibold ' + (n >= 3 ? 'text-gray-700' : 'text-gray-400');
+        });
+        document.getElementById('step2Label').className = 'text-xs font-semibold step-label ' + (n >= 2 ? 'text-gray-700' : 'text-gray-400');
+        document.getElementById('step3Label').className = 'text-xs font-semibold step-label ' + (n >= 3 ? 'text-gray-700' : 'text-gray-400');
+    }
+
+    function setView(v) {
+        currentView = v;
+        document.getElementById('viewFull').classList.toggle('active', v === 'full');
+        document.getElementById('viewDpl').classList.toggle('active', v === 'dpl');
+        renderMatchedTable();
     }
 
     // ============ FILE HANDLING ============
@@ -289,13 +580,11 @@
         var input = document.getElementById('pdfFileInput');
         if (input.files.length) selectFile(input.files[0]);
     }
-
     function handleDrop(e) {
         var files = e.dataTransfer.files;
         if (files.length && files[0].type === 'application/pdf') selectFile(files[0]);
         else showToast('Only PDF files accepted', 'error');
     }
-
     function selectFile(file) {
         if (file.type !== 'application/pdf') { showToast('Only PDF files accepted', 'error'); return; }
         if (file.size > 10 * 1024 * 1024) { showToast('File too large (max 10MB)', 'error'); return; }
@@ -304,51 +593,1027 @@
         document.getElementById('fileSize').textContent = (file.size / 1024 / 1024).toFixed(1) + ' MB';
         document.getElementById('fileInfo').classList.remove('hidden');
         document.getElementById('parseBtn').disabled = false;
+        var aiBtn = document.getElementById('aiParseBtn'); if (aiBtn) aiBtn.disabled = false;
         document.getElementById('parseStatus').textContent = '';
     }
-
     function clearFile() {
         selectedFile = null;
         document.getElementById('pdfFileInput').value = '';
         document.getElementById('fileInfo').classList.add('hidden');
         document.getElementById('parseBtn').disabled = true;
-        document.getElementById('parseStatus').textContent = '';
+        var aiBtn = document.getElementById('aiParseBtn'); if (aiBtn) aiBtn.disabled = true;
     }
 
     // ============ PARSE PDF ============
     async function parsePDF() {
         if (!selectedFile) return;
-        var btn = document.getElementById('parseBtn');
-        var spinner = document.getElementById('parseSpinner');
-        btn.disabled = true; spinner.classList.remove('hidden');
-        document.getElementById('parseStatus').textContent = 'Parsing ' + selectedFile.name + '... (large PDFs may take a few seconds)';
-
-        var formData = new FormData();
-        formData.append('pdf', selectedFile);
-        formData.append('match', 'true');
-
+        var btn = document.getElementById('parseBtn'), sp = document.getElementById('parseSpinner');
+        btn.disabled = true; sp.classList.remove('hidden');
+        document.getElementById('parseStatus').textContent = 'Parsing ' + selectedFile.name + '...';
+        var fd = new FormData();
+        fd.append('pdf', selectedFile);
+        fd.append('match', 'true');
         try {
             var resp = await fetch('/api/zoho/items/parse-price-list', {
-                method: 'POST',
-                headers: { 'Authorization': 'Bearer ' + getAuthToken() },
-                body: formData
+                method: 'POST', headers: { 'Authorization': 'Bearer ' + getToken() }, body: fd
             });
-
             if (!resp.ok) {
-                var errText = await resp.text();
-                try { var errObj = JSON.parse(errText); throw new Error(errObj.message || 'Server error'); } catch(e) { if (e.message !== 'Server error') throw new Error('Server returned ' + resp.status + ': ' + errText.substring(0, 100)); throw e; }
+                var err = await resp.json().catch(function(){ return {}; });
+                throw new Error(err.message || 'Server error ' + resp.status);
             }
-
             var data = await resp.json();
             if (!data.success) throw new Error(data.message || 'Parse failed');
-
             parseResult = data.data;
             showResults();
         } catch (err) {
             showToast('Parse error: ' + err.message, 'error');
             document.getElementById('parseStatus').textContent = 'Error: ' + err.message;
         } finally {
-            btn.disabled = false; spinner.classList.add('hidden');
+            btn.disabled = false; sp.classList.add('hidden');
+        }
+    }
+
+    // ============ AI PARSE PDF ============
+    async function aiParsePDF() {
+        if (!selectedFile) return;
+        var btn = document.getElementById('aiParseBtn'), sp = document.getElementById('aiParseSpinner');
+        btn.disabled = true; sp.classList.remove('hidden');
+        var statusEl = document.getElementById('parseStatus');
+
+        // Step 1: Upload PDF → get job_id immediately (< 2s, no timeout)
+        statusEl.textContent = 'Uploading ' + selectedFile.name + '...';
+        var fd = new FormData();
+        fd.append('pdf', selectedFile);
+        var jobId;
+        try {
+            var resp = await fetch('/api/zoho/items/ai-parse-price-list', {
+                method: 'POST', headers: { 'Authorization': 'Bearer ' + getToken() }, body: fd
+            });
+            if (!resp.ok) {
+                var err = await resp.json().catch(function(){ return {}; });
+                throw new Error(err.message || 'Server error ' + resp.status);
+            }
+            var startData = await resp.json();
+            if (!startData.success) throw new Error(startData.message || 'Failed to start');
+            jobId = startData.job_id;
+        } catch (err) {
+            showToast('Upload error: ' + err.message, 'error');
+            statusEl.textContent = 'Error: ' + err.message;
+            btn.disabled = false; sp.classList.add('hidden');
+            return;
+        }
+
+        // Step 2: Poll job status every 3 seconds until done
+        var dots = 0;
+        var pollTimer = null;
+        var elapsed = 0;
+        function pollStatus() {
+            dots = (dots + 1) % 4;
+            var d = '.'.repeat(dots);
+            statusEl.textContent = 'AI extracting all products' + d + ' (' + elapsed + 's)';
+            elapsed += 3;
+            fetch('/api/zoho/items/ai-parse-job/' + jobId, {
+                headers: { 'Authorization': 'Bearer ' + getToken() }
+            }).then(function(r){ return r.json(); }).then(function(job) {
+                if (!job.success) {
+                    clearTimeout(pollTimer);
+                    showToast('Poll error: ' + (job.message||'unknown'), 'error');
+                    statusEl.textContent = 'Error checking status';
+                    btn.disabled = false; sp.classList.add('hidden');
+                    return;
+                }
+                if (job.status === 'done') {
+                    clearTimeout(pollTimer);
+                    statusEl.textContent = 'Done! ' + (job.data && job.data.totalExtracted||0) + ' products extracted.';
+                    aiData = job.data;
+                    showAiResults();
+                    btn.disabled = false; sp.classList.add('hidden');
+                } else if (job.status === 'error') {
+                    clearTimeout(pollTimer);
+                    showToast('AI parse error: ' + job.error, 'error');
+                    statusEl.textContent = 'Error: ' + job.error;
+                    btn.disabled = false; sp.classList.add('hidden');
+                } else {
+                    // still running — poll again
+                    if (job.progress) statusEl.textContent = job.progress + ' (' + elapsed + 's)';
+                    pollTimer = setTimeout(pollStatus, 3000);
+                }
+            }).catch(function(e) {
+                // network error — keep polling
+                pollTimer = setTimeout(pollStatus, 3000);
+            });
+        }
+        statusEl.textContent = 'AI reading full PDF (this takes 30–90s for large files)...';
+        pollTimer = setTimeout(pollStatus, 3000);
+    }
+
+    // ============ AI: pack-size helpers (mirror server logic) ============
+    function aiPackSizeToCode(sz) {
+        var s = String(sz||'').toUpperCase().replace(/\s+/g,'');
+        var ml = s.match(/^(\d+(?:\.\d+)?)ML$/);
+        if (ml) return ml[1].replace('.','').substr(0,2)+'M';
+        var lt = s.match(/^(\d+(?:\.\d+)?)(L|LT|LTR|LITRE|LITER|LITRES)?$/);
+        if (lt) {
+            var n=parseFloat(lt[1]);
+            if (n < 1) return '0' + Math.round(n*10);
+            var i=Math.floor(n);
+            return i<10?'0'+i:String(i);
+        }
+        var kg = s.match(/^(\d+(?:\.\d+)?)KG$/);
+        if (kg) { var n2=parseFloat(kg[1]); var i2=Math.floor(n2); return i2<10?'0'+i2:String(i2); }
+        return null;
+    }
+    function aiFormatPackDisplay(sz) {
+        var s = String(sz||'').toUpperCase().replace(/\s+/g,'');
+        var ml = s.match(/^(\d+(?:\.\d+)?)ML$/); if(ml) return ml[1]+' ML';
+        var lt = s.match(/^(\d+(?:\.\d+)?)(L|LT|LTR|LITRE|LITER|LITRES)?$/);
+        if(lt){ var n=parseFloat(lt[1]); var i=Math.floor(n); return (i<10?'0'+i:String(i))+' L'; }
+        var kg = s.match(/^(\d+(?:\.\d+)?)KG$/);
+        if(kg){ var n2=parseFloat(kg[1]); var i2=Math.floor(n2); return (i2<10?'0'+i2:String(i2))+' KG'; }
+        return sz;
+    }
+
+    // ============ AI: compute proposed Name/SKU/Description/Rate client-side ============
+    // Mirrors server-side priceListParser.computeProposedFields() so changing the
+    // dropdown immediately re-derives the proposed columns without a server round trip.
+    function aiComputeProposed(pdfItem, zohoItem, brandKey) {
+        var dpl = parseFloat(pdfItem.dpl || 0);
+        var proposedRate = dpl > 0 ? Math.ceil(dpl * 1.18 * 1.10) : null;
+        var base = { proposedRate: proposedRate };
+        if (!zohoItem) return base;
+        if (brandKey !== 'birlaopus') return base;
+
+        // SKU prefix = SKU minus last 2 pack-code chars (preserves base indicator)
+        // e.g. "ESWT01"→"ESWT", "ES201"→"ES2", "CS9901"→"CS99"
+        var skuUp = String(zohoItem.sku || '').toUpperCase();
+        var skuPrefix = skuUp.length > 2 ? skuUp.slice(0, -2) : null;
+        // Normalize near-equivalent pack sizes before encoding
+        var normPack = normalizeBirlaPackSize(pdfItem.packSize);
+        var packCode = aiPackSizeToCode(normPack);
+        if (!skuPrefix || !packCode) return base;
+
+        var packFmt = aiFormatPackDisplay(normPack);
+        // Strip base-variant suffix ("Calista Ever Stay - Mid Tone" → "CALISTA EVER STAY")
+        var productNameBase = String(pdfItem.product || '').split(/\s*-\s*/)[0].toUpperCase().trim();
+        // WT-base items: second short-code token in name convention
+        var secondToken = /WT$/i.test(skuPrefix) ? (' ' + skuPrefix) : '';
+        var proposedSku = skuPrefix + packCode;
+        var proposedName = proposedSku + secondToken + ' ' + productNameBase + ' BIRLA OPUS ' + packFmt;
+        var category = String(zohoItem.category || '').toUpperCase().trim();
+        var proposedDescription = (skuPrefix + ' ' + category + ' BIRLA OPUS ' + packFmt).replace(/\s+/g,' ').trim();
+        return {
+            proposedRate: proposedRate,
+            proposedName: proposedName,
+            proposedSku: proposedSku,
+            proposedDescription: proposedDescription
+        };
+    }
+
+    function aiBrandKey() {
+        return String(aiData && aiData.brand || '').replace(/-/g,'').toLowerCase();
+    }
+
+    // ============ Zoho match cell with brand/category dropdowns ============
+    function renderMatchCell(row, idx, mz, isCard) {
+        var isFuzzy = !!row._fuzzyMatched;
+        var btnLbl, btnBorder, btnBg, btnColor, btnTitle;
+        if (mz) {
+            btnLbl    = (mz.sku ? mz.sku+' — ' : '') + mz.name;
+            btnBorder = isFuzzy ? '#fbbf24' : '#a5b4fc';
+            btnBg     = isFuzzy ? '#fffbeb' : '#eef2ff';
+            btnColor  = isFuzzy ? '#92400e' : '#4338ca';
+            btnTitle  = (isFuzzy ? '⚠ Fuzzy-matched — verify: ' : '') + esc(btnLbl);
+        } else {
+            btnLbl    = '+ Click to match or leave as NEW ITEM';
+            btnBorder = '#d1fae5';
+            btnBg     = '#ecfdf5';
+            btnColor  = '#065f46';
+            btnTitle  = 'This product has no Zoho match. Click to pick one, or leave unchecked to skip.';
+        }
+        var btnPad    = isCard ? '10px 12px' : '5px 8px';
+        var btnRadius = isCard ? '8px' : '6px';
+        var btnFSize  = isCard ? '13px' : '11px';
+        var btnWrap   = isCard ? 'white-space:normal;word-break:break-word' : 'white-space:nowrap;overflow:hidden;text-overflow:ellipsis';
+        var h = '<button id="ai-match-btn-'+idx+'" onclick="openZohoPicker('+idx+')" '
+              + 'style="width:100%;text-align:left;padding:'+btnPad+';border:1px solid '+btnBorder+';border-radius:'+btnRadius+';font-size:'+btnFSize+';cursor:pointer;'+btnWrap+';background:'+btnBg+';color:'+btnColor+'" '
+              + 'title="'+btnTitle+'">'+esc(btnLbl)+'</button>';
+        if (mz) {
+            var curBrand = row._brandOverride != null ? row._brandOverride : (mz.brand||'');
+            var curCat   = row._catOverride   != null ? row._catOverride   : (mz.category||'');
+            var brandChanged = row._brandOverride != null && row._brandOverride !== (mz.brand||'');
+            var catChanged   = row._catOverride   != null && row._catOverride   !== (mz.category||'');
+            // Brand dropdown
+            var bOpts = '<option value="">— Brand —</option>'
+                + aiZohoBrands.map(function(b){ return '<option value="'+esc(b)+'"'+(b===curBrand?' selected':'')+'>'+esc(b)+'</option>'; }).join('');
+            // Category dropdown
+            var cOpts = '<option value="">— Category —</option>'
+                + aiZohoCategories.map(function(c){ return '<option value="'+esc(c)+'"'+(c===curCat?' selected':'')+'>'+esc(c)+'</option>'; }).join('');
+            var selGap  = isCard ? '6px' : '3px';
+            var selMTop = isCard ? '8px' : '3px';
+            var selFont = isCard ? '12px' : '10px';
+            var selPad  = isCard ? '6px 8px' : '2px 3px';
+            var selRad  = isCard ? '6px' : '3px';
+            h += '<div style="display:flex;gap:'+selGap+';margin-top:'+selMTop+'">'
+               + '<select id="ai-brand-'+idx+'" onchange="aiOnBrandEdit('+idx+',this.value)" '
+               + 'style="flex:1;min-width:0;font-size:'+selFont+';padding:'+selPad+';border:1px solid '+(brandChanged?'#f59e0b':'#e5e7eb')+';border-radius:'+selRad+';outline:none;color:'+(brandChanged?'#92400e':'#6b7280')+';background:#fff" title="Brand">'+bOpts+'</select>'
+               + '<select id="ai-cat-'+idx+'" onchange="aiOnCatEdit('+idx+',this.value)" '
+               + 'style="flex:1;min-width:0;font-size:'+selFont+';padding:'+selPad+';border:1px solid '+(catChanged?'#f59e0b':'#e5e7eb')+';border-radius:'+selRad+';outline:none;color:'+(catChanged?'#92400e':'#6b7280')+';background:#fff" title="Category">'+cOpts+'</select>'
+               + '</div>';
+        }
+        return h;
+    }
+    function aiOnBrandEdit(idx, val) {
+        var row = aiData.items[idx];
+        row._brandOverride = val;
+        var sel = document.getElementById('ai-brand-'+idx);
+        var mz = row._matchedZohoId ? (aiData.zohoItems||[]).find(function(z){return z.zoho_item_id===row._matchedZohoId;}) : null;
+        if (sel) { var chg = mz && val !== (mz.brand||''); sel.style.borderColor=chg?'#f59e0b':'#e5e7eb'; sel.style.color=chg?'#92400e':'#6b7280'; }
+    }
+    function aiOnCatEdit(idx, val) {
+        var row = aiData.items[idx];
+        row._catOverride = val;
+        var sel = document.getElementById('ai-cat-'+idx);
+        var mz = row._matchedZohoId ? (aiData.zohoItems||[]).find(function(z){return z.zoho_item_id===row._matchedZohoId;}) : null;
+        if (sel) { var chg = mz && val !== (mz.category||''); sel.style.borderColor=chg?'#f59e0b':'#e5e7eb'; sel.style.color=chg?'#92400e':'#6b7280'; }
+    }
+
+    // ============ ZOHO PICKER MODAL ============
+    var zpActiveIdx = null;
+
+    function zpPopulateFilters() {
+        var items = (aiData && aiData.zohoItems) || [];
+        var brands = [], cats = [], seenB = {}, seenC = {};
+        items.forEach(function(z) {
+            var b = (z.brand||'').trim(), c = (z.category||'').trim();
+            if (b && !seenB[b]) { seenB[b]=1; brands.push(b); }
+            if (c && !seenC[c]) { seenC[c]=1; cats.push(c); }
+        });
+        brands.sort(); cats.sort();
+        var bSel = document.getElementById('zpBrand');
+        var cSel = document.getElementById('zpCategory');
+        if (bSel) bSel.innerHTML = '<option value="">All Brands ('+brands.length+')</option>'
+            + brands.map(function(b){return '<option value="'+esc(b)+'">'+esc(b)+'</option>';}).join('');
+        if (cSel) cSel.innerHTML = '<option value="">All Categories ('+cats.length+')</option>'
+            + cats.map(function(c){return '<option value="'+esc(c)+'">'+esc(c)+'</option>';}).join('');
+    }
+
+    function openZohoPicker(idx) {
+        zpActiveIdx = idx;
+        var row = aiData.items[idx];
+        // Pre-set brand filter to selected item's brand for convenience
+        var z = row._matchedZohoId
+            ? (aiData.zohoItems||[]).find(function(x){return x.zoho_item_id===row._matchedZohoId;}) : null;
+        var picker = document.getElementById('zohoPicker');
+        picker.style.display = 'flex';
+        var srch = document.getElementById('zpSearch');
+        if (srch) { srch.value = ''; srch.focus(); }
+        var bSel = document.getElementById('zpBrand');
+        if (bSel) bSel.value = z ? (z.brand||'') : '';
+        var cSel = document.getElementById('zpCategory');
+        if (cSel) cSel.value = '';
+        zpRender();
+    }
+
+    function closeZohoPicker() {
+        var picker = document.getElementById('zohoPicker');
+        if (picker) picker.style.display = 'none';
+        zpActiveIdx = null;
+    }
+
+    function zpRender() {
+        var search   = ((document.getElementById('zpSearch')||{}).value||'').toLowerCase().trim();
+        var brandF   = ((document.getElementById('zpBrand')||{}).value||'');
+        var catF     = ((document.getElementById('zpCategory')||{}).value||'');
+        var allItems = (aiData && aiData.zohoItems) || [];
+        var selectedId = zpActiveIdx !== null ? (aiData.items[zpActiveIdx]._matchedZohoId||'') : '';
+
+        var filtered = allItems.filter(function(z) {
+            if (brandF && (z.brand||'').trim() !== brandF) return false;
+            if (catF   && (z.category||'').trim() !== catF)  return false;
+            if (search) {
+                var hay = ((z.sku||'')+' '+(z.name||'')+' '+(z.description||'')).toLowerCase();
+                return hay.indexOf(search) !== -1;
+            }
+            return true;
+        });
+
+        var countEl = document.getElementById('zpCount');
+        if (countEl) countEl.textContent = filtered.length + ' items';
+
+        // Show max 80 items (performance)
+        var shown = filtered.slice(0, 80);
+        var html = '';
+        shown.forEach(function(z) {
+            var isSel = z.zoho_item_id === selectedId;
+            var label = (z.sku ? z.sku+' — ' : '') + (z.name||'');
+            var bg = isSel ? 'background:#eef2ff' : '';
+            var col = isSel ? 'color:#4338ca;font-weight:600' : 'color:#1f2937';
+            html += '<div onclick="zpSelectItem(\''+esc(z.zoho_item_id)+'\')" '
+                  + 'style="padding:9px 14px;cursor:pointer;border-bottom:1px solid #f3f4f6;'+bg+'" '
+                  + 'onmouseover="this.style.background=\'#f5f3ff\'" onmouseout="this.style.background=\''+(isSel?'#eef2ff':'#fff')+'\'">';
+            html += '<div style="font-size:12px;'+col+';white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="'+esc(label)+'">'+esc(label)+'</div>';
+            if (z.brand || z.category) {
+                html += '<div style="font-size:10px;color:#9ca3af;margin-top:1px">'
+                      + (z.brand ? esc(z.brand) : '') + (z.brand && z.category ? ' · ' : '') + (z.category ? esc(z.category) : '')
+                      + '</div>';
+            }
+            html += '</div>';
+        });
+        if (filtered.length > 80) {
+            html += '<div style="padding:8px 14px;font-size:11px;color:#9ca3af;text-align:center">Showing 80 of '+filtered.length+' — type to refine</div>';
+        }
+        if (filtered.length === 0) {
+            html += '<div style="padding:24px 14px;font-size:12px;color:#9ca3af;text-align:center">No items found</div>';
+        }
+        var list = document.getElementById('zpList');
+        if (list) list.innerHTML = html;
+    }
+
+    function zpSelectItem(zohoItemId) {
+        if (zpActiveIdx === null) return;
+        var idx = zpActiveIdx;
+        var row = aiData.items[idx];
+        row._matchedZohoId = zohoItemId || '';
+        var z = zohoItemId ? (aiData.zohoItems||[]).find(function(x){return x.zoho_item_id===zohoItemId;}) : null;
+        row._proposed = aiComputeProposed(row, z, aiBrandKey());
+        row._selected = !!zohoItemId;
+
+        // Reset overrides when match changes
+        row._brandOverride = null;
+        row._catOverride   = null;
+        row._fuzzyMatched  = false;
+
+        closeZohoPicker();
+
+        if (aiIsMobileLayout()) {
+            renderAiTable();
+        } else {
+            // Update full match cell (button + brand/category inputs)
+            var matchTd = document.getElementById('ai-match-btn-'+idx);
+            if (matchTd && matchTd.parentElement) {
+                matchTd.parentElement.innerHTML = renderMatchCell(row, idx, z);
+            }
+            // Update checkbox + row highlight
+            var cb = document.getElementById('ai-row-cb-'+idx);
+            if (cb) cb.checked = row._selected;
+            var tr = document.querySelector('tr[data-row="'+idx+'"]');
+            if (tr) tr.className = zohoItemId ? 'row-changed' : '';
+            // Re-render proposed cells
+            var nc = document.getElementById('ai-prop-name-'+idx);
+            var sc = document.getElementById('ai-prop-sku-'+idx);
+            var rc = document.getElementById('ai-prop-rate-'+idx);
+            if (nc) nc.innerHTML = renderProposedNameCell(row, idx);
+            if (sc) sc.innerHTML = renderProposedSkuCell(row, idx);
+            if (rc) rc.innerHTML = renderProposedRateCell(row);
+        }
+        aiUpdateSelectedCount();
+    }
+
+    // Close picker on backdrop click
+    document.addEventListener('click', function(e) {
+        var picker = document.getElementById('zohoPicker');
+        if (picker && picker.style.display !== 'none' && e.target === picker) closeZohoPicker();
+    });
+
+    // ============ AI: build options + cache unique brand/category lists ============
+    var aiZohoBrands = [], aiZohoCategories = [];
+    function aiBuildZohoOptionsHtml() {
+        zpPopulateFilters();
+        // Cache unique brands + categories for match cell dropdowns
+        var bSeen = {}, cSeen = {};
+        aiZohoBrands = []; aiZohoCategories = [];
+        (aiData.zohoItems||[]).forEach(function(z){
+            var b=(z.brand||'').trim(), c=(z.category||'').trim();
+            if(b&&!bSeen[b]){bSeen[b]=1;aiZohoBrands.push(b);}
+            if(c&&!cSeen[c]){cSeen[c]=1;aiZohoCategories.push(c);}
+        });
+        aiZohoBrands.sort(); aiZohoCategories.sort();
+    }
+
+    // ============ AI: render the Excel table ============
+    function showAiResults() {
+        setStep(2);
+        document.getElementById('step2Ai').classList.remove('hidden');
+        document.getElementById('step2Quick').classList.add('hidden');
+        document.getElementById('step2Label').textContent = 'AI Review';
+
+        var d = aiData;
+        document.getElementById('aiStatPages').textContent       = d.pages || '-';
+        document.getElementById('aiStatExtracted').textContent   = d.totalExtracted || 0;
+        document.getElementById('aiStatMatched').textContent     = d.autoMatched || 0;
+        document.getElementById('aiStatUnmatched').textContent   = (d.totalExtracted || 0) - (d.autoMatched || 0);
+        var bn = (d.brand || 'Unknown').replace(/-/g,' ').replace(/\b\w/g, function(c){ return c.toUpperCase(); });
+        document.getElementById('aiStatBrand').textContent = bn;
+
+        // Pre-seed each row's working state from auto_match
+        (d.items || []).forEach(function(row) {
+            var serverMatchId = (row.auto_match && row.auto_match.zoho_item_id) || '';
+            // Validate server match: check category compatibility before accepting it
+            if (serverMatchId) {
+                var serverZoho = (d.zohoItems || []).find(function(x){ return x.zoho_item_id === serverMatchId; });
+                if (serverZoho && !aiCatCompatible(row.category, serverZoho.category)) {
+                    serverMatchId = ''; // reject incompatible server match
+                }
+                if (serverMatchId && serverZoho && !aiBaseVariantCompatible(row.product, row.category, serverZoho)) {
+                    serverMatchId = ''; // reject White↔non-White base mismatch
+                }
+                if (serverMatchId && serverZoho &&
+                    /\bSHINE\b/i.test(row.product) !== /\bSHINE\b/i.test(serverZoho.name)) {
+                    serverMatchId = ''; // reject SHINE↔non-SHINE mismatch
+                }
+            }
+            row._matchedZohoId = serverMatchId;
+            row._selected = !!row._matchedZohoId;
+            var z = row._matchedZohoId
+                ? (d.zohoItems || []).find(function(x){ return x.zoho_item_id === row._matchedZohoId; })
+                : null;
+            row._proposed = aiComputeProposed(row, z, aiBrandKey());
+            // Mark as already-pushed if Zoho item's cf_dpl matches this row's DPL price
+            var isPushed = !!(z && z.cf_dpl && Math.abs(parseFloat(z.cf_dpl) - parseFloat(row.dpl)) < 0.01);
+            row._alreadyPushed = isPushed;
+            row._pushedAt = (isPushed && z && z.dpl_updated_at) ? z.dpl_updated_at : null;
+        });
+
+        aiBuildZohoOptionsHtml();
+        aiPopulateCatFilter();
+        // Client-side fuzzy match for rows the server didn't auto-match
+        var extraMatched = aiClientFuzzyMatch();
+        if (extraMatched > 0) {
+            // Recount stats
+            var totalM = (d.items||[]).filter(function(r){return !!r._matchedZohoId;}).length;
+            document.getElementById('aiStatMatched').textContent = totalM;
+            document.getElementById('aiStatUnmatched').textContent = (d.totalExtracted||0) - totalM;
+        }
+        aiApplyLayout();
+        renderAiTable();
+    }
+
+    // ============ CLIENT-SIDE FUZZY MATCH ============
+    // Noise = brand names + generic filler words that don't distinguish products
+    // PRIMER/ENAMEL/EMULSION = product TYPE words, not product-name words — don't use for matching
+    var AI_NOISE = new Set(['BIRLA','OPUS','ASIAN','BERGER','NIPPON','JSW','GEM','ASTRAL',
+        'PAINT','PAINTS','BRAND','PREMIUM','LUXURY','ULTRA','PROFESSIONAL',
+        'COLOUR','COLOR','COLOURS','COLORS','THE','AND','WITH','FOR','PER','NEW',
+        'COAT','FINISH','BASE','GRADE','PRODUCT','SERIES','RANGE','TYPE',
+        'PRIMER','ENAMEL','EMULSION']);
+
+    function aiWords(text) {
+        return String(text||'').toUpperCase().replace(/[-\/–]/g,' ').split(/[\s,]+/)
+            .filter(function(w){ return w.length >= 3 && !AI_NOISE.has(w) && !/^\d+$/.test(w); });
+    }
+
+    // Check if PDF category and Zoho category are compatible
+    function aiCatCompatible(pdfCat, zohoCat) {
+        if (!pdfCat || !zohoCat) return true;
+        var p = pdfCat.toUpperCase();
+        var z = zohoCat.toUpperCase();
+        if (p === z) return true;
+        // Product-line code in category (3+ digits like "936003") — can't gate reliably
+        if (/\d{3,}/.test(p)) return true;
+        var pIsIntExtCat = /\b(INTERIOR|EXTERIOR)\s+CATEGORY\b/.test(p);
+        // Word-set match to prevent "WALLNROOF" triggering "WALL" check
+        var pWordSet = {};
+        p.split(/[\s&,\/\-\(\)]+/).forEach(function(w){ if (w.length >= 3) pWordSet[w] = true; });
+        var zWordSet = {};
+        z.split(/[\s&,\/\-\(\)]+/).forEach(function(w){ if (w.length >= 3) zWordSet[w] = true; });
+        var MAIN_WORDS = ['EMULSION','ENAMEL','PRIMER','PUTTY','WOOD','METAL','PAINT','FINISH','COAT','WALL','CEIL','DISTEMPER','DISTEMPAR'];
+        var pHasMain = MAIN_WORDS.some(function(w){ return !!pWordSet[w]; }) || pIsIntExtCat;
+        if (!pHasMain) return true;
+        var zHasMain = MAIN_WORDS.some(function(w){ return !!zWordSet[w]; });
+        if (!zHasMain) return true;
+        // Interior/Exterior Category (emulsion) must not match Enamel or Distemper items
+        if (pIsIntExtCat && (zWordSet['ENAMEL'] || zWordSet['DISTEMPAR'] || zWordSet['DISTEMPER'])) return false;
+        var pWords = p.split(/[\s&,\/\-]+/).filter(function(w){ return w.length >= 4; });
+        var zWords = z.split(/[\s&,\/\-]+/).filter(function(w){ return w.length >= 4; });
+        return pWords.some(function(pw){ return zWords.indexOf(pw) !== -1; });
+    }
+
+    // Normalize Birla Opus near-equivalent pack sizes: 0.9L≈1L, 9L≈10L, 18L≈20L, 3.6L≈4L
+    function normalizeBirlaPackSize(sz) {
+        var s = String(sz||'').replace(/\s/g,'').toUpperCase();
+        var ml = s.match(/^(\d+(?:\.\d+)?)ML$/);
+        if (ml) { var v = parseFloat(ml[1]); if (v >= 800 && v <= 1050) return '1L'; }
+        var lt = s.match(/^(\d+(?:\.\d+)?)(L|LT|LTR)?$/i);
+        if (lt) {
+            var n = parseFloat(lt[1]);
+            if (n >= 0.8 && n <= 1.05) return '1L';
+            if (n > 3.0 && n < 4.5) return '4L';
+            if (n > 8.0 && n < 11.0) return '10L';
+            if (n > 16.0 && n <= 20.0) return '20L';
+        }
+        return sz;
+    }
+
+    // Check if pack size string appears in a Zoho item name.
+    // Handles both compact ("1L","4L") and padded Birla Opus format ("01 L","04 L").
+    function aiPackSizeInName(packSize, zohoName) {
+        var sz = String(normalizeBirlaPackSize(packSize)||'').replace(/\s/g,'').toUpperCase();
+        if (!sz) return true; // no pack size to check = don't filter
+        var nm = (zohoName||'').toUpperCase();
+        // Direct compact match: "10L", "20L"
+        if (nm.indexOf(sz) !== -1) return true;
+        // Spaced: "1 L", "4 L", "10 L", "20 L"
+        var spaced = sz.replace(/([A-Z]+)$/, ' $1'); // "1L"→"1 L", "10KG"→"10 KG"
+        if (nm.indexOf(spaced) !== -1) return true;
+        // Zero-padded + spaced (Birla Opus): "1L"→"01 L", "4L"→"04 L", "9L"→"09 L"
+        var numPart = sz.match(/^(\d+)/);
+        if (numPart) {
+            var n = numPart[1];
+            var pad = n.length === 1 ? '0' + n : n;
+            var unit = sz.slice(n.length);
+            var paddedSpaced = pad + ' ' + unit;    // "01 L", "04 L"
+            var paddedCompact = pad + unit;         // "01L", "04L"
+            if (nm.indexOf(paddedSpaced) !== -1 || nm.indexOf(paddedCompact) !== -1) return true;
+        }
+        return false;
+    }
+
+    // Exact base-variant gate for emulsion products.
+    // Maps PDF base name → Zoho SKU base key, then requires them to match exactly.
+    // White→"WT", Pastel→"1", Mid Tone→"2", Clear→"99", Organic Yellow→"5", Organic Red→"6"
+    function aiBaseVariantCompatible(pdfProduct, pdfCategory, zohoItem) {
+        // Gate on recognised base suffix regardless of category text — exterior products
+        // also use base variants but their category may not contain "Emulsion".
+        var variantM = String(pdfProduct||'').match(/\s*-\s*(.+)$/);
+        if (!variantM) return true;
+        var v = variantM[1].toUpperCase();
+        var pdfBase =
+            /\bWHITE\b/.test(v)               ? 'WT' :
+            /\bPASTEL\b/.test(v)              ? '1'  :
+            /\bMID[\s-]*TONE\b/.test(v)       ? '2'  :
+            /\bCLEAR\b/.test(v)               ? '99' :
+            /ORGANIC[\s-]*YELLOW|\bYELLOW\b/.test(v) ? '5' :
+            /ORGANIC[\s-]*RED|\bRED\b/.test(v)        ? '6' : null;
+        if (!pdfBase) return true; // unrecognised variant — no gating
+        var s = String(zohoItem.sku || zohoItem.zoho_sku || '').toUpperCase();
+        var zohoBase =
+            /^[A-Z]{2,5}WT\d{2}$/.test(s) ? 'WT' :
+            /^[A-Z]{2,5}(99)\d{2}$/.test(s) ? '99' :
+            (function(){ var m = s.match(/^[A-Z]{2,5}(\d)\d{2}$/); return m ? m[1] : null; })();
+        if (!zohoBase) return true; // SKU doesn't encode base — no gating
+        return pdfBase === zohoBase;
+    }
+
+    function aiClientFuzzyMatch() {
+        var zohoItems = (aiData && aiData.zohoItems) || [];
+        var brandKey  = aiBrandKey();
+
+        // Track which Zoho IDs are already used (server matches)
+        var usedIds = new Set();
+        (aiData.items||[]).forEach(function(r){ if (r._matchedZohoId) usedIds.add(r._matchedZohoId); });
+
+        // Build word → [zohoItem] index (name + description words)
+        var wordIdx = {};
+        zohoItems.forEach(function(z) {
+            aiWords((z.name||'')+' '+(z.description||'')).forEach(function(w) {
+                if (!wordIdx[w]) wordIdx[w] = [];
+                wordIdx[w].push(z);
+            });
+        });
+
+        var matched = 0;
+        (aiData.items||[]).forEach(function(row) {
+            if (row._matchedZohoId) return;
+
+            var pdfProductBase = (row.product||'').split(/\s*-\s*/)[0].trim();
+            var pdfWords = aiWords(pdfProductBase);
+            if (pdfWords.length === 0) return;
+            var pdfCat  = (row.category||'').toUpperCase();
+            var pdfPack = String(row.packSize||'').replace(/\s/g,'').toUpperCase();
+
+            // Score Zoho items: category compatible + ≥2 word hits
+            var scores = {};
+            pdfWords.forEach(function(w) {
+                (wordIdx[w]||[]).forEach(function(z) {
+                    if (usedIds.has(z.zoho_item_id)) return;
+                    if (!aiCatCompatible(pdfCat, z.category)) return;
+                    // PACK SIZE GATE: if PDF has a pack size, Zoho name must contain it.
+                    // Fallback: approximate numeric match within 25% handles L↔KG unit mismatch.
+                    if (pdfPack && !aiPackSizeInName(pdfPack, z.name)) {
+                        var pNum = parseFloat(pdfPack) || 0;
+                        var zNM = z.name.match(/\b(\d+(?:\.\d+)?)\s*(?:KGS?|L\b|LT\b|LTR\b|ML\b)/i);
+                        var zNum = zNM ? parseFloat(zNM[1]) : 0;
+                        var approxOk = pNum > 0 && zNum > 0 && Math.abs(pNum - zNum) / Math.max(pNum, zNum) <= 0.25;
+                        if (!approxOk) return;
+                    }
+                    // BASE VARIANT GATE: White emulsion must not match digit-base; non-White must not match WT
+                    if (!aiBaseVariantCompatible(row.product, pdfCat, z)) return;
+                    // SHINE GATE: "Product X" must not match "Product X Shine" and vice versa
+                    if (/\bSHINE\b/i.test(row.product) !== /\bSHINE\b/i.test(z.name)) return;
+                    if (!scores[z.zoho_item_id]) scores[z.zoho_item_id] = { z: z, hits: 0 };
+                    scores[z.zoho_item_id].hits++;
+                });
+            });
+
+            // Require ≥2 word hits
+            var best = null, bestScore = 0;
+            Object.keys(scores).forEach(function(id) {
+                var e = scores[id];
+                if (e.hits < 2) return;
+                var catExact = pdfCat && (e.z.category||'').toUpperCase() === pdfCat;
+                var score = e.hits * 10 + (catExact ? 5 : 0);
+                if (score > bestScore) { bestScore = score; best = e.z; }
+            });
+
+            if (best) {
+                row._matchedZohoId = best.zoho_item_id;
+                row._proposed = aiComputeProposed(row, best, brandKey);
+                row._selected = true;
+                row._fuzzyMatched = true;
+                usedIds.add(best.zoho_item_id);
+                matched++;
+            }
+        });
+        return matched;
+    }
+
+    function aiPopulateCatFilter() {
+        var items = (aiData && aiData.items) || [];
+        var seen = {}, cats = [];
+        items.forEach(function(r) {
+            var c = (r.category||'').trim();
+            if (c && !seen[c]) { seen[c]=1; cats.push(c); }
+        });
+        cats.sort();
+        var sel = document.getElementById('aiCatFilter');
+        if (!sel) return;
+        sel.innerHTML = '<option value="">All Categories ('+cats.length+')</option>'
+            + cats.map(function(c){ return '<option value="'+esc(c)+'">'+esc(c)+'</option>'; }).join('');
+    }
+
+    function renderAiCards(rows, search, catF) {
+        var html = '';
+        var visible = 0;
+        rows.forEach(function(row, idx) {
+            var searchTxt = ((row.product||'') + ' ' + (row.packSize||'') + ' ' + (row.category||'')).toLowerCase();
+            if (search && searchTxt.indexOf(search) === -1) return;
+            if (catF && (row.category||'').trim() !== catF) return;
+            if (aiHidePushedCheck(row)) return;
+            visible++;
+            var hasMatch = !!row._matchedZohoId;
+            var mz = row._matchedZohoId ? (aiData.zohoItems||[]).find(function(x){return x.zoho_item_id===row._matchedZohoId;}) : null;
+            var cardClass = 'ai-card' + (hasMatch ? (row._fuzzyMatched ? ' ai-card-fuzzy' : ' ai-card-matched') : '');
+            var pushedLabel = row._alreadyPushed ? ('✓ PUSHED' + (row._pushedAt ? ' ' + fmtPushedAt(row._pushedAt) : '')) : '';
+            var pushedBadge = pushedLabel ? '<span style="background:#d1fae5;color:#065f46;border:1px solid #6ee7b7;border-radius:4px;font-size:9px;font-weight:700;padding:2px 6px;margin-left:6px;">' + pushedLabel + '</span>' : '';
+            // Matched cards collapsed by default; unmatched always compact
+            var expanded = hasMatch && !!row._cardExpanded;
+            html += '<div class="'+cardClass+'" data-row="'+idx+'">';
+            // Header: checkbox + product name + meta
+            html += '<div class="ai-card-header">';
+            html += '<input type="checkbox" class="ai-row-cb" id="ai-row-cb-'+idx+'" data-idx="'+idx+'" '+(row._selected?'checked':'')+' onchange="aiOnRowToggle('+idx+')" style="flex-shrink:0;width:16px;height:16px;margin-top:3px">';
+            html += '<div class="ai-card-product">';
+            html += '<div class="ai-card-name">'+esc(row.product||'')+pushedBadge+'</div>';
+            var meta = [];
+            if (row.category) meta.push(esc(row.category));
+            if (row.packSize) meta.push(esc(row.packSize));
+            if (row.dpl) meta.push('DPL &#8377;'+fmt(row.dpl));
+            if (meta.length) html += '<div class="ai-card-meta">'+meta.join(' &middot; ')+'</div>';
+            html += '</div>';
+            html += '</div>';
+            // Match cell + toggle button (for matched cards)
+            html += '<div class="ai-card-match">'+renderMatchCell(row, idx, mz, true)+'</div>';
+            if (hasMatch) {
+                html += '<button id="ai-card-toggle-'+idx+'" onclick="aiToggleCard('+idx+')" '
+                    + 'style="width:100%;margin-top:6px;padding:5px 8px;background:none;border:1px dashed #c7d2fe;border-radius:6px;font-size:11px;cursor:pointer;color:'+(expanded?'#4338ca':'#9ca3af')+';text-align:center">'
+                    + (expanded ? '▲ Hide proposed fields' : '▼ Show proposed fields')
+                    + '</button>';
+            }
+            // Proposed fields — hidden by default for matched cards
+            if (hasMatch) {
+                html += '<div id="ai-card-proposed-'+idx+'" class="ai-card-proposed" style="display:'+(expanded?'block':'none')+'">';
+                html += '<div class="ai-card-field-label">Proposed Name</div>';
+                html += '<div id="ai-prop-name-'+idx+'">'+renderProposedNameCell(row, idx)+'</div>';
+                html += '<div class="ai-card-row">';
+                html += '<div style="flex:1"><div class="ai-card-field-label">SKU</div><div id="ai-prop-sku-'+idx+'">'+renderProposedSkuCell(row, idx)+'</div></div>';
+                html += '<div style="text-align:right"><div class="ai-card-field-label">Rate</div><div id="ai-prop-rate-'+idx+'">'+renderProposedRateCell(row)+'</div></div>';
+                html += '</div>';
+                html += '</div>';
+            }
+            html += '</div>';
+        });
+        if (visible === 0) {
+            html = '<div style="padding:24px;text-align:center;color:#9ca3af;font-size:13px">No items match the current filter</div>';
+        }
+        return html;
+    }
+
+    function aiToggleCard(idx) {
+        var row = aiData.items[idx];
+        row._cardExpanded = !row._cardExpanded;
+        var propEl   = document.getElementById('ai-card-proposed-'+idx);
+        var toggleEl = document.getElementById('ai-card-toggle-'+idx);
+        if (propEl)   propEl.style.display = row._cardExpanded ? 'block' : 'none';
+        if (toggleEl) {
+            toggleEl.textContent = row._cardExpanded ? '▲ Hide proposed fields' : '▼ Show proposed fields';
+            toggleEl.style.color = row._cardExpanded ? '#4338ca' : '#9ca3af';
+            toggleEl.style.borderColor = row._cardExpanded ? '#c7d2fe' : '#e5e7eb';
+        }
+    }
+
+    // 3-state pushed filter: '' = All, 'hide' = Hide Pushed, 'only' = Show Pushed Only
+    var aiPushedFilter = '';
+    function aiCyclePushedFilter() {
+        aiPushedFilter = aiPushedFilter === '' ? 'hide' : aiPushedFilter === 'hide' ? 'only' : '';
+        var btn = document.getElementById('aiPushedFilterBtn');
+        if (btn) {
+            if (aiPushedFilter === 'hide') {
+                btn.textContent = 'Filter: Hide Pushed'; btn.style.borderColor = '#f59e0b'; btn.style.color = '#b45309';
+            } else if (aiPushedFilter === 'only') {
+                btn.textContent = 'Filter: Pushed Only'; btn.style.borderColor = '#10b981'; btn.style.color = '#065f46';
+            } else {
+                btn.textContent = 'Filter: All'; btn.style.borderColor = ''; btn.style.color = '';
+            }
+        }
+        renderAiTable();
+    }
+    // Legacy alias used by renderAiTable/renderAiCards
+    function aiHidePushedCheck(row) {
+        if (aiPushedFilter === 'hide' && row._alreadyPushed) return true;
+        if (aiPushedFilter === 'only' && !row._alreadyPushed) return true;
+        return false;
+    }
+
+    function aiIsMobileLayout() {
+        return window.matchMedia('(max-width:639px)').matches;
+    }
+
+    function aiApplyLayout() {
+        var isMob = aiIsMobileLayout();
+        var tw = document.getElementById('aiTableWrap');
+        var cc = document.getElementById('aiCardContainer');
+        if (tw) tw.style.display = isMob ? 'none' : '';
+        if (cc) cc.style.display = isMob ? '' : 'none';
+    }
+
+    function renderAiTable() {
+        if (!aiData) return;
+        var search  = (document.getElementById('aiRowSearch').value || '').toLowerCase();
+        var catF    = (document.getElementById('aiCatFilter') ? document.getElementById('aiCatFilter').value : '');
+        var rows = aiData.items || [];
+        var cardCont = document.getElementById('aiCardContainer');
+
+        if (aiIsMobileLayout()) {
+            document.getElementById('aiMatchBody').innerHTML = '';
+            if (cardCont) cardCont.innerHTML = renderAiCards(rows, search, catF);
+            aiUpdateSelectedCount();
+            return;
+        }
+        if (cardCont) cardCont.innerHTML = '';
+
+        var html = '';
+        var visible = 0;
+
+        rows.forEach(function(row, idx) {
+            var searchTxt = ((row.product||'') + ' ' + (row.packSize||'') + ' ' + (row.category||'')).toLowerCase();
+            if (search && searchTxt.indexOf(search) === -1) return;
+            if (catF && (row.category||'').trim() !== catF) return;
+            if (aiHidePushedCheck(row)) return;
+            visible++;
+
+            var p = row._proposed || {};
+            var hasMatch = !!row._matchedZohoId;
+
+            // Row-level visual cue: matched rows get a soft green tint
+            var rowCls = hasMatch ? 'row-changed' : '';
+            if (row._alreadyPushed) rowCls += ' ai-pushed-row';
+            html += '<tr class="' + rowCls + '" data-row="' + idx + '">';
+
+            // Checkbox
+            html += '<td><input type="checkbox" class="ai-row-cb" id="ai-row-cb-' + idx + '" data-idx="' + idx + '" ' + (row._selected ? 'checked' : '') + ' onchange="aiOnRowToggle(' + idx + ')"></td>';
+
+            // PDF product (truncate)
+            html += '<td style="max-width:240px"><div class="truncate" title="' + esc(row.product) + '">' + esc(row.product) + '</div>';
+            if (row.category) html += '<div class="text-[10px] text-gray-400 truncate">' + esc(row.category) + '</div>';
+            html += '</td>';
+
+            // Pack
+            html += '<td class="text-right" style="white-space:nowrap">' + esc(row.packSize) + '</td>';
+
+            // DPL
+            var pushedBadgeTd = row._alreadyPushed
+                ? ' <span title="' + (row._pushedAt ? 'Pushed: ' + fmtPushedAt(row._pushedAt) : 'Pushed') + '" style="background:#d1fae5;color:#065f46;border:1px solid #6ee7b7;border-radius:3px;font-size:9px;font-weight:700;padding:1px 4px;cursor:default;">✓' + (row._pushedAt ? ' ' + fmtPushedAt(row._pushedAt) : '') + '</span>' : '';
+            html += '<td class="text-right font-medium" style="color:#059669;white-space:nowrap">' + fmt(row.dpl) + '<br>' + pushedBadgeTd + '</td>';
+
+            // Zoho match — picker button + editable brand/category below
+            var mz = row._matchedZohoId ? (aiData.zohoItems||[]).find(function(x){return x.zoho_item_id===row._matchedZohoId;}) : null;
+            html += '<td style="min-width:220px">';
+            html += renderMatchCell(row, idx, mz);
+            html += '</td>';
+
+            // Proposed Name
+            html += '<td id="ai-prop-name-' + idx + '" style="max-width:260px" class="text-[11px]">';
+            html += renderProposedNameCell(row, idx);
+            html += '</td>';
+
+            // Proposed SKU
+            html += '<td id="ai-prop-sku-' + idx + '" style="white-space:nowrap" class="text-[11px]">';
+            html += renderProposedSkuCell(row, idx);
+            html += '</td>';
+
+            // Proposed Rate
+            html += '<td id="ai-prop-rate-' + idx + '" class="text-right text-[11px]" style="white-space:nowrap">';
+            html += renderProposedRateCell(row);
+            html += '</td>';
+
+            html += '</tr>';
+        });
+
+        if (visible === 0) {
+            html = '<tr><td colspan="8" class="text-center py-6" style="color:#9ca3af">No items match the current filter</td></tr>';
+        }
+        document.getElementById('aiMatchBody').innerHTML = html;
+
+        aiUpdateSelectedCount();
+    }
+
+    function fmtPushedAt(iso) {
+        if (!iso) return '';
+        try {
+            var d = new Date(iso);
+            // Format as DD/MM HH:MM in IST (UTC+5:30)
+            var ist = new Date(d.getTime() + 5.5 * 60 * 60 * 1000);
+            var dd = String(ist.getUTCDate()).padStart(2,'0');
+            var mm = String(ist.getUTCMonth()+1).padStart(2,'0');
+            var hh = String(ist.getUTCHours()).padStart(2,'0');
+            var min = String(ist.getUTCMinutes()).padStart(2,'0');
+            return dd+'/'+mm+' '+hh+':'+min;
+        } catch(e) { return ''; }
+    }
+
+    function renderProposedNameCell(row, idx) {
+        var p = row._proposed || {};
+        if (!row._matchedZohoId) return '<span style="color:#d1d5db">—</span>';
+        var zoho = (aiData.zohoItems || []).find(function(z){ return z.zoho_item_id === row._matchedZohoId; });
+        var curName = zoho ? (zoho.name || '') : '';
+        var editVal = (p.proposedName != null) ? p.proposedName : curName;
+        // No change — just show dash; user can click to override if needed
+        if (editVal.trim().toUpperCase() === curName.trim().toUpperCase()) {
+            return '<span style="color:#d1d5db;font-size:11px" title="' + esc(curName) + '">— same</span>';
+        }
+        var html = '';
+        if (curName) {
+            html += '<div style="font-size:10px;color:#9ca3af;text-decoration:line-through;white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="' + esc(curName) + '">' + esc(curName) + '</div>';
+        }
+        html += '<input type="text" id="ai-name-input-' + idx + '" value="' + esc(editVal) + '" ' +
+                'oninput="aiOnNameEdit(' + idx + ',this.value)" ' +
+                'style="width:100%;font-size:11px;padding:2px 5px;border:1px solid #6366f1;border-radius:3px;outline:none;color:#4338ca" ' +
+                'onfocus="this.style.borderColor=\'#6366f1\'" title="' + esc(editVal) + '">';
+        return html;
+    }
+    function aiOnNameEdit(idx, value) {
+        var row = aiData.items[idx];
+        if (!row._proposed) row._proposed = {};
+        row._proposed.proposedName = value;
+        // Update input border colour live
+        var input = document.getElementById('ai-name-input-' + idx);
+        var zoho = row._matchedZohoId ? (aiData.zohoItems || []).find(function(z){ return z.zoho_item_id === row._matchedZohoId; }) : null;
+        var curName = zoho ? (zoho.name || '') : '';
+        if (input) {
+            input.style.borderColor = value !== curName ? '#6366f1' : '#d1d5db';
+            input.style.color = value !== curName ? '#4338ca' : '#374151';
+        }
+    }
+    function aiOnSkuEdit(idx, value) {
+        var row = aiData.items[idx];
+        if (!row._proposed) row._proposed = {};
+        row._proposed.editedSku = value.toUpperCase().trim();
+        var input = document.getElementById('ai-sku-input-' + idx);
+        var zoho = row._matchedZohoId ? (aiData.zohoItems || []).find(function(z){ return z.zoho_item_id === row._matchedZohoId; }) : null;
+        var curSku = zoho ? (zoho.sku || '') : '';
+        if (input) {
+            var diff = row._proposed.editedSku !== curSku;
+            input.style.borderColor = diff ? '#7c3aed' : '#d1d5db';
+            input.style.color = diff ? '#5b21b6' : '#374151';
+        }
+    }
+    function renderProposedSkuCell(row, idx) {
+        var p = row._proposed || {};
+        if (!row._matchedZohoId) return '<span style="color:#d1d5db">—</span>';
+        var zoho = (aiData.zohoItems || []).find(function(z){ return z.zoho_item_id === row._matchedZohoId; });
+        var curSku = zoho ? (zoho.sku || '') : '';
+        var editVal = (p.editedSku != null) ? p.editedSku : (p.proposedSku || curSku);
+        var diff = editVal !== curSku;
+        var html = '';
+        if (diff && curSku) {
+            html += '<div style="font-size:10px;color:#9ca3af;text-decoration:line-through;white-space:nowrap" title="' + esc(curSku) + '">' + esc(curSku) + '</div>';
+        }
+        html += '<input type="text" id="ai-sku-input-' + idx + '" value="' + esc(editVal) + '" ' +
+                'oninput="aiOnSkuEdit(' + idx + ',this.value)" ' +
+                'style="width:90px;font-size:11px;padding:2px 5px;border:1px solid ' + (diff ? '#7c3aed' : '#d1d5db') + ';border-radius:3px;outline:none;color:' + (diff ? '#5b21b6' : '#374151') + ';font-family:monospace" ' +
+                'onfocus="this.style.borderColor=\'#7c3aed\'" title="' + esc(editVal) + '">';
+        return html;
+    }
+    function renderProposedRateCell(row) {
+        var p = row._proposed || {};
+        if (!row._matchedZohoId) {
+            return p.proposedRate ? '<span style="color:#2563eb;font-weight:600">' + fmt(p.proposedRate) + '</span>' : '<span style="color:#d1d5db">—</span>';
+        }
+        var zoho = (aiData.zohoItems || []).find(function(z){ return z.zoho_item_id === row._matchedZohoId; });
+        var curRate = zoho ? parseFloat(zoho.rate || 0) : 0;
+        var newRate = p.proposedRate || 0;
+        if (!newRate) return '<span style="color:#d1d5db">—</span>';
+        if (Math.abs(newRate - curRate) < 0.01) {
+            return '<span class="diff-same">' + fmt(newRate) + '</span>';
+        }
+        return '<div class="diff-cell items-end">' +
+               '<div class="diff-old">' + (curRate > 0 ? fmt(curRate) : '—') + '</div>' +
+               '<div class="diff-new" style="color:#2563eb">' + fmt(newRate) + '</div></div>';
+    }
+
+    // ============ AI: checkbox handlers ============
+    function aiOnRowToggle(idx) {
+        var row = aiData.items[idx];
+        var cb = document.getElementById('ai-row-cb-' + idx);
+        row._selected = cb ? cb.checked : false;
+        aiUpdateSelectedCount();
+    }
+    // Apply check state only to currently visible (filtered) rows via DOM checkboxes
+    function aiSetVisibleChecked(checked) {
+        document.querySelectorAll('#aiMatchBody .ai-row-cb').forEach(function(cb) {
+            var idx = parseInt(cb.getAttribute('data-idx'));
+            cb.checked = checked;
+            if (aiData && aiData.items && aiData.items[idx]) aiData.items[idx]._selected = checked;
+        });
+        aiUpdateSelectedCount();
+    }
+    function aiToggleAll() {
+        aiSetVisibleChecked(document.getElementById('aiSelectAllCb').checked);
+    }
+    function aiSelectAll() { aiSetVisibleChecked(true); }
+    function aiClearAll()   { aiSetVisibleChecked(false); }
+    function aiSelectAutoMatched() {
+        // Only touches visible rows; sets checked if they have a match
+        document.querySelectorAll('#aiMatchBody .ai-row-cb').forEach(function(cb) {
+            var idx = parseInt(cb.getAttribute('data-idx'));
+            var row = aiData && aiData.items && aiData.items[idx];
+            var val = row ? !!row._matchedZohoId : false;
+            cb.checked = val;
+            if (row) row._selected = val;
+        });
+        aiUpdateSelectedCount();
+    }
+    function aiUpdateSelectedCount() {
+        var count = 0;
+        (aiData && aiData.items || []).forEach(function(r){ if (r._selected) count++; });
+        document.getElementById('aiSelectedCount').textContent = count > 0 ? count + ' rows selected' : 'No rows selected';
+        document.getElementById('aiSelectedBadge').textContent = count + ' selected';
+    }
+
+    // ============ AI: Apply & Push to Zoho ============
+    async function aiApplyAndPushToZoho() {
+        if (!aiData) { showToast('No AI data', 'error'); return; }
+        var items = [];
+        var skipped_no_match = 0;
+        (aiData.items || []).forEach(function(row) {
+            if (!row._selected) return;
+            if (!row._matchedZohoId) { skipped_no_match++; return; }
+            var changes = { cf_dpl: parseFloat(row.dpl) };
+            var p = row._proposed || {};
+            if (p.proposedRate)        changes.rate = p.proposedRate;
+            if (p.proposedName)        changes.name = p.proposedName;
+            var finalSku = p.editedSku != null ? p.editedSku : p.proposedSku;
+            if (finalSku)              changes.sku  = finalSku;
+            if (p.proposedDescription) changes.description = p.proposedDescription;
+            // Brand / category overrides (edited by user in the match cell)
+            var zohoItem2 = (aiData.zohoItems||[]).find(function(z){ return z.zoho_item_id === row._matchedZohoId; });
+            if (row._brandOverride != null && row._brandOverride !== (zohoItem2&&zohoItem2.brand||'')) changes.brand    = row._brandOverride;
+            if (row._catOverride   != null && row._catOverride   !== (zohoItem2&&zohoItem2.category||'')) changes.category = row._catOverride;
+            var zohoItem = (aiData.zohoItems || []).find(function(z){ return z.zoho_item_id === row._matchedZohoId; });
+            items.push({
+                zoho_item_id: row._matchedZohoId,
+                item_name: p.proposedName || (zohoItem && zohoItem.name) || '',
+                changes: changes
+            });
+        });
+
+        if (!items.length) {
+            showToast(skipped_no_match
+                ? 'Selected rows have no Zoho match — pick one in the dropdown first'
+                : 'Select at least one matched item', 'error');
+            return;
+        }
+
+        if (!confirm('Apply and push ' + items.length + ' items to Zoho Books?')) return;
+
+        var btn = document.getElementById('aiApplyBtn'), sp = document.getElementById('aiApplySpinner');
+        btn.disabled = true; sp.classList.remove('hidden');
+        try {
+            var resp = await fetch('/api/zoho/items/bulk-edit', {
+                method: 'POST',
+                headers: { 'Authorization': 'Bearer ' + getToken(), 'Content-Type': 'application/json' },
+                body: JSON.stringify({ items: items })
+            });
+            var data = await resp.json();
+            if (!resp.ok || !data.success) throw new Error(data.message || 'Push failed');
+            setStep(3);
+            document.getElementById('doneTitle').textContent = 'Items Updated & Queued!';
+            document.getElementById('doneMsg').textContent = items.length + ' items updated. Zoho Books sync running in background.';
+            document.getElementById('bulkJobLink').classList.remove('hidden');
+            showToast('Bulk job created for ' + items.length + ' items', 'success');
+        } catch (err) {
+            showToast('Push error: ' + err.message, 'error');
+        } finally {
+            btn.disabled = false; sp.classList.add('hidden');
         }
     }
 
@@ -356,63 +1621,159 @@
     function showResults() {
         var d = parseResult;
         setStep(2);
-
-        // Stats
+        // Show Quick view, hide AI view
+        document.getElementById('step2Quick').classList.remove('hidden');
+        document.getElementById('step2Ai').classList.add('hidden');
+        document.getElementById('step2Label').textContent = 'Compare & Review';
         document.getElementById('statPages').textContent = d.pages || '-';
         document.getElementById('statExtracted').textContent = d.totalExtracted || 0;
         document.getElementById('statMatched').textContent = d.matchedCount || 0;
         document.getElementById('statUnmatched').textContent = d.unmatchedCount || 0;
-        var brandName = (d.brand || 'Unknown').replace(/-/g, ' ').replace(/\b\w/g, function(l) { return l.toUpperCase(); });
-        document.getElementById('statBrand').textContent = brandName;
-
+        var bn = (d.brand || 'Unknown').replace(/-/g,' ').replace(/\b\w/g, function(c){ return c.toUpperCase(); });
+        document.getElementById('statBrand').textContent = bn;
         document.getElementById('matchedCountBadge').textContent = d.matchedCount || 0;
         document.getElementById('unmatchedLabel').textContent = 'Unmatched Items (' + (d.unmatchedCount || 0) + ')';
-
         renderMatchedTable();
         renderUnmatchedTable();
     }
 
+    // ============ RENDER MATCHED TABLE ============
     function renderMatchedTable() {
         var matched = (parseResult && parseResult.matched) || [];
         var search = (document.getElementById('matchSearch').value || '').toLowerCase();
         var hideUnchanged = document.getElementById('hideUnchanged').checked;
+        var isFull = (currentView === 'full');
 
-        var html = '';
-        var visibleCount = 0;
+        // Table header
+        var headHtml = '<tr>';
+        headHtml += '<th class="w-8"><input type="checkbox" id="selectAllMatched" onchange="toggleAllMatched()" checked></th>';
+        if (isFull) {
+            headHtml += '<th>Current Item Name → Proposed</th>';
+            headHtml += '<th>SKU</th>';
+            headHtml += '<th class="text-right">DPL</th>';
+            headHtml += '<th class="text-right">Rate</th>';
+            headHtml += '<th>Changes</th>';
+        } else {
+            headHtml += '<th>Zoho Item Name</th>';
+            headHtml += '<th>PDF Product</th>';
+            headHtml += '<th class="text-right">Pack</th>';
+            headHtml += '<th class="text-right">New DPL</th>';
+            headHtml += '<th class="text-right">Cur DPL</th>';
+            headHtml += '<th class="text-right">Cur Rate</th>';
+            headHtml += '<th class="text-right">New Rate</th>';
+            headHtml += '<th class="text-center">Δ</th>';
+        }
+        headHtml += '</tr>';
+        document.getElementById('matchedHead').innerHTML = headHtml;
+
+        var html = '', visible = 0;
         matched.forEach(function(m, idx) {
-            var currentDpl = parseFloat(m.currentDpl || 0);
-            var newDpl = parseFloat(m.dpl || 0);
-            var changed = Math.abs(newDpl - currentDpl) >= 0.01;
-            var diff = currentDpl > 0 ? ((newDpl - currentDpl) / currentDpl * 100).toFixed(1) : 'new';
+            var curDpl  = parseFloat(m.currentDpl || 0);
+            var newDpl  = parseFloat(m.dpl || 0);
+            var curRate = parseFloat(m.currentRate || 0);
+            var newRate = m.proposed_rate ? parseFloat(m.proposed_rate) : 0;
 
-            if (hideUnchanged && !changed) return;
+            var dplChanged  = Math.abs(newDpl - curDpl) >= 0.01;
+            var rateChanged = newRate > 0 && Math.abs(newRate - curRate) >= 0.01;
+            var nameChanged = m.proposed_name && m.proposed_name !== m.zoho_item_name;
+            var skuChanged  = m.proposed_sku && m.proposed_sku !== m.current_sku;
+            var anyChanged  = dplChanged || rateChanged || nameChanged || skuChanged;
 
-            var searchText = (m.zoho_item_name + ' ' + m.product + ' ' + m.packSize).toLowerCase();
-            if (search && searchText.indexOf(search) === -1) return;
+            if (hideUnchanged && !anyChanged) return;
+            var searchTxt = (m.zoho_item_name + ' ' + (m.product || '') + ' ' + (m.packSize || '') + ' ' + (m.current_sku || '')).toLowerCase();
+            if (search && searchTxt.indexOf(search) === -1) return;
+            visible++;
 
-            visibleCount++;
-            var rowClass = changed ? 'row-changed' : 'row-same';
-            html += '<tr class="' + rowClass + '">';
-            html += '<td><input type="checkbox" class="match-cb" data-idx="' + idx + '" ' + (changed ? 'checked' : '') + ' onchange="updateSelectedCount()"></td>';
-            var warnBadge = m._warning ? ' <span class="text-[9px] px-1 py-0.5 bg-amber-100 text-amber-700 rounded" title="' + escapeHtml(m._warning) + '">⚠</span>' : '';
-            html += '<td class="font-medium" style="max-width:220px" title="' + escapeHtml(m.zoho_item_name) + (m._warning ? ' — ' + escapeHtml(m._warning) : '') + '"><div class="truncate">' + escapeHtml(m.zoho_item_name) + warnBadge + '</div></td>';
-            html += '<td class="text-gray-500" style="max-width:180px" title="' + escapeHtml(m.product) + '"><div class="truncate">' + escapeHtml(m.product) + '</div></td>';
-            html += '<td class="text-right">' + escapeHtml(m.packSize) + '</td>';
-            html += '<td class="text-right font-bold text-green-700">' + formatINR(newDpl) + '</td>';
-            html += '<td class="text-right text-gray-400">' + (currentDpl > 0 ? formatINR(currentDpl) : '<span class="text-gray-300">--</span>') + '</td>';
-            html += '<td class="text-right text-gray-400">' + formatINR(m.currentRate) + '</td>';
-            html += '<td class="text-center">';
-            if (changed) {
-                var diffColor = diff === 'new' ? 'text-blue-600' : (parseFloat(diff) > 0 ? 'text-red-500' : 'text-green-600');
-                html += '<span class="text-[10px] font-bold ' + diffColor + '">' + (diff === 'new' ? 'NEW' : (parseFloat(diff) > 0 ? '+' : '') + diff + '%') + '</span>';
+            var rowCls = anyChanged ? 'row-changed' : 'row-same';
+            var warn = m._warning ? ' <span title="' + esc(m._warning) + '" style="color:#f59e0b;cursor:help;">⚠</span>' : '';
+
+            html += '<tr class="' + rowCls + '">';
+            html += '<td><input type="checkbox" class="match-cb" data-idx="' + idx + '" ' + (anyChanged ? 'checked' : '') + ' onchange="updateSelectedCount()"></td>';
+
+            if (isFull) {
+                // NAME column
+                html += '<td style="max-width:280px">';
+                if (nameChanged) {
+                    html += '<div class="diff-cell">';
+                    html += '<div class="diff-old truncate" title="' + esc(m.zoho_item_name) + '">' + esc(m.zoho_item_name) + warn + '</div>';
+                    html += '<div class="diff-new truncate" title="' + esc(m.proposed_name) + '">' + esc(m.proposed_name) + '</div>';
+                    html += '</div>';
+                } else {
+                    html += '<div class="diff-same truncate" title="' + esc(m.zoho_item_name) + '">' + esc(m.zoho_item_name) + warn + '</div>';
+                }
+                html += '</td>';
+
+                // SKU column
+                html += '<td style="white-space:nowrap">';
+                if (skuChanged) {
+                    html += '<div class="diff-cell">';
+                    html += '<div class="diff-old">' + esc(m.current_sku) + '</div>';
+                    html += '<div class="diff-new">' + esc(m.proposed_sku) + '</div>';
+                    html += '</div>';
+                } else {
+                    html += '<span class="diff-same">' + esc(m.current_sku || '—') + '</span>';
+                }
+                html += '</td>';
+
+                // DPL column
+                html += '<td class="text-right" style="white-space:nowrap">';
+                if (dplChanged) {
+                    html += '<div class="diff-cell items-end">';
+                    html += '<div class="diff-old">' + (curDpl > 0 ? fmt(curDpl) : '—') + '</div>';
+                    html += '<div class="diff-new">' + fmt(newDpl) + '</div>';
+                    html += '</div>';
+                } else {
+                    html += '<span class="diff-same">' + fmt(newDpl) + '</span>';
+                }
+                html += '</td>';
+
+                // RATE column
+                html += '<td class="text-right" style="white-space:nowrap">';
+                if (rateChanged) {
+                    html += '<div class="diff-cell items-end">';
+                    html += '<div class="diff-old">' + (curRate > 0 ? fmt(curRate) : '—') + '</div>';
+                    html += '<div class="diff-new">' + fmt(newRate) + '</div>';
+                    html += '</div>';
+                } else {
+                    html += '<span class="diff-same">' + (curRate > 0 ? fmt(curRate) : '—') + '</span>';
+                }
+                html += '</td>';
+
+                // Change tags
+                html += '<td style="white-space:nowrap">';
+                var tags = [];
+                if (dplChanged)  tags.push('<span class="tag-dpl">DPL</span>');
+                if (rateChanged) tags.push('<span class="tag-rate">RATE</span>');
+                if (nameChanged) tags.push('<span class="tag-name">NAME</span>');
+                if (skuChanged)  tags.push('<span class="tag-sku">SKU</span>');
+                html += tags.length ? tags.join(' ') : '<span style="color:#d1d5db;font-size:0.65rem">same</span>';
+                html += '</td>';
+
             } else {
-                html += '<span class="text-[10px] text-gray-300">same</span>';
+                // DPL-only view (simple)
+                var diff = curDpl > 0 ? ((newDpl - curDpl) / curDpl * 100).toFixed(1) : 'new';
+                html += '<td style="max-width:200px"><div class="truncate" title="' + esc(m.zoho_item_name) + '">' + esc(m.zoho_item_name) + warn + '</div></td>';
+                html += '<td style="max-width:160px;color:#64748b"><div class="truncate" title="' + esc(m.product) + '">' + esc(m.product) + '</div></td>';
+                html += '<td class="text-right">' + esc(m.packSize) + '</td>';
+                html += '<td class="text-right font-bold" style="color:#059669">' + fmt(newDpl) + '</td>';
+                html += '<td class="text-right" style="color:#94a3b8">' + (curDpl > 0 ? fmt(curDpl) : '<span style="color:#d1d5db">—</span>') + '</td>';
+                html += '<td class="text-right" style="color:#94a3b8">' + (curRate > 0 ? fmt(curRate) : '—') + '</td>';
+                html += '<td class="text-right font-semibold" style="color:#2563eb">' + (newRate > 0 ? fmt(newRate) : '—') + '</td>';
+                html += '<td class="text-center">';
+                if (dplChanged) {
+                    var dc = diff === 'new' ? 'color:#2563eb' : (parseFloat(diff) > 0 ? 'color:#ef4444' : 'color:#059669');
+                    html += '<span style="font-size:0.65rem;font-weight:700;' + dc + '">' + (diff === 'new' ? 'NEW' : (parseFloat(diff) > 0 ? '+' : '') + diff + '%') + '</span>';
+                } else {
+                    html += '<span style="font-size:0.65rem;color:#d1d5db">same</span>';
+                }
+                html += '</td>';
             }
-            html += '</td></tr>';
+            html += '</tr>';
         });
 
-        if (visibleCount === 0) {
-            html = '<tr><td colspan="8" class="text-center py-6 text-gray-400">No matching items found</td></tr>';
+        if (visible === 0) {
+            var cols = isFull ? 6 : 9;
+            html = '<tr><td colspan="' + cols + '" class="text-center py-6" style="color:#9ca3af">No items match the current filter</td></tr>';
         }
         document.getElementById('matchedBody').innerHTML = html;
         updateSelectedCount();
@@ -420,8 +1781,31 @@
 
     function updateSelectedCount() {
         var count = document.querySelectorAll('.match-cb:checked').length;
-        var el = document.getElementById('selectedCount');
-        if (el) el.textContent = count > 0 ? count + ' selected' : '';
+        document.getElementById('selectedCount').textContent = count > 0 ? count + ' selected' : '';
+    }
+    function toggleAllMatched() {
+        var checked = document.getElementById('selectAllMatched').checked;
+        document.querySelectorAll('.match-cb').forEach(function(cb) { cb.checked = checked; });
+        updateSelectedCount();
+    }
+    function bulkCheckAll(checked) {
+        document.querySelectorAll('.match-cb').forEach(function(cb) { cb.checked = checked; });
+        updateSelectedCount();
+    }
+
+    function selectOnlyChanged() {
+        var matched = (parseResult && parseResult.matched) || [];
+        document.querySelectorAll('.match-cb').forEach(function(cb) {
+            var idx = parseInt(cb.getAttribute('data-idx'));
+            var m = matched[idx];
+            if (!m) { cb.checked = false; return; }
+            var dplChg = Math.abs(parseFloat(m.dpl||0) - parseFloat(m.currentDpl||0)) >= 0.01;
+            var rateChg = m.proposed_rate && Math.abs(parseFloat(m.proposed_rate)-parseFloat(m.currentRate||0)) >= 0.01;
+            var nameChg = m.proposed_name && m.proposed_name !== m.zoho_item_name;
+            var skuChg  = m.proposed_sku && m.proposed_sku !== m.current_sku;
+            cb.checked = (dplChg || rateChg || nameChg || skuChg);
+        });
+        updateSelectedCount();
     }
 
     function renderUnmatchedTable() {
@@ -429,83 +1813,504 @@
         var html = '';
         unmatched.forEach(function(u) {
             html += '<tr>';
-            html += '<td>' + escapeHtml(u.product) + '</td>';
-            html += '<td class="text-right">' + escapeHtml(u.packSize || '?') + '</td>';
-            html += '<td class="text-right font-medium">' + formatINR(u.dpl) + '</td>';
-            html += '<td class="text-gray-400">' + escapeHtml(u.category || '') + '</td>';
-            html += '<td class="text-amber-600 text-xs">' + escapeHtml(u._reject_reason || '') + '</td>';
+            html += '<td>' + esc(u.product) + '</td>';
+            html += '<td class="text-right">' + esc(u.packSize || '?') + '</td>';
+            html += '<td class="text-right font-medium">' + fmt(u.dpl) + '</td>';
+            html += '<td style="color:#94a3b8">' + esc(u.category || '') + '</td>';
+            html += '<td style="color:#f59e0b;font-size:0.68rem">' + esc(u._reject_reason || '') + '</td>';
             html += '</tr>';
         });
-        if (unmatched.length === 0) {
-            html = '<tr><td colspan="5" class="text-center py-4 text-gray-400">All items matched!</td></tr>';
+        if (!unmatched.length) {
+            html = '<tr><td colspan="5" class="text-center py-4" style="color:#9ca3af">All items matched!</td></tr>';
         }
         document.getElementById('unmatchedBody').innerHTML = html;
     }
 
-    function toggleAllMatched() {
-        var checked = document.getElementById('selectAllMatched').checked;
-        document.querySelectorAll('.match-cb').forEach(function(cb) { cb.checked = checked; });
-        updateSelectedCount();
-    }
-
-    // ============ APPLY DPL DIRECTLY ============
-    async function applyDplDirect() {
-        if (!parseResult || !parseResult.matched) return;
-        var matched = parseResult.matched;
+    // ============ BUILD PAYLOAD FROM SELECTION ============
+    function buildPayload() {
+        var matched = (parseResult && parseResult.matched) || [];
         var selected = [];
         document.querySelectorAll('.match-cb:checked').forEach(function(cb) {
             var idx = parseInt(cb.getAttribute('data-idx'));
-            if (matched[idx]) selected.push(matched[idx]);
+            var m = matched[idx];
+            if (m) selected.push(m);
         });
-        if (selected.length === 0) { showToast('Select at least one item', 'error'); return; }
+        return selected;
+    }
 
-        if (!confirm('Update DPL for ' + selected.length + ' items in the database?')) return;
+    // ============ SAVE TO DB ONLY (no Zoho sync) ============
+    async function applyToDb() {
+        var selected = buildPayload();
+        if (!selected.length) { showToast('Select at least one item', 'error'); return; }
+        if (!confirm('Save changes for ' + selected.length + ' items to local DB only (no Zoho sync)?')) return;
 
-        var btn = document.getElementById('applyBtn');
-        var spinner = document.getElementById('applySpinner');
-        btn.disabled = true; spinner.classList.remove('hidden');
-
+        var updateNameSku = !!(document.getElementById('updateNameSku') || {}).checked;
+        document.getElementById('applyDbBtn').disabled = true;
         try {
-            var payload = selected.map(function(m) {
-                return { zoho_item_id: m.zoho_item_id, cf_dpl: m.dpl };
+            var items = selected.map(function(m) {
+                var obj = { zoho_item_id: m.zoho_item_id, cf_dpl: m.dpl };
+                if (m.proposed_rate) obj.rate = m.proposed_rate;
+                if (updateNameSku) {
+                    if (m.proposed_name)        obj.name        = m.proposed_name;
+                    if (m.proposed_sku)         obj.sku         = m.proposed_sku;
+                    if (m.proposed_description) obj.description = m.proposed_description;
+                }
+                return obj;
             });
-
             var resp = await fetch('/api/zoho/items/apply-price-list', {
                 method: 'POST',
-                headers: {
-                    'Authorization': 'Bearer ' + getAuthToken(),
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({ items: payload })
+                headers: { 'Authorization': 'Bearer ' + getToken(), 'Content-Type': 'application/json' },
+                body: JSON.stringify({ items: items })
             });
             var data = await resp.json();
-            if (!resp.ok || !data.success) throw new Error(data.message || 'Apply failed');
-
-            // Show step 3
-            setStep(3);
-            document.getElementById('doneTitle').textContent = 'DPL Updated Successfully!';
-            document.getElementById('doneMsg').textContent = 'Updated ' + data.data.updated + ' of ' + data.data.total + ' items. Go to Edit Items to review and push to Zoho Books.';
-            showToast('DPL updated for ' + data.data.updated + ' items', 'success');
+            if (!resp.ok || !data.success) throw new Error(data.message || 'Save failed');
+            showToast('Saved ' + data.data.updated + ' items to DB', 'success');
         } catch (err) {
-            showToast('Apply error: ' + err.message, 'error');
+            showToast('Error: ' + err.message, 'error');
         } finally {
-            btn.disabled = false; spinner.classList.add('hidden');
+            document.getElementById('applyDbBtn').disabled = false;
+        }
+    }
+
+    // ============ APPLY & PUSH TO ZOHO (bulk-edit job) ============
+    async function applyAndPushToZoho() {
+        var selected = buildPayload();
+        if (!selected.length) { showToast('Select at least one item', 'error'); return; }
+
+        var changeSummary = { dpl: 0, rate: 0, name: 0, sku: 0 };
+        selected.forEach(function(m) {
+            if (Math.abs(parseFloat(m.dpl||0)-parseFloat(m.currentDpl||0)) >= 0.01) changeSummary.dpl++;
+            if (m.proposed_rate && Math.abs(parseFloat(m.proposed_rate)-parseFloat(m.currentRate||0)) >= 0.01) changeSummary.rate++;
+            if (m.proposed_name && m.proposed_name !== m.zoho_item_name) changeSummary.name++;
+            if (m.proposed_sku  && m.proposed_sku  !== m.current_sku)    changeSummary.sku++;
+        });
+
+        var summary = selected.length + ' items: ';
+        var parts = [];
+        if (changeSummary.dpl)  parts.push(changeSummary.dpl + ' DPL');
+        if (changeSummary.rate) parts.push(changeSummary.rate + ' Rate');
+        if (changeSummary.name) parts.push(changeSummary.name + ' Name');
+        if (changeSummary.sku)  parts.push(changeSummary.sku + ' SKU');
+        summary += parts.join(', ') + ' changes';
+
+        if (!confirm('Apply and push to Zoho Books?\n\n' + summary + '\n\nThis will create a bulk job for Zoho Books sync.')) return;
+
+        var btn = document.getElementById('applyBtn'), sp = document.getElementById('applySpinner');
+        btn.disabled = true; sp.classList.remove('hidden');
+
+        var updateNameSku = !!(document.getElementById('updateNameSku') || {}).checked;
+        try {
+            // Build bulk-edit payload
+            var bulkItems = selected.map(function(m) {
+                var changes = {};
+                changes.cf_dpl = m.dpl;
+                if (m.proposed_rate) changes.rate = m.proposed_rate;
+                if (updateNameSku) {
+                    if (m.proposed_name)        changes.name        = m.proposed_name;
+                    if (m.proposed_sku)         changes.sku         = m.proposed_sku;
+                    if (m.proposed_description) changes.description = m.proposed_description;
+                }
+                return {
+                    zoho_item_id: m.zoho_item_id,
+                    item_name: (updateNameSku && m.proposed_name) ? m.proposed_name : m.zoho_item_name,
+                    changes: changes
+                };
+            });
+
+            var resp = await fetch('/api/zoho/items/bulk-edit', {
+                method: 'POST',
+                headers: { 'Authorization': 'Bearer ' + getToken(), 'Content-Type': 'application/json' },
+                body: JSON.stringify({ items: bulkItems })
+            });
+            var data = await resp.json();
+            if (!resp.ok || !data.success) throw new Error(data.message || 'Push failed');
+
+            setStep(3);
+            document.getElementById('doneTitle').textContent = 'Items Updated & Queued for Zoho Sync!';
+            document.getElementById('doneMsg').textContent = summary + '. Bulk job created — Zoho Books sync is running in background.';
+            document.getElementById('bulkJobLink').classList.remove('hidden');
+            showToast('Bulk job created for ' + selected.length + ' items', 'success');
+        } catch (err) {
+            showToast('Push error: ' + err.message, 'error');
+        } finally {
+            btn.disabled = false; sp.classList.add('hidden');
+        }
+    }
+
+    // ============ AUTO-PROPOSE (No PDF) ============
+    // State for the auto-propose flow — kept separate from PDF parse / AI parse state.
+    var apData = null;          // { brand, total, withChanges, items[] }
+    var apFilter = 'changed';   // 'changed' | 'all' | 'skipped'
+
+    async function autoProposeFetch() {
+        var brand = (document.getElementById('autoProposeBrand') || {}).value || 'birlaopus';
+        var btn = document.getElementById('autoProposeBtn');
+        var sp  = document.getElementById('autoProposeSpinner');
+        btn.disabled = true; sp.classList.remove('hidden');
+        document.getElementById('parseStatus').textContent = 'Loading items from database...';
+        try {
+            var resp = await fetch('/api/zoho/items/propose-naming?brand=' + encodeURIComponent(brand), {
+                headers: { 'Authorization': 'Bearer ' + getToken() }
+            });
+            if (!resp.ok) {
+                var err = await resp.json().catch(function(){ return {}; });
+                throw new Error(err.message || 'Server error ' + resp.status);
+            }
+            var data = await resp.json();
+            if (!data.success) throw new Error(data.message || 'Auto-propose failed');
+            apData = data.data;
+            // Pre-seed working state on every item (selection + editable proposed name)
+            (apData.items || []).forEach(function(it) {
+                it._selected = false;
+                it._editedName = it.proposed_name; // user can override the proposed name
+            });
+            apShowResults();
+            document.getElementById('parseStatus').textContent = '';
+        } catch (e) {
+            showToast('Auto-propose error: ' + e.message, 'error');
+            document.getElementById('parseStatus').textContent = 'Error: ' + e.message;
+        } finally {
+            btn.disabled = false; sp.classList.add('hidden');
+        }
+    }
+
+    function apShowResults() {
+        if (!apData) return;
+        setStep(2);
+        document.getElementById('step2Quick').classList.add('hidden');
+        document.getElementById('step2Ai').classList.add('hidden');
+        document.getElementById('step2AutoPropose').classList.remove('hidden');
+        document.getElementById('step2Label').textContent = 'Auto-Propose Review';
+
+        var total = apData.total || 0;
+        var changed = apData.withChanges || 0;
+        var skipped = (apData.items || []).filter(function(it){ return !!it.skip_reason; }).length;
+        var same = total - changed - skipped;
+        document.getElementById('apStatTotal').textContent   = total;
+        document.getElementById('apStatChanged').textContent = changed;
+        document.getElementById('apStatSame').textContent    = same;
+        document.getElementById('apStatSkipped').textContent = skipped;
+
+        apRenderTable();
+    }
+
+    function apSetFilter(f) {
+        apFilter = f;
+        document.getElementById('apFilterChanged').classList.toggle('active', f === 'changed');
+        document.getElementById('apFilterAll').classList.toggle('active', f === 'all');
+        document.getElementById('apFilterSkipped').classList.toggle('active', f === 'skipped');
+        apRenderTable();
+    }
+
+    function apRenderTable() {
+        if (!apData) return;
+        var search = ((document.getElementById('apRowSearch') || {}).value || '').toLowerCase();
+        var rows = apData.items || [];
+        var html = '';
+        var visible = 0;
+
+        rows.forEach(function(row, idx) {
+            // Filter by status tab
+            if (apFilter === 'changed' && (!row.has_changes || row.skip_reason)) return;
+            if (apFilter === 'skipped' && !row.skip_reason) return;
+            // 'all' shows everything
+
+            // Free-text filter
+            if (search) {
+                var hay = ((row.current_name||'') + ' ' + (row.current_sku||'') + ' ' +
+                           (row.proposed_name||'') + ' ' + (row.proposed_sku||'')).toLowerCase();
+                if (hay.indexOf(search) === -1) return;
+            }
+            visible++;
+
+            // Status badge
+            var badge;
+            if (row.skip_reason) {
+                badge = '<span class="px-2 py-0.5 bg-amber-100 text-amber-700 rounded-full text-[10px] font-bold" title="' + esc(row.skip_reason) + '">Skipped</span>';
+            } else if (row.has_changes) {
+                badge = '<span class="px-2 py-0.5 bg-emerald-100 text-emerald-700 rounded-full text-[10px] font-bold">Changed</span>';
+            } else {
+                badge = '<span class="px-2 py-0.5 bg-gray-100 text-gray-500 rounded-full text-[10px] font-bold">Same</span>';
+            }
+
+            var rowCls = row.skip_reason ? '' : (row.has_changes ? 'row-changed' : 'row-same');
+            html += '<tr class="' + rowCls + '" data-ap-row="' + idx + '">';
+
+            // Checkbox (disabled for skipped rows)
+            var cbDisabled = row.skip_reason ? 'disabled' : '';
+            html += '<td><input type="checkbox" class="ap-row-cb" id="ap-row-cb-' + idx + '" data-idx="' + idx + '" ' +
+                    (row._selected ? 'checked' : '') + ' ' + cbDisabled + ' onchange="apOnRowToggle(' + idx + ')"></td>';
+
+            // Current name
+            html += '<td style="max-width:240px"><div class="truncate text-[11px]" title="' + esc(row.current_name) + '">' + esc(row.current_name) + '</div></td>';
+
+            // Current SKU
+            html += '<td class="text-[11px]" style="white-space:nowrap">' + esc(row.current_sku) + '</td>';
+
+            // Current DPL
+            html += '<td class="text-right text-[11px]" style="white-space:nowrap;color:#059669">' +
+                    (row.current_dpl ? fmt(row.current_dpl) : '<span style="color:#d1d5db">—</span>') + '</td>';
+
+            // Proposed name (editable)
+            if (row.skip_reason) {
+                html += '<td class="text-[11px]" style="color:#9ca3af">—</td>';
+            } else {
+                var propName = row._editedName != null ? row._editedName : (row.proposed_name || '');
+                var nameDiff = propName !== (row.current_name || '').trim();
+                html += '<td style="max-width:280px" class="text-[11px]">';
+                if (nameDiff && row.current_name) {
+                    html += '<div style="font-size:10px;color:#9ca3af;text-decoration:line-through;white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="' + esc(row.current_name) + '">' + esc(row.current_name) + '</div>';
+                }
+                html += '<input type="text" id="ap-name-input-' + idx + '" value="' + esc(propName) + '" ' +
+                        'oninput="apOnNameEdit(' + idx + ',this.value)" ' +
+                        'style="width:100%;font-size:11px;padding:2px 5px;border:1px solid ' + (nameDiff ? '#10b981' : '#d1d5db') + ';border-radius:3px;outline:none;color:' + (nameDiff ? '#047857' : '#374151') + '" ' +
+                        'title="' + esc(propName) + '">';
+                html += '</td>';
+            }
+
+            // Proposed SKU
+            if (row.skip_reason) {
+                html += '<td class="text-[11px]" style="color:#9ca3af;white-space:nowrap">—</td>';
+            } else {
+                html += '<td class="text-[11px]" style="white-space:nowrap">' + apRenderSkuCell(row, idx) + '</td>';
+            }
+
+            // Proposed Description
+            if (row.skip_reason) {
+                html += '<td class="text-[11px]" style="color:#9ca3af">—</td>';
+            } else {
+                html += '<td class="text-[11px]" style="max-width:200px"><div class="truncate" title="' + esc(row.proposed_description || '') + '">' + esc(row.proposed_description || '') + '</div></td>';
+            }
+
+            // Proposed Rate
+            if (row.skip_reason) {
+                html += '<td class="text-right text-[11px]" style="color:#9ca3af">—</td>';
+            } else {
+                html += '<td class="text-right text-[11px]" style="white-space:nowrap">' + apRenderRateCell(row) + '</td>';
+            }
+
+            // Status
+            html += '<td>' + badge + '</td>';
+
+            html += '</tr>';
+        });
+
+        if (visible === 0) {
+            html = '<tr><td colspan="9" class="text-center py-6" style="color:#9ca3af">No items match the current filter</td></tr>';
+        }
+        document.getElementById('apTableBody').innerHTML = html;
+        apUpdateSelectedCount();
+    }
+
+    function apRenderSkuCell(row, idx) {
+        var cur = (row.current_sku || '').trim().toUpperCase();
+        var editVal = (row._editedSku != null) ? row._editedSku : ((row.proposed_sku || '').trim() || cur);
+        var diff = editVal !== cur;
+        var html = '';
+        if (diff && cur) {
+            html += '<div style="font-size:10px;color:#9ca3af;text-decoration:line-through;white-space:nowrap" title="' + esc(cur) + '">' + esc(cur) + '</div>';
+        }
+        html += '<input type="text" id="ap-sku-input-' + idx + '" value="' + esc(editVal) + '" ' +
+                'oninput="apOnSkuEdit(' + idx + ',this.value)" ' +
+                'style="width:90px;font-size:11px;padding:2px 5px;border:1px solid ' + (diff ? '#7c3aed' : '#d1d5db') + ';border-radius:3px;outline:none;color:' + (diff ? '#5b21b6' : '#374151') + ';font-family:monospace" ' +
+                'onfocus="this.style.borderColor=\'#7c3aed\'" title="' + esc(editVal) + '">';
+        return html;
+    }
+    function apRenderRateCell(row) {
+        var cur = row.current_rate != null ? parseFloat(row.current_rate) : 0;
+        var nw  = row.proposed_rate != null ? parseFloat(row.proposed_rate) : 0;
+        if (!nw) return '<span style="color:#d1d5db">—</span>';
+        if (Math.abs(nw - cur) < 0.01) return '<span class="diff-same">' + fmt(nw) + '</span>';
+        return '<div class="diff-cell items-end">' +
+               '<div class="diff-old">' + (cur > 0 ? fmt(cur) : '—') + '</div>' +
+               '<div class="diff-new" style="color:#2563eb">' + fmt(nw) + '</div></div>';
+    }
+
+    function apOnNameEdit(idx, value) {
+        var row = apData.items[idx];
+        row._editedName = value;
+        var input = document.getElementById('ap-name-input-' + idx);
+        var nameDiff = value !== (row.current_name || '').trim();
+        if (input) {
+            input.style.borderColor = nameDiff ? '#10b981' : '#d1d5db';
+            input.style.color = nameDiff ? '#047857' : '#374151';
+        }
+    }
+    function apOnSkuEdit(idx, value) {
+        var row = apData.items[idx];
+        row._editedSku = value.toUpperCase().trim();
+        var input = document.getElementById('ap-sku-input-' + idx);
+        var cur = (row.current_sku || '').trim().toUpperCase();
+        if (input) {
+            var diff = row._editedSku !== cur;
+            input.style.borderColor = diff ? '#7c3aed' : '#d1d5db';
+            input.style.color = diff ? '#5b21b6' : '#374151';
+        }
+    }
+    function apOnRowToggle(idx) {
+        var row = apData.items[idx];
+        var cb = document.getElementById('ap-row-cb-' + idx);
+        row._selected = cb ? cb.checked : false;
+        apUpdateSelectedCount();
+    }
+    function apToggleAll() {
+        var checked = document.getElementById('apSelectAllCb').checked;
+        // Apply to currently visible (filtered) rows only
+        var rows = document.querySelectorAll('#apTableBody tr[data-ap-row]');
+        rows.forEach(function(tr) {
+            var idx = parseInt(tr.getAttribute('data-ap-row'), 10);
+            var row = apData.items[idx];
+            if (!row || row.skip_reason) return;
+            row._selected = checked;
+            var cb = document.getElementById('ap-row-cb-' + idx);
+            if (cb) cb.checked = checked;
+        });
+        apUpdateSelectedCount();
+    }
+    function apSelectAllChanged() {
+        (apData.items || []).forEach(function(row, idx) {
+            if (row.skip_reason || !row.has_changes) return;
+            row._selected = true;
+            var cb = document.getElementById('ap-row-cb-' + idx);
+            if (cb) cb.checked = true;
+        });
+        apUpdateSelectedCount();
+    }
+    function apClearAll() {
+        (apData.items || []).forEach(function(row, idx) {
+            row._selected = false;
+            var cb = document.getElementById('ap-row-cb-' + idx);
+            if (cb) cb.checked = false;
+        });
+        apUpdateSelectedCount();
+    }
+    function apUpdateSelectedCount() {
+        var count = 0;
+        (apData && apData.items || []).forEach(function(r){ if (r._selected) count++; });
+        document.getElementById('apSelectedCount').textContent = count > 0 ? count + ' rows selected' : 'No rows selected';
+        document.getElementById('apSelectedBadge').textContent = count + ' selected';
+    }
+
+    // Apply selected rows by calling the existing /api/zoho/items/bulk-edit endpoint.
+    // Same payload shape as the AI flow: { items: [ { zoho_item_id, item_name, changes } ] }
+    async function autoProposeApply() {
+        if (!apData) { showToast('No auto-propose data', 'error'); return; }
+        var items = [];
+        (apData.items || []).forEach(function(row) {
+            if (!row._selected || row.skip_reason) return;
+            // Only push fields that actually differ from current values
+            var changes = {};
+            var finalName = (row._editedName != null ? row._editedName : row.proposed_name) || '';
+            if (finalName && finalName !== (row.current_name || '').trim()) {
+                changes.name = finalName;
+            }
+            var finalSku = (row._editedSku != null) ? row._editedSku : (row.proposed_sku || '');
+            if (finalSku && finalSku !== (row.current_sku || '').trim().toUpperCase()) {
+                changes.sku = finalSku;
+            }
+            if (row.proposed_description && row.proposed_description !== (row.current_description || '').trim()) {
+                changes.description = row.proposed_description;
+            }
+            if (row.proposed_rate != null && row.current_rate != null &&
+                Math.abs(parseFloat(row.proposed_rate) - parseFloat(row.current_rate)) >= 0.01) {
+                changes.rate = row.proposed_rate;
+            } else if (row.proposed_rate != null && row.current_rate == null) {
+                changes.rate = row.proposed_rate;
+            }
+            // If nothing changed, skip — bulk-edit rejects empty changes
+            if (Object.keys(changes).length === 0) return;
+            items.push({
+                zoho_item_id: row.zoho_item_id,
+                item_name: finalName || row.current_name || '',
+                changes: changes
+            });
+        });
+
+        if (!items.length) {
+            showToast('No items have changes to push (selected rows are unchanged)', 'error');
+            return;
+        }
+
+        if (!confirm('Apply and push ' + items.length + ' items to Zoho Books?')) return;
+
+        var btn = document.getElementById('apApplyBtn'), sp = document.getElementById('apApplySpinner');
+        btn.disabled = true; sp.classList.remove('hidden');
+        try {
+            var resp = await fetch('/api/zoho/items/bulk-edit', {
+                method: 'POST',
+                headers: { 'Authorization': 'Bearer ' + getToken(), 'Content-Type': 'application/json' },
+                body: JSON.stringify({ items: items })
+            });
+            var data = await resp.json();
+            if (!resp.ok || !data.success) throw new Error(data.message || 'Push failed');
+            setStep(3);
+            document.getElementById('doneTitle').textContent = 'Items Updated & Queued!';
+            document.getElementById('doneMsg').textContent = items.length + ' items updated. Zoho Books sync running in background.';
+            document.getElementById('bulkJobLink').classList.remove('hidden');
+            showToast('Bulk job created for ' + items.length + ' items', 'success');
+        } catch (err) {
+            showToast('Push error: ' + err.message, 'error');
+        } finally {
+            btn.disabled = false; sp.classList.add('hidden');
         }
     }
 
     // ============ NAVIGATION ============
     function backToUpload() {
-        parseResult = null;
-        selectedFile = null;
+        parseResult = null; selectedFile = null; aiData = null; apData = null;
         document.getElementById('pdfFileInput').value = '';
         document.getElementById('fileInfo').classList.add('hidden');
         document.getElementById('parseBtn').disabled = true;
+        var aiBtn = document.getElementById('aiParseBtn'); if (aiBtn) aiBtn.disabled = true;
         document.getElementById('parseStatus').textContent = '';
+        // Reset Step 2 sub-views
+        document.getElementById('step2Ai').classList.add('hidden');
+        document.getElementById('step2AutoPropose').classList.add('hidden');
+        document.getElementById('step2Quick').classList.remove('hidden');
+        document.getElementById('step2Label').textContent = 'Compare & Review';
         setStep(1);
     }
 
     // ============ INIT ============
     setStep(1);
+
+    // Re-render table/cards when screen rotates or resizes past mobile breakpoint
+    var _aiRszTimer;
+    window.addEventListener('resize', function() {
+        clearTimeout(_aiRszTimer);
+        _aiRszTimer = setTimeout(function() { if (aiData) { aiApplyLayout(); renderAiTable(); } }, 200);
+    });
     </script>
+
+<!-- ===== ZOHO ITEM PICKER MODAL ===== -->
+<div id="zohoPicker" style="display:none;position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,0.45);display:none;align-items:center;justify-content:center;padding:16px">
+    <div style="background:#fff;border-radius:14px;box-shadow:0 20px 60px rgba(0,0,0,0.3);width:100%;max-width:520px;display:flex;flex-direction:column;max-height:88vh">
+        <!-- Header -->
+        <div style="padding:12px 14px 10px;border-bottom:1px solid #e5e7eb;flex-shrink:0">
+            <div style="display:flex;gap:8px;align-items:center;margin-bottom:8px">
+                <input id="zpSearch" type="text" placeholder="Search by name, SKU, description..." oninput="zpRender()"
+                    style="flex:1;padding:7px 10px;border:1px solid #a5b4fc;border-radius:7px;font-size:13px;outline:none">
+                <button onclick="closeZohoPicker()" style="padding:4px 10px;font-size:20px;color:#9ca3af;background:none;border:none;cursor:pointer;line-height:1">×</button>
+            </div>
+            <div style="display:flex;gap:6px;flex-wrap:wrap">
+                <select id="zpBrand" onchange="zpRender()" style="flex:1;min-width:120px;padding:5px 8px;border:1px solid #d1d5db;border-radius:6px;font-size:11px;outline:none;background:#fff">
+                    <option value="">All Brands</option>
+                </select>
+                <select id="zpCategory" onchange="zpRender()" style="flex:1;min-width:120px;padding:5px 8px;border:1px solid #d1d5db;border-radius:6px;font-size:11px;outline:none;background:#fff">
+                    <option value="">All Categories</option>
+                </select>
+                <span id="zpCount" style="font-size:10px;color:#9ca3af;align-self:center"></span>
+            </div>
+        </div>
+        <!-- List -->
+        <div id="zpList" style="overflow-y:auto;flex:1"></div>
+        <!-- Footer -->
+        <div style="padding:8px 10px;border-top:1px solid #f3f4f6;flex-shrink:0">
+            <button onclick="zpSelectItem('')" style="width:100%;padding:7px;font-size:12px;color:#9ca3af;background:#f9fafb;border:1px solid #e5e7eb;border-radius:6px;cursor:pointer">
+                — Clear / No match —
+            </button>
+        </div>
+    </div>
+</div>
 </body>
 </html>

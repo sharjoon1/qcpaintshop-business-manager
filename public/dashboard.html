@@ -13,12 +13,14 @@
     <script src="/js/auth-helper.js"></script>
     <script>
         checkAuthOrRedirect();
-        // Only admin and manager can access this dashboard
+        // Admin-level roles (admin / administrator / super_admin / manager /
+        // branch_manager) can access this dashboard; everyone else is redirected.
         (function() {
             try {
                 const user = JSON.parse(localStorage.getItem('user'));
-                const role = user && user.role;
-                if (role && role !== 'admin' && role !== 'manager') {
+                const role = (user && user.role || '').toLowerCase();
+                const ADMIN_LEVEL = ['admin', 'administrator', 'super_admin', 'manager', 'branch_manager'];
+                if (role && !ADMIN_LEVEL.includes(role)) {
                     window.location.href = role === 'customer' ? '/customer-dashboard.html' : '/staff/dashboard.html';
                 }
             } catch (e) {}
@@ -342,6 +344,10 @@
                         <svg viewBox="0 0 24 24"><path d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
                         <span>HR & Attendance</span>
                     </a>
+                    <a href="/staff/dashboard.html" class="quick-link" style="background:linear-gradient(135deg,#f0fdf4,#dcfce7);border-color:#86efac;">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+                        <span>My Attendance</span>
+                    </a>
                     <a href="/admin-salary-monthly.html" class="quick-link">
                         <svg viewBox="0 0 24 24"><path d="M12 1v22M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6"/></svg>
                         <span>Salary & Payroll</span>
@@ -569,7 +575,7 @@
                 container.innerHTML = notices.map(n => {
                     const priClass = n.priority === 'urgent' ? 'urgent' : n.priority === 'important' ? 'important' : '';
                     const user = JSON.parse(localStorage.getItem('user') || '{}');
-                    const canDel = user.role === 'admin' || n.posted_by === user.id;
+                    const canDel = (window.isFullAdminRole ? window.isFullAdminRole(user.role) : user.role === 'admin') || n.posted_by === user.id;
                     return `<div class="notice-card ${priClass}">
                         <div style="display:flex;justify-content:space-between;align-items:start;">
                             <div>

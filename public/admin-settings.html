@@ -13,12 +13,14 @@
     <script src="/js/auth-helper.js"></script>
     <script>
         requireAdminOrRedirect();
-        // Settings page is admin-only
+        // Settings page is admin-only (admin / administrator / super_admin)
         (function() {
             try {
                 const user = JSON.parse(localStorage.getItem('user') || '{}');
-                if (user.role && user.role !== 'admin') {
-                    window.location.href = user.role === 'staff' || user.role === 'accountant'
+                const role = (user.role || '').toLowerCase();
+                const FULL_ADMIN = ['admin', 'administrator', 'super_admin'];
+                if (role && !FULL_ADMIN.includes(role)) {
+                    window.location.href = (role === 'staff' || role === 'accountant')
                         ? '/staff/dashboard.html' : '/dashboard.html';
                 }
             } catch(e) {}

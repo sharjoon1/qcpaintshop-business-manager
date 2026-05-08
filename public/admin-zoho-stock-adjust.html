@@ -56,6 +56,9 @@
             .adj-table-wrap { display: block; }
             .adj-cards { display: none; }
         }
+        /* M3 — +/− button tap targets */
+        .adj-btn { width: 44px; height: 44px; }
+        @media (min-width: 768px) { .adj-btn { width: 28px; height: 28px; } }
     </style>
 </head>
 <body data-page="zoho-stock-adjust" class="bg-gray-50">
@@ -328,9 +331,9 @@
             html += '<td class="text-right text-gray-500">' + (parseFloat(item.available_stock) || 0) + '</td>';
             html += '<td class="text-center">';
             html += '<div class="flex items-center justify-center gap-1">';
-            html += '<button onclick="adjustQty(\'' + escapeHtml(key) + '\', -1)" class="w-6 h-6 rounded bg-gray-100 hover:bg-red-100 text-gray-600 hover:text-red-600 flex items-center justify-center text-sm font-bold transition">-</button>';
+            html += '<button onclick="adjustQty(\'' + escapeHtml(key) + '\', -1)" class="adj-btn rounded bg-gray-100 hover:bg-red-100 text-gray-600 hover:text-red-600 flex items-center justify-center text-sm font-bold transition">-</button>';
             html += '<input type="number" class="adj-input' + (adjVal > 0 ? ' positive' : (adjVal < 0 ? ' negative' : '')) + '" value="' + (hasAdj ? adj : '') + '" placeholder="0" data-key="' + escapeHtml(key) + '" data-item-id="' + escapeHtml(item.item_id) + '" onchange="onAdjInput(this)" onkeydown="if(event.key===\'Enter\')this.blur()">';
-            html += '<button onclick="adjustQty(\'' + escapeHtml(key) + '\', 1)" class="w-6 h-6 rounded bg-gray-100 hover:bg-green-100 text-gray-600 hover:text-green-600 flex items-center justify-center text-sm font-bold transition">+</button>';
+            html += '<button onclick="adjustQty(\'' + escapeHtml(key) + '\', 1)" class="adj-btn rounded bg-gray-100 hover:bg-green-100 text-gray-600 hover:text-green-600 flex items-center justify-center text-sm font-bold transition">+</button>';
             html += '</div></td>';
             html += '<td class="text-right font-medium' + (adjVal > 0 ? ' text-green-600' : (adjVal < 0 ? ' text-red-600' : '')) + '">';
             html += hasAdj ? newStock.toFixed(0) : '--';
@@ -365,9 +368,9 @@
             if (cardMeta) html += '<div class="item-meta">' + escapeHtml(cardMeta) + '</div>';
             html += '<div class="text-xs text-gray-500 mt-0.5">SKU: ' + escapeHtml(item.sku || '--') + ' | Stock: <b>' + currentStock + '</b></div></div>';
             html += '<div class="flex items-center gap-1">';
-            html += '<button onclick="adjustQty(\'' + escapeHtml(key) + '\', -1)" class="w-7 h-7 rounded bg-gray-100 hover:bg-red-100 text-gray-600 hover:text-red-600 flex items-center justify-center text-base font-bold">-</button>';
+            html += '<button onclick="adjustQty(\'' + escapeHtml(key) + '\', -1)" class="adj-btn rounded bg-gray-100 hover:bg-red-100 text-gray-600 hover:text-red-600 flex items-center justify-center text-base font-bold">-</button>';
             html += '<input type="number" class="adj-input" style="width:60px" value="' + (hasAdj ? adj : '') + '" placeholder="0" data-key="' + escapeHtml(key) + '" data-item-id="' + escapeHtml(item.item_id) + '" onchange="onAdjInput(this)">';
-            html += '<button onclick="adjustQty(\'' + escapeHtml(key) + '\', 1)" class="w-7 h-7 rounded bg-gray-100 hover:bg-green-100 text-gray-600 hover:text-green-600 flex items-center justify-center text-base font-bold">+</button>';
+            html += '<button onclick="adjustQty(\'' + escapeHtml(key) + '\', 1)" class="adj-btn rounded bg-gray-100 hover:bg-green-100 text-gray-600 hover:text-green-600 flex items-center justify-center text-base font-bold">+</button>';
             html += '</div></div>';
             if (hasAdj) html += '<div class="text-xs mt-1">New: <b class="' + (adjVal > 0 ? 'text-green-600' : 'text-red-600') + '">' + (currentStock + adjVal) + '</b> <span class="qty-badge ' + (adjVal > 0 ? 'increase' : 'decrease') + '">' + (adjVal > 0 ? '+' : '') + adjVal + '</span></div>';
             html += '</div>';
@@ -429,8 +432,15 @@
     function updatePushBar() {
         var count = getTotalAdjCount();
         var bar = document.getElementById('pushBar');
-        if (count > 0) { bar.classList.remove('hidden'); document.getElementById('pushBarCount').textContent = count; }
-        else { bar.classList.add('hidden'); }
+        var container = document.querySelector('.container.mx-auto');
+        if (count > 0) {
+            bar.classList.remove('hidden');
+            document.getElementById('pushBarCount').textContent = count;
+            if (container) container.style.paddingBottom = '80px';
+        } else {
+            bar.classList.add('hidden');
+            if (container) container.style.paddingBottom = '';
+        }
     }
 
     function updateSummary() {

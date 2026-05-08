@@ -361,7 +361,7 @@
 <script>
 const token = localStorage.getItem('auth_token');
 const user = JSON.parse(localStorage.getItem('user') || '{}');
-const isAdmin = ['admin', 'super_admin', 'manager'].includes(user.role);
+const isAdmin = ['admin', 'administrator', 'super_admin', 'manager', 'branch_manager'].includes((user.role || '').toLowerCase());
 const headers = { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token };
 let allCustomers = [];
 let debounceTimer = null;
@@ -379,7 +379,7 @@ async function checkPagePermissions() {
     // If user doesn't have credit_limits.view, redirect away
     if (!permManager.can('credit_limits', 'view')) {
         alert('You do not have permission to access Credit Limits. Contact your admin.');
-        window.location.href = user.role === 'admin' ? '/dashboard.html' : '/staff/dashboard.html';
+        window.location.href = isAdmin ? '/dashboard.html' : '/staff/dashboard.html';
         return false;
     }
 

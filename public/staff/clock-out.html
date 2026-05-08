@@ -149,6 +149,81 @@
             margin: 0 auto 20px;
             font-size: 40px;
         }
+
+        /* ── EOD Modal ── */
+        .eod-overlay {
+            display: none;
+            position: fixed; inset: 0;
+            background: rgba(0,0,0,0.6);
+            z-index: 999;
+            overflow-y: auto;
+            padding: 16px;
+        }
+        .eod-overlay.active { display: flex; align-items: flex-start; justify-content: center; }
+        .eod-modal {
+            background: #fff;
+            border-radius: 20px;
+            width: 100%; max-width: 480px;
+            padding: 20px;
+            margin: auto;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+        }
+        .eod-title {
+            font-size: 18px; font-weight: 700; color: #1B5E3B;
+            margin-bottom: 4px; text-align: center;
+        }
+        .eod-sub {
+            font-size: 12px; color: #6b7280; text-align: center;
+            margin-bottom: 16px;
+        }
+        .eod-task-row {
+            display: flex; align-items: center;
+            gap: 10px; padding: 10px 12px;
+            background: #f9fafb; border-radius: 10px;
+            margin-bottom: 8px; cursor: pointer;
+            border: 1.5px solid transparent;
+            transition: all .15s;
+        }
+        .eod-task-row.selected {
+            background: #f0fdf4; border-color: #10b981;
+        }
+        .eod-task-row input[type=checkbox] { width: 18px; height: 18px; accent-color: #1B5E3B; flex-shrink: 0; cursor: pointer; }
+        .eod-task-label { flex: 1; font-size: 14px; font-weight: 600; color: #1f2937; }
+        .eod-task-tamil { font-size: 11px; color: #6b7280; display: block; font-weight: 400; }
+        .eod-count-wrap { display: none; }
+        .eod-task-row.selected .eod-count-wrap { display: flex; align-items: center; gap: 6px; }
+        .eod-count-wrap input {
+            width: 56px; padding: 4px 6px;
+            border: 1px solid #d1d5db; border-radius: 8px;
+            font-size: 14px; font-weight: 700; color: #1B5E3B;
+            text-align: center;
+        }
+        .eod-count-wrap span { font-size: 11px; color: #6b7280; }
+        .eod-ref-box {
+            background: #f0fdf4; border: 1px solid #bbf7d0;
+            border-radius: 10px; padding: 10px 12px;
+            margin: 6px 0 10px 28px; display: none;
+        }
+        .eod-ref-box.show { display: block; }
+        .eod-ref-title { font-size: 11px; font-weight: 700; color: #1B5E3B; margin-bottom: 6px; }
+        .eod-ref-item {
+            display: flex; align-items: center; gap: 8px;
+            padding: 5px 0; border-bottom: 1px solid #d1fae5; font-size: 12px;
+        }
+        .eod-ref-item:last-child { border-bottom: none; }
+        .eod-ref-item input[type=checkbox] { width: 15px; height: 15px; accent-color: #1B5E3B; }
+        .eod-ref-name { flex: 1; color: #1f2937; font-weight: 500; }
+        .eod-ref-badge { font-size: 10px; padding: 2px 7px; border-radius: 99px; background: #dbeafe; color: #1e40af; }
+        .eod-ref-empty { font-size: 11px; color: #9ca3af; font-style: italic; padding: 4px 0; }
+        .eod-notes-wrap { margin-top: 12px; }
+        .eod-notes-wrap textarea {
+            width: 100%; border: 1px solid #d1d5db; border-radius: 10px;
+            padding: 10px; font-size: 13px; resize: vertical; min-height: 64px;
+            font-family: inherit;
+        }
+        .eod-footer { margin-top: 16px; display: flex; gap: 10px; }
+        .eod-footer .btn { font-size: 15px; padding: 14px; }
+        .eod-required { color: #dc2626; font-size: 11px; margin-top: 8px; display: none; }
     </style>
     <script src="/universal-nav-loader.js"></script>
 </head>
@@ -247,10 +322,115 @@
 
         <!-- Submit -->
         <div class="card" id="submitCard" style="display: none;">
-            <button class="btn btn-primary" onclick="submitClockIn()" id="submitBtn">
+            <button class="btn btn-primary" onclick="openEOD()" id="submitBtn">
                 <span id="submitBtnText">✓ Clock Out Now</span>
             </button>
         </div>
+    </div>
+
+    <!-- ── EOD Work Report Modal ── -->
+    <div class="eod-overlay" id="eodOverlay">
+      <div class="eod-modal">
+        <div class="eod-title">📋 இன்றைய வேலை அறிக்கை</div>
+        <div class="eod-sub">Clock Out செய்வதற்கு முன் இன்று செய்த வேலைகளை பதிவு செய்யுங்கள்</div>
+
+        <!-- Task: Marketing -->
+        <div class="eod-task-row" id="row-marketing" onclick="toggleTask('marketing')">
+            <input type="checkbox" id="chk-marketing">
+            <div style="flex:1">
+                <div class="eod-task-label">📣 Marketing
+                    <span class="eod-task-tamil">புதிய வாடிக்கையாளர்களை தொடர்பு கொண்டீர்களா?</span>
+                </div>
+            </div>
+            <div class="eod-count-wrap">
+                <input type="number" id="cnt-marketing" min="0" value="0" onclick="event.stopPropagation()">
+                <span>பேர்</span>
+            </div>
+        </div>
+        <div class="eod-ref-box" id="ref-marketing">
+            <div class="eod-ref-title">📌 இன்று Lead Manager-ல் Update செய்த Followups:</div>
+            <div id="leads-list"><div class="eod-ref-empty">Loading...</div></div>
+        </div>
+
+        <!-- Task: Outstanding Follow-up -->
+        <div class="eod-task-row" id="row-outstanding" onclick="toggleTask('outstanding')">
+            <input type="checkbox" id="chk-outstanding">
+            <div style="flex:1">
+                <div class="eod-task-label">💰 Outstanding Follow-up
+                    <span class="eod-task-tamil">கடன் வசூலை பின்தொடர்ந்தீர்களா?</span>
+                </div>
+            </div>
+            <div class="eod-count-wrap">
+                <input type="number" id="cnt-outstanding" min="0" value="0" onclick="event.stopPropagation()">
+                <span>பேர்</span>
+            </div>
+        </div>
+        <div class="eod-ref-box" id="ref-outstanding">
+            <div class="eod-ref-title">📌 இன்று Credit Management-ல் Follow-up செய்தவர்கள்:</div>
+            <div id="credits-list"><div class="eod-ref-empty">Loading...</div></div>
+        </div>
+
+        <!-- Task: Material Arrangement -->
+        <div class="eod-task-row" id="row-material" onclick="toggleTask('material')">
+            <input type="checkbox" id="chk-material">
+            <div style="flex:1">
+                <div class="eod-task-label">📦 பொருள் அமைப்பு (Material Arrangement)
+                    <span class="eod-task-tamil">கடையில் பொருட்களை ஒழுங்குபடுத்தினீர்களா?</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Task: Shop Cleaning -->
+        <div class="eod-task-row" id="row-cleaning" onclick="toggleTask('cleaning')">
+            <input type="checkbox" id="chk-cleaning">
+            <div style="flex:1">
+                <div class="eod-task-label">🧹 கடை சுத்தம் (Shop Cleaning)
+                    <span class="eod-task-tamil">கடையை சுத்தமாக வைத்தீர்களா?</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Task: Customer Service -->
+        <div class="eod-task-row" id="row-customers" onclick="toggleTask('customers')">
+            <input type="checkbox" id="chk-customers">
+            <div style="flex:1">
+                <div class="eod-task-label">🤝 வாடிக்கையாளர் சேவை (Customer Service)
+                    <span class="eod-task-tamil">இன்று எத்தனை வாடிக்கையாளர்களுக்கு சேவை செய்தீர்கள்?</span>
+                </div>
+            </div>
+            <div class="eod-count-wrap">
+                <input type="number" id="cnt-customers" min="0" value="0" onclick="event.stopPropagation()">
+                <span>பேர்</span>
+            </div>
+        </div>
+
+        <!-- Task: Other -->
+        <div class="eod-task-row" id="row-other" onclick="toggleTask('other')">
+            <input type="checkbox" id="chk-other">
+            <div style="flex:1">
+                <div class="eod-task-label">📝 மற்றவை (Other Tasks)
+                    <span class="eod-task-tamil">வேறு என்ன வேலை செய்தீர்கள்?</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Notes -->
+        <div class="eod-notes-wrap">
+            <textarea id="eodNotes" placeholder="கூடுதல் குறிப்புகள்... (Optional)"></textarea>
+        </div>
+
+        <div class="eod-required" id="eodRequired">⚠️ குறைந்தது ஒரு வேலையாவது தேர்வு செய்யவும்</div>
+
+        <div class="eod-footer">
+            <button class="btn btn-secondary" style="flex:0 0 80px" onclick="closeEOD()">Back</button>
+            <button class="btn btn-primary" id="eodSubmitBtn" onclick="submitEOD()">
+                <span id="eodSubmitText">✓ அறிக்கை சமர்ப்பி & Clock Out</span>
+            </button>
+        </div>
+      </div>
+    </div>
+
+    <div class="container" style="display:none" id="hiddenContainerPlaceholder">
 
         <!-- Success -->
         <div class="card" id="successCard" style="display: none; text-align: center;">
@@ -427,6 +607,140 @@
             document.getElementById('submitCard').style.display = 'none';
             startCamera();
         }
+
+        // ── EOD Work Report ──────────────────────────────────────────────────────
+        let eodData = { leads: [], credits: [] };
+        let eodReady = false;
+
+        async function openEOD() {
+            if (!latitude || !longitude) { alert('Location required.'); return; }
+            if (!photoBlob) { alert('Photo required.'); return; }
+            document.getElementById('eodOverlay').classList.add('active');
+            if (!eodReady) await loadEODData();
+        }
+
+        function closeEOD() {
+            document.getElementById('eodOverlay').classList.remove('active');
+        }
+
+        async function loadEODData() {
+            try {
+                const token = localStorage.getItem('auth_token');
+                const res = await fetch('/api/attendance/eod-data', { headers: { Authorization: `Bearer ${token}` } });
+                const d = await res.json();
+                if (d.success) {
+                    eodData = d;
+                    renderLeads(d.leads);
+                    renderCredits(d.credits);
+                    if (d.existing) prefillExisting(d.existing);
+                }
+            } catch (e) { console.error(e); }
+            eodReady = true;
+        }
+
+        function renderLeads(leads) {
+            const el = document.getElementById('leads-list');
+            if (!leads || !leads.length) {
+                el.innerHTML = '<div class="eod-ref-empty">இன்று Lead Manager-ல் Follow-up பதிவு இல்லை.</div>';
+                return;
+            }
+            el.innerHTML = leads.map(l => `
+                <div class="eod-ref-item">
+                    <input type="checkbox" class="lead-chk" value="${l.id}" checked>
+                    <span class="eod-ref-name">${l.lead_name || '—'} <span style="color:#9ca3af;font-size:11px;">${l.phone || ''}</span></span>
+                    <span class="eod-ref-badge">${l.followup_type}</span>
+                </div>`).join('');
+        }
+
+        function renderCredits(credits) {
+            const el = document.getElementById('credits-list');
+            if (!credits || !credits.length) {
+                el.innerHTML = '<div class="eod-ref-empty">இன்று Credit Management Follow-up பதிவு இல்லை.</div>';
+                return;
+            }
+            el.innerHTML = credits.map(c => `
+                <div class="eod-ref-item">
+                    <input type="checkbox" class="credit-chk" value="${c.id}" checked>
+                    <span class="eod-ref-name">${c.customer_name || '—'} <span style="color:#9ca3af;font-size:11px;">${c.phone || ''}</span></span>
+                    <span class="eod-ref-badge">${c.reminder_type}</span>
+                </div>`).join('');
+        }
+
+        function prefillExisting(ex) {
+            (ex.tasks || []).forEach(t => {
+                if (t.type) toggleTask(t.type, true);
+                if (t.count) {
+                    const inp = document.getElementById('cnt-' + t.type);
+                    if (inp) inp.value = t.count;
+                }
+            });
+        }
+
+        function toggleTask(id, forceOn) {
+            const row = document.getElementById('row-' + id);
+            const chk = document.getElementById('chk-' + id);
+            if (!row || !chk) return;
+            const on = forceOn !== undefined ? forceOn : !chk.checked;
+            chk.checked = on;
+            row.classList.toggle('selected', on);
+            const ref = document.getElementById('ref-' + id);
+            if (ref) ref.classList.toggle('show', on);
+            document.getElementById('eodRequired').style.display = 'none';
+        }
+
+        async function submitEOD() {
+            const taskMap = [
+                { id: 'marketing',  countId: 'cnt-marketing'  },
+                { id: 'outstanding',countId: 'cnt-outstanding' },
+                { id: 'material',   countId: null              },
+                { id: 'cleaning',   countId: null              },
+                { id: 'customers',  countId: 'cnt-customers'  },
+                { id: 'other',      countId: null              },
+            ];
+            const tasks = taskMap
+                .filter(t => document.getElementById('chk-' + t.id)?.checked)
+                .map(t => ({
+                    type: t.id,
+                    count: t.countId ? (parseInt(document.getElementById(t.countId).value) || 0) : null
+                }));
+
+            if (!tasks.length) {
+                document.getElementById('eodRequired').style.display = 'block';
+                return;
+            }
+
+            const leadIds = [...document.querySelectorAll('.lead-chk:checked')].map(c => parseInt(c.value));
+            const creditIds = [...document.querySelectorAll('.credit-chk:checked')].map(c => parseInt(c.value));
+            const notes = document.getElementById('eodNotes').value.trim();
+
+            const btn = document.getElementById('eodSubmitBtn');
+            const btnTxt = document.getElementById('eodSubmitText');
+            btn.disabled = true;
+            btnTxt.textContent = 'சமர்ப்பிக்கிறது...';
+
+            try {
+                const token = localStorage.getItem('auth_token');
+                const res = await fetch('/api/attendance/eod-submit', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+                    body: JSON.stringify({ tasks, marketing_lead_ids: leadIds, credit_reminder_ids: creditIds, notes })
+                });
+                const d = await res.json();
+                if (d.success) {
+                    closeEOD();
+                    await submitClockIn();
+                } else {
+                    alert(d.message || 'Error submitting report.');
+                    btn.disabled = false;
+                    btnTxt.textContent = '✓ அறிக்கை சமர்ப்பி & Clock Out';
+                }
+            } catch (e) {
+                alert('Network error. Please try again.');
+                btn.disabled = false;
+                btnTxt.textContent = '✓ அறிக்கை சமர்ப்பி & Clock Out';
+            }
+        }
+        // ─────────────────────────────────────────────────────────────────────────
 
         // Submit clock in
         async function submitClockIn() {

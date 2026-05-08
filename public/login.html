@@ -159,9 +159,12 @@
                     localStorage.setItem('auth_token', data.token);
                     localStorage.setItem('user', JSON.stringify(data.user));
 
-                    // Redirect based on user role
-                    const role = data.user.role;
-                    if (role === 'admin' || role === 'manager' || role === 'branch_manager') {
+                    // Redirect based on user role.
+                    // Admin-level roles (admin / administrator / super_admin /
+                    // manager / branch_manager) all land on the manager dashboard.
+                    const role = (data.user.role || '').toLowerCase();
+                    const ADMIN_LEVEL = ['admin', 'administrator', 'super_admin', 'manager', 'branch_manager'];
+                    if (ADMIN_LEVEL.includes(role)) {
                         window.location.href = '/dashboard.html';
                     } else if (role === 'customer') {
                         window.location.href = '/customer-dashboard.html';
@@ -192,8 +195,9 @@
         if (localStorage.getItem('auth_token')) {
             try {
                 const user = JSON.parse(localStorage.getItem('user'));
-                const role = user && user.role;
-                if (role === 'admin' || role === 'manager') {
+                const role = (user && user.role || '').toLowerCase();
+                const ADMIN_LEVEL = ['admin', 'administrator', 'super_admin', 'manager', 'branch_manager'];
+                if (ADMIN_LEVEL.includes(role)) {
                     window.location.href = '/dashboard.html';
                 } else if (role === 'customer') {
                     window.location.href = '/customer-dashboard.html';

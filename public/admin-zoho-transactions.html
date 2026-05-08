@@ -309,7 +309,7 @@
 
 <!-- Generate Report Modal -->
 <div id="generateModal" class="modal-overlay hidden" onclick="closeGenerateModalBackdrop(event)">
-    <div class="bg-white rounded-lg shadow-xl max-w-md w-full" onclick="event.stopPropagation()">
+    <div class="bg-white rounded-lg shadow-xl max-w-md w-full modal-safe-pb" onclick="event.stopPropagation()">
         <div class="border-b px-6 py-4 flex justify-between items-center">
             <h3 class="text-lg font-bold text-gray-800">Generate Transaction Report</h3>
             <button onclick="closeGenerateModal()" class="text-gray-400 hover:text-gray-600 text-2xl leading-none">&times;</button>
@@ -344,7 +344,7 @@
 
 <!-- Drilldown Detail Modal -->
 <div id="detailModal" class="modal-overlay hidden" onclick="closeDetailModalBackdrop(event)">
-    <div class="bg-white rounded-lg shadow-xl max-w-4xl w-full max-h-[90vh] overflow-y-auto" onclick="event.stopPropagation()">
+    <div class="bg-white rounded-lg shadow-xl max-w-4xl w-full max-h-[90vh] overflow-y-auto modal-safe-pb" onclick="event.stopPropagation()">
         <div class="sticky top-0 bg-white border-b px-6 py-4 flex justify-between items-center z-10">
             <h3 class="text-lg font-bold text-gray-800" id="detailModalTitle">Transaction Details</h3>
             <button onclick="closeDetailModal()" class="text-gray-400 hover:text-gray-600 text-2xl leading-none">&times;</button>
@@ -443,7 +443,7 @@
                 var select = document.getElementById('locationFilter');
                 locationList.forEach(function(loc) {
                     var opt = document.createElement('option');
-                    opt.value = loc.id || loc.location_id || '';
+                    opt.value = loc.zoho_location_id || loc.location_id || '';
                     opt.textContent = loc.name || loc.location_name || 'Unknown';
                     select.appendChild(opt);
                 });
@@ -650,7 +650,7 @@
         transactions.forEach(function(txn, index) {
             var date = txn.date || txn.transaction_date || '';
             var location = txn.location_name || txn.location || 'All';
-            var locationId = txn.location_id || '';
+            var locationId = txn.zoho_location_id || '';
 
             var invCount = parseInt(txn.invoice_count || txn.invoices_count || 0);
             var invAmount = parseFloat(txn.invoice_amount || txn.invoices_amount || 0);
@@ -694,7 +694,7 @@
         transactions.forEach(function(txn, index) {
             var date = txn.date || txn.transaction_date || '';
             var location = txn.location_name || txn.location || 'All';
-            var locationId = txn.location_id || '';
+            var locationId = txn.zoho_location_id || '';
 
             var invCount = parseInt(txn.invoice_count || txn.invoices_count || 0);
             var invAmount = parseFloat(txn.invoice_amount || txn.invoices_amount || 0);
@@ -906,7 +906,7 @@
         // Previous
         html += '<button onclick="goToPage(' + (currentPage - 1) + ')" ' +
                 (currentPage <= 1 ? 'disabled' : '') +
-                ' class="px-3 py-1.5 text-sm rounded-lg border ' +
+                ' class="px-3 py-1.5 pag-mob text-sm rounded-lg border' +
                 (currentPage <= 1 ? 'text-gray-400 border-gray-200 cursor-not-allowed' : 'text-gray-700 border-gray-300 hover:bg-gray-100') +
                 '">Prev</button>';
 
@@ -919,7 +919,7 @@
         }
 
         if (startPage > 1) {
-            html += '<button onclick="goToPage(1)" class="px-3 py-1.5 text-sm rounded-lg border border-gray-300 text-gray-700 hover:bg-gray-100">1</button>';
+            html += '<button onclick="goToPage(1)" class="px-3 py-1.5 pag-mob text-sm rounded-lg borderborder-gray-300 text-gray-700 hover:bg-gray-100">1</button>';
             if (startPage > 2) {
                 html += '<span class="px-2 py-1.5 text-sm text-gray-400">...</span>';
             }
@@ -927,9 +927,9 @@
 
         for (var i = startPage; i <= endPage; i++) {
             if (i === currentPage) {
-                html += '<button class="px-3 py-1.5 text-sm rounded-lg text-white font-medium" style="background:#667eea;">' + i + '</button>';
+                html += '<button class="px-3 py-1.5 pag-mob text-sm rounded-lg text-white font-medium" style="background:#667eea;">' + i + '</button>';
             } else {
-                html += '<button onclick="goToPage(' + i + ')" class="px-3 py-1.5 text-sm rounded-lg border border-gray-300 text-gray-700 hover:bg-gray-100">' + i + '</button>';
+                html += '<button onclick="goToPage(' + i + ')" class="px-3 py-1.5 pag-mob text-sm rounded-lg borderborder-gray-300 text-gray-700 hover:bg-gray-100">' + i + '</button>';
             }
         }
 
@@ -937,13 +937,13 @@
             if (endPage < totalPages - 1) {
                 html += '<span class="px-2 py-1.5 text-sm text-gray-400">...</span>';
             }
-            html += '<button onclick="goToPage(' + totalPages + ')" class="px-3 py-1.5 text-sm rounded-lg border border-gray-300 text-gray-700 hover:bg-gray-100">' + totalPages + '</button>';
+            html += '<button onclick="goToPage(' + totalPages + ')" class="px-3 py-1.5 pag-mob text-sm rounded-lg borderborder-gray-300 text-gray-700 hover:bg-gray-100">' + totalPages + '</button>';
         }
 
         // Next
         html += '<button onclick="goToPage(' + (currentPage + 1) + ')" ' +
                 (currentPage >= totalPages ? 'disabled' : '') +
-                ' class="px-3 py-1.5 text-sm rounded-lg border ' +
+                ' class="px-3 py-1.5 pag-mob text-sm rounded-lg border' +
                 (currentPage >= totalPages ? 'text-gray-400 border-gray-200 cursor-not-allowed' : 'text-gray-700 border-gray-300 hover:bg-gray-100') +
                 '">Next</button>';
 

@@ -62,13 +62,14 @@
         /* Modal */
         .modal-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100vh; background: rgba(0,0,0,0.4); z-index: 9997; }
         .modal-overlay.show { display: flex; align-items: center; justify-content: center; }
-        .modal-box { background: white; border-radius: 12px; padding: 24px; max-width: 520px; width: 90%; max-height: 90vh; overflow-y: auto; box-shadow: 0 20px 60px rgba(0,0,0,0.3); }
+        .modal-box { background: white; border-radius: 12px; padding: 24px; padding-bottom: max(1.5rem, env(safe-area-inset-bottom)); max-width: 520px; width: 90%; max-height: 90vh; overflow-y: auto; box-shadow: 0 20px 60px rgba(0,0,0,0.3); }
 
         /* Checkbox */
         .row-check { width: 16px; height: 16px; cursor: pointer; accent-color: #667eea; }
 
         /* Pagination */
-        .pag-btn { padding: 4px 10px; border-radius: 6px; font-size: 0.75rem; border: 1px solid #e2e8f0; background: white; cursor: pointer; color: #475569; }
+        .pag-btn { padding: 10px 16px; border-radius: 6px; font-size: 0.75rem; border: 1px solid #e2e8f0; background: white; cursor: pointer; color: #475569; }
+        @media (min-width: 640px) { .pag-btn { padding: 4px 10px; } }
         .pag-btn:hover:not(:disabled) { background: #f1f5f9; }
         .pag-btn:disabled { opacity: 0.5; cursor: default; }
         .pag-btn.active { background: #667eea; color: white; border-color: #667eea; }
@@ -101,11 +102,11 @@
 
         <!-- Tabs -->
         <div class="flex gap-1 border-b border-gray-200 mb-4 overflow-x-auto">
-            <button class="cc-tab active" onclick="switchTab('summary')">Summary</button>
-            <button class="cc-tab" onclick="switchTab('customers')">Customers</button>
-            <button class="cc-tab" onclick="switchTab('invoices')">Invoices</button>
-            <button class="cc-tab" onclick="switchTab('reminders')">Reminders</button>
-            <button class="cc-tab" onclick="switchTab('promises')">Promises</button>
+            <button class="cc-tab active" data-tab="summary" onclick="switchTab('summary')">Summary</button>
+            <button class="cc-tab" data-tab="customers" onclick="switchTab('customers')">Customers</button>
+            <button class="cc-tab" data-tab="invoices" onclick="switchTab('invoices')">Invoices</button>
+            <button class="cc-tab" data-tab="reminders" onclick="switchTab('reminders')">Reminders</button>
+            <button class="cc-tab" data-tab="promises" onclick="switchTab('promises')">Promises</button>
         </div>
 
         <!-- ==================== SUMMARY TAB ==================== -->
@@ -573,7 +574,8 @@
         document.querySelectorAll('[id^="tab-"]').forEach(el => el.style.display = 'none');
         document.getElementById('tab-' + tab).style.display = '';
         document.querySelectorAll('.cc-tab').forEach(el => el.classList.remove('active'));
-        event.target.classList.add('active');
+        const btn = document.querySelector(`.cc-tab[data-tab="${tab}"]`);
+        if (btn) btn.classList.add('active');
         localStorage.setItem('cc_tab', tab);
 
         if (tab === 'summary') loadSummary();
@@ -1379,7 +1381,7 @@
     (async function init() {
         // Detect admin role
         const user = JSON.parse(localStorage.getItem('user') || '{}');
-        isAdmin = user.role === 'admin';
+        isAdmin = ['admin','administrator','super_admin'].includes((user.role || '').toLowerCase());
 
         if (isAdmin) {
             document.getElementById('branchFilterWrap').style.display = '';

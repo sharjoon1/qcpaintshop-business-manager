@@ -20,7 +20,7 @@
 
 const express = require('express');
 const router = express.Router();
-const { requirePermission } = require('../middleware/permissionMiddleware');
+const { requirePermission, isFullAdmin } = require('../middleware/permissionMiddleware');
 const activityFeed = require('../services/activity-feed');
 
 let pool;
@@ -31,7 +31,7 @@ const perm = requirePermission('zoho', 'collections');
 // Helper: resolve branch_id from user role
 // Returns { branchId, includeUnassigned } for proper filtering
 function getBranchFilter(req) {
-    if (req.user.role === 'admin') {
+    if (isFullAdmin(req.user.role)) {
         return req.query.branch_id ? parseInt(req.query.branch_id) : null;
     }
     return req.user.branch_id || null;

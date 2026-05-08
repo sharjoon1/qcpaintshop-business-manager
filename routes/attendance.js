@@ -145,19 +145,18 @@ async function checkGeoFence(branchId, latitude, longitude) {
 }
 
 /**
- * Calculate delete_after date (40 days from now)
+ * Calculate delete_after date (40 days from now, in IST)
  */
 function getDeleteAfterDate() {
-    const date = new Date();
-    date.setDate(date.getDate() + 40);
-    return date.toISOString().split('T')[0];
+    const istNow = getNowIST();
+    return new Date(istNow.getTime() + 40 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
 }
 
 /**
  * Get shop hours for branch and day
  */
 async function getShopHours(branchId, date) {
-    const dayOfWeek = new Date(date).toLocaleString('en-US', { weekday: 'long' }).toLowerCase();
+    const dayOfWeek = new Date(date).toLocaleString('en-US', { weekday: 'long', timeZone: 'Asia/Kolkata' }).toLowerCase();
     
     const [rows] = await pool.query(
         `SELECT * FROM shop_hours_config 
@@ -186,6 +185,22 @@ function isLateArrival(clockInTime, openTime, thresholdMinutes) {
     const diffMinutes = (clockIn - open) / 1000 / 60;
     
     return diffMinutes > thresholdMinutes;
+}
+
+/**
+ * Calculate late penalty in attendance minutes to deduct.
+ * Grace period: open_time to open_time+15min (e.g. 8:30–8:45) → 0 min deducted
+ * Tier 1: open_time+15 to open_time+30 (e.g. 8:45–9:00) → 10 min deducted per minute late
+ * Tier 2: beyond open_time+30 (e.g. after 9:00) → 5 min deducted per minute late (additional)
+ */
+function calculateLatePenalty(currentTime, openTime) {
+    const base = new Date(`1970-01-01T${openTime}`);
+    const current = new Date(`1970-01-01T${currentTime}`);
+    const diffMinutes = (current - base) / 1000 / 60;
+    if (diffMinutes <= 15) return 0;
+    const tier1Minutes = Math.min(diffMinutes - 15, 15);
+    const tier2Minutes = Math.max(0, diffMinutes - 30);
+    return Math.round(tier1Minutes * 10 + tier2Minutes * 5);
 }
 
 /**
@@ -373,14 +388,18 @@ router.post('/clock-in', requireAuth, upload.single('photo'), async (req, res) =
         const shopHours = await getShopHours(branchId, today);
 
         // Check if late (skip for re-clock-in)
-        const currentTime = now.toTimeString().split(' ')[0];
+        const currentTime = getNowIST().toISOString().substring(11, 19); // HH:MM:SS in IST
         const late = isReclockin ? false : isLateArrival(currentTime, shopHours.open_time, shopHours.late_threshold_minutes);
 
+        // Calculate late penalty minutes to deduct (10 min/min from 8:45–9:00, 5 min/min after 9:00)
+        const latePenaltyAmount = (late && !isReclockin) ? calculateLatePenalty(currentTime, shopHours.open_time) : 0;
+        const lateMinutesTotal = late ? Math.floor(
+            (new Date(`1970-01-01T${currentTime}`) - new Date(`1970-01-01T${shopHours.open_time}`)) / 1000 / 60
+        ) : 0;
+
         // Determine if this re-clock-in counts as overtime
-        // Use fallback of 5h (Sunday) or 10h if expected_hours is 0 or missing
         const rawExpected = parseFloat(shopHours.expected_hours);
-        const isSunday = now.getDay() === 0;
-        const expectedMinutes = (rawExpected > 0 ? rawExpected : (isSunday ? 5 : 10)) * 60;
+        const expectedMinutes = (rawExpected > 0 ? rawExpected : 10) * 60;
         const isOvertime = isReclockin && previousWorkedMinutes >= expectedMinutes;
 
         // Save photo
@@ -392,11 +411,12 @@ router.post('/clock-in', requireAuth, upload.single('photo'), async (req, res) =
             `INSERT INTO staff_attendance
              (user_id, branch_id, date, clock_in_time, clock_in_photo,
               clock_in_lat, clock_in_lng, clock_in_address,
-              is_late, expected_hours, status, clock_in_distance, is_reclockin, is_overtime,
-              break_allowance_minutes)
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'present', ?, ?, ?, ?)`,
+              is_late, late_minutes, late_penalty_minutes, expected_hours, status,
+              clock_in_distance, is_reclockin, is_overtime, break_allowance_minutes)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'present', ?, ?, ?, ?)`,
             [userId, branchId, today, now, photoPath, latitude, longitude,
-             address, late ? 1 : 0, shopHours.expected_hours, clockInDistance,
+             address, late ? 1 : 0, lateMinutesTotal, latePenaltyAmount,
+             shopHours.expected_hours, clockInDistance,
              isReclockin ? 1 : 0, isOvertime ? 1 : 0, breakAllowanceForRecord]
         );
 
@@ -407,43 +427,39 @@ router.post('/clock-in', requireAuth, upload.single('photo'), async (req, res) =
                 [previousRecordId]
             );
         }
-        
+
         const attendanceId = result.insertId;
-        
+
         // Save photo record
         await pool.query(
-            `INSERT INTO attendance_photos 
-             (attendance_id, user_id, photo_type, file_path, file_size, 
-              latitude, longitude, address, captured_at, delete_after) 
+            `INSERT INTO attendance_photos
+             (attendance_id, user_id, photo_type, file_path, file_size,
+              latitude, longitude, address, captured_at, delete_after)
              VALUES (?, ?, 'clock_in', ?, ?, ?, ?, ?, ?, ?)`,
-            [attendanceId, userId, photoPath, photo.size, latitude, longitude, 
+            [attendanceId, userId, photoPath, photo.size, latitude, longitude,
              address, now, getDeleteAfterDate()]
         );
-        
+
         // If late, auto-create permission request
         let permissionId = null;
         if (late) {
-            const lateMinutes = Math.floor(
-                (new Date(`1970-01-01T${currentTime}`) - new Date(`1970-01-01T${shopHours.open_time}`)) / 1000 / 60
-            );
-            
             const [permResult] = await pool.query(
-                `INSERT INTO attendance_permissions 
-                 (user_id, attendance_id, request_type, request_date, 
-                  request_time, duration_minutes, reason, requested_by) 
+                `INSERT INTO attendance_permissions
+                 (user_id, attendance_id, request_type, request_date,
+                  request_time, duration_minutes, reason, requested_by)
                  VALUES (?, ?, 'late_arrival', ?, ?, ?, 'Auto-generated late arrival', ?)`,
-                [userId, attendanceId, today, currentTime, lateMinutes, userId]
+                [userId, attendanceId, today, currentTime, lateMinutesTotal, userId]
             );
-            
+
             permissionId = permResult.insertId;
-            
+
             // Link permission to attendance
             await pool.query(
                 'UPDATE staff_attendance SET late_permission_id = ? WHERE id = ?',
                 [permissionId, attendanceId]
             );
         }
-        
+
         res.json({
             success: true,
             message: late ? 'Clocked in successfully. Late arrival detected - permission request created.' : 'Clocked in successfully',
@@ -451,6 +467,8 @@ router.post('/clock-in', requireAuth, upload.single('photo'), async (req, res) =
                 attendance_id: attendanceId,
                 clock_in_time: now,
                 is_late: late,
+                late_minutes: lateMinutesTotal,
+                late_penalty_minutes: latePenaltyAmount,
                 shop_open_time: shopHours.open_time,
                 expected_hours: shopHours.expected_hours,
                 permission_id: permissionId
@@ -640,8 +658,8 @@ router.post('/clock-out', requireAuth, upload.single('photo'), async (req, res) 
             );
         }
 
-        // Check if early checkout
-        const currentTime = now.toTimeString().split(' ')[0];
+        // Check if early checkout (compare IST current time vs IST close time)
+        const currentTime = getNowIST().toISOString().substring(11, 19); // HH:MM:SS in IST
         const closeTime = new Date(`1970-01-01T${record.close_time}`);
         const currentDateTime = new Date(`1970-01-01T${currentTime}`);
         const isEarly = currentDateTime < closeTime;
@@ -1109,7 +1127,7 @@ router.post('/break-end', requireAuth, upload.single('photo'), async (req, res) 
 
             // Notify admins
             try {
-                const [admins] = await pool.query("SELECT id FROM users WHERE role = 'admin' AND status = 'active'");
+                const [admins] = await pool.query("SELECT id FROM users WHERE role IN ('admin','administrator','super_admin') AND status = 'active'");
                 const [staffUser] = await pool.query('SELECT full_name FROM users WHERE id = ?', [userId]);
                 const staffName = staffUser.length > 0 ? staffUser[0].full_name : 'Staff';
                 for (const admin of admins) {
@@ -1348,7 +1366,7 @@ router.post('/permission/request-reclockin', requireAuth, async (req, res) => {
         // Notify admins
         try {
             const [admins] = await pool.query(
-                `SELECT id FROM users WHERE role = 'admin' AND status = 'active'`
+                `SELECT id FROM users WHERE role IN ('admin','administrator','super_admin') AND status = 'active'`
             );
             const staffName = req.user.full_name || req.user.username || 'Staff';
             for (const admin of admins) {
@@ -2445,7 +2463,7 @@ router.post('/geo-auto-clockout', requireAuth, async (req, res) => {
         try {
             const [userInfo] = await pool.query('SELECT full_name FROM users WHERE id = ?', [userId]);
             const staffName = userInfo.length > 0 ? userInfo[0].full_name : 'Staff';
-            const [admins] = await pool.query("SELECT id FROM users WHERE role = 'admin' AND status = 'active'");
+            const [admins] = await pool.query("SELECT id FROM users WHERE role IN ('admin','administrator','super_admin') AND status = 'active'");
             for (const admin of admins) {
                 await notificationService.send(admin.id, {
                     type: 'geo_auto_clockout_admin',
@@ -2575,7 +2593,7 @@ router.post('/location-report', requireAuth, async (req, res) => {
 
                 // Alert all admins
                 try {
-                    const [admins] = await pool.query("SELECT id FROM users WHERE role = 'admin' AND status = 'active'");
+                    const [admins] = await pool.query("SELECT id FROM users WHERE role IN ('admin','administrator','super_admin') AND status = 'active'");
                     for (const admin of admins) {
                         await notificationService.send(admin.id, {
                             type: 'geofence_exit_admin',
@@ -2636,7 +2654,7 @@ router.post('/location-report', requireAuth, async (req, res) => {
                     } catch(e) {}
 
                     try {
-                        const [admins] = await pool.query("SELECT id FROM users WHERE role = 'admin' AND status = 'active'");
+                        const [admins] = await pool.query("SELECT id FROM users WHERE role IN ('admin','administrator','super_admin') AND status = 'active'");
                         for (const admin of admins) {
                             await notificationService.send(admin.id, {
                                 type: 'geo_auto_clockout_admin',
@@ -2706,7 +2724,7 @@ router.post('/location-off', requireAuth, async (req, res) => {
         try {
             const [userInfo] = await pool.query('SELECT full_name FROM users WHERE id = ?', [userId]);
             const staffName = userInfo[0]?.full_name || 'Staff';
-            const [admins] = await pool.query("SELECT id FROM users WHERE role = 'admin' AND status = 'active'");
+            const [admins] = await pool.query("SELECT id FROM users WHERE role IN ('admin','administrator','super_admin') AND status = 'active'");
             for (const admin of admins) {
                 await notificationService.send(admin.id, {
                     type: 'location_off_admin',
@@ -4163,6 +4181,105 @@ router.get('/leave-balance', requireAuth, async (req, res) => {
     } catch (error) {
         console.error('Error fetching leave balance:', error);
         res.status(500).json({ success: false, message: 'Failed to fetch leave balance' });
+    }
+});
+
+// ── EOD (End-of-Day) Work Report ─────────────────────────────────────────────
+
+/**
+ * GET /api/attendance/eod-data
+ * Returns today's marketing followups and credit reminders done by this user.
+ */
+router.get('/eod-data', requireAuth, async (req, res) => {
+    try {
+        const userId = req.user.id;
+        const today = getTodayIST();
+
+        const [leads] = await pool.query(
+            `SELECT lf.id, lf.followup_type, lf.notes, lf.outcome,
+                    l.name AS lead_name, l.phone, l.status AS lead_status
+             FROM lead_followups lf
+             JOIN leads l ON lf.lead_id = l.id
+             WHERE lf.user_id = ? AND DATE(CONVERT_TZ(lf.created_at,'+00:00','+05:30')) = ?
+             ORDER BY lf.created_at DESC`,
+            [userId, today]
+        );
+
+        const [credits] = await pool.query(
+            `SELECT id, customer_name, phone, reminder_type, notes, status,
+                    zoho_invoice_id
+             FROM collection_reminders
+             WHERE sent_by = ? AND DATE(CONVERT_TZ(COALESCE(sent_at, created_at),'+00:00','+05:30')) = ?
+             ORDER BY created_at DESC`,
+            [userId, today]
+        );
+
+        const [existing] = await pool.query(
+            `SELECT id, tasks, total_customers_served, notes FROM staff_eod_submissions
+             WHERE user_id = ? AND report_date = ?`,
+            [userId, today]
+        );
+
+        res.json({
+            success: true,
+            leads,
+            credits,
+            existing: existing[0] || null
+        });
+    } catch (err) {
+        console.error('EOD data error:', err);
+        res.status(500).json({ success: false, message: 'Server error' });
+    }
+});
+
+/**
+ * POST /api/attendance/eod-submit
+ * Save the daily work report (required before clock-out).
+ */
+router.post('/eod-submit', requireAuth, async (req, res) => {
+    try {
+        const userId = req.user.id;
+        const { tasks, marketing_lead_ids, credit_reminder_ids, total_customers_served, notes } = req.body;
+
+        if (!tasks || !Array.isArray(tasks) || tasks.length === 0) {
+            return res.status(400).json({ success: false, message: 'At least one task is required' });
+        }
+
+        const today = getTodayIST();
+        const now = getNowIST().toISOString().replace('T', ' ').substring(0, 19);
+
+        const [att] = await pool.query(
+            'SELECT id FROM staff_attendance WHERE user_id = ? AND date = ? ORDER BY id DESC LIMIT 1',
+            [userId, today]
+        );
+        const attendanceId = att[0]?.id || null;
+
+        await pool.query(
+            `INSERT INTO staff_eod_submissions
+                (user_id, attendance_id, report_date, tasks, marketing_lead_ids, credit_reminder_ids, total_customers_served, notes, submitted_at)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+             ON DUPLICATE KEY UPDATE
+                tasks = VALUES(tasks),
+                marketing_lead_ids = VALUES(marketing_lead_ids),
+                credit_reminder_ids = VALUES(credit_reminder_ids),
+                total_customers_served = VALUES(total_customers_served),
+                notes = VALUES(notes),
+                submitted_at = VALUES(submitted_at)`,
+            [
+                userId, attendanceId, today,
+                JSON.stringify(tasks),
+                JSON.stringify(marketing_lead_ids || []),
+                JSON.stringify(credit_reminder_ids || []),
+                total_customers_served || 0,
+                notes || null,
+                now
+            ]
+        );
+
+        res.json({ success: true });
+    } catch (err) {
+        console.error('EOD submit error:', err);
+        res.status(500).json({ success: false, message: 'Server error' });
     }
 });
 

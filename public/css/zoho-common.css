@@ -32,3 +32,10 @@
     0% { background-position: 200% 0; }
     100% { background-position: -200% 0; }
 }
+
+/* M6+M8 — Modal safe-area padding for iOS home indicator */
+.modal-safe-pb { padding-bottom: max(1rem, env(safe-area-inset-bottom)); }
+
+/* M7 — Responsive pagination buttons: larger on mobile */
+.pag-mob { }
+@media (max-width: 639px) { .pag-mob { padding: 10px 16px !important; } }

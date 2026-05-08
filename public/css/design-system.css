@@ -6,6 +6,10 @@
  * across the entire application.
  */
 
+/* Tailwind JIT compat: CDN added !important; local build does not.
+   This restores the expected behaviour so .hidden always wins. */
+.hidden { display: none !important; }
+
 /* Load Inter font */
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
 

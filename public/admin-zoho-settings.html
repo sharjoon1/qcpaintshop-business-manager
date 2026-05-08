@@ -549,7 +549,7 @@
                         document.getElementById('whatsappApiUrl').value = val;
                         break;
                     case 'whatsapp_api_key':
-                        document.getElementById('whatsappApiKey').value = val;
+                        document.getElementById('whatsappApiKey').placeholder = c.is_set ? '••••••••' : 'Enter API key';
                         break;
                     case 'overdue_reminder_days':
                         document.getElementById('overdueReminderDays').value = val;
@@ -618,9 +618,9 @@
 
         body.innerHTML = customers.map(c => `
             <tr class="border-b border-gray-100 hover:bg-gray-50">
-                <td class="py-3 px-3 font-medium text-gray-800">${escapeHtml(c.contact_name || c.name || '--')}</td>
-                <td class="py-3 px-3 text-gray-600 hidden sm:table-cell">${escapeHtml(c.phone || '--')}</td>
-                <td class="py-3 px-3 text-gray-600 hidden md:table-cell">${escapeHtml(c.email || '--')}</td>
+                <td class="py-3 px-3 font-medium text-gray-800">${escapeHtml(c.zoho_contact_name || c.contact_name || c.name || '--')}</td>
+                <td class="py-3 px-3 text-gray-600 hidden sm:table-cell">${escapeHtml(c.zoho_phone || c.phone || '--')}</td>
+                <td class="py-3 px-3 text-gray-600 hidden md:table-cell">${escapeHtml(c.zoho_email || c.email || '--')}</td>
                 <td class="py-3 px-3 text-right">
                     <div class="relative inline-block">
                         <button onclick="openMappingDropdown(this, ${c.id})" class="px-3 py-1.5 bg-purple-100 text-purple-700 rounded-lg hover:bg-purple-200 font-semibold text-xs transition">

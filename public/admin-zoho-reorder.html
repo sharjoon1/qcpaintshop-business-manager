@@ -792,7 +792,7 @@
 
 <!-- Snooze Item Modal -->
 <div id="snoozeModal" class="modal-overlay hidden" onclick="(function(e){ if(e.target.id==='snoozeModal') closeSnoozeModal(); })(event)">
-    <div class="bg-white rounded-lg shadow-xl max-w-md w-full" onclick="event.stopPropagation()">
+    <div class="bg-white rounded-lg shadow-xl max-w-md w-full modal-safe-pb" onclick="event.stopPropagation()">
         <div class="border-b px-6 py-4 flex justify-between items-center">
             <h3 class="text-lg font-bold text-gray-800">Snooze item — hide from alerts</h3>
             <button onclick="closeSnoozeModal()" class="text-gray-400 hover:text-gray-600 text-2xl leading-none">&times;</button>
@@ -847,7 +847,7 @@
 
 <!-- Send WhatsApp Modal -->
 <div id="sendWaModal" class="modal-overlay hidden" onclick="closeSendWaModalOverlay(event)">
-    <div class="bg-white rounded-lg shadow-xl max-w-md w-full" onclick="event.stopPropagation()">
+    <div class="bg-white rounded-lg shadow-xl max-w-md w-full modal-safe-pb" onclick="event.stopPropagation()">
         <div class="border-b px-6 py-4 flex justify-between items-center">
             <h3 class="text-lg font-bold text-gray-800">Send Report to WhatsApp</h3>
             <button onclick="closeSendWaModal()" class="text-gray-400 hover:text-gray-600 text-2xl leading-none">&times;</button>
@@ -874,7 +874,7 @@
 
 <!-- Resolve Alert Modal -->
 <div id="resolveModal" class="modal-overlay hidden" onclick="closeResolveModal(event)">
-    <div class="bg-white rounded-lg shadow-xl max-w-md w-full" onclick="event.stopPropagation()">
+    <div class="bg-white rounded-lg shadow-xl max-w-md w-full modal-safe-pb" onclick="event.stopPropagation()">
         <div class="border-b px-6 py-4 flex justify-between items-center">
             <h3 class="text-lg font-bold text-gray-800">Resolve Alert</h3>
             <button onclick="closeResolveModalDirect()" class="text-gray-400 hover:text-gray-600 text-2xl leading-none">&times;</button>
@@ -912,7 +912,7 @@
 
 <!-- Brand Config Add/Edit Modal -->
 <div id="brandModal" class="modal-overlay hidden" onclick="closeBrandModalOverlay(event)">
-    <div class="bg-white rounded-lg shadow-xl max-w-md w-full" onclick="event.stopPropagation()">
+    <div class="bg-white rounded-lg shadow-xl max-w-md w-full modal-safe-pb" onclick="event.stopPropagation()">
         <div class="border-b px-6 py-4 flex justify-between items-center">
             <h3 class="text-lg font-bold text-gray-800" id="brandModalTitle">Add Brand</h3>
             <button onclick="closeBrandModal()" class="text-gray-400 hover:text-gray-600 text-2xl leading-none">&times;</button>

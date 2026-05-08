@@ -1,0 +1,200 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Staff Agreements - Admin</title>
+    <script src="/js/auth-helper.js"></script>
+    <script>checkAuthOrRedirect();</script>
+    <link rel="stylesheet" href="/css/tailwind.css">
+    <link rel="stylesheet" href="/css/design-system.css">
+    <script src="/universal-nav-loader.js"></script>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #f3f4f6; }
+        .container { max-width: 900px; margin: 0 auto; padding: 16px; }
+        .card { background: #fff; border-radius: 16px; padding: 20px; margin-bottom: 16px; box-shadow: 0 4px 16px rgba(0,0,0,.08); }
+        .stat-grid { display: grid; grid-template-columns: repeat(4,1fr); gap: 12px; }
+        @media(max-width:640px) { .stat-grid { grid-template-columns: repeat(2,1fr); } }
+        .stat-box { background: #f9fafb; border-radius: 12px; padding: 16px; text-align: center; }
+        .stat-num { font-size: 28px; font-weight: 800; }
+        .stat-lbl { font-size: 12px; color: #6b7280; margin-top: 2px; }
+        table { width: 100%; border-collapse: collapse; }
+        th { background: #f9fafb; padding: 10px 12px; text-align: left; font-size: 12px; color: #6b7280; font-weight: 600; }
+        td { padding: 12px; border-bottom: 1px solid #f3f4f6; font-size: 14px; color: #374151; }
+        tr:hover td { background: #fafafa; }
+        .badge { display: inline-block; padding: 3px 10px; border-radius: 99px; font-size: 12px; font-weight: 600; }
+        .badge-pending  { background: #fef9c3; color: #854d0e; }
+        .badge-viewed   { background: #dbeafe; color: #1e40af; }
+        .badge-uploaded { background: #dcfce7; color: #166534; }
+        .badge-none     { background: #f3f4f6; color: #9ca3af; }
+        .btn { padding: 10px 18px; border-radius: 10px; font-size: 14px; font-weight: 600; border: none; cursor: pointer; transition: all .2s; }
+        .btn-primary { background: linear-gradient(135deg,#1B5E3B,#10b981); color: #fff; }
+        .btn-sm { padding: 5px 12px; font-size: 12px; border-radius: 8px; border: none; cursor: pointer; }
+        .btn-view { background: #eff6ff; color: #2563eb; }
+        .search-box { width: 100%; padding: 10px 14px; border: 1.5px solid #e5e7eb; border-radius: 10px; font-size: 14px; outline: none; }
+        .search-box:focus { border-color: #10b981; }
+        #loader { text-align:center; padding: 40px; color: #9ca3af; }
+    </style>
+</head>
+<body data-page="admin-agreements">
+<div class="container" style="margin-top:16px;">
+
+    <!-- Header -->
+    <div class="card">
+        <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;">
+            <div>
+                <h1 style="font-size:22px;font-weight:700;color:#1f2937;">📄 Staff Agreements</h1>
+                <p style="color:#6b7280;font-size:14px;">வேலை ஒப்பந்தம் — Status Tracking</p>
+            </div>
+            <button class="btn btn-primary" onclick="assignAll()" id="assignBtn">
+                ➕ Assign to All Staff
+            </button>
+        </div>
+    </div>
+
+    <!-- Stats -->
+    <div class="card">
+        <div class="stat-grid">
+            <div class="stat-box">
+                <div class="stat-num" id="s-total" style="color:#374151;">—</div>
+                <div class="stat-lbl">Total Staff</div>
+            </div>
+            <div class="stat-box">
+                <div class="stat-num" id="s-uploaded" style="color:#16a34a;">—</div>
+                <div class="stat-lbl">✅ Signed & Uploaded</div>
+            </div>
+            <div class="stat-box">
+                <div class="stat-num" id="s-viewed" style="color:#2563eb;">—</div>
+                <div class="stat-lbl">👁️ Viewed</div>
+            </div>
+            <div class="stat-box">
+                <div class="stat-num" id="s-pending" style="color:#d97706;">—</div>
+                <div class="stat-lbl">⏳ Pending</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Staff List -->
+    <div class="card">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;gap:10px;flex-wrap:wrap;">
+            <h2 style="font-size:16px;font-weight:700;color:#1f2937;">Staff List</h2>
+            <input class="search-box" style="max-width:260px;" placeholder="🔍 Search name / branch..." oninput="filterTable(this.value)" id="searchBox">
+        </div>
+        <div id="loader">Loading...</div>
+        <div id="tableWrap" style="display:none;overflow-x:auto;">
+            <table id="staffTable">
+                <thead>
+                    <tr>
+                        <th>Name</th>
+                        <th>Role</th>
+                        <th>Branch</th>
+                        <th>Status</th>
+                        <th>Viewed At</th>
+                        <th>Uploaded At</th>
+                        <th>Document</th>
+                    </tr>
+                </thead>
+                <tbody id="staffBody"></tbody>
+            </table>
+        </div>
+    </div>
+
+</div>
+
+<script>
+const token = localStorage.getItem('auth_token');
+let allStaff = [];
+
+async function loadStats() {
+    const res = await fetch('/api/agreements/admin/stats', { headers: { Authorization: `Bearer ${token}` } });
+    const data = await res.json();
+    if (!data.success) return;
+    const s = data.stats;
+    document.getElementById('s-total').textContent   = s.total;
+    document.getElementById('s-uploaded').textContent = s.uploaded;
+    document.getElementById('s-viewed').textContent   = s.viewed;
+    document.getElementById('s-pending').textContent  = s.pending;
+}
+
+function fmtDate(dt) {
+    if (!dt) return '—';
+    return new Date(dt).toLocaleDateString('en-IN', { day:'2-digit', month:'short', year:'numeric', hour:'2-digit', minute:'2-digit', timeZone:'Asia/Kolkata' });
+}
+
+function renderTable(staff) {
+    const tbody = document.getElementById('staffBody');
+    if (!staff.length) {
+        tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;color:#9ca3af;padding:30px;">No staff found</td></tr>';
+        return;
+    }
+    tbody.innerHTML = staff.map(s => {
+        const status = s.agreement_status || 'none';
+        const badgeClass = { none:'badge-none', pending:'badge-pending', viewed:'badge-viewed', uploaded:'badge-uploaded' }[status] || 'badge-none';
+        const badgeLabel = { none:'Not Assigned', pending:'Pending', viewed:'Viewed', uploaded:'Signed ✅' }[status] || status;
+        const docLink = s.signed_document
+            ? `<a href="${s.signed_document}" target="_blank" class="btn-sm btn-view">View</a>`
+            : '—';
+        return `<tr data-name="${(s.full_name||'').toLowerCase()}" data-branch="${(s.branch_name||'').toLowerCase()}">
+            <td style="font-weight:600;">${s.full_name || '—'}</td>
+            <td style="color:#6b7280;">${s.role || '—'}</td>
+            <td>${s.branch_name || '—'}</td>
+            <td><span class="badge ${badgeClass}">${badgeLabel}</span></td>
+            <td style="color:#6b7280;font-size:12px;">${fmtDate(s.viewed_at)}</td>
+            <td style="color:#6b7280;font-size:12px;">${fmtDate(s.uploaded_at)}</td>
+            <td>${docLink}</td>
+        </tr>`;
+    }).join('');
+}
+
+function filterTable(q) {
+    q = q.toLowerCase();
+    const filtered = allStaff.filter(s =>
+        (s.full_name || '').toLowerCase().includes(q) ||
+        (s.branch_name || '').toLowerCase().includes(q) ||
+        (s.role || '').toLowerCase().includes(q)
+    );
+    renderTable(filtered);
+}
+
+async function loadStaff() {
+    try {
+        const res = await fetch('/api/agreements/admin/staff-list', { headers: { Authorization: `Bearer ${token}` } });
+        const data = await res.json();
+        document.getElementById('loader').style.display = 'none';
+        document.getElementById('tableWrap').style.display = 'block';
+        if (!data.success) return;
+        allStaff = data.staff || [];
+        renderTable(allStaff);
+    } catch (err) {
+        document.getElementById('loader').textContent = 'Error loading staff list.';
+    }
+}
+
+async function assignAll() {
+    const btn = document.getElementById('assignBtn');
+    btn.disabled = true;
+    btn.textContent = 'Assigning...';
+    try {
+        const res = await fetch('/api/agreements/admin/assign-all', {
+            method: 'POST', headers: { Authorization: `Bearer ${token}` }
+        });
+        const data = await res.json();
+        btn.textContent = '➕ Assign to All Staff';
+        btn.disabled = false;
+        if (data.success) {
+            alert(`✅ ${data.assigned} new staff assigned. Reload to see updated list.`);
+            loadStats();
+            loadStaff();
+        }
+    } catch (err) {
+        btn.textContent = '➕ Assign to All Staff';
+        btn.disabled = false;
+    }
+}
+
+loadStats();
+loadStaff();
+</script>
+</body>
+</html>

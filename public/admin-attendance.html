@@ -923,8 +923,8 @@
         function initPage() {
             if (initialized) return;
             initialized = true;
-            // Set default dates
-            const today = new Date().toISOString().split('T')[0];
+            // Set default dates (IST)
+            const today = getTodayIST();
             const currentMonth = today.substring(0, 7);
 
             document.getElementById('liveDate').value = today;
@@ -964,16 +964,21 @@
             return div.innerHTML;
         }
 
+        // Returns today's date as YYYY-MM-DD in IST (not UTC)
+        function getTodayIST() {
+            return new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' });
+        }
+
         function formatTime(dateStr) {
             if (!dateStr) return '--:--';
             const d = new Date(dateStr);
-            return d.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+            return d.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true, timeZone: 'Asia/Kolkata' });
         }
 
         function formatDate(dateStr) {
             if (!dateStr) return '--';
             const d = new Date(dateStr);
-            return d.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
+            return d.toLocaleDateString('en-IN', { year: 'numeric', month: 'short', day: 'numeric', timeZone: 'Asia/Kolkata' });
         }
 
         function formatMinutesToHours(minutes) {
@@ -1229,7 +1234,7 @@
                 }
 
                 tbody.innerHTML = rows.map(r => {
-                    const requestedAt = r.requested_at ? new Date(r.requested_at).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' }) : '--';
+                    const requestedAt = r.requested_at ? new Date(r.requested_at).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true, timeZone: 'Asia/Kolkata' }) : '--';
                     const workMins = r.working_minutes_at_request || 0;
                     const workHrs = `${Math.floor(workMins / 60)}h ${workMins % 60}m`;
                     const expHrs = `${Math.round((r.expected_minutes || 600) / 60)}h`;
@@ -2014,7 +2019,7 @@
 
         function initReportsTab() {
             if (!document.getElementById('reportDate').value) {
-                document.getElementById('reportDate').value = new Date().toISOString().split('T')[0];
+                document.getElementById('reportDate').value = getTodayIST();
             }
             if (!reportBranchesLoaded) {
                 loadReportBranches();
@@ -2051,7 +2056,7 @@
 
         function fmtTime(dt) {
             if (!dt) return '--:--';
-            return new Date(dt).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true });
+            return new Date(dt).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true, timeZone: 'Asia/Kolkata' });
         }
 
         async function loadReportStaff() {

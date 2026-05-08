@@ -5,7 +5,7 @@
 
 const express = require('express');
 const router = express.Router();
-const { requirePermission, requireAuth } = require('../middleware/permissionMiddleware');
+const { requirePermission, requireAuth, isFullAdmin } = require('../middleware/permissionMiddleware');
 const notificationService = require('../services/notification-service');
 
 // Database connection (imported from main app)
@@ -731,7 +731,7 @@ router.patch('/:id/status', requireAuth, async (req, res) => {
         const task = tasks[0];
 
         // Staff can only update their own tasks (admin can update any)
-        if (req.user.role !== 'admin' && task.assigned_to !== userId) {
+        if (!isFullAdmin(req.user.role) && task.assigned_to !== userId) {
             return res.status(403).json({
                 success: false,
                 message: 'You can only update status of tasks assigned to you'
@@ -844,7 +844,7 @@ router.post('/:id/update', requireAuth, async (req, res) => {
         }
 
         // Staff can only comment on their own tasks (admin can comment on any)
-        if (req.user.role !== 'admin' && tasks[0].assigned_to !== userId) {
+        if (!isFullAdmin(req.user.role) && tasks[0].assigned_to !== userId) {
             return res.status(403).json({
                 success: false,
                 message: 'You can only add updates to tasks assigned to you'
@@ -930,7 +930,7 @@ router.patch('/:id/progress', requireAuth, async (req, res) => {
         const task = tasks[0];
 
         // Staff can only update their own tasks (admin can update any)
-        if (req.user.role !== 'admin' && task.assigned_to !== userId) {
+        if (!isFullAdmin(req.user.role) && task.assigned_to !== userId) {
             return res.status(403).json({
                 success: false,
                 message: 'You can only update progress of tasks assigned to you'

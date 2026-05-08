@@ -64,10 +64,11 @@ async function generateLeadNumber() {
  * Staff: only own leads | Manager: branch leads | Admin: all leads
  */
 function buildRoleFilter(user) {
-    if (user.role === 'admin' || user.role === 'super_admin') {
+    const role = (user.role || '').toLowerCase();
+    if (['admin', 'administrator', 'super_admin'].includes(role)) {
         return { clause: '', params: [] };
     }
-    if (user.role === 'manager') {
+    if (role === 'manager' || role === 'branch_manager') {
         return { clause: ' AND l.branch_id = ?', params: [user.branch_id] };
     }
     return { clause: ' AND l.assigned_to = ?', params: [user.id] };

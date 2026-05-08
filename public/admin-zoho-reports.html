@@ -260,6 +260,7 @@
         // ===== Report Tab Selection =====
         function selectReport(type) {
             currentReport = type;
+            localStorage.setItem('zoho_report_type', type);
             const tabs = document.querySelectorAll('#reportTabs button');
             tabs.forEach(btn => {
                 if (btn.dataset.report === type) {
@@ -309,6 +310,10 @@
                 showError('Missing Date', 'Please select a To Date.');
                 return;
             }
+
+            // Persist filter state
+            localStorage.setItem('zoho_report_from', fromDate);
+            localStorage.setItem('zoho_report_to', toDate);
 
             showState('loadingState');
             document.getElementById('cacheIndicator').classList.add('hidden');
@@ -659,15 +664,26 @@
 
         // ===== Init =====
         document.addEventListener('DOMContentLoaded', function() {
-            // Set default dates to current Indian FY
-            const now = new Date();
-            const fyStart = getIndianFYStart(now);
-            const fyEnd = getIndianFYEnd(now);
-            document.getElementById('fromDate').value = toISO(fyStart);
-            document.getElementById('toDate').value = toISO(now > fyEnd ? fyEnd : now);
+            const savedReport = localStorage.getItem('zoho_report_type');
+            const savedFrom = localStorage.getItem('zoho_report_from');
+            const savedTo = localStorage.getItem('zoho_report_to');
 
-            // Ensure correct initial tab state
-            selectReport('profit_loss');
+            if (savedFrom) {
+                document.getElementById('fromDate').value = savedFrom;
+            } else {
+                const fyStart = getIndianFYStart(new Date());
+                document.getElementById('fromDate').value = toISO(fyStart);
+            }
+
+            if (savedTo) {
+                document.getElementById('toDate').value = savedTo;
+            } else {
+                const now = new Date();
+                const fyEnd = getIndianFYEnd(now);
+                document.getElementById('toDate').value = toISO(now > fyEnd ? fyEnd : now);
+            }
+
+            selectReport(savedReport || 'profit_loss');
         });
     </script>
 </body>

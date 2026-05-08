@@ -697,8 +697,9 @@ async function handleNotifClick(id, type, dataB64) {
     } catch { data = {}; }
 
     const user = JSON.parse(localStorage.getItem('user') || '{}');
-    const isStaff = user.role === 'staff' || user.role === 'manager';
-    const isAdmin = user.role === 'admin' || user.role === 'super_admin';
+    const _hRole = (user.role || '').toLowerCase();
+    const isAdmin = ['admin', 'administrator', 'super_admin'].includes(_hRole);
+    const isStaff = !isAdmin && (_hRole === 'staff' || _hRole === 'manager' || _hRole === 'branch_manager' || _hRole === 'accountant' || _hRole === 'sales_staff');
 
     // Data-based deep links (highest priority)
     if (data.conversation_id) {

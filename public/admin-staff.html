@@ -78,6 +78,7 @@
                         <tr>
                             <th class="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase hide-mobile">ID</th>
                             <th class="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase">Name</th>
+                            <th class="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase">Role</th>
                             <th class="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase hide-mobile">KYC</th>
                             <th class="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase hide-mobile">Username</th>
                             <th class="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase hide-mobile">Phone</th>
@@ -294,7 +295,7 @@
             const tbody = document.getElementById('staffTableBody');
             
             if (allStaff.length === 0) {
-                tbody.innerHTML = '<tr><td colspan="9" class="text-center py-8 text-gray-500">No staff members found</td></tr>';
+                tbody.innerHTML = '<tr><td colspan="10" class="text-center py-8 text-gray-500">No staff members found</td></tr>';
                 return;
             }
             
@@ -304,6 +305,12 @@
                     ? assignedBranches.map(ab => ab.is_primary ? `<strong>${ab.branch_name}</strong>` : ab.branch_name).join(', ')
                     : (branches.find(b => b.id == staff.branch_id)?.name || 'N/A');
                 const geoEnabled = staff.geo_fence_enabled !== undefined ? staff.geo_fence_enabled : true;
+                const roleObj = roles.find(r => (r.name || '').toLowerCase() === (staff.role || '').toLowerCase());
+                const roleLabel = roleObj ? (roleObj.display_name || roleObj.name) : (staff.role || 'N/A');
+                const isAdminRole = ['admin','administrator','super_admin'].includes((staff.role || '').toLowerCase());
+                const roleBadgeClass = isAdminRole ? 'bg-purple-100 text-purple-800'
+                    : (staff.role === 'manager' || staff.role === 'branch_manager' ? 'bg-blue-100 text-blue-800'
+                    : 'bg-gray-100 text-gray-700');
                 return `
                     <tr class="hover:bg-gray-50">
                         <td class="px-4 py-3 text-sm hide-mobile">${staff.id}</td>
@@ -318,6 +325,9 @@
                                     <div class="text-xs text-gray-500">${esc(staff.email)}</div>
                                 </div>
                             </div>
+                        </td>
+                        <td class="px-4 py-3">
+                            <span class="px-2 py-1 text-xs rounded-full font-semibold ${roleBadgeClass}">${esc(roleLabel)}</span>
                         </td>
                         <td class="px-4 py-3 hide-mobile">
                             <span class="px-2 py-0.5 text-xs rounded-full ${getKycClass(staff.kyc_status)}">${getKycText(staff.kyc_status)}</span>
@@ -446,8 +456,17 @@
             document.getElementById('aadharNumber').value = staff.aadhar_number || '';
             document.getElementById('panNumber').value = staff.pan_number || '';
 
-            // Match role by name since users table stores role as text, not role_id
-            const matchedRole = roles.find(r => r.name.toLowerCase() === (staff.role || '').toLowerCase());
+            // Match role by name since users table stores role as text, not role_id.
+            // 'administrator' and 'super_admin' are treated as distinct roles in the
+            // dropdown; they're matched by exact name first.
+            const staffRoleName = (staff.role || '').toLowerCase();
+            let matchedRole = roles.find(r => (r.name || '').toLowerCase() === staffRoleName);
+            // If no exact match (e.g. legacy data), and the role is one of the
+            // admin aliases, fall back to the canonical 'admin' option so the
+            // dropdown still has a sensible selection.
+            if (!matchedRole && ['admin', 'administrator', 'super_admin'].includes(staffRoleName)) {
+                matchedRole = roles.find(r => (r.name || '').toLowerCase() === 'admin');
+            }
             document.getElementById('roleId').value = matchedRole ? matchedRole.id : '';
             document.getElementById('status').value = staff.status;
             document.getElementById('password').required = false;
@@ -462,9 +481,16 @@
 
         async function saveStaff(event) {
             event.preventDefault();
-            
+
             const selectedRoleId = document.getElementById('roleId').value;
             const selectedRole = roles.find(r => r.id == selectedRoleId);
+
+            // Reject the form if the roles list never loaded — otherwise we'd
+            // silently downgrade everyone to 'staff' on save.
+            if (!selectedRole) {
+                alert('Please select a role for this staff member.');
+                return;
+            }
 
             // Gather selected branch IDs
             const selectedBranchIds = [];
@@ -490,7 +516,7 @@
                 branch_ids: selectedBranchIds,
                 geo_fence_enabled: document.getElementById('geoFenceEnabled').checked,
                 status: document.getElementById('status').value,
-                role: selectedRole ? selectedRole.name.toLowerCase() : 'staff'
+                role: (selectedRole.name || 'staff').toLowerCase()
             };
 
             // KYC fields (only when editing)
@@ -511,29 +537,32 @@
             }
             
             try {
-                const url = editingStaffId 
+                const url = editingStaffId
                     ? `/api/users/${editingStaffId}`
                     : '/api/users';
-                    
+
                 const method = editingStaffId ? 'PUT' : 'POST';
-                
+
                 const response = await fetch(url, {
                     method: method,
                     headers: getAuthHeaders(),
                     body: JSON.stringify(staffData)
                 });
-                
+
+                let body = null;
+                try { body = await response.json(); } catch(_) {}
+
                 if (response.ok) {
                     alert(editingStaffId ? 'Staff updated successfully!' : 'Staff added successfully!');
                     closeModal();
                     loadStaff();
                 } else {
-                    const error = await response.json();
-                    alert('Failed to save staff: ' + (error.error || 'Unknown error'));
+                    const msg = (body && (body.error || body.message)) || `HTTP ${response.status}`;
+                    alert('Failed to save staff: ' + msg);
                 }
             } catch (error) {
                 console.error('Error saving staff:', error);
-                alert('Error saving staff');
+                alert('Error saving staff: ' + (error.message || error));
             }
         }
 

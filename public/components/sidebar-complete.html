@@ -584,10 +584,10 @@
                 <span class="qc-nav-item-text">Live Monitor</span>
                 <span class="qc-nav-tooltip">Live Monitor</span>
             </a>
-            <a href="/staff/dashboard.html" class="qc-nav-item" data-page="staff-dashboard" data-roles="staff,accountant">
-                <span class="qc-nav-item-icon"><svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg></span>
-                <span class="qc-nav-item-text">My Dashboard</span>
-                <span class="qc-nav-tooltip">My Dashboard</span>
+            <a href="/staff/dashboard.html" class="qc-nav-item" data-page="staff-dashboard" data-roles="admin,administrator,super_admin,manager,branch_manager,staff,accountant,sales_staff">
+                <span class="qc-nav-item-icon"><svg viewBox="0 0 24 24"><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/></svg></span>
+                <span class="qc-nav-item-text">My Attendance</span>
+                <span class="qc-nav-tooltip">My Attendance</span>
             </a>
         </div>
 
@@ -724,6 +724,11 @@
                 <span class="qc-nav-item-text">Staff Registrations</span>
                 <span class="qc-nav-tooltip">Staff Registrations</span>
             </a>
+            <a href="/admin-agreements.html" class="qc-nav-item" data-page="admin-agreements" data-roles="admin,manager">
+                <span class="qc-nav-item-icon"><svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg></span>
+                <span class="qc-nav-item-text">Staff Agreements</span>
+                <span class="qc-nav-tooltip">Staff Agreements</span>
+            </a>
             <a href="/admin-roles.html" class="qc-nav-item" data-page="roles">
                 <span class="qc-nav-item-icon"><svg viewBox="0 0 24 24"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg></span>
                 <span class="qc-nav-item-text">Roles</span>
@@ -768,6 +773,11 @@
                 <span class="qc-nav-item-icon"><svg viewBox="0 0 24 24"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg></span>
                 <span class="qc-nav-item-text">Daily Activities</span>
                 <span class="qc-nav-tooltip">Daily Activities</span>
+            </a>
+            <a href="/staff/agreement.html" class="qc-nav-item" data-page="staff-agreement" data-roles="admin,administrator,super_admin,manager,branch_manager,staff,accountant,sales_staff">
+                <span class="qc-nav-item-icon"><svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg></span>
+                <span class="qc-nav-item-text">வேலை ஒப்பந்தம்</span>
+                <span class="qc-nav-tooltip">Agreement</span>
             </a>
             <a href="/staff/tasks.html" class="qc-nav-item" data-page="my-tasks">
                 <span class="qc-nav-item-icon"><svg viewBox="0 0 24 24"><polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg></span>
@@ -1396,24 +1406,29 @@ function filterNavByRole() {
     let userRole = null;
     try {
         const user = JSON.parse(localStorage.getItem('user'));
-        userRole = user && user.role;
+        userRole = user && user.role ? String(user.role).toLowerCase() : null;
     } catch (e) {}
 
-    // Admin sees everything — no filtering needed
-    if (!userRole || userRole === 'admin') return;
+    // Admin / administrator / super_admin see everything — no filtering needed.
+    const FULL_ADMIN = ['admin', 'administrator', 'super_admin'];
+    if (!userRole || FULL_ADMIN.includes(userRole)) return;
+
+    // For role matching, treat administrator+super_admin as 'admin' so that
+    // any data-roles="admin,..." entries are visible to them too.
+    const matchRole = userRole;
 
     // Hide sections restricted to other roles
     document.querySelectorAll('.qc-nav-section[data-roles]').forEach(section => {
-        const allowed = section.getAttribute('data-roles').split(',');
-        if (!allowed.includes(userRole)) {
+        const allowed = section.getAttribute('data-roles').split(',').map(s => s.trim().toLowerCase());
+        if (!allowed.includes(matchRole)) {
             section.style.display = 'none';
         }
     });
 
     // Hide individual items restricted to other roles
     document.querySelectorAll('.qc-nav-item[data-roles]').forEach(item => {
-        const allowed = item.getAttribute('data-roles').split(',');
-        if (!allowed.includes(userRole)) {
+        const allowed = item.getAttribute('data-roles').split(',').map(s => s.trim().toLowerCase());
+        if (!allowed.includes(matchRole)) {
             item.style.display = 'none';
         }
     });

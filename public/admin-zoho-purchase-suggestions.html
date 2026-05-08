@@ -644,7 +644,7 @@
 
         var prev = document.createElement('button');
         prev.textContent = 'Prev';
-        prev.className = 'px-3 py-1 text-sm rounded border ' + (page <= 1 ? 'border-gray-200 text-gray-400 cursor-not-allowed' : 'border-gray-300 text-gray-700 hover:bg-gray-100');
+        prev.className = 'px-3 py-1.5 pag-mob text-sm rounded border ' + (page <= 1 ? 'border-gray-200 text-gray-400 cursor-not-allowed' : 'border-gray-300 text-gray-700 hover:bg-gray-100');
         prev.disabled = page <= 1;
         prev.onclick = function() { goPage(type, page - 1); };
         ctrlEl.appendChild(prev);
@@ -656,7 +656,7 @@
 
         var next = document.createElement('button');
         next.textContent = 'Next';
-        next.className = 'px-3 py-1 text-sm rounded border ' + (page >= totalPages ? 'border-gray-200 text-gray-400 cursor-not-allowed' : 'border-gray-300 text-gray-700 hover:bg-gray-100');
+        next.className = 'px-3 py-1.5 pag-mob text-sm rounded border ' + (page >= totalPages ? 'border-gray-200 text-gray-400 cursor-not-allowed' : 'border-gray-300 text-gray-700 hover:bg-gray-100');
         next.disabled = page >= totalPages;
         next.onclick = function() { goPage(type, page + 1); };
         ctrlEl.appendChild(next);

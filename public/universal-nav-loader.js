@@ -6,11 +6,16 @@
 (function() {
     'use strict';
     
-    // Determine sidebar based on user role
+    // Determine sidebar based on user role.
+    // Admin-level roles (admin / administrator / super_admin / manager /
+    // branch_manager) get the full admin sidebar; everyone else gets the
+    // staff sidebar.
     let sidebarPath = '/components/sidebar-complete.html';
+    const ADMIN_LEVEL_ROLES = ['admin', 'administrator', 'super_admin', 'manager', 'branch_manager'];
     try {
         const u = JSON.parse(localStorage.getItem('user') || '{}');
-        if (u.role && !['admin', 'manager', 'branch_manager', 'super_admin'].includes(u.role)) {
+        const role = u.role ? String(u.role).toLowerCase() : '';
+        if (role && !ADMIN_LEVEL_ROLES.includes(role)) {
             sidebarPath = '/components/staff-sidebar.html';
         }
     } catch(e) {}

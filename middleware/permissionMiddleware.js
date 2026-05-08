@@ -14,6 +14,19 @@ function initPool(dbPool) {
 }
 
 /**
+ * Roles that are treated as full administrators across the app.
+ * - 'admin' is the canonical name in the users.role ENUM.
+ * - 'administrator' is an alias used in some UIs / legacy data.
+ * - 'super_admin' is the highest tier (also full admin).
+ * Any of these passes admin-only / requireAdmin gates and bypasses
+ * fine-grained permission checks.
+ */
+const FULL_ADMIN_ROLES = ['admin', 'administrator', 'super_admin'];
+function isFullAdmin(role) {
+    return !!role && FULL_ADMIN_ROLES.includes(String(role).toLowerCase());
+}
+
+/**
  * Check if user has specific permission
  * @param {string} module - Module name (e.g., 'products', 'customers')
  * @param {string} action - Action name (e.g., 'view', 'add', 'edit', 'delete')
@@ -58,8 +71,8 @@ function requirePermission(module, action) {
                 branch_id: user.branch_id || null
             };
 
-            // Admin role has all permissions
-            if (user.role === 'admin') {
+            // Admin / administrator / super_admin always have all permissions
+            if (isFullAdmin(user.role)) {
                 return next();
             }
 
@@ -140,8 +153,8 @@ function requireAnyPermission(permissionsNeeded) {
                 branch_id: user.branch_id || null
             };
 
-            // Admin has all permissions
-            if (user.role === 'admin') {
+            // Admin / administrator / super_admin always have all permissions
+            if (isFullAdmin(user.role)) {
                 return next();
             }
 
@@ -245,10 +258,18 @@ async function requireAuth(req, res, next) {
 }
 
 /**
- * Require specific role(s)
+ * Require specific role(s).
+ * If 'admin' appears in the list, 'administrator' and 'super_admin' are also accepted
+ * (they are aliases / higher tiers of the admin role).
  */
 function requireRole(...roles) {
-    const flatRoles = roles.flat();
+    let flatRoles = roles.flat().map(r => String(r).toLowerCase());
+    if (flatRoles.includes('admin')) {
+        // Auto-include admin aliases so callers don't have to remember to list them
+        for (const alias of FULL_ADMIN_ROLES) {
+            if (!flatRoles.includes(alias)) flatRoles.push(alias);
+        }
+    }
     return async (req, res, next) => {
         try {
             const token = req.headers.authorization?.replace('Bearer ', '');
@@ -287,7 +308,7 @@ function requireRole(...roles) {
                 branch_id: user.branch_id || null
             };
 
-            if (!flatRoles.includes(user.role)) {
+            if (!flatRoles.includes(String(user.role || '').toLowerCase())) {
                 return res.status(403).json({
                     success: false,
                     message: `Access denied. Required role: ${roles.join(' or ')}`,
@@ -339,8 +360,8 @@ async function getUserPermissions(req, res) {
 
         const user = sessions[0];
 
-        // Admin has all permissions
-        if (user.role === 'admin') {
+        // Admin / administrator / super_admin have all permissions
+        if (isFullAdmin(user.role)) {
             try {
                 const [allPermissions] = await pool.query(
                     'SELECT module, action, display_name FROM permissions ORDER BY module, action'
@@ -407,5 +428,7 @@ module.exports = {
     requireAnyPermission,
     requireAuth,
     requireRole,
-    getUserPermissions
+    getUserPermissions,
+    isFullAdmin,
+    FULL_ADMIN_ROLES
 };
