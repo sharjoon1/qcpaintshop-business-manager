@@ -1090,6 +1090,17 @@ function extractEmulsionProductName(pdfProduct) {
     return main.toUpperCase();
 }
 
+// Enamel product+color split — preserves the color (the part after " - ").
+// Returns { productName, color }, both ALL CAPS. Color is empty if no dash.
+function extractEnamelProductAndColor(pdfProduct) {
+    if (!pdfProduct) return { productName: '', color: '' };
+    const parts = String(pdfProduct).split(/\s*-\s*/).map(s => s.trim()).filter(Boolean);
+    if (parts.length === 0) return { productName: '', color: '' };
+    const productName = parts[0].toUpperCase();
+    const color = parts.length > 1 ? parts.slice(1).join(' ').toUpperCase() : '';
+    return { productName, color };
+}
+
 // ============ MATCH WITH ZOHO ITEMS ============
 function matchWithZohoItems(parsedItems, zohoItems) {
     const matched = [];
@@ -1542,6 +1553,7 @@ module.exports = {
     isEmulsionCategory,
     isEnamelCategory,
     extractEmulsionProductName,
+    extractEnamelProductAndColor,
     // DPL import helpers
     computeProposedFields,
     brandKeyFromName,

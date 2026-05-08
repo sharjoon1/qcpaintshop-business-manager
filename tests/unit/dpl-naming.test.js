@@ -68,3 +68,28 @@ describe('extractEmulsionProductName', () => {
         expect(extractEmulsionProductName(null)).toBe('');
     });
 });
+
+describe('extractEnamelProductAndColor', () => {
+    test('splits product and color on dash', () => {
+        expect(extractEnamelProductAndColor('Calista Sparkle - Blue')).toEqual({
+            productName: 'CALISTA SPARKLE',
+            color: 'BLUE',
+        });
+    });
+    test('handles multi-word color', () => {
+        expect(extractEnamelProductAndColor('Calista Sparkle - Deep Orange')).toEqual({
+            productName: 'CALISTA SPARKLE',
+            color: 'DEEP ORANGE',
+        });
+    });
+    test('color empty when no separator', () => {
+        expect(extractEnamelProductAndColor('Cover Max')).toEqual({
+            productName: 'COVER MAX',
+            color: '',
+        });
+    });
+    test('handles empty', () => {
+        expect(extractEnamelProductAndColor('')).toEqual({ productName: '', color: '' });
+        expect(extractEnamelProductAndColor(null)).toEqual({ productName: '', color: '' });
+    });
+});
