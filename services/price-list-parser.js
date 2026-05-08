@@ -1064,6 +1064,17 @@ function detectFinish(name) {
     return null;
 }
 
+// ============ BIRLA OPUS NAMING HELPERS ============
+
+// Category routing for proposed-name format selection.
+function isEmulsionCategory(cat) {
+    return /\bEMULSION\b/i.test(String(cat || ''));
+}
+
+function isEnamelCategory(cat) {
+    return /\bENAMEL\b/i.test(String(cat || ''));
+}
+
 // ============ MATCH WITH ZOHO ITEMS ============
 function matchWithZohoItems(parsedItems, zohoItems) {
     const matched = [];
@@ -1512,6 +1523,9 @@ module.exports = {
     extractBase,
     detectFinish,
     normalizeBrand,
+    // Birla Opus naming helpers
+    isEmulsionCategory,
+    isEnamelCategory,
     // DPL import helpers
     computeProposedFields,
     brandKeyFromName,
