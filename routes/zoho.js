@@ -5262,7 +5262,7 @@ ${textSection}`;
                 brand:          detectedBrand || 'unknown',
                 pages,
                 totalExtracted: cleanItems.length,
-                autoMatched:    matchedByKey.size,
+                autoMatched:    matchResult.matched.length,
                 items:          itemsOut,
                 zohoItems:      zohoItemsOut,
                 ai: {
