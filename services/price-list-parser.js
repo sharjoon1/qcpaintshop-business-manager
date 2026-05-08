@@ -853,6 +853,31 @@ function brandKeyFromName(brandName) {
     return null;
 }
 
+// Strip trailing pack-code suffix from a SKU for use as a description prefix.
+// Real Birla Opus SKUs end with one of:
+//   - 2 digits: ESWT01, PE204
+//   - 3 digits: CME500, CST200
+//   - 2-3 digits + ML/KG/L: CSTSBK500ML, AWPUEM01L
+//   - 3 digits + color tag: CST200BGN, CST200GYL (treat the 3-digit part as pack code; let color stay)
+// We try patterns longest-first; whichever matches strips the pack code.
+// If nothing matches we return the SKU unchanged.
+function stripPackSuffixForDescription(sku) {
+    if (!sku) return sku;
+    const s = String(sku).toUpperCase();
+    const patterns = [
+        /^(.+?)\d{2,3}(?:ML|KG)$/,       // CSTSBK500ML, AWPUEM01L (with ML/KG)
+        /^(.+?)\d{2,3}L$/,                 // AWPUEM01L (with single L)
+        /^(.+?)\d{3}[A-Z]{2,3}$/,          // CST200BGN — 3 digits then color tag
+        /^(.+?)\d{3}$/,                    // CME500
+        /^(.+?)\d{2}$/,                    // ESWT01, PE204
+    ];
+    for (const p of patterns) {
+        const m = s.match(p);
+        if (m && m[1] && m[1].length >= 2) return m[1];
+    }
+    return s;
+}
+
 // Compute proposed Name / SKU / Description / Rate based on brand naming rules.
 // Selling Price rule (all brands): ceil(DPL × 1.18 × 1.10)
 // Birla Opus name rule: [ABBREV+PACKCODE] PRODUCT BIRLA OPUS PACK_FORMATTED
@@ -868,17 +893,20 @@ function computeProposedFields(pdfItem, zohoItem, brandKey) {
 
     if (brandKey !== 'birlaopus') return base;
 
-    // SKU prefix = everything except last 2 pack-code chars, preserving base indicator
-    // e.g. "ESWT01"→"ESWT", "ES201"→"ES2", "CS9901"→"CS99"
-    const skuUpper  = currentSku.toUpperCase();
-    const skuPrefix = skuUpper.length > 2 ? skuUpper.slice(0, -2) : null;
+    const skuUpper = currentSku.toUpperCase();
+    // Preserve the Zoho SKU verbatim — it's the source of truth.
+    // (Auto-deriving from prefix+packCode broke ml-pack SKUs and was unwanted.)
+    const proposedSku = skuUpper;
+    // Derive a name-prefix by stripping any trailing pack-code suffix.
+    // Used only for `proposedDescription`. Pack codes seen in real SKUs:
+    //   2 digits (01, 04, 20), 3 digits (500, 200, 100), trailing ML/KG, or color-suffixed.
+    const skuPrefix = stripPackSuffixForDescription(skuUpper);
     // Normalize near-equivalent pack sizes (0.9L→1L, 9L→10L…) before encoding
     const normPack  = normalizeBirlaPackSize(pdfItem.packSize);
     const packCode  = packSizeToCode(normPack);
     if (!skuPrefix || !packCode) return base;
 
     const packFormatted = formatPackDisplay(normPack);
-    const proposedSku   = skuPrefix + packCode;
     // Use the resolved Zoho category if present, else fall back to PDF category.
     const categoryForRouting = (zohoItem.category || zohoItem.zoho_category_name || pdfItem.category || '').toString();
 

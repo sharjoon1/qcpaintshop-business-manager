@@ -271,3 +271,54 @@ describe('computeProposedFields — Birla Opus integration', () => {
         expect(result.proposed_rate).toBe(Math.ceil(100 * 1.18 * 1.10));
     });
 });
+
+describe('computeProposedFields — proposed_sku preserved for ml-pack SKUs', () => {
+    test('500ml enamel: short SKU CME500 preserved', () => {
+        const result = computeProposedFields(
+            { dpl: 320, packSize: '500ml', product: 'Cover Max - Phirozi Blue', category: 'ENAMEL' },
+            { sku: 'CME500', description: '', category: 'ENAMEL' },
+            'birlaopus'
+        );
+        expect(result.proposed_sku).toBe('CME500');
+        expect(result.proposed_name).toBe('CME500 COVER MAX ENAMEL PHIROZI BLUE BIRLA OPUS 500 ML');
+    });
+
+    test('500ml enamel: ML-suffixed SKU CSTSBK500ML preserved', () => {
+        const result = computeProposedFields(
+            { dpl: 220, packSize: '500ml', product: 'Calista Sparkle - Satin Black', category: 'ENAMEL' },
+            { sku: 'CSTSBK500ML', description: '', category: 'ENAMEL' },
+            'birlaopus'
+        );
+        expect(result.proposed_sku).toBe('CSTSBK500ML');
+        expect(result.proposed_name).toBe('CSTSBK500ML CALISTA SPARKLE ENAMEL SATIN BLACK BIRLA OPUS 500 ML');
+    });
+
+    test('200ml enamel: SKU CST200BGN preserved (color-suffixed)', () => {
+        const result = computeProposedFields(
+            { dpl: 90, packSize: '200ml', product: 'Calista Sparkle - Bus Green', category: 'ENAMEL' },
+            { sku: 'CST200BGN', description: '', category: 'ENAMEL' },
+            'birlaopus'
+        );
+        expect(result.proposed_sku).toBe('CST200BGN');
+        expect(result.proposed_name).toBe('CST200BGN CALISTA SPARKLE ENAMEL BUS GREEN BIRLA OPUS 200 ML');
+    });
+
+    test('1L emulsion: ESWT01 still preserved (regression check)', () => {
+        const result = computeProposedFields(
+            { dpl: 100, packSize: '1L', product: 'Calista Ever Stay - White', category: 'INTERIOR EMULSION' },
+            { sku: 'ESWT01', description: '', category: 'INTERIOR EMULSION' },
+            'birlaopus'
+        );
+        expect(result.proposed_sku).toBe('ESWT01');
+        expect(result.proposed_name).toBe('ESWT01 CALISTA EVER STAY BIRLA OPUS 01 L');
+    });
+
+    test('20L emulsion: TL9920 still preserved (regression check)', () => {
+        const result = computeProposedFields(
+            { dpl: 500, packSize: '20L', product: 'One True Look - Clear', category: 'EXTERIOR EMULSION' },
+            { sku: 'TL9920', description: '', category: 'EXTERIOR EMULSION' },
+            'birlaopus'
+        );
+        expect(result.proposed_sku).toBe('TL9920');
+    });
+});
