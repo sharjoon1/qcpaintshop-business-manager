@@ -222,3 +222,52 @@ describe('buildBirlaName', () => {
         })).toBeNull();
     });
 });
+
+describe('computeProposedFields — Birla Opus integration', () => {
+    test('emulsion: WT-base no duplicate prefix in proposed_name', () => {
+        const result = computeProposedFields(
+            { dpl: 100, packSize: '1L', product: 'Calista Ever Stay - White', category: 'INTERIOR EMULSION' },
+            { sku: 'ESWT01', description: '', category: 'INTERIOR EMULSION' },
+            'birlaopus'
+        );
+        expect(result.proposed_name).toBe('ESWT01 CALISTA EVER STAY BIRLA OPUS 01 L');
+        expect(result.proposed_sku).toBe('ESWT01');
+    });
+
+    test('emulsion: ONE tier and Mid Tone variant stripped', () => {
+        const result = computeProposedFields(
+            { dpl: 200, packSize: '4L', product: 'One Pure Elegance - Mid Tone', category: 'INTERIOR EMULSION' },
+            { sku: 'PE204', description: '', category: 'INTERIOR EMULSION' },
+            'birlaopus'
+        );
+        expect(result.proposed_name).toBe('PE204 ONE PURE ELEGANCE BIRLA OPUS 04 L');
+    });
+
+    test('enamel: color preserved with ENAMEL keyword', () => {
+        const result = computeProposedFields(
+            { dpl: 150, packSize: '1L', product: 'Calista Sparkle - Blue', category: 'ENAMEL' },
+            { sku: 'CSTBL01', description: '', category: 'ENAMEL' },
+            'birlaopus'
+        );
+        expect(result.proposed_name).toBe('CSTBL01 CALISTA SPARKLE ENAMEL BLUE BIRLA OPUS 01 L');
+    });
+
+    test('non-birlaopus brand: returns base unchanged (no proposed_name)', () => {
+        const result = computeProposedFields(
+            { dpl: 100, packSize: '1L', product: 'Whatever', category: 'EMULSION' },
+            { sku: 'XYZ01', description: '', category: 'EMULSION' },
+            'asian'
+        );
+        expect(result.proposed_name).toBeUndefined();
+        expect(result.proposed_rate).toBe(Math.ceil(100 * 1.18 * 1.10));
+    });
+
+    test('proposed_rate matches selling price formula', () => {
+        const result = computeProposedFields(
+            { dpl: 100, packSize: '1L', product: 'Ever Stay - White', category: 'INTERIOR EMULSION' },
+            { sku: 'ESWT01', description: '', category: 'INTERIOR EMULSION' },
+            'birlaopus'
+        );
+        expect(result.proposed_rate).toBe(Math.ceil(100 * 1.18 * 1.10));
+    });
+});

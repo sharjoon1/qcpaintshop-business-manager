@@ -877,16 +877,21 @@ function computeProposedFields(pdfItem, zohoItem, brandKey) {
     const packCode  = packSizeToCode(normPack);
     if (!skuPrefix || !packCode) return base;
 
-    const brandDisplay  = BRAND_DISPLAY_NAMES[brandKey] || 'BIRLA OPUS';
     const packFormatted = formatPackDisplay(normPack);
-    // Strip base-variant suffix from product name ("Ever Stay - Mid Tone" → "EVER STAY")
-    const productNameBase = String(pdfItem.product || '').split(/\s*-\s*/)[0].toUpperCase().trim();
-    // WT-base items use a second short-code token in name (Birla Opus convention)
-    // e.g. "CSWT01 CSWT STYLE COLOR SMART BIRLA OPUS 01 L"
-    const secondToken = /WT$/i.test(skuPrefix) ? (' ' + skuPrefix) : '';
+    const proposedSku   = skuPrefix + packCode;
+    // Use the resolved Zoho category if present, else fall back to PDF category.
+    const categoryForRouting = (zohoItem.category || zohoItem.zoho_category_name || pdfItem.category || '').toString();
 
-    const proposedSku  = skuPrefix + packCode;
-    const proposedName = `${proposedSku}${secondToken} ${productNameBase} ${brandDisplay} ${packFormatted}`;
+    const proposedName = buildBirlaName({
+        sku: proposedSku,
+        pdfProduct: pdfItem.product,
+        category: categoryForRouting,
+        packFormatted,
+    });
+
+    if (!proposedName) return base;
+
+    const brandDisplay        = BRAND_DISPLAY_NAMES[brandKey] || 'BIRLA OPUS';
     const proposedDescription = `${skuPrefix} ${currentCat} ${brandDisplay} ${packFormatted}`.replace(/\s+/g, ' ').trim();
 
     return { ...base, proposed_name: proposedName, proposed_sku: proposedSku, proposed_description: proposedDescription };
