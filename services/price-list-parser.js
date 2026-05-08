@@ -1075,6 +1075,21 @@ function isEnamelCategory(cat) {
     return /\bENAMEL\b/i.test(String(cat || ''));
 }
 
+// Emulsion product name = PDF product name with variant suffix stripped,
+// ALL CAPS. If the leading "- " segment is "ANNEXURE", use the next segment
+// instead (matches the existing `extractProductAbbrev` strategy).
+function extractEmulsionProductName(pdfProduct) {
+    if (!pdfProduct) return '';
+    const parts = String(pdfProduct).split(/\s*-\s*/).map(s => s.trim()).filter(Boolean);
+    if (parts.length === 0) return '';
+    // Skip a leading ANNEXURE-style label if there is at least one more part
+    let main = parts[0];
+    if (/^ANNEXURE\b/i.test(main) && parts.length > 1) {
+        main = parts[1];
+    }
+    return main.toUpperCase();
+}
+
 // ============ MATCH WITH ZOHO ITEMS ============
 function matchWithZohoItems(parsedItems, zohoItems) {
     const matched = [];
@@ -1526,6 +1541,7 @@ module.exports = {
     // Birla Opus naming helpers
     isEmulsionCategory,
     isEnamelCategory,
+    extractEmulsionProductName,
     // DPL import helpers
     computeProposedFields,
     brandKeyFromName,

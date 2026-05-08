@@ -46,3 +46,25 @@ describe('isEnamelCategory', () => {
         expect(isEnamelCategory(null)).toBe(false);
     });
 });
+
+describe('extractEmulsionProductName', () => {
+    test('strips variant suffix and uppercases', () => {
+        expect(extractEmulsionProductName('Ever Stay - White')).toBe('EVER STAY');
+    });
+    test('handles Pastel variant', () => {
+        expect(extractEmulsionProductName('Calista Ever Clear - Pastel')).toBe('CALISTA EVER CLEAR');
+    });
+    test('keeps tier word ONE', () => {
+        expect(extractEmulsionProductName('One Pure Elegance - Mid Tone')).toBe('ONE PURE ELEGANCE');
+    });
+    test('returns name unchanged when no separator', () => {
+        expect(extractEmulsionProductName('Style Color Fresh')).toBe('STYLE COLOR FRESH');
+    });
+    test('skips ANNEXURE prefix and uses meaningful part', () => {
+        expect(extractEmulsionProductName('Annexure - Calista Sparkle PU')).toBe('CALISTA SPARKLE PU');
+    });
+    test('handles empty', () => {
+        expect(extractEmulsionProductName('')).toBe('');
+        expect(extractEmulsionProductName(null)).toBe('');
+    });
+});
