@@ -5038,17 +5038,27 @@ ${textSection}`;
                 DESIGNER: 'INTERIOR EMULSION', UNDERCOATS: 'INTERIOR PRIMER',
                 OTHERS: ''
             };
-            // Typical Birla Opus ascending pack sizes for mapping _prices
-            const TYPICAL_PACKS = ['200ml', '0.9L', '1L', '4L', '9L', '10L', '18L', '20L'];
+            // Preserve _prices arrays so matchWithZohoItems can do rate-anchored
+            // expansion against Zoho catalog rates (price-list-parser.js:1100-1254).
+            // Flat items (single dpl + packSize) pass through unchanged.
             for (const item of rawTrad) {
                 const cat = TIER_TO_CAT[item.category] || item.category || '';
                 if (Array.isArray(item._prices) && item._prices.length > 0) {
-                    const sorted = item._prices.slice().sort((a, b) => a - b);
-                    sorted.forEach((price, i) => {
-                        tradRawItems.push({ p: item.product, s: TYPICAL_PACKS[Math.min(i + 2, TYPICAL_PACKS.length - 1)], d: price, c: cat });
+                    tradRawItems.push({
+                        product:  item.product,
+                        _prices:  item._prices.slice(),
+                        category: cat,
+                        brand:    detectedBrand,
+                        baseCode: item.baseCode,
                     });
                 } else if (item.dpl) {
-                    tradRawItems.push({ p: item.product, s: item.packSize || '?', d: item.dpl, c: cat });
+                    tradRawItems.push({
+                        product:  item.product,
+                        packSize: item.packSize || '?',
+                        dpl:      item.dpl,
+                        category: cat,
+                        brand:    detectedBrand,
+                    });
                 }
             }
             tradDebug.items = tradRawItems.length;
@@ -5098,21 +5108,24 @@ ${textSection}`;
             }
         }
 
-        // ── 6. Merge AI + Traditional (AI takes priority, trad fills gaps) ──
-        // Use normalised (product|packSize) key for deduplication.
-        const mergedMap = new Map();
-        const normKey = it =>
-            String(it.p || it.product || '').toUpperCase().replace(/\s+/g, ' ').trim() + '|' +
-            String(it.s || it.packSize || '').toUpperCase().replace(/\s+/g, '').trim();
-
-        for (const it of aiRawItems) {
-            const k = normKey(it);
-            if (k !== '|') mergedMap.set(k, it);
-        }
-        // Traditional items only fill gaps the AI missed
+        // ── 6. Merge: traditional (with _prices) wins for products it covered;
+        //          AI flat rows fill gaps for products traditional missed.
+        const productKey = (s) => String(s || '').toUpperCase().replace(/\s+/g, ' ').trim();
+        const tradProductSet = new Set();
         for (const it of tradRawItems) {
-            const k = normKey(it);
-            if (k !== '|' && !mergedMap.has(k)) mergedMap.set(k, it);
+            const k = productKey(it.product);
+            if (k) tradProductSet.add(k);
+        }
+
+        // Pool A: every traditional item (both _prices and flat-dpl shapes).
+        const mergedItems = tradRawItems.slice();
+
+        // Pool B: AI flat rows for products NOT covered by traditional.
+        for (const it of aiRawItems) {
+            const k = productKey(it.p || it.product);
+            if (!k) continue;
+            if (tradProductSet.has(k)) continue;
+            mergedItems.push(it);
         }
 
         // ── 7. Sanitise merged items ─────────────────────────────────────────
@@ -5126,13 +5139,32 @@ ${textSection}`;
         }
 
         const cleanItems = [];
-        for (const it of mergedMap.values()) {
+        for (const it of mergedItems) {
             if (!it || typeof it !== 'object') continue;
             const product  = fixDoubledName(String(it.p || it.product || '').trim());
+            const category = String(it.c || it.category || '').toUpperCase().trim();
+            if (!product) continue;
+
+            // Shape 1: _prices array — pass through for rate-anchored expansion.
+            if (Array.isArray(it._prices) && it._prices.length > 0) {
+                const cleanedPrices = it._prices
+                    .map(p => parseFloat(p))
+                    .filter(p => isFinite(p) && p > 0);
+                if (cleanedPrices.length === 0) continue;
+                cleanItems.push({
+                    product,
+                    _prices:  cleanedPrices,
+                    category,
+                    brand:    detectedBrand,
+                    baseCode: it.baseCode,
+                });
+                continue;
+            }
+
+            // Shape 2: flat row — require explicit packSize + valid dpl.
             const packSize = String(it.s || it.packSize || it.pack || '').trim();
             const dplNum   = parseFloat(it.d != null ? it.d : it.dpl);
-            const category = String(it.c || it.category || '').toUpperCase().trim();
-            if (!product || !packSize || !isFinite(dplNum) || dplNum <= 0) continue;
+            if (!packSize || !isFinite(dplNum) || dplNum <= 0) continue;
             cleanItems.push({ product, packSize, dpl: dplNum, category, brand: detectedBrand });
         }
 
@@ -5151,34 +5183,46 @@ ${textSection}`;
         // Keep brand so matchWithZohoItems can scope to same-brand Zoho items only
         const cleanItemsForMatch = cleanItems;
         const matchResult = priceListParser.matchWithZohoItems(cleanItemsForMatch, zohoItems);
-        const matchedByKey = new Map();
-        for (const m of matchResult.matched) {
-            const key = (m.product || '') + '|' + (m.packSize || '');
-            if (!matchedByKey.has(key)) matchedByKey.set(key, m);
-        }
 
         // ── 10. Build output ─────────────────────────────────────────────────
-        const itemsOut = cleanItems.map(it => {
-            const key = it.product + '|' + it.packSize;
-            const m = matchedByKey.get(key);
-            const out = { product: it.product, packSize: it.packSize, dpl: it.dpl, category: it.category };
-            if (m && m.zoho_item_id) {
+        // Source rows from matchResult.matched + unmatched (one entry per resolved
+        // PDF row, including expansions of _prices arrays). This replaces the
+        // old cleanItems.map approach which assumed every input had an explicit
+        // packSize — now invalid because Birla Opus emulsion items use _prices.
+        const itemsOut = [];
+        for (const m of matchResult.matched) {
+            const out = {
+                product:  m.product,
+                packSize: m.packSize,
+                dpl:      m.dpl,
+                category: m.category,
+            };
+            if (m.zoho_item_id) {
                 out.auto_match = {
-                    zoho_item_id:           m.zoho_item_id,
-                    zoho_item_name:         m.zoho_item_name,
-                    proposed_name:          m.proposed_name          || null,
-                    proposed_sku:           m.proposed_sku           || null,
-                    proposed_description:   m.proposed_description   || null,
-                    proposed_rate:          m.proposed_rate          || null,
-                    current_sku:            m.current_sku            || null,
-                    current_description:    m.current_description    || null,
-                    current_rate:           m.currentRate            || null,
-                    current_dpl:            m.currentDpl             || null,
-                    warning:                m._warning               || null
+                    zoho_item_id:         m.zoho_item_id,
+                    zoho_item_name:       m.zoho_item_name,
+                    proposed_name:        m.proposed_name        || null,
+                    proposed_sku:         m.proposed_sku         || null,
+                    proposed_description: m.proposed_description || null,
+                    proposed_rate:        m.proposed_rate        || null,
+                    current_sku:          m.current_sku          || null,
+                    current_description:  m.current_description  || null,
+                    current_rate:         m.currentRate          || null,
+                    current_dpl:          m.currentDpl           || null,
+                    warning:              m._warning             || null,
                 };
             }
-            return out;
-        });
+            itemsOut.push(out);
+        }
+        for (const u of matchResult.unmatched) {
+            itemsOut.push({
+                product:  u.product,
+                packSize: u.packSize || '?',
+                dpl:      u.dpl,
+                category: u.category,
+                unmatched_reason: u._reject_reason || null,
+            });
+        }
 
         // Filter Zoho items to same brand so client dropdown doesn't show other-brand items.
         // Fallback: check item name for brand keywords when the brand column is empty.
