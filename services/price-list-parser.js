@@ -1354,10 +1354,20 @@ function matchWithZohoItems(parsedItems, zohoItems) {
             ) {
                 startIdx++;
             }
-            const take = Math.min(pricesSorted.length, famSorted.length - startIdx);
+
+            // When PDF has MORE prices than Zoho family slots, the surplus is at the
+            // SMALL end (Zoho catalog typically lacks 200ml SKUs while PDFs list them).
+            // Drop the smallest excess prices so the largest prices align with the
+            // largest Zoho sizes — this matches real Birla Opus catalog behavior.
+            const familySlots = famSorted.length - startIdx;
+            const priceStart = pricesSorted.length > familySlots
+                ? pricesSorted.length - familySlots
+                : 0;
+            const take = Math.min(pricesSorted.length - priceStart, familySlots);
+
             for (let i = 0; i < take; i++) {
                 const fam = famSorted[startIdx + i];
-                const price = pricesSorted[i];
+                const price = pricesSorted[priceStart + i];
                 expandedParsed.push({
                     brand: p.brand,
                     product: p.product,
@@ -1369,11 +1379,11 @@ function matchWithZohoItems(parsedItems, zohoItems) {
                     _fuzzy: fromFallback || undefined
                 });
             }
-            // Any leftover prices (more prices than family members) → unmatched
-            for (let i = take; i < pricesSorted.length; i++) {
+            // Excess smaller prices (PDF has sizes Zoho lacks) → unmatched
+            for (let i = 0; i < priceStart; i++) {
                 unmatched.push({
                     ...p, dpl: pricesSorted[i], packSize: '?',
-                    _reject_reason: `Extra price in PDF row — family has ${famSorted.length - startIdx} sizes, PDF row has ${pricesSorted.length}`
+                    _reject_reason: `Extra small price in PDF row — Zoho family has ${familySlots} sizes, PDF row has ${pricesSorted.length} (likely a smaller size missing from Zoho catalog)`
                 });
             }
         } else {

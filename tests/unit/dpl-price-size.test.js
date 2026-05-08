@@ -140,3 +140,63 @@ describe('matchWithZohoItems — Birla Opus _prices rate-anchored expansion', ()
         expect(byZohoId['99'].dpl).toBe(150);
     });
 });
+
+describe('matchWithZohoItems — overflow handling (PDF prices > Zoho family)', () => {
+    test('5 prices, 4-size family: drops SMALLEST price (200ml not in Zoho)', () => {
+        // Real-world Birla Opus Pastel emulsion: PDF lists 200ml/1L/4L/10L/20L,
+        // but Zoho catalog only stocks 1L/4L/10L/20L (no 200ml SKU).
+        const parsed = [{
+            brand: 'Birla Opus',
+            product: 'Calista Ever Stay - Pastel',
+            _prices: [104, 484, 1902, 4740, 9390],
+            category: 'INTERIOR EMULSION',
+            baseCode: '9901',
+        }];
+        const zoho = [
+            { zoho_item_id: '1', sku: 'ES101', name: 'ES101 CALISTA EVER STAY BIRLA OPUS 01 L', rate: 628,   brand: 'Birla Opus', category: 'INTERIOR EMULSION', cf_dpl: 0, description: '' },
+            { zoho_item_id: '2', sku: 'ES104', name: 'ES104 CALISTA EVER STAY BIRLA OPUS 04 L', rate: 2467,  brand: 'Birla Opus', category: 'INTERIOR EMULSION', cf_dpl: 0, description: '' },
+            { zoho_item_id: '3', sku: 'ES110', name: 'ES110 CALISTA EVER STAY BIRLA OPUS 10 L', rate: 6149,  brand: 'Birla Opus', category: 'INTERIOR EMULSION', cf_dpl: 0, description: '' },
+            { zoho_item_id: '4', sku: 'ES120', name: 'ES120 CALISTA EVER STAY BIRLA OPUS 20 L', rate: 12184, brand: 'Birla Opus', category: 'INTERIOR EMULSION', cf_dpl: 0, description: '' },
+        ];
+
+        const { matched, unmatched } = matchWithZohoItems(parsed, zoho);
+
+        const byZohoId = Object.fromEntries(matched.map(m => [m.zoho_item_id, m]));
+        // The 4 LARGEST prices map to the 4 Zoho sizes ascending.
+        expect(byZohoId['1'].dpl).toBe(484);   // 1L  <- was wrongly 104
+        expect(byZohoId['2'].dpl).toBe(1902);  // 4L  <- was wrongly 484
+        expect(byZohoId['3'].dpl).toBe(4740);  // 10L <- was wrongly 1902
+        expect(byZohoId['4'].dpl).toBe(9390);  // 20L <- was wrongly 4740 (and 9390 was dropped)
+        // The smallest price (104) goes to unmatched as the missing-size leftover.
+        const pastelLeftovers = unmatched.filter(u => u.product && u.product.includes('Ever Stay - Pastel'));
+        expect(pastelLeftovers).toHaveLength(1);
+        expect(pastelLeftovers[0].dpl).toBe(104);
+    });
+
+    test('3 prices, 5-size family: no overflow, 3 smallest sizes mapped (regression check)', () => {
+        // Existing behavior: when PDF has FEWER prices than Zoho family,
+        // smallest prices map to smallest sizes (rate-anchored ascending).
+        const parsed = [{
+            brand: 'Birla Opus',
+            product: 'Calista Ever Stay - Clear',
+            _prices: [91, 418, 1643],
+            category: 'INTERIOR EMULSION',
+            baseCode: '9999',
+        }];
+        const zoho = [
+            { zoho_item_id: '1', sku: 'ES9912M', name: 'ES9912M CALISTA EVER STAY BIRLA OPUS 200 ML', rate: 118,   brand: 'Birla Opus', category: 'INTERIOR EMULSION', cf_dpl: 0, description: '' },
+            { zoho_item_id: '2', sku: 'ES9901',  name: 'ES9901 CALISTA EVER STAY BIRLA OPUS 01 L',    rate: 541,   brand: 'Birla Opus', category: 'INTERIOR EMULSION', cf_dpl: 0, description: '' },
+            { zoho_item_id: '3', sku: 'ES9904',  name: 'ES9904 CALISTA EVER STAY BIRLA OPUS 04 L',    rate: 2127,  brand: 'Birla Opus', category: 'INTERIOR EMULSION', cf_dpl: 0, description: '' },
+            { zoho_item_id: '4', sku: 'ES9910',  name: 'ES9910 CALISTA EVER STAY BIRLA OPUS 10 L',    rate: 5276,  brand: 'Birla Opus', category: 'INTERIOR EMULSION', cf_dpl: 0, description: '' },
+            { zoho_item_id: '5', sku: 'ES9920',  name: 'ES9920 CALISTA EVER STAY BIRLA OPUS 20 L',    rate: 10448, brand: 'Birla Opus', category: 'INTERIOR EMULSION', cf_dpl: 0, description: '' },
+        ];
+
+        const { matched } = matchWithZohoItems(parsed, zoho);
+        const byZohoId = Object.fromEntries(matched.map(m => [m.zoho_item_id, m]));
+        expect(byZohoId['1'].dpl).toBe(91);    // 200ml
+        expect(byZohoId['2'].dpl).toBe(418);   // 1L
+        expect(byZohoId['3'].dpl).toBe(1643);  // 4L
+        expect(byZohoId['4']).toBeUndefined();
+        expect(byZohoId['5']).toBeUndefined();
+    });
+});
