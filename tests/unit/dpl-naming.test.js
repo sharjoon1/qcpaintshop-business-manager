@@ -93,3 +93,31 @@ describe('extractEnamelProductAndColor', () => {
         expect(extractEnamelProductAndColor(null)).toEqual({ productName: '', color: '' });
     });
 });
+
+describe('stripDuplicateSkuPrefix', () => {
+    test('strips leading SKU-prefix token (CSWT case)', () => {
+        // SKU = CSWT20, name starts with "CSWT STYLE COLOR SMART ..."
+        expect(stripDuplicateSkuPrefix('CSWT STYLE COLOR SMART BIRLA OPUS', 'CSWT20'))
+            .toBe('STYLE COLOR SMART BIRLA OPUS');
+    });
+    test('strips full SKU + dangling unit (CSTSBK500ML case)', () => {
+        // SKU = CSTSBK500ML, name = "CSTSBK500 ML CST SATIN BLACK ..."
+        expect(stripDuplicateSkuPrefix('CSTSBK500 ML CST SATIN BLACK ENAMEL', 'CSTSBK500ML'))
+            .toBe('CST SATIN BLACK ENAMEL');
+    });
+    test('strips full SKU + dangling L (AWPUEM01L case)', () => {
+        expect(stripDuplicateSkuPrefix('AWPUEM01 L PU EXTERIOR MATT', 'AWPUEM01L'))
+            .toBe('PU EXTERIOR MATT');
+    });
+    test('does not strip when name does not duplicate SKU', () => {
+        expect(stripDuplicateSkuPrefix('CALISTA EVER STAY BIRLA OPUS', 'ES101'))
+            .toBe('CALISTA EVER STAY BIRLA OPUS');
+    });
+    test('handles missing sku gracefully', () => {
+        expect(stripDuplicateSkuPrefix('CALISTA EVER STAY', '')).toBe('CALISTA EVER STAY');
+        expect(stripDuplicateSkuPrefix('CALISTA EVER STAY', null)).toBe('CALISTA EVER STAY');
+    });
+    test('handles empty name', () => {
+        expect(stripDuplicateSkuPrefix('', 'CSWT20')).toBe('');
+    });
+});

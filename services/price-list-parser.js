@@ -1101,6 +1101,39 @@ function extractEnamelProductAndColor(pdfProduct) {
     return { productName, color };
 }
 
+// Remove leading tokens of `name` that duplicate the SKU.
+// Strips: (a) full SKU exact match, (b) leading [A-Z]+ run of SKU followed by
+// digits (e.g. "CSWT" from SKU "CSWT20"), (c) one dangling unit token (L/ML/KG)
+// only when it follows a stripped SKU-like token. Stops at the first non-matching
+// token. Pure function — no side effects.
+function stripDuplicateSkuPrefix(name, sku) {
+    if (!name || !sku) return name || '';
+    const skuU = String(sku).toUpperCase();
+    const skuAlphaMatch = skuU.match(/^[A-Z]+/);
+    if (!skuAlphaMatch) return name;
+    const skuAlpha = skuAlphaMatch[0]; // e.g. "CSWT", "CSTSBK", "AWPUEM"
+
+    const tokens = String(name).trim().split(/\s+/);
+    let stripped = false;
+    while (tokens.length) {
+        const t = tokens[0].toUpperCase();
+        // Case (a): exact SKU match
+        if (t === skuU) { tokens.shift(); stripped = true; continue; }
+        // Case (b): starts with skuAlpha and contains only [A-Z0-9] (e.g. "CSWT", "CSTSBK500", "CSWT20")
+        if (t.startsWith(skuAlpha) && /^[A-Z0-9]+$/.test(t) && t.length >= skuAlpha.length) {
+            tokens.shift(); stripped = true; continue;
+        }
+        // Case (c): dangling unit token immediately after a strip
+        if (stripped && /^(L|ML|KG)$/.test(t)) {
+            tokens.shift();
+            stripped = false; // only consume one trailing unit
+            continue;
+        }
+        break;
+    }
+    return tokens.join(' ');
+}
+
 // ============ MATCH WITH ZOHO ITEMS ============
 function matchWithZohoItems(parsedItems, zohoItems) {
     const matched = [];
@@ -1554,6 +1587,7 @@ module.exports = {
     isEnamelCategory,
     extractEmulsionProductName,
     extractEnamelProductAndColor,
+    stripDuplicateSkuPrefix,
     // DPL import helpers
     computeProposedFields,
     brandKeyFromName,
