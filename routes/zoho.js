@@ -5261,8 +5261,12 @@ ${textSection}`;
             data: {
                 brand:          detectedBrand || 'unknown',
                 pages,
-                totalExtracted: cleanItems.length,
+                // Counts are post-expansion (each _prices array yields multiple itemsOut rows).
+                // Reporting cleanItems.length here would under-count because rate-anchored
+                // expansion in matchWithZohoItems turns one _prices entry into N matched rows.
+                totalExtracted: itemsOut.length,
                 autoMatched:    matchResult.matched.length,
+                needsReview:    matchResult.unmatched.length,
                 items:          itemsOut,
                 zohoItems:      zohoItemsOut,
                 ai: {
