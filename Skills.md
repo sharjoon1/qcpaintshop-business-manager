@@ -3612,5 +3612,61 @@ Open D-items: D1 admin dashboard refresh, D2 mobile clock-in flow, D3 painter po
 
 ---
 
+### 2026-05-08 → 2026-05-09 — DPL Extraction Overhaul (Birla Opus)
+
+Two-spec brainstorm → plan → subagent-driven-development cycle fixing Birla Opus DPL upload accuracy. All shipped to production and smoke-tested against the Feb 2026 BirlaOpus-DPL PDF.
+
+**Specs**: `docs/superpowers/specs/2026-05-08-birla-opus-dpl-naming-design.md`, `docs/superpowers/specs/2026-05-08-dpl-price-size-mapping-design.md`
+**Plans**: same dates under `docs/superpowers/plans/`
+
+#### Spec 1 — Birla Opus naming (commits 96b7914 → dd2efff, 9 commits)
+
+**Bug**: `computeProposedFields` produced `ESWT01 ESWT EVER STAY BIRLA OPUS 01 L` (duplicate WT prefix) and lost colors for enamels because variant suffix splitter was shared with emulsion. Also: `proposed_sku = skuPrefix + packCode` mangled ml-pack SKUs (`CME500` → `CME550M`).
+
+**Fix**: 5 new helpers (`isEmulsionCategory`, `isEnamelCategory`, `extractEmulsionProductName`, `extractEnamelProductAndColor`, `stripDuplicateSkuPrefix`) + `buildBirlaName` template builder in `services/price-list-parser.js`. `computeProposedFields` Birla Opus branch rewired to call `buildBirlaName`. Task 9 (`dd2efff`) preserved `currentSku` verbatim as `proposedSku` (drops legacy auto-correct that mangled ml-pack SKUs); description prefix now derived via `stripPackSuffixForDescription`.
+
+**UI** (commit 9340f68): `admin-dpl.html::renderProposedNameCell` — Proposed Name cell now always renders an editable input; "same" badge appears beside it when equal to current name (gray border) instead of replacing the input with `— same` placeholder.
+
+**Naming rules** (canonical, see `feedback_birla_opus_naming_rules.md` in user memory):
+- ALL CAPS, brand always `BIRLA OPUS`, tier word kept (STYLE/CALISTA/ONE), pack zero-padded (`01 L`/`200 ML`).
+- Emulsion: `{SKU} {PRODUCT_VARIANT_STRIPPED} BIRLA OPUS {PACK}`. Variant (White/Pastel/Mid Tone/Clear/Yellow/Red) stripped — base info encoded in SKU's middle digit.
+- Enamel: `{SKU} {PRODUCT_BEFORE_DASH} ENAMEL {COLOR} BIRLA OPUS {PACK}`. Color preserved.
+- Other Birla categories (Primer/Wood/Construction/Colorant) → DEFERRED, currently fall through to emulsion format.
+
+**Tests**: `tests/unit/dpl-naming.test.js` (45 tests including 5 ml-pack proposed_sku regression checks).
+
+#### Spec 2 — DPL price→size mapping (commits 1f024a1 → 0abb922, 4 commits)
+
+**Bug**: `routes/zoho.js` AI parse job was flattening `parseBirlaOpus` `_prices` arrays via `TYPICAL_PACKS[i+2]` shifted-index hack, producing wrong sizes (`1L/4L/9L/10L` for any 4-price row). This bypassed the rate-anchored expansion in `matchWithZohoItems` (lines 1100-1254) that uses Zoho catalog rates as ground truth.
+
+**Fix** (`eb1bee3`): Strategy A in `routes/zoho.js` (~lines 5025-5181) preserves `_prices` arrays. Two-pool merge (Pool A: traditional with `_prices` always wins; Pool B: AI flat rows for products NOT in `tradProductSet`). Sanitize handles both shapes. `itemsOut` now built from `matchResult.matched + matchResult.unmatched` (post-expansion individual rows). Removed `mergedMap`/`matchedByKey`/`TYPICAL_PACKS` constants.
+
+**Telemetry fix** (`877f52c`): caught by review — dangling `matchedByKey.size` reference in success-job telemetry would have made every successful AI parse job land as `status='error'`. Replaced with `matchResult.matched.length`.
+
+**Overflow handling** (`0abb922`): caught by smoke test — when PDF has more prices than Zoho family slots, the surplus is at the SMALL end (PDF lists 200ml that Zoho doesn't catalog as separate SKU). `matchWithZohoItems` rate-anchored block now drops the smallest excess prices to `unmatched` (with `_reject_reason: "Extra small price in PDF row — Zoho family has N sizes, PDF row has M (likely a smaller size missing from Zoho catalog)"`) and aligns the remaining largest prices ascending to the family.
+
+**Smoke-test results on production** (Feb 2026 PDF, real Zoho catalog):
+- One Pure Elegance Pastel: `1L=₹484, 4L=₹1,902, 10L=₹4,740, 20L=₹9,390` ✓ (₹104 / 200ml unmatched, no SKU in catalog)
+- One Pure Elegance Mid Tone: `1L=₹477, 4L=₹1,881, 10L=₹4,661, 20L=₹9,233` ✓
+- One Pure Elegance Clear: `1L=₹418, 4L=₹1,643` ✓
+- One Pure Elegance White: 0 matched (no WT-base SKUs in catalog → 4 rows go to NEW ITEM workflow as expected)
+
+**Tests**: `tests/unit/dpl-price-size.test.js` (7 tests pinning rate-anchored expansion + overflow drop).
+
+#### Quick wins (`3fdc935`, `24ef197`)
+
+- **DPL > rate × 1.5 advisory warning** in `matchWithZohoItems`: catches AI mislabeling where a larger pack's price lands on a smaller-pack SKU (e.g. `AWMT01L` getting 5L's ₹792 DPL vs rate ₹212 = 3.7×). Counterpart of existing `DPL < rate × 0.25` warning. Both add to `out._warning` and surface as the ⚠ icon already wired in `admin-dpl.html`.
+- **`admin-zoho-items-edit.html`**: flipped existing `dpl_updated_at` column to `visible: true` by default. Data already stamped by the `/dpl-apply` path.
+- **Stats counts fix**: `totalExtracted` now counts `itemsOut.length` (post-expansion total = matched + unmatched) instead of `cleanItems.length` (input products, one per `_prices` array). Also exposes `needsReview` explicitly. Old code produced negative `Needs Review` because `cleanItems.length - matched.length` went < 0 when `_prices` expansion produced more matched rows than input items.
+
+#### Deferred (next session candidates)
+
+1. Non-emulsion Birla products (Allwood Melamine Thinner / Primer / Putty / Construction Chemicals / Wood Polish) — AI mislabels sizes because `parseBirlaOpus` only catches emulsion-shaped rows. Fix path: extend traditional parser to non-emulsion families OR teach AI prompt about sparse-column patterns per category.
+2. Other brands DPL extraction (Asian / Berger / Gem / JSW / Nippon) — each has its own brand-specific parser, all weaker than Birla Opus.
+3. Surface "no DPL update available" rows for Zoho SKUs whose size isn't in PDF (e.g., `ADSS10` 10L Salt Seal — Zoho doesn't have that SKU but if it did, PDF doesn't list 10L for Salt Seal so currently silent).
+4. `stripPackSuffixForDescription` greedy regex on 99-base SKUs (`TL9920` → `TL9` instead of `TL`) — affects only `proposed_description` advisory field. Final reviewer flagged as follow-up not blocker.
+
+---
+
 *This document should be updated whenever new features are added or existing ones are enhanced.*
-*Last Updated: 2026-05-01 | Version: 3.3.9 (Staff/Customer), 3.1.7 (Painter vc19) | Maintained by: Development Team*
+*Last Updated: 2026-05-09 | Version: 3.3.9 (Staff/Customer), 3.1.7 (Painter vc19) | Maintained by: Development Team*
