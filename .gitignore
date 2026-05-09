@@ -70,3 +70,7 @@ public/.well-known/
 
 # Temp APK / build artifacts (delivered via Telegram, not git)
 public/temp/
+
+# DPL audit artifacts (PDFs are too large for git; raw text extracts are regeneratable)
+docs/audits/*.pdf
+docs/audits/*.txt
