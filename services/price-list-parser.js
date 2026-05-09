@@ -1553,6 +1553,13 @@ function matchWithZohoItems(parsedItems, zohoItems) {
             if (matchRate >= 100 && parsedDpl > 0 && parsedDpl < matchRate * 0.25) {
                 out._warning = `DPL ₹${parsedDpl} is <25% of rate ₹${matchRate} — verify before applying`;
             }
+            // Catch the opposite case: AI/parser mislabeled a larger size's price onto
+            // a smaller-pack Zoho item (e.g. 5L price applied to 1L SKU). DPL should
+            // normally be < rate (rate = DPL × markup). DPL > rate × 1.5 is suspicious.
+            if (matchRate >= 100 && parsedDpl > matchRate * 1.5) {
+                out._warning = (out._warning ? out._warning + '; ' : '')
+                    + `DPL ₹${parsedDpl} exceeds rate ₹${matchRate} (×${(parsedDpl/matchRate).toFixed(1)}) — likely a larger size's price; verify pack alignment`;
+            }
             if (parsed._fuzzy) {
                 out._warning = (out._warning ? out._warning + '; ' : '') + 'Fuzzy keyword match — verify';
             }
