@@ -43,10 +43,35 @@ const invoiceLineSync = require('../services/zoho-invoice-line-sync');
 const reorderCompute = require('../services/reorder-compute-service');
 const reorderReport = require('../services/reorder-report-service');
 const vendorItemMapper = require('../services/vendor-item-mapper');
+const brandDplService = require('../services/brand-dpl-service');
 const pathMod = require('path');
 const fsMod = require('fs');
 
 let pool;
+
+// Maps DPL paste-mode category strings (e.g. "Interior Luxury") to canonical
+// category names that matchWithZohoItems / propose-naming expect.
+// Shared by /items/brand-dpl/:brand POST + /items/brand-dpl/:brand/match.
+const PASTE_CAT_TO_CANON = {
+    'INTERIOR LUXURY':       'INTERIOR EMULSION',
+    'INTERIOR PREMIUM':      'INTERIOR EMULSION',
+    'INTERIOR ECONOMY':      'INTERIOR EMULSION',
+    'EXTERIOR LUXURY':       'EXTERIOR EMULSION',
+    'EXTERIOR PREMIUM':      'EXTERIOR EMULSION',
+    'EXTERIOR ECONOMY':      'EXTERIOR EMULSION',
+    'WATERPROOFING':         'WATERPROOFING',
+    'ENAMEL LUXURY':         'ENAMEL',
+    'ENAMEL PREMIUM':        'ENAMEL',
+    'ENAMEL ECONOMY':        'ENAMEL',
+    'WOOD FINISHES LUXURY':  'WOOD FINISH',
+    'WOOD FINISHES PREMIUM': 'WOOD FINISH',
+    'WOOD FINISHES ECONOMY': 'WOOD FINISH',
+    'WOOD FINISHES OTHER':   'WOOD FINISH',
+    'PAINTING TOOLS':        '',
+    'THINNERS':              '',
+    'COLORANTS':             'COLORANT',
+    'STAINERS':              'COLORANT',
+};
 
 // Module-scoped flag to prevent concurrent invoice-line back-fills
 let invoiceBackfillState = { running: false, startedAt: null };
@@ -99,6 +124,7 @@ function setPool(dbPool) {
     zohoOAuth.setPool(dbPool);
     zohoAPI.setPool(dbPool);
     purchaseSuggestion.setPool(dbPool);
+    brandDplService.setPool(dbPool);
 
     // Ensure Zoho permissions have proper display names (auto-fix for existing databases)
     ensureZohoPermissions(dbPool).catch(err => {
@@ -5289,196 +5315,212 @@ ${textSection}`;
 });
 
 /**
- * POST /api/zoho/items/parse-pasted-dpl
+ * GET /api/zoho/items/brand-dpl/:brand
  *
- * Synchronous Birla Opus DPL ingestion from pasted tab-separated text.
- * Skips PDF + AI extraction; uses the deterministic tabular parser, then
- * runs the same matchWithZohoItems pipeline as the PDF flow.
- *
- * Body: { brand: 'birlaopus', text: '<pasted-table>' }
- *
- * Returns the same `data` shape as /items/ai-parse-job/:id when status==='done'
- * so the frontend can plug it into the existing aiData / showAiResults flow.
+ * Return saved DPL summary for a brand. Drives the Saved Summary Card
+ * in admin-dpl.html. ?include=raw also returns raw_text (used when admin
+ * clicks "Update DPL" to pre-fill the textarea).
  */
-router.post('/items/parse-pasted-dpl', requirePermission('zoho', 'manage'), async (req, res) => {
+router.get('/items/brand-dpl/:brand', requirePermission('zoho', 'manage'), async (req, res) => {
     try {
-        const brand = String(req.body && req.body.brand || '').toLowerCase().trim();
-        const text  = String(req.body && req.body.text  || '');
-
+        const brand = String(req.params.brand || '').toLowerCase().trim();
         if (brand !== 'birlaopus') {
-            return res.status(400).json({
-                success: false,
-                message: `Paste-text mode is only supported for Birla Opus right now. Use the PDF upload mode for "${brand || 'this brand'}".`
-            });
+            return res.status(400).json({ success: false, message: `Brand "${brand}" not yet supported` });
         }
+        const includeRaw = req.query.include === 'raw';
+        const row = await brandDplService.get(brand, { includeRaw });
+        if (!row) {
+            return res.status(404).json({ success: false, code: 'NO_SAVED_DPL', message: 'No DPL saved for this brand' });
+        }
+        return res.json({ success: true, data: row });
+    } catch (err) {
+        console.error('GET brand-dpl error:', err);
+        return res.status(500).json({ success: false, message: err.message || 'Server error' });
+    }
+});
+
+/**
+ * POST /api/zoho/items/brand-dpl/:brand
+ *
+ * Save (or replace) a brand's DPL price list. Optionally runs match in
+ * the same call (default true) so the frontend can plug the response
+ * into the existing aiData / showAiResults() review UI.
+ *
+ * Body: { text, effective_date?, match? }
+ */
+router.post('/items/brand-dpl/:brand', requirePermission('zoho', 'manage'), async (req, res) => {
+    try {
+        const brand = String(req.params.brand || '').toLowerCase().trim();
+        if (brand !== 'birlaopus') {
+            return res.status(400).json({ success: false, message: `Brand "${brand}" not yet supported for paste-text mode` });
+        }
+        const body = req.body || {};
+        const text = String(body.text || '');
         if (!text.trim()) {
             return res.status(400).json({ success: false, message: 'No text provided' });
         }
         if (text.length > 1_000_000) {
-            return res.status(413).json({
-                success: false,
-                message: 'Pasted text is too large. Maximum 1,000,000 characters.'
-            });
+            return res.status(413).json({ success: false, message: 'Pasted text is too large. Maximum 1,000,000 characters.' });
         }
 
-        // 1. Parse pasted text → flat rows.
-        const rawRows = priceListParser.parseBirlaOpusTabular(text);
-        if (rawRows.length === 0) {
-            return res.json({
-                success: true,
-                data: {
-                    brand: 'birlaopus',
-                    pages: 0,
-                    totalExtracted: 0,
-                    autoMatched: 0,
-                    needsReview: 0,
-                    items: [],
-                    zohoItems: [],
-                    source: { type: 'pasted-text', lines: text.split('\n').length, parsed: 0 },
-                }
-            });
+        const effectiveDate = body.effective_date && /^\d{4}-\d{2}-\d{2}$/.test(body.effective_date)
+            ? body.effective_date
+            : new Date().toISOString().slice(0, 10);
+        const runMatch = body.match !== false;
+
+        const parsedRows = priceListParser.parseBirlaOpusTabular(text);
+        if (parsedRows.length === 0) {
+            return res.status(400).json({ success: false, message: 'No data rows found in pasted text' });
         }
 
-        // 2. Map paste-mode "Interior Luxury" / "Exterior Economy" / etc. to the
-        //    canonical category names matchWithZohoItems / propose-naming expect.
-        //    Mirrors TIER_TO_CAT in the AI flow but keyed off paste category strings.
-        const PASTE_CAT_TO_CANON = {
-            'INTERIOR LUXURY':       'INTERIOR EMULSION',
-            'INTERIOR PREMIUM':      'INTERIOR EMULSION',
-            'INTERIOR ECONOMY':      'INTERIOR EMULSION',
-            'EXTERIOR LUXURY':       'EXTERIOR EMULSION',
-            'EXTERIOR PREMIUM':      'EXTERIOR EMULSION',
-            'EXTERIOR ECONOMY':      'EXTERIOR EMULSION',
-            'WATERPROOFING':         'WATERPROOFING',
-            'ENAMEL LUXURY':         'ENAMEL',
-            'ENAMEL PREMIUM':        'ENAMEL',
-            'ENAMEL ECONOMY':        'ENAMEL',
-            'WOOD FINISHES LUXURY':  'WOOD FINISH',
-            'WOOD FINISHES PREMIUM': 'WOOD FINISH',
-            'WOOD FINISHES ECONOMY': 'WOOD FINISH',
-            'WOOD FINISHES OTHER':   'WOOD FINISH',
-            'PAINTING TOOLS':        '',
-            'THINNERS':              '',
-            'COLORANTS':             'COLORANT',
-            'STAINERS':              'COLORANT',
-        };
-        const unmappedCats = new Set();
-        const cleanItems = rawRows.map(r => {
-            const rawCat = String(r.category || '').toUpperCase().trim();
-            let canonCat = PASTE_CAT_TO_CANON[rawCat];
-            if (canonCat === undefined && rawCat) {
-                unmappedCats.add(rawCat);
-                canonCat = r.category || ''; // fall through to raw value
-            }
-            return {
-                product:  r.product,
-                packSize: r.packSize,
-                dpl:      r.dpl,
-                category: canonCat || '',
-                brand:    r.brand,
-                baseCode: r.baseCode,
-            };
-        });
-        if (unmappedCats.size > 0) {
-            console.warn('[parse-pasted-dpl] Unmapped categories — pass-through to matcher (may mis-match): ' + Array.from(unmappedCats).join(', '));
-        }
+        const before = await brandDplService.get(brand);
 
-        // 3. Fetch active Zoho items.
-        const [zohoItems] = await pool.query(
-            `SELECT zoho_item_id, zoho_item_name AS name, zoho_sku AS sku,
-                    zoho_rate AS rate, zoho_cf_dpl AS cf_dpl,
-                    zoho_brand AS brand, zoho_category_name AS category, zoho_description AS description,
-                    dpl_updated_at
-             FROM zoho_items_map
-             WHERE zoho_status = 'active'
-             ORDER BY zoho_item_name ASC`
-        );
-
-        // 4. Match.
-        const matchResult = priceListParser.matchWithZohoItems(cleanItems, zohoItems);
-
-        // 5. Build itemsOut (same shape as /items/ai-parse-job/:id done payload).
-        const itemsOut = [];
-        for (const m of matchResult.matched) {
-            const out = {
-                product:  m.product,
-                packSize: m.packSize,
-                dpl:      m.dpl,
-                category: m.category,
-            };
-            if (m.zoho_item_id) {
-                out.auto_match = {
-                    zoho_item_id:         m.zoho_item_id,
-                    zoho_item_name:       m.zoho_item_name,
-                    proposed_name:        m.proposed_name        || null,
-                    proposed_sku:         m.proposed_sku         || null,
-                    proposed_description: m.proposed_description || null,
-                    proposed_rate:        m.proposed_rate        || null,
-                    current_sku:          m.current_sku          || null,
-                    current_description:  m.current_description  || null,
-                    current_rate:         m.currentRate          || null,
-                    current_dpl:          m.currentDpl           || null,
-                    warning:              m._warning             || null,
-                };
-            }
-            itemsOut.push(out);
-        }
-        for (const u of matchResult.unmatched) {
-            itemsOut.push({
-                product:  u.product,
-                packSize: u.packSize || '?',
-                dpl:      u.dpl,
-                category: u.category,
-                unmatched_reason: u._reject_reason || null,
-            });
-        }
-
-        // 6. Filter Zoho items to same brand (mirror PDF flow behavior).
-        const brandNorm = priceListParser.normalizeBrand('Birla Opus');
-        const sameBrandZoho = zohoItems.filter(z => {
-            let zb = priceListParser.normalizeBrand(z.brand || '');
-            if (!zb) {
-                const nm = (z.name || '').toUpperCase();
-                zb = (nm.includes('BIRLA') || nm.includes('OPUS')) ? 'BIRLAOPUS' : '';
-            }
-            if (!zb) return true;
-            return zb === brandNorm || zb.includes(brandNorm) || brandNorm.includes(zb);
+        const updatedBy = req.user && req.user.username ? req.user.username : null;
+        const saved = await brandDplService.save({
+            brand, rawText: text, parsedRows, effectiveDate, updatedBy,
         });
 
-        const zohoItemsOut = sameBrandZoho.map(z => ({
-            zoho_item_id: z.zoho_item_id,
-            name:    z.name,
-            sku:     z.sku,
-            rate:    parseFloat(z.rate    || 0),
-            cf_dpl:  parseFloat(z.cf_dpl  || 0),
-            category:    z.category    || '',
-            description: z.description || '',
-            brand:       z.brand       || '',
-            dpl_updated_at: z.dpl_updated_at ? new Date(z.dpl_updated_at).toISOString() : null
-        }));
+        try {
+            const audit = require('../services/audit-log');
+            await audit.record(req, {
+                action: 'brand_dpl.save',
+                entity_type: 'brand_dpl_lists',
+                entity_id: brand,
+                before: before ? { parsed_count: before.parsed_count, effective_date: before.effective_date, updated_at: before.updated_at } : null,
+                after: { parsed_count: saved.parsed_count, effective_date: saved.effective_date, updated_at: saved.updated_at },
+            });
+        } catch (e) {
+            console.warn('audit-log record failed:', e.message);
+        }
 
-        return res.json({
-            success: true,
-            data: {
-                brand:          'birlaopus',
-                pages:          0,
-                totalExtracted: itemsOut.length,
-                autoMatched:    matchResult.matched.length,
-                needsReview:    matchResult.unmatched.length,
-                items:          itemsOut,
-                zohoItems:      zohoItemsOut,
-                source: {
-                    type:   'pasted-text',
-                    lines:  text.split('\n').length,
-                    parsed: rawRows.length,
-                },
-            }
-        });
+        let match = null;
+        if (runMatch) {
+            match = await runMatchAgainstStoredDpl(brand, parsedRows);
+        }
+
+        return res.json({ success: true, data: { saved, ...(match ? { match } : {}) } });
     } catch (err) {
-        console.error('parse-pasted-dpl error:', err);
+        console.error('POST brand-dpl error:', err);
         return res.status(500).json({ success: false, message: err.message || 'Server error' });
     }
 });
+
+/**
+ * POST /api/zoho/items/brand-dpl/:brand/match
+ *
+ * Re-match against already-saved DPL — no text in body. Powers the
+ * "Match Now" button on the Saved Summary Card.
+ */
+router.post('/items/brand-dpl/:brand/match', requirePermission('zoho', 'manage'), async (req, res) => {
+    try {
+        const brand = String(req.params.brand || '').toLowerCase().trim();
+        if (brand !== 'birlaopus') {
+            return res.status(400).json({ success: false, message: `Brand "${brand}" not yet supported` });
+        }
+        const parsedRows = await brandDplService.getForMatch(brand);
+        if (!parsedRows) {
+            return res.status(404).json({ success: false, code: 'NO_SAVED_DPL', message: 'No DPL saved for this brand' });
+        }
+        const match = await runMatchAgainstStoredDpl(brand, parsedRows);
+        return res.json({ success: true, data: match });
+    } catch (err) {
+        console.error('POST brand-dpl match error:', err);
+        return res.status(500).json({ success: false, message: err.message || 'Server error' });
+    }
+});
+
+/**
+ * Internal helper: run matchWithZohoItems against parsed-rows + return the
+ * payload shape consumed by admin-dpl.html's showAiResults().
+ */
+async function runMatchAgainstStoredDpl(brand, parsedRows) {
+    const unmappedCats = new Set();
+    const cleanItems = parsedRows.map(r => {
+        const rawCat = String(r.category || '').toUpperCase().trim();
+        let canonCat = PASTE_CAT_TO_CANON[rawCat];
+        if (canonCat === undefined && rawCat) {
+            unmappedCats.add(rawCat);
+            canonCat = r.category || '';
+        }
+        return {
+            product: r.product, packSize: r.packSize, dpl: r.dpl,
+            category: canonCat || '',
+            brand: r.brand, baseCode: r.baseCode,
+        };
+    });
+    if (unmappedCats.size > 0) {
+        console.warn('[brand-dpl] Unmapped categories — pass-through (may mis-match): ' + Array.from(unmappedCats).join(', '));
+    }
+
+    const [zohoItems] = await pool.query(
+        `SELECT zoho_item_id, zoho_item_name AS name, zoho_sku AS sku,
+                zoho_rate AS rate, zoho_cf_dpl AS cf_dpl,
+                zoho_brand AS brand, zoho_category_name AS category, zoho_description AS description,
+                dpl_updated_at
+         FROM zoho_items_map
+         WHERE zoho_status = 'active'
+         ORDER BY zoho_item_name ASC`
+    );
+
+    const matchResult = priceListParser.matchWithZohoItems(cleanItems, zohoItems);
+
+    const itemsOut = [];
+    for (const m of matchResult.matched) {
+        const out = { product: m.product, packSize: m.packSize, dpl: m.dpl, category: m.category };
+        if (m.zoho_item_id) {
+            out.auto_match = {
+                zoho_item_id:         m.zoho_item_id,
+                zoho_item_name:       m.zoho_item_name,
+                proposed_name:        m.proposed_name        || null,
+                proposed_sku:         m.proposed_sku         || null,
+                proposed_description: m.proposed_description || null,
+                proposed_rate:        m.proposed_rate        || null,
+                current_sku:          m.current_sku          || null,
+                current_description:  m.current_description  || null,
+                current_rate:         m.currentRate          || null,
+                current_dpl:          m.currentDpl           || null,
+                warning:              m._warning             || null,
+            };
+        }
+        itemsOut.push(out);
+    }
+    for (const u of matchResult.unmatched) {
+        itemsOut.push({
+            product: u.product, packSize: u.packSize || '?', dpl: u.dpl, category: u.category,
+            unmatched_reason: u._reject_reason || null,
+        });
+    }
+
+    const brandNorm = priceListParser.normalizeBrand('Birla Opus');
+    const sameBrandZoho = zohoItems.filter(z => {
+        let zb = priceListParser.normalizeBrand(z.brand || '');
+        if (!zb) {
+            const nm = (z.name || '').toUpperCase();
+            zb = (nm.includes('BIRLA') || nm.includes('OPUS')) ? 'BIRLAOPUS' : '';
+        }
+        if (!zb) return true;
+        return zb === brandNorm || zb.includes(brandNorm) || brandNorm.includes(zb);
+    });
+
+    const zohoItemsOut = sameBrandZoho.map(z => ({
+        zoho_item_id: z.zoho_item_id,
+        name: z.name, sku: z.sku,
+        rate: parseFloat(z.rate || 0),
+        cf_dpl: parseFloat(z.cf_dpl || 0),
+        category: z.category || '', description: z.description || '', brand: z.brand || '',
+        dpl_updated_at: z.dpl_updated_at ? new Date(z.dpl_updated_at).toISOString() : null,
+    }));
+
+    return {
+        brand, pages: 0,
+        totalExtracted: itemsOut.length,
+        autoMatched: matchResult.matched.length,
+        needsReview: matchResult.unmatched.length,
+        items: itemsOut,
+        zohoItems: zohoItemsOut,
+        source: { type: 'stored-dpl', parsed: parsedRows.length },
+    };
+}
 
 /**
  * GET /api/zoho/items/propose-naming
