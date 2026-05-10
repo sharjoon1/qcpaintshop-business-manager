@@ -166,3 +166,45 @@ describe('getForMatch', () => {
         expect(out).toEqual(parsedRows);
     });
 });
+
+describe('error hardening', () => {
+    test('save throws when pool is not set', async () => {
+        brandDplService.setPool(null);
+        await expect(brandDplService.save({
+            brand: 'birlaopus', rawText: 'x',
+            parsedRows: [{ product: 'A', packSize: '1L', dpl: 1, category: '', brand: 'Birla Opus', baseCode: '' }],
+            effectiveDate: null, updatedBy: null,
+        })).rejects.toThrow(/pool not set/);
+    });
+
+    test('get throws when pool is not set', async () => {
+        brandDplService.setPool(null);
+        await expect(brandDplService.get('birlaopus')).rejects.toThrow(/pool not set/);
+    });
+
+    test('getForMatch throws when pool is not set', async () => {
+        brandDplService.setPool(null);
+        await expect(brandDplService.getForMatch('birlaopus')).rejects.toThrow(/pool not set/);
+    });
+
+    test('save throws if readback returns null after successful INSERT', async () => {
+        const pool = makePool();
+        pool.query.mockResolvedValueOnce([{ affectedRows: 1 }]); // INSERT succeeds
+        pool.query.mockResolvedValueOnce([[]]); // SELECT returns nothing (race / replication gap)
+        brandDplService.setPool(pool);
+
+        await expect(brandDplService.save({
+            brand: 'birlaopus', rawText: 'x',
+            parsedRows: [{ product: 'A', packSize: '1L', dpl: 1, category: '', brand: 'Birla Opus', baseCode: '' }],
+            effectiveDate: null, updatedBy: null,
+        })).rejects.toThrow(/readback.*returned null/);
+    });
+
+    test('getForMatch throws with brand context on JSON parse error', async () => {
+        const pool = makePool();
+        pool.query.mockResolvedValueOnce([[{ parsed_rows: '{not valid json' }]]);
+        brandDplService.setPool(pool);
+
+        await expect(brandDplService.getForMatch('birlaopus')).rejects.toThrow(/birlaopus.*not valid JSON/);
+    });
+});

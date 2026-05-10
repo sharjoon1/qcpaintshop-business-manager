@@ -20,6 +20,7 @@ function setPool(p) { pool = p; }
  * @returns {Promise<object>} The saved summary row (no raw_text)
  */
 async function save({ brand, rawText, parsedRows, effectiveDate, updatedBy }) {
+    if (!pool) throw new Error('brand-dpl-service: pool not set');
     if (!Array.isArray(parsedRows) || parsedRows.length === 0) {
         throw new Error('Cannot save brand DPL with zero parsed rows');
     }
@@ -40,7 +41,11 @@ async function save({ brand, rawText, parsedRows, effectiveDate, updatedBy }) {
         [brand, rawText, parsedJson, parsedCount, effectiveDate || null, updatedBy || null]
     );
 
-    return await get(brand);
+    const saved = await get(brand);
+    if (!saved) {
+        throw new Error(`brand-dpl-service: save succeeded but readback for '${brand}' returned null`);
+    }
+    return saved;
 }
 
 /**
@@ -52,6 +57,7 @@ async function save({ brand, rawText, parsedRows, effectiveDate, updatedBy }) {
  * @returns {Promise<object|null>}
  */
 async function get(brand, opts = {}) {
+    if (!pool) throw new Error('brand-dpl-service: pool not set');
     const cols = opts.includeRaw
         ? 'brand, raw_text, parsed_count, effective_date, updated_at, updated_by'
         : 'brand, parsed_count, effective_date, updated_at, updated_by';
@@ -81,14 +87,19 @@ async function get(brand, opts = {}) {
  * @returns {Promise<Array<object>|null>}
  */
 async function getForMatch(brand) {
+    if (!pool) throw new Error('brand-dpl-service: pool not set');
     const [rows] = await pool.query(
         `SELECT parsed_rows FROM brand_dpl_lists WHERE brand = ?`,
         [brand]
     );
     if (rows.length === 0) return null;
-    const raw = rows[0].parsed_rows;
     // MariaDB driver may return JSON column as already-parsed object or as string.
-    return typeof raw === 'string' ? JSON.parse(raw) : raw;
+    const raw = rows[0].parsed_rows;
+    try {
+        return typeof raw === 'string' ? JSON.parse(raw) : raw;
+    } catch (e) {
+        throw new Error(`brand-dpl-service: parsed_rows for '${brand}' is not valid JSON: ${e.message}`);
+    }
 }
 
 module.exports = { setPool, save, get, getForMatch };
