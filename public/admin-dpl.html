@@ -146,7 +146,7 @@
                     <div class="text-xs font-bold text-gray-700">Asian</div>
                     <div class="text-[10px] text-gray-400">192 pages</div>
                 </div>
-                <div class="brand-card rounded-lg p-2 bg-amber-50 border-amber-300 text-center" style="border: 2px solid #f59e0b;">
+                <div class="brand-card rounded-lg p-2 bg-amber-50 border-amber-300 text-center" style="border: 2px solid #f59e0b;" onclick="loadBrandDplState('birlaopus')">
                     <div class="text-xs font-bold text-amber-700">Birla Opus</div>
                     <div class="text-[10px] text-amber-500">Full rules ✓</div>
                 </div>
@@ -206,29 +206,55 @@
                 </div>
             </div>
 
-            <!-- Paste Text Mode — alternate input when PDF parsing is unreliable -->
-            <div class="mt-4 border-t pt-4">
-                <div class="bg-amber-50 border border-amber-200 rounded-lg p-3">
-                    <div class="flex items-start gap-3 mb-3">
-                        <svg class="w-5 h-5 text-amber-600 mt-0.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/></svg>
-                        <div>
-                            <div class="font-bold text-sm text-amber-800">Paste DPL Text (No PDF)</div>
-                            <div class="text-[11px] text-amber-700 mt-0.5">Paste a tab-separated Birla Opus DPL table (same columns as the PDF: SNo, Category, Product, Shade, PackSize, Price). Bypasses PDF + AI extraction — deterministic and instant.</div>
+            <!-- Brand DPL Mode — saved per-brand DPL price list -->
+            <div id="brandDplPanel" class="mt-4 border-t pt-4 hidden">
+                <!-- State A: Saved DPL summary card -->
+                <div id="brandDplSavedCard" class="hidden">
+                    <div class="bg-emerald-50 border border-emerald-200 rounded-lg p-3">
+                        <div class="flex items-start gap-3 mb-3">
+                            <svg class="w-5 h-5 text-emerald-600 mt-0.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+                            <div class="flex-1">
+                                <div class="font-bold text-sm text-emerald-800" id="brandDplSavedTitle">Birla Opus DPL — Saved</div>
+                                <div class="grid grid-cols-2 sm:grid-cols-3 gap-2 mt-2 text-[11px]">
+                                    <div><span class="text-gray-500">Rows:</span> <span class="font-semibold text-gray-800" id="brandDplSavedRows">-</span></div>
+                                    <div><span class="text-gray-500">Effective:</span> <span class="font-semibold text-gray-800" id="brandDplSavedEffective">-</span></div>
+                                    <div><span class="text-gray-500">Last updated:</span> <span class="font-semibold text-gray-800" id="brandDplSavedUpdated">-</span></div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="flex flex-wrap gap-2 mt-2">
+                            <button onclick="matchSavedDpl()" id="matchSavedDplBtn" class="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-bold transition flex items-center gap-2 disabled:opacity-50">
+                                <svg id="matchSavedDplSpinner" class="hidden w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
+                                ⚡ Match Now
+                            </button>
+                            <button onclick="startUpdateDpl()" id="updateDplBtn" class="px-4 py-2 border border-emerald-300 bg-white hover:bg-emerald-50 text-emerald-700 rounded-lg text-xs font-bold transition">📝 Update DPL</button>
                         </div>
                     </div>
-                    <textarea id="pastedDplText" rows="8" aria-label="Pasted DPL text"
-                              class="w-full text-[11px] font-mono px-3 py-2 border border-amber-300 rounded bg-white focus:border-amber-500 outline-none resize-y"
-                              placeholder="1&#9;Interior Luxury&#9;One Pure Elegance (941001)&#9;White&#9;1L&#9;490&#10;2&#9;Interior Luxury&#9;One Pure Elegance (941001)&#9;White&#9;4L&#9;1,930&#10;..."
-                              oninput="updatePastedDplLineCount()"></textarea>
-                    <div class="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2 mt-3">
-                        <div id="pastedDplLineCount" class="text-[11px] text-amber-700">Lines detected: 0</div>
-                        <div class="flex items-center gap-2">
-                            <select id="pastedDplBrand" aria-label="Brand for pasted DPL" class="px-2 py-1.5 border border-amber-300 rounded text-xs bg-white focus:border-amber-500 outline-none">
-                                <option value="birlaopus">Birla Opus</option>
-                            </select>
-                            <button onclick="parsePastedText()" id="pastedDplBtn" class="px-4 py-2 bg-amber-600 hover:bg-amber-700 text-white rounded-lg text-xs font-bold transition flex items-center gap-2 disabled:opacity-50">
-                                <svg id="pastedDplSpinner" class="hidden w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
-                                Parse Pasted Text
+                </div>
+                <!-- State B: Paste UI -->
+                <div id="brandDplPasteCard" class="hidden">
+                    <div class="bg-amber-50 border border-amber-200 rounded-lg p-3">
+                        <div class="flex items-start gap-3 mb-3">
+                            <svg class="w-5 h-5 text-amber-600 mt-0.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/></svg>
+                            <div>
+                                <div class="font-bold text-sm text-amber-800" id="brandDplPasteTitle">Paste DPL Text — Birla Opus</div>
+                                <div class="text-[11px] text-amber-700 mt-0.5">Paste a tab-separated DPL table (SNo, Category, Product, Shade, PackSize, Price). The text is saved as the brand's default — match runs automatically afterwards.</div>
+                            </div>
+                        </div>
+                        <textarea id="pastedDplText" rows="8" aria-label="Pasted DPL text"
+                                  class="w-full text-[11px] font-mono px-3 py-2 border border-amber-300 rounded bg-white focus:border-amber-500 outline-none resize-y"
+                                  placeholder="1&#9;Interior Luxury&#9;One Pure Elegance (941001)&#9;White&#9;1L&#9;490&#10;2&#9;Interior Luxury&#9;One Pure Elegance (941001)&#9;White&#9;4L&#9;1,930&#10;..."
+                                  oninput="updatePastedDplLineCount()"></textarea>
+                        <div class="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2 mt-3">
+                            <div class="flex flex-wrap items-center gap-3">
+                                <div id="pastedDplLineCount" class="text-[11px] text-amber-700">Lines detected: 0</div>
+                                <label class="text-[11px] text-amber-700">Effective date:
+                                    <input type="date" id="pastedDplEffectiveDate" class="ml-1 px-2 py-0.5 border border-amber-300 rounded text-[11px] bg-white focus:border-amber-500 outline-none">
+                                </label>
+                            </div>
+                            <button onclick="saveBrandDpl()" id="saveBrandDplBtn" class="px-4 py-2 bg-amber-600 hover:bg-amber-700 text-white rounded-lg text-xs font-bold transition flex items-center gap-2 disabled:opacity-50">
+                                <svg id="saveBrandDplSpinner" class="hidden w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
+                                💾 Save & Match
                             </button>
                         </div>
                     </div>
@@ -736,55 +762,172 @@
         pollTimer = setTimeout(pollStatus, 3000);
     }
 
-    // ============ PASTE TEXT MODE ============
+    // ============ BRAND DPL MODE (saved + match) ============
+    var currentBrandDpl = null;
+
     function updatePastedDplLineCount() {
-        const ta = document.getElementById('pastedDplText');
-        const txt = ta && ta.value ? ta.value : '';
-        const nonBlankLines = txt.split('\n').filter(l => l.trim().length > 0).length;
-        const out = document.getElementById('pastedDplLineCount');
+        var ta = document.getElementById('pastedDplText');
+        var txt = ta && ta.value ? ta.value : '';
+        var nonBlankLines = txt.split('\n').filter(function(l) { return l.trim().length > 0; }).length;
+        var out = document.getElementById('pastedDplLineCount');
         if (out) out.textContent = 'Lines detected: ' + nonBlankLines;
     }
 
-    async function parsePastedText() {
-        const ta = document.getElementById('pastedDplText');
-        const brandSel = document.getElementById('pastedDplBrand');
-        const text = ta && ta.value ? ta.value : '';
-        const brand = brandSel && brandSel.value ? brandSel.value : 'birlaopus';
+    async function loadBrandDplState(brand) {
+        currentBrandDpl = brand;
+        var panel = document.getElementById('brandDplPanel');
+        var savedCard = document.getElementById('brandDplSavedCard');
+        var pasteCard = document.getElementById('brandDplPasteCard');
+        if (!panel || !savedCard || !pasteCard) return;
+        panel.classList.remove('hidden');
+
+        if (brand !== 'birlaopus') {
+            panel.classList.add('hidden');
+            return;
+        }
+
+        try {
+            var resp = await fetch('/api/zoho/items/brand-dpl/' + encodeURIComponent(brand), {
+                headers: { 'Authorization': 'Bearer ' + getToken() }
+            });
+            if (resp.status === 404) {
+                renderPasteDplUI();
+                return;
+            }
+            if (!resp.ok) {
+                var err = await resp.json().catch(function() { return {}; });
+                throw new Error(err.message || ('Server error ' + resp.status));
+            }
+            var body = await resp.json();
+            renderSavedDplCard(body.data);
+        } catch (e) {
+            showToast('Failed to load DPL state: ' + e.message, 'error');
+            renderPasteDplUI();
+        }
+    }
+
+    function renderSavedDplCard(data) {
+        document.getElementById('brandDplSavedCard').classList.remove('hidden');
+        document.getElementById('brandDplPasteCard').classList.add('hidden');
+        document.getElementById('brandDplSavedRows').textContent = data.parsed_count != null ? data.parsed_count : '-';
+        document.getElementById('brandDplSavedEffective').textContent = data.effective_date ? formatDplDate(data.effective_date) : '—';
+        var updatedTxt = '—';
+        if (data.updated_at) {
+            var d = new Date(data.updated_at);
+            updatedTxt = d.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) +
+                         ', ' + d.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: false });
+            if (data.updated_by) updatedTxt += ' (' + data.updated_by + ')';
+        }
+        document.getElementById('brandDplSavedUpdated').textContent = updatedTxt;
+    }
+
+    function renderPasteDplUI() {
+        document.getElementById('brandDplSavedCard').classList.add('hidden');
+        document.getElementById('brandDplPasteCard').classList.remove('hidden');
+        var dateInput = document.getElementById('pastedDplEffectiveDate');
+        if (dateInput && !dateInput.value) {
+            dateInput.value = new Date().toISOString().slice(0, 10);
+        }
+        updatePastedDplLineCount();
+    }
+
+    function formatDplDate(iso) {
+        var m = String(iso).match(/^(\d{4})-(\d{2})-(\d{2})/);
+        if (!m) return iso;
+        var months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+        return parseInt(m[3], 10) + ' ' + months[parseInt(m[2], 10) - 1] + ' ' + m[1];
+    }
+
+    async function saveBrandDpl() {
+        var brand = currentBrandDpl || 'birlaopus';
+        var ta = document.getElementById('pastedDplText');
+        var dateInput = document.getElementById('pastedDplEffectiveDate');
+        var text = ta && ta.value ? ta.value : '';
+        var effectiveDate = dateInput && dateInput.value ? dateInput.value : null;
         if (!text.trim()) {
             showToast('Paste some DPL text first', 'error');
             return;
         }
-        const btn = document.getElementById('pastedDplBtn');
-        const sp = document.getElementById('pastedDplSpinner');
+        var btn = document.getElementById('saveBrandDplBtn');
+        var sp = document.getElementById('saveBrandDplSpinner');
         btn.disabled = true; sp.classList.remove('hidden');
-        const statusEl = document.getElementById('parseStatus');
-        if (statusEl) statusEl.textContent = 'Parsing pasted text...';
+        var statusEl = document.getElementById('parseStatus');
+        if (statusEl) statusEl.textContent = 'Saving + matching...';
         try {
-            const resp = await fetch('/api/zoho/items/parse-pasted-dpl', {
+            var resp = await fetch('/api/zoho/items/brand-dpl/' + encodeURIComponent(brand), {
                 method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': 'Bearer ' + getToken()
-                },
-                body: JSON.stringify({ brand: brand, text: text })
+                headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + getToken() },
+                body: JSON.stringify({ text: text, effective_date: effectiveDate, match: true })
             });
             if (!resp.ok) {
-                const err = await resp.json().catch(function(){ return {}; });
+                var err = await resp.json().catch(function() { return {}; });
                 throw new Error(err.message || ('Server error ' + resp.status));
             }
-            const body = await resp.json();
-            if (!body.success) throw new Error(body.message || 'Parse failed');
-            // Plug response into the same state slot used by the AI flow,
-            // then trigger the existing review UI.
-            aiData = body.data;
-            if (statusEl) statusEl.textContent = 'Parsed ' + (body.data.totalExtracted || 0) + ' rows from pasted text.';
+            var body = await resp.json();
+            if (!body.success) throw new Error(body.message || 'Save failed');
+            aiData = body.data.match;
+            if (statusEl) statusEl.textContent = 'Saved + matched ' + (body.data.match.totalExtracted || 0) + ' rows.';
             showAiResults();
+            renderSavedDplCard(body.data.saved);
         } catch (err) {
-            showToast('Parse error: ' + err.message, 'error');
+            showToast('Save error: ' + err.message, 'error');
             if (statusEl) statusEl.textContent = 'Error: ' + err.message;
         } finally {
             btn.disabled = false; sp.classList.add('hidden');
         }
+    }
+
+    async function matchSavedDpl() {
+        var brand = currentBrandDpl || 'birlaopus';
+        var btn = document.getElementById('matchSavedDplBtn');
+        var sp = document.getElementById('matchSavedDplSpinner');
+        btn.disabled = true; sp.classList.remove('hidden');
+        var statusEl = document.getElementById('parseStatus');
+        if (statusEl) statusEl.textContent = 'Matching saved DPL...';
+        try {
+            var resp = await fetch('/api/zoho/items/brand-dpl/' + encodeURIComponent(brand) + '/match', {
+                method: 'POST',
+                headers: { 'Authorization': 'Bearer ' + getToken() }
+            });
+            if (!resp.ok) {
+                var err = await resp.json().catch(function() { return {}; });
+                throw new Error(err.message || ('Server error ' + resp.status));
+            }
+            var body = await resp.json();
+            if (!body.success) throw new Error(body.message || 'Match failed');
+            aiData = body.data;
+            if (statusEl) statusEl.textContent = 'Matched ' + (body.data.totalExtracted || 0) + ' rows from saved DPL.';
+            showAiResults();
+        } catch (err) {
+            showToast('Match error: ' + err.message, 'error');
+            if (statusEl) statusEl.textContent = 'Error: ' + err.message;
+        } finally {
+            btn.disabled = false; sp.classList.add('hidden');
+        }
+    }
+
+    async function startUpdateDpl() {
+        var brand = currentBrandDpl || 'birlaopus';
+        try {
+            var resp = await fetch('/api/zoho/items/brand-dpl/' + encodeURIComponent(brand) + '?include=raw', {
+                headers: { 'Authorization': 'Bearer ' + getToken() }
+            });
+            if (resp.ok) {
+                var body = await resp.json();
+                var ta = document.getElementById('pastedDplText');
+                if (ta && body.data && body.data.raw_text) {
+                    ta.value = body.data.raw_text;
+                    updatePastedDplLineCount();
+                }
+                var dateInput = document.getElementById('pastedDplEffectiveDate');
+                if (dateInput && body.data && body.data.effective_date) {
+                    dateInput.value = body.data.effective_date;
+                }
+            }
+        } catch (e) {
+            // Pre-fill is optional — fall through to empty paste UI.
+        }
+        renderPasteDplUI();
     }
 
     // ============ AI: pack-size helpers (mirror server logic) ============
@@ -2354,6 +2497,7 @@
         if (pastedTa) pastedTa.value = '';
         var pastedCount = document.getElementById('pastedDplLineCount');
         if (pastedCount) pastedCount.textContent = 'Lines detected: 0';
+        if (currentBrandDpl) loadBrandDplState(currentBrandDpl);
         // Reset Step 2 sub-views
         document.getElementById('step2Ai').classList.add('hidden');
         document.getElementById('step2AutoPropose').classList.add('hidden');
@@ -2364,6 +2508,7 @@
 
     // ============ INIT ============
     setStep(1);
+    loadBrandDplState('birlaopus');
 
     // Re-render table/cards when screen rotates or resizes past mobile breakpoint
     var _aiRszTimer;
