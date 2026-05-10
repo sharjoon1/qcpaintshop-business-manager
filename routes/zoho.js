@@ -73,6 +73,25 @@ const PASTE_CAT_TO_CANON = {
     'STAINERS':              'COLORANT',
 };
 
+// Brands supported by the paste-text → save → match flow. Each entry maps the
+// lowercase URL key (`:brand` param) to the human-readable display name used
+// inside matchWithZohoItems / normalizeBrand calls.
+const BRAND_DISPLAY_NAMES = {
+    birlaopus: 'Birla Opus',
+};
+
+/**
+ * Validate :brand param. Returns true if supported; otherwise sends 400 and returns false.
+ * Caller must short-circuit on false.
+ */
+function assertSupportedBrand(brand, res) {
+    if (!BRAND_DISPLAY_NAMES[brand]) {
+        res.status(400).json({ success: false, message: `Brand "${brand}" not yet supported for paste-text mode` });
+        return false;
+    }
+    return true;
+}
+
 // Module-scoped flag to prevent concurrent invoice-line back-fills
 let invoiceBackfillState = { running: false, startedAt: null };
 
@@ -5324,9 +5343,7 @@ ${textSection}`;
 router.get('/items/brand-dpl/:brand', requirePermission('zoho', 'manage'), async (req, res) => {
     try {
         const brand = String(req.params.brand || '').toLowerCase().trim();
-        if (brand !== 'birlaopus') {
-            return res.status(400).json({ success: false, message: `Brand "${brand}" not yet supported` });
-        }
+        if (!assertSupportedBrand(brand, res)) return;
         const includeRaw = req.query.include === 'raw';
         const row = await brandDplService.get(brand, { includeRaw });
         if (!row) {
@@ -5351,9 +5368,7 @@ router.get('/items/brand-dpl/:brand', requirePermission('zoho', 'manage'), async
 router.post('/items/brand-dpl/:brand', requirePermission('zoho', 'manage'), async (req, res) => {
     try {
         const brand = String(req.params.brand || '').toLowerCase().trim();
-        if (brand !== 'birlaopus') {
-            return res.status(400).json({ success: false, message: `Brand "${brand}" not yet supported for paste-text mode` });
-        }
+        if (!assertSupportedBrand(brand, res)) return;
         const body = req.body || {};
         const text = String(body.text || '');
         if (!text.trim()) {
@@ -5363,9 +5378,19 @@ router.post('/items/brand-dpl/:brand', requirePermission('zoho', 'manage'), asyn
             return res.status(413).json({ success: false, message: 'Pasted text is too large. Maximum 1,000,000 characters.' });
         }
 
-        const effectiveDate = body.effective_date && /^\d{4}-\d{2}-\d{2}$/.test(body.effective_date)
-            ? body.effective_date
-            : new Date().toISOString().slice(0, 10);
+        let effectiveDate = new Date().toISOString().slice(0, 10);
+        if (body.effective_date) {
+            const ed = String(body.effective_date);
+            // Shape check + roundtrip equality catches "2026-02-30" (which Date silently rolls to 2026-03-02).
+            if (!/^\d{4}-\d{2}-\d{2}$/.test(ed)) {
+                return res.status(400).json({ success: false, message: 'effective_date must be YYYY-MM-DD' });
+            }
+            const parsed = new Date(ed + 'T00:00:00Z');
+            if (Number.isNaN(parsed.getTime()) || parsed.toISOString().slice(0, 10) !== ed) {
+                return res.status(400).json({ success: false, message: `effective_date "${ed}" is not a real calendar date` });
+            }
+            effectiveDate = ed;
+        }
         const runMatch = body.match !== false;
 
         const parsedRows = priceListParser.parseBirlaOpusTabular(text);
@@ -5395,7 +5420,7 @@ router.post('/items/brand-dpl/:brand', requirePermission('zoho', 'manage'), asyn
 
         let match = null;
         if (runMatch) {
-            match = await runMatchAgainstStoredDpl(brand, parsedRows);
+            match = await runBrandDplMatch(brand, parsedRows);
         }
 
         return res.json({ success: true, data: { saved, ...(match ? { match } : {}) } });
@@ -5414,14 +5439,12 @@ router.post('/items/brand-dpl/:brand', requirePermission('zoho', 'manage'), asyn
 router.post('/items/brand-dpl/:brand/match', requirePermission('zoho', 'manage'), async (req, res) => {
     try {
         const brand = String(req.params.brand || '').toLowerCase().trim();
-        if (brand !== 'birlaopus') {
-            return res.status(400).json({ success: false, message: `Brand "${brand}" not yet supported` });
-        }
+        if (!assertSupportedBrand(brand, res)) return;
         const parsedRows = await brandDplService.getForMatch(brand);
         if (!parsedRows) {
             return res.status(404).json({ success: false, code: 'NO_SAVED_DPL', message: 'No DPL saved for this brand' });
         }
-        const match = await runMatchAgainstStoredDpl(brand, parsedRows);
+        const match = await runBrandDplMatch(brand, parsedRows);
         return res.json({ success: true, data: match });
     } catch (err) {
         console.error('POST brand-dpl match error:', err);
@@ -5433,7 +5456,7 @@ router.post('/items/brand-dpl/:brand/match', requirePermission('zoho', 'manage')
  * Internal helper: run matchWithZohoItems against parsed-rows + return the
  * payload shape consumed by admin-dpl.html's showAiResults().
  */
-async function runMatchAgainstStoredDpl(brand, parsedRows) {
+async function runBrandDplMatch(brand, parsedRows) {
     const unmappedCats = new Set();
     const cleanItems = parsedRows.map(r => {
         const rawCat = String(r.category || '').toUpperCase().trim();
@@ -5491,7 +5514,7 @@ async function runMatchAgainstStoredDpl(brand, parsedRows) {
         });
     }
 
-    const brandNorm = priceListParser.normalizeBrand('Birla Opus');
+    const brandNorm = priceListParser.normalizeBrand(BRAND_DISPLAY_NAMES[brand] || brand);
     const sameBrandZoho = zohoItems.filter(z => {
         let zb = priceListParser.normalizeBrand(z.brand || '');
         if (!zb) {
