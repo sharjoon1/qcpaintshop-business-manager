@@ -206,6 +206,35 @@
                 </div>
             </div>
 
+            <!-- Paste Text Mode — alternate input when PDF parsing is unreliable -->
+            <div class="mt-4 border-t pt-4">
+                <div class="bg-amber-50 border border-amber-200 rounded-lg p-3">
+                    <div class="flex items-start gap-3 mb-3">
+                        <svg class="w-5 h-5 text-amber-600 mt-0.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/></svg>
+                        <div>
+                            <div class="font-bold text-sm text-amber-800">Paste DPL Text (No PDF)</div>
+                            <div class="text-[11px] text-amber-700 mt-0.5">Paste a tab-separated Birla Opus DPL table (same columns as the PDF: SNo, Category, Product, Shade, PackSize, Price). Bypasses PDF + AI extraction — deterministic and instant.</div>
+                        </div>
+                    </div>
+                    <textarea id="pastedDplText" rows="8"
+                              class="w-full text-[11px] font-mono px-3 py-2 border border-amber-300 rounded bg-white focus:border-amber-500 outline-none resize-y"
+                              placeholder="1&#9;Interior Luxury&#9;One Pure Elegance (941001)&#9;White&#9;1L&#9;490&#10;2&#9;Interior Luxury&#9;One Pure Elegance (941001)&#9;White&#9;4L&#9;1,930&#10;..."
+                              oninput="updatePastedDplLineCount()"></textarea>
+                    <div class="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2 mt-3">
+                        <div id="pastedDplLineCount" class="text-[11px] text-amber-700">Lines detected: 0</div>
+                        <div class="flex items-center gap-2">
+                            <select id="pastedDplBrand" class="px-2 py-1.5 border border-amber-300 rounded text-xs bg-white focus:border-amber-500 outline-none">
+                                <option value="birlaopus">Birla Opus</option>
+                            </select>
+                            <button onclick="parsePastedText()" id="pastedDplBtn" class="px-4 py-2 bg-amber-600 hover:bg-amber-700 text-white rounded-lg text-xs font-bold transition flex items-center gap-2 disabled:opacity-50">
+                                <svg id="pastedDplSpinner" class="hidden w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
+                                Parse Pasted Text
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
             <!-- Auto-Propose (No PDF) — Step 0 / alternate path -->
             <div class="mt-4 border-t pt-4">
                 <div class="bg-emerald-50 border border-emerald-200 rounded-lg p-3 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
@@ -705,6 +734,57 @@
         }
         statusEl.textContent = 'AI reading full PDF (this takes 30–90s for large files)...';
         pollTimer = setTimeout(pollStatus, 3000);
+    }
+
+    // ============ PASTE TEXT MODE ============
+    function updatePastedDplLineCount() {
+        const ta = document.getElementById('pastedDplText');
+        const txt = ta && ta.value ? ta.value : '';
+        const nonBlankLines = txt.split('\n').filter(l => l.trim().length > 0).length;
+        const out = document.getElementById('pastedDplLineCount');
+        if (out) out.textContent = 'Lines detected: ' + nonBlankLines;
+    }
+
+    async function parsePastedText() {
+        const ta = document.getElementById('pastedDplText');
+        const brandSel = document.getElementById('pastedDplBrand');
+        const text = ta && ta.value ? ta.value : '';
+        const brand = brandSel && brandSel.value ? brandSel.value : 'birlaopus';
+        if (!text.trim()) {
+            showToast('Paste some DPL text first', 'error');
+            return;
+        }
+        const btn = document.getElementById('pastedDplBtn');
+        const sp = document.getElementById('pastedDplSpinner');
+        btn.disabled = true; sp.classList.remove('hidden');
+        const statusEl = document.getElementById('parseStatus');
+        if (statusEl) statusEl.textContent = 'Parsing pasted text...';
+        try {
+            const resp = await fetch('/api/zoho/items/parse-pasted-dpl', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': 'Bearer ' + getToken()
+                },
+                body: JSON.stringify({ brand: brand, text: text })
+            });
+            if (!resp.ok) {
+                const err = await resp.json().catch(function(){ return {}; });
+                throw new Error(err.message || ('Server error ' + resp.status));
+            }
+            const body = await resp.json();
+            if (!body.success) throw new Error(body.message || 'Parse failed');
+            // Plug response into the same state slot used by the AI flow,
+            // then trigger the existing review UI.
+            aiData = body.data;
+            if (statusEl) statusEl.textContent = 'Parsed ' + (body.data.totalExtracted || 0) + ' rows from pasted text.';
+            showAiResults();
+        } catch (err) {
+            showToast('Parse error: ' + err.message, 'error');
+            if (statusEl) statusEl.textContent = 'Error: ' + err.message;
+        } finally {
+            btn.disabled = false; sp.classList.add('hidden');
+        }
     }
 
     // ============ AI: pack-size helpers (mirror server logic) ============
