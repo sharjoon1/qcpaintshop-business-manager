@@ -5289,6 +5289,180 @@ ${textSection}`;
 });
 
 /**
+ * POST /api/zoho/items/parse-pasted-dpl
+ *
+ * Synchronous Birla Opus DPL ingestion from pasted tab-separated text.
+ * Skips PDF + AI extraction; uses the deterministic tabular parser, then
+ * runs the same matchWithZohoItems pipeline as the PDF flow.
+ *
+ * Body: { brand: 'birlaopus', text: '<pasted-table>' }
+ *
+ * Returns the same `data` shape as /items/ai-parse-job/:id when status==='done'
+ * so the frontend can plug it into the existing aiData / showAiResults flow.
+ */
+router.post('/items/parse-pasted-dpl', requirePermission('zoho', 'manage'), async (req, res) => {
+    try {
+        const brand = String(req.body && req.body.brand || '').toLowerCase().trim();
+        const text  = String(req.body && req.body.text  || '');
+
+        if (brand !== 'birlaopus') {
+            return res.status(501).json({
+                success: false,
+                message: `Paste-text mode is only supported for Birla Opus right now. Use the PDF upload mode for "${brand || 'this brand'}".`
+            });
+        }
+        if (!text.trim()) {
+            return res.status(400).json({ success: false, message: 'No text provided' });
+        }
+
+        // 1. Parse pasted text → flat rows.
+        const rawRows = priceListParser.parseBirlaOpusTabular(text);
+        if (rawRows.length === 0) {
+            return res.json({
+                success: true,
+                data: {
+                    brand: 'birlaopus',
+                    pages: 0,
+                    totalExtracted: 0,
+                    autoMatched: 0,
+                    needsReview: 0,
+                    items: [],
+                    zohoItems: [],
+                    source: { type: 'pasted-text', lines: text.split('\n').length, parsed: 0 },
+                }
+            });
+        }
+
+        // 2. Map paste-mode "Interior Luxury" / "Exterior Economy" / etc. to the
+        //    canonical category names matchWithZohoItems / propose-naming expect.
+        //    Mirrors TIER_TO_CAT in the AI flow but keyed off paste category strings.
+        const PASTE_CAT_TO_CANON = {
+            'INTERIOR LUXURY':       'INTERIOR EMULSION',
+            'INTERIOR PREMIUM':      'INTERIOR EMULSION',
+            'INTERIOR ECONOMY':      'INTERIOR EMULSION',
+            'EXTERIOR LUXURY':       'EXTERIOR EMULSION',
+            'EXTERIOR PREMIUM':      'EXTERIOR EMULSION',
+            'EXTERIOR ECONOMY':      'EXTERIOR EMULSION',
+            'WATERPROOFING':         'WATERPROOFING',
+            'ENAMEL LUXURY':         'ENAMEL',
+            'ENAMEL PREMIUM':        'ENAMEL',
+            'ENAMEL ECONOMY':        'ENAMEL',
+            'WOOD FINISHES LUXURY':  'WOOD FINISH',
+            'WOOD FINISHES PREMIUM': 'WOOD FINISH',
+            'WOOD FINISHES ECONOMY': 'WOOD FINISH',
+            'WOOD FINISHES OTHER':   'WOOD FINISH',
+            'PAINTING TOOLS':        '',
+            'THINNERS':              '',
+            'COLORANTS':             'COLORANT',
+            'STAINERS':              'COLORANT',
+        };
+        const cleanItems = rawRows.map(r => ({
+            product:  r.product,
+            packSize: r.packSize,
+            dpl:      r.dpl,
+            category: PASTE_CAT_TO_CANON[String(r.category || '').toUpperCase().trim()] || r.category || '',
+            brand:    r.brand,
+            baseCode: r.baseCode,
+        }));
+
+        // 3. Fetch active Zoho items.
+        const [zohoItems] = await pool.query(
+            `SELECT zoho_item_id, zoho_item_name AS name, zoho_sku AS sku,
+                    zoho_rate AS rate, zoho_cf_dpl AS cf_dpl,
+                    zoho_brand AS brand, zoho_category_name AS category, zoho_description AS description,
+                    dpl_updated_at
+             FROM zoho_items_map
+             WHERE zoho_status = 'active'
+             ORDER BY zoho_item_name ASC`
+        );
+
+        // 4. Match.
+        const matchResult = priceListParser.matchWithZohoItems(cleanItems, zohoItems);
+
+        // 5. Build itemsOut (same shape as /items/ai-parse-job/:id done payload).
+        const itemsOut = [];
+        for (const m of matchResult.matched) {
+            const out = {
+                product:  m.product,
+                packSize: m.packSize,
+                dpl:      m.dpl,
+                category: m.category,
+            };
+            if (m.zoho_item_id) {
+                out.auto_match = {
+                    zoho_item_id:         m.zoho_item_id,
+                    zoho_item_name:       m.zoho_item_name,
+                    proposed_name:        m.proposed_name        || null,
+                    proposed_sku:         m.proposed_sku         || null,
+                    proposed_description: m.proposed_description || null,
+                    proposed_rate:        m.proposed_rate        || null,
+                    current_sku:          m.current_sku          || null,
+                    current_description:  m.current_description  || null,
+                    current_rate:         m.currentRate          || null,
+                    current_dpl:          m.currentDpl           || null,
+                    warning:              m._warning             || null,
+                };
+            }
+            itemsOut.push(out);
+        }
+        for (const u of matchResult.unmatched) {
+            itemsOut.push({
+                product:  u.product,
+                packSize: u.packSize || '?',
+                dpl:      u.dpl,
+                category: u.category,
+                unmatched_reason: u._reject_reason || null,
+            });
+        }
+
+        // 6. Filter Zoho items to same brand (mirror PDF flow behavior).
+        const pdfBrandNorm = priceListParser.normalizeBrand('Birla Opus');
+        const sameBrandZoho = zohoItems.filter(z => {
+            let zb = priceListParser.normalizeBrand(z.brand || '');
+            if (!zb) {
+                const nm = (z.name || '').toUpperCase();
+                zb = (nm.includes('BIRLA') || nm.includes('OPUS')) ? 'BIRLAOPUS' : '';
+            }
+            if (!zb) return true;
+            return zb === pdfBrandNorm || zb.includes(pdfBrandNorm) || pdfBrandNorm.includes(zb);
+        });
+
+        const zohoItemsOut = sameBrandZoho.map(z => ({
+            zoho_item_id: z.zoho_item_id,
+            name:    z.name,
+            sku:     z.sku,
+            rate:    parseFloat(z.rate    || 0),
+            cf_dpl:  parseFloat(z.cf_dpl  || 0),
+            category:    z.category    || '',
+            description: z.description || '',
+            brand:       z.brand       || '',
+            dpl_updated_at: z.dpl_updated_at ? new Date(z.dpl_updated_at).toISOString() : null
+        }));
+
+        return res.json({
+            success: true,
+            data: {
+                brand:          'birlaopus',
+                pages:          0,
+                totalExtracted: itemsOut.length,
+                autoMatched:    matchResult.matched.length,
+                needsReview:    matchResult.unmatched.length,
+                items:          itemsOut,
+                zohoItems:      zohoItemsOut,
+                source: {
+                    type:   'pasted-text',
+                    lines:  text.split('\n').length,
+                    parsed: rawRows.length,
+                },
+            }
+        });
+    } catch (err) {
+        console.error('parse-pasted-dpl error:', err);
+        return res.status(500).json({ success: false, message: err.message || 'Server error' });
+    }
+});
+
+/**
  * GET /api/zoho/items/propose-naming
  *
  * Auto-Propose Naming — reads existing items from DB (no PDF needed) and
