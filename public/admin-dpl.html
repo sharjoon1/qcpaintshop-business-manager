@@ -1629,9 +1629,12 @@
             // Checkbox
             html += '<td><input type="checkbox" class="ai-row-cb" id="ai-row-cb-' + idx + '" data-idx="' + idx + '" ' + (row._selected ? 'checked' : '') + ' onchange="aiOnRowToggle(' + idx + ')"></td>';
 
-            // PDF product (truncate)
-            html += '<td style="max-width:240px"><div class="truncate" title="' + esc(row.product) + '">' + esc(row.product) + '</div>';
-            if (row.category) html += '<div class="text-[10px] text-gray-400 truncate">' + esc(row.category) + '</div>';
+            // PDF product — full name visible, wraps to next line for long names
+            // (e.g. "Calista Sparkle Gloss Enamel - Group A: Golden Yellow") so the
+            // color/shade suffix isn't lost behind an ellipsis. Hover title kept as
+            // a redundancy aid.
+            html += '<td style="max-width:280px;min-width:200px"><div class="break-words text-[12px] leading-snug" title="' + esc(row.product) + '">' + esc(row.product) + '</div>';
+            if (row.category) html += '<div class="text-[10px] text-gray-400 mt-0.5">' + esc(row.category) + '</div>';
             html += '</td>';
 
             // Pack
