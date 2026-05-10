@@ -5306,13 +5306,19 @@ router.post('/items/parse-pasted-dpl', requirePermission('zoho', 'manage'), asyn
         const text  = String(req.body && req.body.text  || '');
 
         if (brand !== 'birlaopus') {
-            return res.status(501).json({
+            return res.status(400).json({
                 success: false,
                 message: `Paste-text mode is only supported for Birla Opus right now. Use the PDF upload mode for "${brand || 'this brand'}".`
             });
         }
         if (!text.trim()) {
             return res.status(400).json({ success: false, message: 'No text provided' });
+        }
+        if (text.length > 1_000_000) {
+            return res.status(413).json({
+                success: false,
+                message: 'Pasted text is too large. Maximum 1,000,000 characters.'
+            });
         }
 
         // 1. Parse pasted text → flat rows.
@@ -5356,14 +5362,26 @@ router.post('/items/parse-pasted-dpl', requirePermission('zoho', 'manage'), asyn
             'COLORANTS':             'COLORANT',
             'STAINERS':              'COLORANT',
         };
-        const cleanItems = rawRows.map(r => ({
-            product:  r.product,
-            packSize: r.packSize,
-            dpl:      r.dpl,
-            category: PASTE_CAT_TO_CANON[String(r.category || '').toUpperCase().trim()] || r.category || '',
-            brand:    r.brand,
-            baseCode: r.baseCode,
-        }));
+        const unmappedCats = new Set();
+        const cleanItems = rawRows.map(r => {
+            const rawCat = String(r.category || '').toUpperCase().trim();
+            let canonCat = PASTE_CAT_TO_CANON[rawCat];
+            if (canonCat === undefined && rawCat) {
+                unmappedCats.add(rawCat);
+                canonCat = r.category || ''; // fall through to raw value
+            }
+            return {
+                product:  r.product,
+                packSize: r.packSize,
+                dpl:      r.dpl,
+                category: canonCat || '',
+                brand:    r.brand,
+                baseCode: r.baseCode,
+            };
+        });
+        if (unmappedCats.size > 0) {
+            console.warn('[parse-pasted-dpl] Unmapped categories — pass-through to matcher (may mis-match): ' + Array.from(unmappedCats).join(', '));
+        }
 
         // 3. Fetch active Zoho items.
         const [zohoItems] = await pool.query(
@@ -5416,7 +5434,7 @@ router.post('/items/parse-pasted-dpl', requirePermission('zoho', 'manage'), asyn
         }
 
         // 6. Filter Zoho items to same brand (mirror PDF flow behavior).
-        const pdfBrandNorm = priceListParser.normalizeBrand('Birla Opus');
+        const brandNorm = priceListParser.normalizeBrand('Birla Opus');
         const sameBrandZoho = zohoItems.filter(z => {
             let zb = priceListParser.normalizeBrand(z.brand || '');
             if (!zb) {
@@ -5424,7 +5442,7 @@ router.post('/items/parse-pasted-dpl', requirePermission('zoho', 'manage'), asyn
                 zb = (nm.includes('BIRLA') || nm.includes('OPUS')) ? 'BIRLAOPUS' : '';
             }
             if (!zb) return true;
-            return zb === pdfBrandNorm || zb.includes(pdfBrandNorm) || pdfBrandNorm.includes(zb);
+            return zb === brandNorm || zb.includes(brandNorm) || brandNorm.includes(zb);
         });
 
         const zohoItemsOut = sameBrandZoho.map(z => ({
