@@ -35,18 +35,23 @@ function cleanPrice(s) {
     return (num > 0 && !isNaN(num)) ? num : null;
 }
 
-function normalizePackSize(size) {
-    if (!size) return size;
-    let s = String(size).trim().toLowerCase();
-    // Normalize common patterns
-    s = s.replace(/litres?|ltrs?|liter/gi, 'L')
-         .replace(/\bml\b/gi, 'ml')
-         .replace(/\bkg\b/gi, 'Kg')
-         .replace(/\bgm\b/gi, 'gm')
-         .replace(/\bno\b\.?/gi, 'No');
-    // "0.050" → "50ml", "0.100" → "100ml", "0.200" → "200ml", "0.500" → "500ml"
-    s = s.replace(/^0\.0*(\d+)\s*$/i, (_, d) => d + 'ml');
-    return s;
+/**
+ * Normalize a pack-size string to a canonical form.
+ * Examples: "1L"→"1L", "25KG"→"25kg", "200ML"→"200ml", "0.9L"→"0.9L".
+ * Non-numeric pack sizes (e.g. "Per Unit", "Sheet", '9"x11"') pass through unchanged.
+ */
+function normalizePackSize(s) {
+    if (s == null) return '';
+    const trimmed = String(s).trim();
+    if (!trimmed) return '';
+    const m = trimmed.match(/^([\d.]+)\s*(L|ml|kg|gm|g)\s*$/i);
+    if (m) {
+        const val = m[1];
+        const unit = m[2].toLowerCase();
+        if (unit === 'l') return `${val}L`;
+        return `${val}${unit}`;
+    }
+    return trimmed;
 }
 
 // ============ ASIAN PAINTS PARSER ============
@@ -240,6 +245,101 @@ function parseBirlaOpus(text) {
             }
             continue;
         }
+    }
+
+    return results;
+}
+
+/**
+ * Parse Birla Opus DPL data in tab-separated tabular format (paste-text mode).
+ * Expected per-row columns: SNo, Category, Product (with optional "(NNNNNN)" code),
+ * Shade, PackSize, Price. Some rows are 5-column (shade missing) — inherit from
+ * the previous row for the same product.
+ *
+ * Returns flat rows compatible with `matchWithZohoItems`:
+ *   { product, packSize, dpl, category, brand, baseCode }
+ *
+ * Where `product` is "<Product> - <Shade>" (matching the existing parseBirlaOpus
+ * output convention, see line ~235), or just "<Product>" when shade is empty.
+ */
+function parseBirlaOpusTabular(text) {
+    if (!text || typeof text !== 'string') return [];
+
+    const results = [];
+    const lines = text.split('\n');
+    const lastShadeByProduct = new Map(); // productName → most recent shade
+
+    for (const rawLine of lines) {
+        const line = rawLine.replace(/\s+$/, ''); // strip trailing whitespace only
+
+        // Stop at T&C section.
+        if (/^Terms\s+and\s+Conditions/i.test(line.trim())) break;
+
+        const trimmed = line.trim();
+        if (!trimmed) continue;
+
+        // Skip column-header row.
+        if (/^S\.?\s*No\b/i.test(trimmed)) continue;
+
+        // Split on tabs first; if that yields < 5 fields, fall back to 2+ spaces.
+        let cols = trimmed.split('\t').map(c => c.trim()).filter(c => c.length > 0);
+        if (cols.length < 5) {
+            cols = trimmed.split(/\s{2,}/).map(c => c.trim()).filter(c => c.length > 0);
+        }
+        if (cols.length < 5) continue;
+
+        // First column must be a row number to be a data row.
+        if (!/^\d+$/.test(cols[0])) continue;
+
+        const category   = cols[1];
+        const productRaw = cols[2];
+
+        let shade, packSize, priceStr;
+        if (cols.length >= 6) {
+            shade    = cols[3];
+            packSize = cols[4];
+            priceStr = cols[5];
+        } else {
+            // 5-column row — shade missing.
+            shade    = null;
+            packSize = cols[3];
+            priceStr = cols[4];
+        }
+
+        // Extract baseCode from "(NNNNNN)" if present.
+        let productName = productRaw;
+        let baseCode = '';
+        const codeMatch = productRaw.match(/^(.+?)\s*\((\d{6})\)\s*\*?\s*$/);
+        if (codeMatch) {
+            productName = codeMatch[1].trim();
+            baseCode = codeMatch[2];
+        }
+
+        // Resolve shade: inherit for 5-col rows; empty for "No Base/Others".
+        if (shade === null) {
+            shade = lastShadeByProduct.get(productName) || '';
+        } else {
+            shade = String(shade).trim();
+            if (/^No\s+Base\s*\/\s*Others$/i.test(shade)) shade = '';
+            if (shade) lastShadeByProduct.set(productName, shade);
+        }
+
+        const normalizedPack = normalizePackSize(packSize);
+        if (!normalizedPack) continue;
+
+        const dpl = parseFloat(String(priceStr).replace(/,/g, ''));
+        if (!isFinite(dpl) || dpl <= 0) continue;
+
+        const product = shade ? `${productName} - ${shade}` : productName;
+
+        results.push({
+            product,
+            packSize: normalizedPack,
+            dpl,
+            category: category || '',
+            brand: 'Birla Opus',
+            baseCode,
+        });
     }
 
     return results;
@@ -1671,8 +1771,11 @@ module.exports = {
     // Export individual parsers for testing
     parseAsian,
     parseBirlaOpus,
+    parseBirlaOpusTabular,
     parseBerger,
     parseGem,
     parseJSW,
-    parseNippon
+    parseNippon,
+    // Pack-size normalization helper (also used by paste-text mode)
+    normalizePackSize
 };
