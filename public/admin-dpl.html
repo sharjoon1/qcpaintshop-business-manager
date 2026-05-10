@@ -146,7 +146,7 @@
                     <div class="text-xs font-bold text-gray-700">Asian</div>
                     <div class="text-[10px] text-gray-400">192 pages</div>
                 </div>
-                <div class="brand-card rounded-lg p-2 bg-amber-50 border-amber-300 text-center" style="border: 2px solid #f59e0b;" onclick="loadBrandDplState('birlaopus')">
+                <div class="brand-card rounded-lg p-2 bg-amber-50 border-amber-300 text-center" style="border: 2px solid #f59e0b;" onclick="selectBrand('birlaopus')">
                     <div class="text-xs font-bold text-amber-700">Birla Opus</div>
                     <div class="text-[10px] text-amber-500">Full rules ✓</div>
                 </div>
@@ -764,6 +764,21 @@
 
     // ============ BRAND DPL MODE (saved + match) ============
     var currentBrandDpl = null;
+    var DEFAULT_BRAND = 'birlaopus';
+
+    function selectBrand(brand) {
+        // Toggle visual selection state on brand cards.
+        document.querySelectorAll('.brand-card').forEach(function(c) { c.classList.remove('active'); });
+        var allCards = document.querySelectorAll('.brand-card');
+        for (var i = 0; i < allCards.length; i++) {
+            var card = allCards[i];
+            if (card.getAttribute('onclick') && card.getAttribute('onclick').indexOf("'" + brand + "'") !== -1) {
+                card.classList.add('active');
+                break;
+            }
+        }
+        loadBrandDplState(brand);
+    }
 
     function updatePastedDplLineCount() {
         var ta = document.getElementById('pastedDplText');
@@ -792,6 +807,12 @@
             });
             if (resp.status === 404) {
                 renderPasteDplUI();
+                return;
+            }
+            // Permission failures: hide panel silently. The page itself is admin-only
+            // (requireAdminOrRedirect at the top), but this user may lack zoho.manage.
+            if (resp.status === 401 || resp.status === 403) {
+                panel.classList.add('hidden');
                 return;
             }
             if (!resp.ok) {
@@ -839,7 +860,7 @@
     }
 
     async function saveBrandDpl() {
-        var brand = currentBrandDpl || 'birlaopus';
+        var brand = currentBrandDpl || DEFAULT_BRAND;
         var ta = document.getElementById('pastedDplText');
         var dateInput = document.getElementById('pastedDplEffectiveDate');
         var text = ta && ta.value ? ta.value : '';
@@ -878,7 +899,7 @@
     }
 
     async function matchSavedDpl() {
-        var brand = currentBrandDpl || 'birlaopus';
+        var brand = currentBrandDpl || DEFAULT_BRAND;
         var btn = document.getElementById('matchSavedDplBtn');
         var sp = document.getElementById('matchSavedDplSpinner');
         btn.disabled = true; sp.classList.remove('hidden');
@@ -907,7 +928,9 @@
     }
 
     async function startUpdateDpl() {
-        var brand = currentBrandDpl || 'birlaopus';
+        var brand = currentBrandDpl || DEFAULT_BRAND;
+        var btn = document.getElementById('updateDplBtn');
+        if (btn) btn.disabled = true;
         try {
             var resp = await fetch('/api/zoho/items/brand-dpl/' + encodeURIComponent(brand) + '?include=raw', {
                 headers: { 'Authorization': 'Bearer ' + getToken() }
@@ -926,6 +949,8 @@
             }
         } catch (e) {
             // Pre-fill is optional — fall through to empty paste UI.
+        } finally {
+            if (btn) btn.disabled = false;
         }
         renderPasteDplUI();
     }
@@ -2508,7 +2533,7 @@
 
     // ============ INIT ============
     setStep(1);
-    loadBrandDplState('birlaopus');
+    selectBrand(DEFAULT_BRAND);
 
     // Re-render table/cards when screen rotates or resizes past mobile breakpoint
     var _aiRszTimer;
