@@ -70,6 +70,30 @@ describe('parseBirlaOpusTabular — shade inheritance', () => {
         expect(out[0].product).toBe('Calista Ever Stay');
         expect(out[0].dpl).toBe(2092);
     });
+
+    test('5-column row does NOT inherit shade from a different product', () => {
+        const text = [
+            '1\tInterior Luxury\tOne Pure Elegance (941001)\tWhite\t1L\t490',
+            '2\tInterior Luxury\tCalista Ever Stay (942001)\t10L\t2,092',
+        ].join('\n');
+        const out = parseBirlaOpusTabular(text);
+        expect(out).toHaveLength(2);
+        expect(out[0].product).toBe('One Pure Elegance - White');
+        expect(out[1].product).toBe('Calista Ever Stay'); // no shade inherited
+    });
+
+    test('5-column row only inherits from immediately-previous row of same product', () => {
+        const text = [
+            '1\tInterior Luxury\tOne Pure Elegance (941001)\tWhite\t1L\t490',
+            '2\tInterior Luxury\tCalista Ever Stay (942001)\tPastel\t1L\t223',
+            '3\tInterior Luxury\tOne Pure Elegance (941001)\t10L\t4,783',
+        ].join('\n');
+        const out = parseBirlaOpusTabular(text);
+        // Row 3 has previous row product = "Calista Ever Stay", not "One Pure Elegance",
+        // so it must NOT inherit "White" (or anything else).
+        expect(out).toHaveLength(3);
+        expect(out[2].product).toBe('One Pure Elegance');
+    });
 });
 
 describe('parseBirlaOpusTabular — price parsing', () => {
@@ -89,6 +113,28 @@ describe('parseBirlaOpusTabular — price parsing', () => {
         const text = '1\tInterior Luxury\tOne Pure Elegance (941001)\tWhite\t1L\tTBD';
         const out = parseBirlaOpusTabular(text);
         expect(out).toHaveLength(0);
+    });
+
+    test('rejects malformed prices with multiple decimal points', () => {
+        const text = '1\tInterior Luxury\tOne Pure Elegance (941001)\tWhite\t1L\t490.00.00';
+        expect(parseBirlaOpusTabular(text)).toHaveLength(0);
+    });
+
+    test('rejects prices with trailing non-numeric characters', () => {
+        const text = '1\tInterior Luxury\tOne Pure Elegance (941001)\tWhite\t1L\t490abc';
+        expect(parseBirlaOpusTabular(text)).toHaveLength(0);
+    });
+
+    test('rejects negative prices explicitly', () => {
+        const text = '1\tInterior Luxury\tOne Pure Elegance (941001)\tWhite\t1L\t-50';
+        expect(parseBirlaOpusTabular(text)).toHaveLength(0);
+    });
+
+    test('accepts decimal prices like 123.50', () => {
+        const text = '1\tInterior Luxury\tOne Pure Elegance (941001)\tWhite\t1L\t123.50';
+        const out = parseBirlaOpusTabular(text);
+        expect(out).toHaveLength(1);
+        expect(out[0].dpl).toBeCloseTo(123.50);
     });
 });
 

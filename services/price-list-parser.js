@@ -267,7 +267,10 @@ function parseBirlaOpusTabular(text) {
 
     const results = [];
     const lines = text.split('\n');
-    const lastShadeByProduct = new Map(); // productName → most recent shade
+    // Shade inheritance is scoped to the IMMEDIATELY-previous successful row.
+    // A 5-col row only inherits shade when its productName matches lastProduct.
+    let lastProduct = null;
+    let lastShade = '';
 
     for (const rawLine of lines) {
         const line = rawLine.replace(/\s+$/, ''); // strip trailing whitespace only
@@ -315,19 +318,25 @@ function parseBirlaOpusTabular(text) {
             baseCode = codeMatch[2];
         }
 
-        // Resolve shade: inherit for 5-col rows; empty for "No Base/Others".
+        // Resolve shade:
+        //  - 5-col row inherits shade ONLY when the immediately-previous row
+        //    was for the same product (and had a non-empty shade).
+        //  - "No Base/Others" → empty shade.
         if (shade === null) {
-            shade = lastShadeByProduct.get(productName) || '';
+            shade = (productName === lastProduct && lastShade) ? lastShade : '';
         } else {
             shade = String(shade).trim();
             if (/^No\s+Base\s*\/\s*Others$/i.test(shade)) shade = '';
-            if (shade) lastShadeByProduct.set(productName, shade);
         }
 
         const normalizedPack = normalizePackSize(packSize);
         if (!normalizedPack) continue;
 
-        const dpl = parseFloat(String(priceStr).replace(/,/g, ''));
+        // Strict price validation: reject "490.00.00", "490abc", negatives, etc.
+        // parseFloat is too lenient — "1.2.3" → 1.2 and "490abc" → 490 silently.
+        const priceClean = String(priceStr).replace(/,/g, '').trim();
+        if (!/^\d+(\.\d+)?$/.test(priceClean)) continue;
+        const dpl = parseFloat(priceClean);
         if (!isFinite(dpl) || dpl <= 0) continue;
 
         const product = shade ? `${productName} - ${shade}` : productName;
@@ -340,6 +349,11 @@ function parseBirlaOpusTabular(text) {
             brand: 'Birla Opus',
             baseCode,
         });
+
+        // Update inheritance state AFTER a successful row — so a 5-col row
+        // only inherits from the directly-preceding successful row.
+        lastProduct = productName;
+        lastShade = shade;
     }
 
     return results;
