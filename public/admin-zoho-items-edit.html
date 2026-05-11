@@ -1847,6 +1847,7 @@
             if (c) catSet.add(c);
         });
         var brandOpts = '<option value="">— any —</option>' +
+            '<option value="__no_brand__" style="color:#b45309;font-weight:600">⚠ (no brand assigned)</option>' +
             Array.from(brandSet).sort().map(function(b){ return '<option value="'+escapeHtml(b)+'">'+escapeHtml(b)+'</option>'; }).join('');
         var catOpts = '<option value="">— any —</option>' +
             Array.from(catSet).sort().map(function(c){ return '<option value="'+escapeHtml(c)+'">'+escapeHtml(c)+'</option>'; }).join('');
@@ -1931,9 +1932,9 @@
             var bHtml = (window._reBrandsHtml||'').replace(bKey, bKey+' selected');
             var cKey = it.newCategory ? 'value="'+escapeHtml(it.newCategory)+'"' : 'value=""';
             var cHtml = (window._reCatsHtml||'').replace(cKey, cKey+' selected');
-            html += '<td style="padding:6px 8px"><select id="re-brand-sel-'+idx+'" onchange="reItems['+idx+'].newBrand=this.value" class="w-full px-2 py-1 border border-gray-300 rounded text-xs">'+bHtml+'</select></td>';
+            html += '<td style="padding:6px 8px"><select id="re-brand-sel-'+idx+'" onchange="reItems['+idx+'].newBrand=this.value; reAutoSelect('+idx+', this.value)" class="w-full px-2 py-1 border border-gray-300 rounded text-xs">'+bHtml+'</select></td>';
             html += '<td style="padding:6px 8px;color:#6b7280">'+escapeHtml(it.currentCategory||'—')+'</td>';
-            html += '<td style="padding:6px 8px"><select id="re-cat-sel-'+idx+'" onchange="reItems['+idx+'].newCategory=this.value" class="w-full px-2 py-1 border border-gray-300 rounded text-xs">'+cHtml+'</select></td>';
+            html += '<td style="padding:6px 8px"><select id="re-cat-sel-'+idx+'" onchange="reItems['+idx+'].newCategory=this.value; reAutoSelect('+idx+', this.value)" class="w-full px-2 py-1 border border-gray-300 rounded text-xs">'+cHtml+'</select></td>';
             html += '</tr>';
         });
         if (!html) html = '<tr><td colspan="6" style="padding:24px;text-align:center;color:#9ca3af">No items match</td></tr>';
@@ -1945,6 +1946,19 @@
     function reSelectAll(sel) {
         document.querySelectorAll('.re-cb').forEach(function(b) { b.checked = !!sel; });
         updateReSelectedCount();
+    }
+    // When a user changes a per-row New Brand or New Category to a non-empty
+    // value, auto-tick the row's checkbox so the Apply button captures the
+    // intent without a second click. Empty values (the "— don't change —"
+    // option) leave the checkbox state untouched — users keep their existing
+    // selection if they intentionally reset a dropdown.
+    function reAutoSelect(idx, value) {
+        if (!value) return;
+        var cb = document.querySelector('.re-cb[data-idx="' + idx + '"]');
+        if (cb && !cb.checked) {
+            cb.checked = true;
+            updateReSelectedCount();
+        }
     }
     function updateReSelectedCount() {
         var n = document.querySelectorAll('.re-cb:checked').length;
