@@ -4610,7 +4610,11 @@ router.get('/items/reassign/scan', requirePermission('zoho', 'manage'), async (r
             whereParts.push('(zoho_item_name LIKE ? OR zoho_sku LIKE ?)');
             params.push('%' + nameContains + '%', '%' + nameContains + '%');
         }
-        if (currentBrand) {
+        if (currentBrand === '__no_brand__') {
+            // Sentinel: match items whose brand is NULL, empty, or whitespace-only.
+            // Used by the "(no brand assigned)" option in the Fix Brand modal.
+            whereParts.push("(zoho_brand IS NULL OR TRIM(zoho_brand) = '')");
+        } else if (currentBrand) {
             whereParts.push('zoho_brand = ?');
             params.push(currentBrand);
         }
