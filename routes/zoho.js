@@ -4618,7 +4618,11 @@ router.get('/items/reassign/scan', requirePermission('zoho', 'manage'), async (r
             whereParts.push('zoho_brand = ?');
             params.push(currentBrand);
         }
-        if (currentCategory) {
+        if (currentCategory === '__no_category__') {
+            // Sentinel: match items whose category is NULL, empty, or whitespace-only.
+            // Used by the "(no category assigned)" option in the Fix Brand modal.
+            whereParts.push("(zoho_category_name IS NULL OR TRIM(zoho_category_name) = '')");
+        } else if (currentCategory) {
             whereParts.push('zoho_category_name = ?');
             params.push(currentCategory);
         }

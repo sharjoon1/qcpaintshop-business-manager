@@ -1850,6 +1850,7 @@
             '<option value="__no_brand__" style="color:#b45309;font-weight:600">⚠ (no brand assigned)</option>' +
             Array.from(brandSet).sort().map(function(b){ return '<option value="'+escapeHtml(b)+'">'+escapeHtml(b)+'</option>'; }).join('');
         var catOpts = '<option value="">— any —</option>' +
+            '<option value="__no_category__" style="color:#b45309;font-weight:600">⚠ (no category assigned)</option>' +
             Array.from(catSet).sort().map(function(c){ return '<option value="'+escapeHtml(c)+'">'+escapeHtml(c)+'</option>'; }).join('');
         document.getElementById('reCurrentBrand').innerHTML = brandOpts;
         document.getElementById('reCurrentCategory').innerHTML = catOpts;
