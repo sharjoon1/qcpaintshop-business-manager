@@ -134,7 +134,7 @@
       .qc-project-time { order: 5; grid-column: 1 / -1; text-align: left; padding-top: 4px; border-top: 1px solid var(--qc-rule-soft); }
     }
     .qc-empty { padding: 60px 24px; text-align: center; }
-    .qc-empty-mark { font-family: var(--serif); font-style: italic; font-size: 36px; color: var(--qc-green); margin-bottom: 14px; }
+    .qc-empty-mark { font-family: var(--sans); font-weight: 600; font-size: 13px; letter-spacing: 2px; text-transform: uppercase; color: var(--qc-muted); margin-bottom: 14px; }
     .qc-empty p { font-size: 14px; color: var(--qc-muted); margin: 0 0 22px; }
 
     /* ─── Account info grid ─── */
@@ -166,11 +166,11 @@
 
   <header class="qc-head">
     <div class="qc-head-inner">
-      <a href="/" class="qc-head-logo">Quality Colours.<small>Engineer · Portal</small></a>
+      <a href="/" class="qc-head-logo">Quality Colours<small>Project Engineer Portal</small></a>
       <nav class="qc-head-nav" aria-label="Primary">
         <a href="/engineer-dashboard.html" class="is-active">Dashboard</a>
-        <a href="/engineer-dashboard.html#projects">Projects</a>
-        <a href="/engineer-new-quote.html" id="navNewQuote">New Quote</a>
+        <a href="/engineer-dashboard.html#projects">Requisitions</a>
+        <a href="/engineer-new-quote.html" id="navNewQuote">Submit Quotation</a>
         <a href="/engineer-profile.html">Profile</a>
       </nav>
       <div class="qc-head-profile" id="qcProfile">
@@ -180,9 +180,9 @@
           <span class="qc-profile-caret"></span>
         </button>
         <div class="qc-profile-menu" role="menu">
-          <a href="/engineer-profile.html" role="menuitem">Edit profile</a>
-          <a href="/engineer-dashboard.html#projects" role="menuitem">My projects</a>
-          <button type="button" id="qcLogoutBtn" role="menuitem">Sign out</button>
+          <a href="/engineer-profile.html" role="menuitem">Edit Profile</a>
+          <a href="/engineer-dashboard.html#projects" role="menuitem">My Requisitions</a>
+          <button type="button" id="qcLogoutBtn" role="menuitem">Sign Out</button>
         </div>
       </div>
       <button class="qc-mobile-toggle" id="qcMobileToggle" aria-label="Toggle menu">
@@ -191,52 +191,53 @@
     </div>
     <div class="qc-mobile-sheet" id="qcMobileSheet">
       <a href="/engineer-dashboard.html" class="is-active">Dashboard</a>
-      <a href="/engineer-dashboard.html#projects">My projects</a>
+      <a href="/engineer-dashboard.html#projects">My Requisitions</a>
+      <a href="/engineer-new-quote.html">Submit Quotation</a>
       <a href="/engineer-profile.html">Profile</a>
-      <a href="#" id="qcLogoutMobile">Sign out</a>
+      <a href="#" id="qcLogoutMobile">Sign Out</a>
     </div>
   </header>
 
   <main class="qc-page">
-    <!-- WELCOME -->
+    <!-- ACCOUNT OVERVIEW -->
     <section class="qc-welcome">
       <div class="qc-welcome-text">
-        <div class="qc-eyebrow"><span class="dot"></span>Engineer dashboard</div>
-        <h1>Welcome back, <em id="welcomeName">Engineer</em>.</h1>
-        <p class="qc-welcome-sub">A snapshot of your projects, quotes, and account with Quality Colours.</p>
+        <div class="qc-eyebrow"><span class="dot"></span>Project Engineer Portal</div>
+        <h1>Account Overview</h1>
+        <p class="qc-welcome-sub">Logged in as <span id="welcomeName">—</span><span id="welcomeCompany"></span>. Project requisitions, quotation status, and credit account summary below.</p>
       </div>
-      <a href="/engineer-new-quote.html" class="qc-welcome-cta">Request a new quote →</a>
+      <a href="/engineer-new-quote.html" class="qc-welcome-cta">Submit Quotation Request</a>
     </section>
 
-    <!-- KPIs -->
+    <!-- KEY METRICS -->
     <section class="qc-kpis" id="qcKpis">
       <div class="qc-kpi">
-        <div class="qc-kpi-label"><span class="dot" style="background:#D4A24E"></span>Open projects</div>
+        <div class="qc-kpi-label"><span class="dot" style="background:#D4A24E"></span>Active Requisitions</div>
         <div class="qc-kpi-num" id="kpiOpen">—</div>
-        <div class="qc-kpi-foot">Awaiting our response</div>
+        <div class="qc-kpi-foot">Awaiting initial response</div>
       </div>
       <div class="qc-kpi">
-        <div class="qc-kpi-label"><span class="dot" style="background:#1B5E3B"></span>Quotes received</div>
+        <div class="qc-kpi-label"><span class="dot" style="background:#1B5E3B"></span>Quotations Issued</div>
         <div class="qc-kpi-num is-green" id="kpiQuotes">—</div>
-        <div class="qc-kpi-foot">Ready for your decision</div>
+        <div class="qc-kpi-foot">Pending acceptance</div>
       </div>
       <div class="qc-kpi">
-        <div class="qc-kpi-label"><span class="dot" style="background:#446285"></span>Active orders</div>
+        <div class="qc-kpi-label"><span class="dot" style="background:#446285"></span>Approved &amp; In Progress</div>
         <div class="qc-kpi-num" id="kpiAccepted">—</div>
-        <div class="qc-kpi-foot">Accepted &amp; in progress</div>
+        <div class="qc-kpi-foot">Confirmed orders under execution</div>
       </div>
       <div class="qc-kpi">
-        <div class="qc-kpi-label"><span class="dot" style="background:#1A1A1A"></span>Completed</div>
+        <div class="qc-kpi-label"><span class="dot" style="background:#1A1A1A"></span>Completed Projects</div>
         <div class="qc-kpi-num" id="kpiCompleted">—</div>
-        <div class="qc-kpi-foot">Lifetime delivered</div>
+        <div class="qc-kpi-foot">Lifetime, delivered &amp; closed</div>
       </div>
     </section>
 
-    <!-- RECENT PROJECTS -->
+    <!-- RECENT PROJECT REQUISITIONS -->
     <section style="margin-bottom: 56px;">
       <div class="qc-section-head">
-        <h2>Recent <em>projects</em></h2>
-        <a href="/customer-requests.html" class="qc-section-link">View all projects →</a>
+        <h2>Recent Project Requisitions</h2>
+        <a href="/engineer-new-quote.html" class="qc-section-link">View all requisitions</a>
       </div>
       <div class="qc-projects" id="qcProjectsList">
         <div class="qc-project-row qc-skel qc-skel-row"></div>
@@ -245,25 +246,25 @@
       </div>
     </section>
 
-    <!-- ACCOUNT INFO -->
+    <!-- ACCOUNT INFORMATION -->
     <section>
       <div class="qc-section-head">
-        <h2>Your <em>account</em></h2>
-        <a href="/customer-requests.html" class="qc-section-link">Order history →</a>
+        <h2>Account Information</h2>
+        <a href="/engineer-profile.html" class="qc-section-link">Edit profile</a>
       </div>
       <div class="qc-account-grid">
         <div class="qc-account-card">
-          <h3>Contact details</h3>
-          <div class="qc-account-row"><span class="label">Name</span><span class="value" id="acctName">—</span></div>
-          <div class="qc-account-row"><span class="label">Phone</span><span class="value" id="acctPhone">—</span></div>
-          <div class="qc-account-row"><span class="label">Account type</span><span class="value">Engineer · B2B</span></div>
-          <div class="qc-account-row"><span class="label">Member since</span><span class="value" id="acctSince">—</span></div>
+          <h3>Primary Contact</h3>
+          <div class="qc-account-row"><span class="label">Registered name</span><span class="value" id="acctName">—</span></div>
+          <div class="qc-account-row"><span class="label">Mobile number</span><span class="value" id="acctPhone">—</span></div>
+          <div class="qc-account-row"><span class="label">Account class</span><span class="value">Project Engineer (B2B)</span></div>
+          <div class="qc-account-row"><span class="label">Account opened</span><span class="value" id="acctSince">—</span></div>
         </div>
         <div class="qc-account-card">
-          <h3>Credit &amp; loyalty</h3>
-          <div class="qc-account-row"><span class="label">Credit limit</span><span class="value">— <small class="qc-coming-soon">Activate with our team</small></span></div>
-          <div class="qc-account-row"><span class="label">Outstanding balance</span><span class="value">₹ 0</span></div>
-          <div class="qc-account-row"><span class="label">Loyalty status</span><span class="value">— <small class="qc-coming-soon">B2B programme launching soon</small></span></div>
+          <h3>Credit Facility &amp; Loyalty</h3>
+          <div class="qc-account-row"><span class="label">Approved credit limit</span><span class="value">— <small class="qc-coming-soon">Pending administrator activation</small></span></div>
+          <div class="qc-account-row"><span class="label">Outstanding balance</span><span class="value">₹ 0.00</span></div>
+          <div class="qc-account-row"><span class="label">Loyalty tier</span><span class="value">— <small class="qc-coming-soon">To be configured</small></span></div>
           <div class="qc-account-row"><span class="label">Relationship manager</span><span class="value"><a href="tel:+917418831122" style="color:var(--qc-green);border-bottom:1px solid var(--qc-green);padding-bottom:1px;">+91 74188 31122</a></span></div>
         </div>
       </div>
@@ -271,7 +272,7 @@
   </main>
 
   <footer class="qc-foot-bar">
-    <span>© 2026 Quality Colours · Ramanathapuram</span> · <span class="qc-tamil">தரமான வண்ணங்கள், சிறந்த முடிவு.</span>
+    <span>© 2026 Quality Colours, Ramanathapuram. All rights reserved.</span> &nbsp;·&nbsp; <span>Authorised distributor — Asian Paints, Berger, Birla Opus, Nippon, Jotun, JSW.</span>
   </footer>
 
   <script>
@@ -302,18 +303,16 @@
     }
 
     function hydrateProfile() {
-      var name = localStorage.getItem('engineer_name') || 'Engineer';
+      var name = localStorage.getItem('engineer_name') || '—';
       var phone = localStorage.getItem('engineer_phone') || '';
       var company = localStorage.getItem('engineer_company') || '';
       document.getElementById('qcProfileName').textContent = name;
       document.getElementById('qcProfileAvatar').textContent = (name || 'E').charAt(0).toUpperCase();
       document.getElementById('welcomeName').textContent = name;
+      var welcomeCompany = document.getElementById('welcomeCompany');
+      if (welcomeCompany) welcomeCompany.textContent = company ? ' of ' + company : '';
       document.getElementById('acctName').textContent = name;
       document.getElementById('acctPhone').textContent = phone ? ('+91 ' + phone) : '—';
-      if (company) {
-        var subEl = document.querySelector('.qc-welcome-sub');
-        if (subEl) subEl.textContent = company + ' · A snapshot of your projects, quotes, and account.';
-      }
     }
 
     function showStatusBanner(status, reason) {
@@ -321,17 +320,17 @@
       if (!bar) return;
       if (status === 'pending') {
         bar.style.display = 'block';
-        bar.textContent = 'Your engineer account is awaiting admin approval. You can browse and submit quote requests; full account features unlock once approved.';
+        bar.textContent = 'Notice: Account verification is in progress. You may submit quotation requests; credit and loyalty facilities will be released upon administrator approval.';
       } else if (status === 'rejected') {
         bar.style.display = 'block';
         bar.style.background = '#b71c1c';
         bar.style.color = '#fff';
-        bar.textContent = 'Account rejected' + (reason ? ': ' + reason : '') + '. Please contact us.';
+        bar.textContent = 'Account application declined' + (reason ? ' — Reason: ' + reason : '') + '. Please contact the relationship manager.';
       } else if (status === 'suspended') {
         bar.style.display = 'block';
         bar.style.background = '#666';
         bar.style.color = '#fff';
-        bar.textContent = 'Your account is suspended. Please contact us to reinstate.';
+        bar.textContent = 'This account is currently suspended. Contact the relationship manager to reinstate.';
       }
     }
 
@@ -358,23 +357,37 @@
     }
 
     function fmtStatus(s) {
-      var m = { 'new': 'New', 'contacted': 'Reviewing', 'quote_sent': 'Quote sent', 'accepted': 'Accepted', 'rejected': 'Declined', 'completed': 'Completed' };
+      var m = {
+        'new': 'Submitted',
+        'contacted': 'Under Review',
+        'quote_sent': 'Quotation Issued',
+        'accepted': 'Approved',
+        'rejected': 'Declined',
+        'completed': 'Completed'
+      };
       return m[s] || s;
     }
     function fmtType(t) {
-      var m = { 'interior': 'Interior painting', 'exterior': 'Exterior painting', 'both': 'Interior & exterior', 'commercial': 'Commercial project', 'renovation': 'Renovation', 'new_construction': 'New construction' };
+      var m = {
+        'interior': 'Interior Painting',
+        'exterior': 'Exterior Painting',
+        'both': 'Interior & Exterior',
+        'commercial': 'Commercial Project',
+        'renovation': 'Renovation / Repainting',
+        'new_construction': 'New Construction'
+      };
       return m[t] || (t || 'Project');
     }
     function fmtTimeAgo(d) {
       if (!d) return '';
       var diff = Date.now() - new Date(d).getTime();
       var h = Math.floor(diff / 3600000);
-      if (h < 1) return 'Just now';
-      if (h < 24) return h + 'h ago';
+      if (h < 1) return 'Submitted just now';
+      if (h < 24) return 'Submitted ' + h + 'h ago';
       var days = Math.floor(h / 24);
-      if (days === 1) return 'Yesterday';
-      if (days < 7) return days + 'd ago';
-      return new Date(d).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
+      if (days === 1) return 'Submitted yesterday';
+      if (days < 7) return 'Submitted ' + days + 'd ago';
+      return 'Submitted ' + new Date(d).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
     }
     function fmtSince(d) {
       if (!d) return '—';
@@ -415,9 +428,9 @@
         var recent = data.slice(0, 5);
         if (!recent.length) {
           list.innerHTML = '<div class="qc-empty">'
-            + '<div class="qc-empty-mark">— Nothing yet —</div>'
-            + '<p>Submit your first project quote request and it will appear here.</p>'
-            + '<a class="qc-welcome-cta" href="/engineer-new-quote.html">Request your first quote →</a>'
+            + '<div class="qc-empty-mark">No requisitions on record</div>'
+            + '<p>Submit a project quotation request to begin tracking it here.</p>'
+            + '<a class="qc-welcome-cta" href="/engineer-new-quote.html">Submit Quotation Request</a>'
             + '</div>';
           return;
         }
@@ -435,7 +448,7 @@
         }).join('');
       } catch (e) {
         console.error('loadProjects', e);
-        list.innerHTML = '<div class="qc-empty"><p>Couldn\'t load your projects right now. Please refresh.</p></div>';
+        list.innerHTML = '<div class="qc-empty"><p>Unable to load project requisitions. Please refresh the page.</p></div>';
       }
     }
 

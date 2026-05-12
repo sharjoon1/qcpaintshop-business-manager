@@ -67,67 +67,67 @@
 </head>
 <body>
   <header class="qc-head">
-    <a href="/engineer-dashboard.html" class="logo">Quality Colours.<small>Engineer · Profile</small></a>
-    <a class="qc-back" href="/engineer-dashboard.html">← Back to dashboard</a>
+    <a href="/engineer-dashboard.html" class="logo">Quality Colours<small>Project Engineer Portal — Profile</small></a>
+    <a class="qc-back" href="/engineer-dashboard.html">← Back to Dashboard</a>
   </header>
 
   <main>
-    <div class="qc-eyebrow"><span class="dot"></span>Your account</div>
-    <h1>Profile &amp; <em>company details.</em></h1>
-    <p class="lead">Keep these up to date so we can prepare accurate quotes and invoices for your firm.</p>
+    <div class="qc-eyebrow"><span class="dot"></span>Profile Management</div>
+    <h1>Account &amp; Company Particulars</h1>
+    <p class="lead">Maintain accurate registration details to ensure correct invoicing, GST compliance, and timely communication regarding ongoing project quotations.</p>
 
     <form id="qcProfileForm">
       <div class="qc-card">
-        <h2>Account</h2>
+        <h2>Account Status</h2>
         <div class="field-group">
-          <label>Account status</label>
+          <label>Current Account Status</label>
           <div class="qc-static" id="statusLine">Loading...</div>
         </div>
         <div class="row">
           <div class="field-group">
-            <label for="phone">Mobile number</label>
+            <label for="phone">Registered Mobile Number</label>
             <input id="phone" type="tel" class="qc-input" readonly>
-            <small style="font-size:11px; color:var(--qc-muted); letter-spacing:0.5px;">Phone is your login — contact us to change it.</small>
+            <small style="font-size:11px; color:var(--qc-muted); letter-spacing:0.5px;">The registered mobile number is also the sign-in identifier. To amend, please contact the relationship manager.</small>
           </div>
           <div class="field-group">
-            <label for="email">Email</label>
+            <label for="email">Email Address</label>
             <input id="email" type="email" class="qc-input" autocomplete="email">
           </div>
         </div>
       </div>
 
       <div class="qc-card">
-        <h2>Personal</h2>
+        <h2>Personal Particulars</h2>
         <div class="field-group">
-          <label for="full_name">Full name *</label>
+          <label for="full_name">Full Name (as on official identification) *</label>
           <input id="full_name" type="text" class="qc-input" required maxlength="120">
         </div>
         <div class="row">
           <div class="field-group">
             <label for="designation">Designation</label>
-            <input id="designation" type="text" class="qc-input" maxlength="80" placeholder="e.g. Site Engineer">
+            <input id="designation" type="text" class="qc-input" maxlength="80" placeholder="e.g. Site Engineer, Project Manager">
           </div>
           <div class="field-group">
-            <label for="city">City / town</label>
+            <label for="city">City / Town</label>
             <input id="city" type="text" class="qc-input" maxlength="60">
           </div>
         </div>
       </div>
 
       <div class="qc-card">
-        <h2>Company</h2>
+        <h2>Company Particulars</h2>
         <div class="row">
           <div class="field-group">
-            <label for="company_name">Company / firm</label>
+            <label for="company_name">Company / Firm Name</label>
             <input id="company_name" type="text" class="qc-input" maxlength="120">
           </div>
           <div class="field-group">
-            <label for="gst_number">GST number</label>
-            <input id="gst_number" type="text" class="qc-input" maxlength="20" style="text-transform:uppercase">
+            <label for="gst_number">GSTIN</label>
+            <input id="gst_number" type="text" class="qc-input" maxlength="20" style="text-transform:uppercase" placeholder="15-character GSTIN, if applicable">
           </div>
         </div>
         <div class="field-group">
-          <label for="address">Office / site address</label>
+          <label for="address">Registered Office / Site Address</label>
           <input id="address" type="text" class="qc-input" maxlength="240">
         </div>
         <div class="row">
@@ -136,14 +136,14 @@
             <input id="district" type="text" class="qc-input" maxlength="60">
           </div>
           <div class="field-group">
-            <label for="pincode">PIN code</label>
+            <label for="pincode">Postal (PIN) Code</label>
             <input id="pincode" type="text" class="qc-input" inputmode="numeric" maxlength="10">
           </div>
         </div>
       </div>
 
       <div class="qc-actions">
-        <button type="submit" id="saveBtn" class="qc-btn">Save changes</button>
+        <button type="submit" id="saveBtn" class="qc-btn">Save Changes</button>
         <a href="/engineer-dashboard.html" class="qc-cancel">Cancel</a>
       </div>
       <div id="msg"></div>
@@ -171,10 +171,16 @@
 
     function setStatusLine(status, reason) {
       var line = document.getElementById('statusLine');
-      var label = status ? status.charAt(0).toUpperCase() + status.slice(1) : '—';
+      var formal = {
+        'pending': 'Pending Administrator Approval',
+        'approved': 'Approved &amp; Active',
+        'suspended': 'Suspended',
+        'rejected': 'Application Declined'
+      };
+      var label = formal[status] || (status ? (status.charAt(0).toUpperCase() + status.slice(1)) : '—');
       line.innerHTML = '<span>' + label + '</span><span class="badge ' + (status || '') + '">' + (status || '—') + '</span>';
       if (status === 'rejected' && reason) {
-        line.innerHTML += '<div style="font-size:12px;color:#b71c1c;margin-top:8px;">Reason: ' + reason.replace(/[<>&]/g, '') + '</div>';
+        line.innerHTML += '<div style="font-size:12px;color:#b71c1c;margin-top:8px;">Reason on record: ' + reason.replace(/[<>&]/g, '') + '</div>';
       }
     }
 
@@ -206,7 +212,7 @@
     document.getElementById('qcProfileForm').addEventListener('submit', async function (e) {
       e.preventDefault();
       var btn = document.getElementById('saveBtn');
-      btn.disabled = true; btn.textContent = 'Saving...';
+      btn.disabled = true; btn.textContent = 'Saving changes...';
       try {
         var payload = {};
         ['email','full_name','designation','city','company_name','gst_number','address','district','pincode'].forEach(function (k) {
@@ -225,11 +231,11 @@
           if (payload.full_name) localStorage.setItem('engineer_name', payload.full_name);
           if (payload.company_name !== null) localStorage.setItem('engineer_company', payload.company_name || '');
         } catch (_) {}
-        showMsg('Saved. Your profile is up to date.', 'ok');
+        showMsg('Changes saved successfully. Your profile has been updated on record.', 'ok');
       } catch (err) {
-        showMsg(err.message || 'Could not save. Try again.', 'err');
+        showMsg(err.message || 'Save unsuccessful. Please retry.', 'err');
       } finally {
-        btn.disabled = false; btn.textContent = 'Save changes';
+        btn.disabled = false; btn.textContent = 'Save Changes';
       }
     });
 

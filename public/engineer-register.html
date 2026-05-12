@@ -48,24 +48,24 @@
     .qc-back { display: block; text-align: center; margin-top: 18px; font-size: 12px; color: var(--qc-muted); text-decoration: none; }
     .qc-tagline { font-family: var(--tamil); font-style: italic; font-size: 13px; color: var(--qc-gold); text-align: center; margin-top: 12px; }
     .qc-success { text-align: center; padding: 20px 0; }
-    .qc-success-mark { font-family: var(--serif); font-style: italic; font-size: 56px; color: var(--qc-green); line-height: 1; margin-bottom: 8px; }
+    .qc-success-mark { font-family: var(--sans); font-weight: 600; font-size: 13px; letter-spacing: 3px; text-transform: uppercase; color: var(--qc-green); line-height: 1; margin-bottom: 20px; padding: 8px 16px; background: rgba(27,94,59,0.08); display: inline-block; }
   </style>
 </head>
 <body>
   <div class="qc-card">
     <div id="formWrap">
-      <div class="qc-eyebrow"><span class="dot"></span>Engineer registration</div>
-      <h1>Open an <em>engineer account.</em></h1>
-      <p class="lead">For site engineers, contractors, and project managers buying paint in bulk. Once submitted, our team reviews within 24 hours. <span class="qc-tagline" style="display:inline;margin-left:6px;">பொறியாளர் கணக்கு.</span></p>
+      <div class="qc-eyebrow"><span class="dot"></span>Engineer Account Registration</div>
+      <h1>Apply for an Engineer Account</h1>
+      <p class="lead">Open to civil engineers, site supervisors, contractors, and project managers procuring industrial volumes. Applications are reviewed within 24 working hours; on approval, a sign-in OTP will be dispatched to the registered number. Fields marked with an asterisk are mandatory.</p>
 
       <form id="qcEngForm" novalidate>
         <div>
-          <label for="full_name">Full name *</label>
-          <input id="full_name" name="full_name" type="text" class="qc-input" placeholder="As on your ID" required maxlength="120" autocomplete="name">
+          <label for="full_name">Full Name (as on official identification) *</label>
+          <input id="full_name" name="full_name" type="text" class="qc-input" placeholder="Enter your full legal name" required maxlength="120" autocomplete="name">
         </div>
         <div class="row">
           <div>
-            <label for="phone">Mobile number *</label>
+            <label for="phone">Registered Mobile Number *</label>
             <div class="qc-phone-row">
               <span class="cc">+91</span>
               <input id="phone" name="phone" type="tel" inputmode="numeric" class="qc-input" placeholder="10-digit number" maxlength="10" required autocomplete="tel">
@@ -73,54 +73,54 @@
             <div class="field-error" id="err_phone"></div>
           </div>
           <div>
-            <label for="email">Email</label>
-            <input id="email" name="email" type="email" class="qc-input" placeholder="optional" maxlength="120" autocomplete="email">
+            <label for="email">Email Address</label>
+            <input id="email" name="email" type="email" class="qc-input" placeholder="Optional" maxlength="120" autocomplete="email">
           </div>
         </div>
         <div class="row">
           <div>
-            <label for="company_name">Company / firm</label>
-            <input id="company_name" name="company_name" type="text" class="qc-input" placeholder="e.g. KS Constructions" maxlength="120">
+            <label for="company_name">Company / Firm Name</label>
+            <input id="company_name" name="company_name" type="text" class="qc-input" placeholder="e.g. KS Constructions Pvt. Ltd." maxlength="120">
           </div>
           <div>
-            <label for="designation">Role / designation</label>
-            <input id="designation" name="designation" type="text" class="qc-input" placeholder="e.g. Site Engineer" maxlength="80">
+            <label for="designation">Designation</label>
+            <input id="designation" name="designation" type="text" class="qc-input" placeholder="e.g. Site Engineer, Project Manager" maxlength="80">
           </div>
         </div>
         <div class="row">
           <div>
-            <label for="gst_number">GST number</label>
-            <input id="gst_number" name="gst_number" type="text" class="qc-input" placeholder="optional" maxlength="20" style="text-transform:uppercase">
+            <label for="gst_number">GSTIN (Goods &amp; Services Tax Number)</label>
+            <input id="gst_number" name="gst_number" type="text" class="qc-input" placeholder="15-character GSTIN, if applicable" maxlength="20" style="text-transform:uppercase">
           </div>
           <div>
-            <label for="city">City / town</label>
+            <label for="city">City / Town</label>
             <input id="city" name="city" type="text" class="qc-input" placeholder="e.g. Ramanathapuram" maxlength="60">
           </div>
         </div>
         <div>
-          <label for="address">Office / site address</label>
-          <input id="address" name="address" type="text" class="qc-input" placeholder="Street, area" maxlength="240">
+          <label for="address">Office / Site Address</label>
+          <input id="address" name="address" type="text" class="qc-input" placeholder="Street, area, district" maxlength="240">
         </div>
-        <button type="submit" id="submitBtn" class="qc-btn">Submit registration</button>
+        <button type="submit" id="submitBtn" class="qc-btn">Submit Application</button>
         <div id="msg"></div>
       </form>
 
       <div class="qc-foot">
-        <a href="/engineer-login.html">Already registered? Sign in →</a>
+        <a href="/engineer-login.html">Existing account holder? Sign In</a>
       </div>
     </div>
 
     <div id="successWrap" style="display:none">
       <div class="qc-success">
-        <div class="qc-success-mark">— Thank you —</div>
-        <h1>Registration <em>received.</em></h1>
-        <p class="lead">Our team will review your details within 24 hours and call you back on the number you provided. You can sign in any time after approval.</p>
-        <a href="/engineer-login.html" class="qc-btn" style="text-decoration:none;display:inline-flex;">Go to sign in</a>
+        <div class="qc-success-mark">Application Received</div>
+        <h1>Awaiting administrator review</h1>
+        <p class="lead">Your application has been submitted to our administration team for verification. You will receive a confirmation on your registered mobile number once the account is activated, typically within 24 working hours.</p>
+        <a href="/engineer-login.html" class="qc-btn" style="text-decoration:none;display:inline-flex;">Proceed to Sign In</a>
       </div>
     </div>
 
-    <a class="qc-back" href="/">← Back to home</a>
-    <p class="qc-tagline">தரமான வண்ணங்கள், சிறந்த முடிவு.</p>
+    <a class="qc-back" href="/">← Return to Home</a>
+    <p style="text-align:center;font-size:11px;color:var(--qc-muted);margin-top:8px;letter-spacing:0.5px;">Authorised distributor — Asian Paints, Berger, Birla Opus, Nippon, Jotun, JSW.</p>
   </div>
 
   <script>
@@ -148,13 +148,13 @@
 
       var phone = phoneEl.value.trim();
       if (!/^[6-9]\d{9}$/.test(phone)) {
-        errPhoneEl.textContent = 'Enter a valid 10-digit mobile number starting with 6-9.';
+        errPhoneEl.textContent = 'Please enter a valid 10-digit Indian mobile number commencing with 6, 7, 8 or 9.';
         phoneEl.focus();
         return;
       }
       var name = document.getElementById('full_name').value.trim();
       if (!name) {
-        showMsg('Please enter your full name.', 'err');
+        showMsg('Full name is required to proceed.', 'err');
         return;
       }
 
@@ -170,7 +170,7 @@
       };
 
       submitBtn.disabled = true;
-      submitBtn.textContent = 'Submitting...';
+      submitBtn.textContent = 'Submitting application...';
 
       try {
         var r = await fetch('/api/engineers/register', {
@@ -178,13 +178,14 @@
           body: JSON.stringify(payload)
         });
         var data = await r.json();
-        if (!r.ok || !data.success) throw new Error(data.message || 'Registration failed. Please try again.');
+        if (!r.ok || !data.success) throw new Error(data.message || 'Application submission failed. Please try again.');
         document.getElementById('formWrap').style.display = 'none';
         document.getElementById('successWrap').style.display = 'block';
+        window.scrollTo({ top: 0, behavior: 'smooth' });
       } catch (err) {
-        showMsg(err.message || 'Network error. Please try again.', 'err');
+        showMsg(err.message || 'Connection error. Please retry.', 'err');
         submitBtn.disabled = false;
-        submitBtn.textContent = 'Submit registration';
+        submitBtn.textContent = 'Submit Application';
       }
     });
   </script>

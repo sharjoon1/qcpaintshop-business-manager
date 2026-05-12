@@ -77,24 +77,24 @@
 </head>
 <body>
   <div class="qc-card">
-    <div class="qc-eyebrow"><span class="dot"></span>Engineer Portal</div>
-    <h1>Sign in to your <em>engineer account.</em></h1>
-    <p class="lead">Enter your registered phone number. We'll send a one-time password to verify it's you.<br><span class="ta">பொறியாளர் கணக்கில் உள்நுழைக.</span></p>
+    <div class="qc-eyebrow"><span class="dot"></span>Project Engineer Portal</div>
+    <h1>Secure Sign-In</h1>
+    <p class="lead">Authenticate with the registered mobile number. A six-digit one-time password (OTP) will be dispatched via SMS and WhatsApp for verification.</p>
 
     <!-- Phone step -->
     <div id="phoneStep">
-      <label for="phone">Mobile number</label>
+      <label for="phone">Registered Mobile Number</label>
       <div class="qc-phone-row">
         <span class="cc">+91</span>
         <input type="tel" id="phone" inputmode="numeric" autocomplete="tel" class="qc-input" placeholder="10-digit number" maxlength="10">
       </div>
-      <button id="sendBtn" class="qc-btn" type="button">Send OTP</button>
+      <button id="sendBtn" class="qc-btn" type="button">Request OTP</button>
       <div id="phoneErr" class="qc-err"></div>
     </div>
 
     <!-- OTP step -->
     <div id="otpStep" style="display:none">
-      <label>One-time password</label>
+      <label>One-Time Password (OTP)</label>
       <div class="qc-otp-row">
         <input type="tel" inputmode="numeric" class="qc-otp-input" maxlength="1" data-otp="0">
         <input type="tel" inputmode="numeric" class="qc-otp-input" maxlength="1" data-otp="1">
@@ -104,17 +104,17 @@
         <input type="tel" inputmode="numeric" class="qc-otp-input" maxlength="1" data-otp="5">
       </div>
       <p class="lead" id="otpHint" style="margin: 14px 0 0; font-size: 12px;"></p>
-      <button id="verifyBtn" class="qc-btn" type="button">Verify &amp; sign in</button>
+      <button id="verifyBtn" class="qc-btn" type="button">Verify &amp; Sign In</button>
       <div id="otpErr" class="qc-err"></div>
       <div class="qc-foot-row">
-        <a href="#" id="changeNumber">Change number</a>
+        <a href="#" id="changeNumber">Change Number</a>
         <a href="#" id="resendOtp">Resend OTP</a>
       </div>
     </div>
 
-    <p style="font-size:13px;color:var(--qc-muted);text-align:center;margin:24px 0 0;">New here? <a href="/engineer-register.html" style="color:var(--qc-green);font-weight:500;border-bottom:1px solid var(--qc-green);padding-bottom:1px;">Register as an engineer →</a></p>
-    <a class="qc-back" href="/">← Back to home</a>
-    <p class="qc-tagline" style="text-align:center">தரமான வண்ணங்கள், சிறந்த முடிவு.</p>
+    <p style="font-size:13px;color:var(--qc-muted);text-align:center;margin:24px 0 0;">Not yet registered? <a href="/engineer-register.html" style="color:var(--qc-green);font-weight:500;border-bottom:1px solid var(--qc-green);padding-bottom:1px;">Apply for an Engineer Account</a></p>
+    <a class="qc-back" href="/">← Return to Home</a>
+    <p style="text-align:center;font-size:11px;color:var(--qc-muted);margin-top:6px;letter-spacing:0.5px;">Authorised distributor — Asian Paints, Berger, Birla Opus, Nippon, Jotun, JSW.</p>
   </div>
 
   <script>
@@ -144,11 +144,11 @@
       clearErr(phoneErr);
       var phone = phoneEl.value.trim();
       if (!/^[6-9]\d{9}$/.test(phone)) {
-        showErr(phoneErr, 'Please enter a valid 10-digit mobile number.');
+        showErr(phoneErr, 'Please enter a valid 10-digit Indian mobile number.');
         return;
       }
       sendBtn.disabled = true;
-      sendBtn.textContent = 'Sending OTP...';
+      sendBtn.textContent = 'Dispatching OTP...';
       try {
         var r = await fetch(API_BASE + '/send-otp', {
           method: 'POST', headers: { 'Content-Type': 'application/json' },
@@ -156,21 +156,21 @@
         });
         var data = await r.json();
         if (r.status === 404 && data.code === 'NOT_REGISTERED') {
-          showErr(phoneErr, 'No engineer account for this number. Register first to receive an OTP.');
+          showErr(phoneErr, 'No engineer account is associated with this number. Please apply for an Engineer Account first.');
           return;
         }
-        if (!r.ok || !data.success) throw new Error(data.message || 'Could not send OTP. Try again.');
+        if (!r.ok || !data.success) throw new Error(data.message || 'OTP dispatch failed. Please try again.');
         currentPhone = phone;
         phoneStep.style.display = 'none';
         otpStep.style.display = 'block';
-        var statusHint = data.status === 'approved' ? '' : ' (account status: ' + data.status + ')';
-        otpHint.textContent = 'We sent a 6-digit code to +91 ' + phone + '.' + statusHint;
+        var statusHint = data.status === 'approved' ? '' : ' (Account status: ' + data.status + '.)';
+        otpHint.textContent = 'A 6-digit OTP has been dispatched to +91 ' + phone + '.' + statusHint + ' OTP is valid for 10 minutes.';
         setTimeout(function () { otpInputs[0].focus(); }, 50);
       } catch (e) {
-        showErr(phoneErr, e.message || 'Network error. Please try again.');
+        showErr(phoneErr, e.message || 'Connection error. Please retry.');
       } finally {
         sendBtn.disabled = false;
-        sendBtn.textContent = 'Send OTP';
+        sendBtn.textContent = 'Request OTP';
       }
     }
 
@@ -200,11 +200,11 @@
       clearErr(otpErr);
       var otp = Array.prototype.map.call(otpInputs, function (i) { return i.value; }).join('');
       if (otp.length !== 6) {
-        showErr(otpErr, 'Please enter the full 6-digit code.');
+        showErr(otpErr, 'Please enter the complete 6-digit OTP.');
         return;
       }
       verifyBtn.disabled = true;
-      verifyBtn.textContent = 'Verifying...';
+      verifyBtn.textContent = 'Authenticating...';
       try {
         var r = await fetch(API_BASE + '/verify-otp', {
           method: 'POST', headers: { 'Content-Type': 'application/json' },
@@ -225,18 +225,18 @@
         if (eng.status === 'pending') {
           window.location.href = '/engineer-dashboard.html?welcome=1';
         } else if (eng.status === 'rejected' || eng.status === 'suspended') {
-          showErr(otpErr, 'Your account is ' + eng.status + '. Please contact us.');
+          showErr(otpErr, 'This account is currently ' + eng.status + '. Please contact the relationship manager.');
           verifyBtn.disabled = false;
-          verifyBtn.textContent = 'Verify & sign in';
+          verifyBtn.textContent = 'Verify & Sign In';
           return;
         } else {
           window.location.href = '/engineer-dashboard.html';
         }
       } catch (e) {
-        showErr(otpErr, e.message || 'Could not verify. Try again.');
+        showErr(otpErr, e.message || 'Authentication failed. Please try again.');
       } finally {
         verifyBtn.disabled = false;
-        verifyBtn.textContent = 'Verify & sign in';
+        verifyBtn.textContent = 'Verify & Sign In';
       }
     }
 
