@@ -3,492 +3,289 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta name="theme-color" content="#1B5E3B">
-  <meta name="description" content="Engineer dashboard — Quality Colours">
-  <title>Engineer Dashboard · Quality Colours</title>
+  <meta name="theme-color" content="#1A2535">
+  <meta name="description" content="Engineer dashboard — Quality Colours Project Engineer Portal">
+  <title>Dashboard · Project Engineer Portal · Quality Colours</title>
   <link rel="icon" type="image/png" sizes="192x192" href="/icons/icon-192x192.png">
-  <link rel="apple-touch-icon" href="/icons/icon-192x192.png">
-  <script>
-    // Auth gate
-    (function () {
-      var hasToken = localStorage.getItem('engineer_token');
-      var loggedIn = localStorage.getItem('engineer_logged_in') === 'true';
-      if (!hasToken || !loggedIn) {
-        window.location.href = '/engineer-login.html';
-      }
-    })();
-  </script>
-
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,500;0,600;1,400;1,500&family=Inter:wght@300;400;500;600&family=Noto+Serif+Tamil:wght@400;500&display=swap" rel="stylesheet">
-
-  <style>
-    :root {
-      --qc-cream: #FBFAF7;
-      --qc-green: #1B5E3B;
-      --qc-green-dark: #154D31;
-      --qc-gold: #D4A24E;
-      --qc-ink: #1A1A1A;
-      --qc-muted: #666666;
-      --qc-rule: #E5E5E5;
-      --qc-rule-soft: rgba(26,26,26,0.08);
-      --serif: 'Playfair Display', Georgia, serif;
-      --sans: 'Inter', system-ui, -apple-system, sans-serif;
-      --tamil: 'Noto Serif Tamil', serif;
-      --pad-x: clamp(20px, 4vw, 48px);
-    }
-    *, *::before, *::after { box-sizing: border-box; }
-    html { -webkit-font-smoothing: antialiased; }
-    body { margin: 0; font-family: var(--sans); color: var(--qc-ink); background: var(--qc-cream); font-size: 15px; line-height: 1.55; min-height: 100vh; }
-    a { color: inherit; text-decoration: none; }
-
-    /* ─── Header ─── */
-    .qc-head { background: #fff; border-bottom: 1px solid var(--qc-rule-soft); position: sticky; top: 0; z-index: 30; }
-    .qc-head-inner { display: flex; align-items: center; justify-content: space-between; padding: 16px var(--pad-x); max-width: 1240px; margin: 0 auto; gap: 24px; }
-    .qc-head-logo { font-family: var(--serif); font-weight: 500; font-size: 22px; letter-spacing: -0.3px; color: var(--qc-ink); line-height: 1; }
-    .qc-head-logo small { font-family: var(--sans); display: block; font-size: 9px; letter-spacing: 2px; color: var(--qc-green); font-weight: 600; margin-top: 4px; text-transform: uppercase; }
-    .qc-head-nav { display: flex; gap: 28px; }
-    .qc-head-nav a { font-size: 13px; font-weight: 500; color: var(--qc-muted); transition: color 0.2s; padding: 6px 0; position: relative; }
-    .qc-head-nav a:hover { color: var(--qc-ink); }
-    .qc-head-nav a.is-active { color: var(--qc-ink); }
-    .qc-head-nav a.is-active::after { content: ''; position: absolute; left: 0; right: 0; bottom: -16px; height: 2px; background: var(--qc-green); }
-    .qc-head-profile { position: relative; }
-    .qc-profile-btn { display: inline-flex; align-items: center; gap: 12px; padding: 6px 10px 6px 6px; background: var(--qc-cream); border: 1px solid var(--qc-rule-soft); cursor: pointer; transition: background 0.2s; }
-    .qc-profile-btn:hover { background: #fff; }
-    .qc-profile-avatar { width: 32px; height: 32px; border-radius: 50%; background: var(--qc-green); color: #fff; display: flex; align-items: center; justify-content: center; font-family: var(--serif); font-weight: 500; font-size: 14px; }
-    .qc-profile-name { font-size: 13px; font-weight: 500; color: var(--qc-ink); }
-    .qc-profile-caret { width: 7px; height: 7px; border-right: 1.5px solid var(--qc-muted); border-bottom: 1.5px solid var(--qc-muted); transform: rotate(45deg); margin-bottom: 3px; }
-    .qc-profile-menu { position: absolute; right: 0; top: calc(100% + 8px); min-width: 200px; background: #fff; border: 1px solid var(--qc-rule-soft); box-shadow: 0 14px 36px rgba(0,0,0,0.10); opacity: 0; pointer-events: none; transform: translateY(-6px); transition: opacity 0.18s, transform 0.18s; }
-    .qc-head-profile.is-open .qc-profile-menu { opacity: 1; pointer-events: auto; transform: translateY(0); }
-    .qc-profile-menu a, .qc-profile-menu button { display: block; width: 100%; text-align: left; padding: 12px 18px; font-size: 13px; color: var(--qc-ink); background: transparent; border: 0; font-family: var(--sans); cursor: pointer; transition: background 0.15s, color 0.15s; }
-    .qc-profile-menu a:hover, .qc-profile-menu button:hover { background: var(--qc-cream); color: var(--qc-green); }
-    .qc-mobile-toggle { display: none; background: transparent; border: 0; color: var(--qc-ink); padding: 8px; cursor: pointer; }
-    @media (max-width: 720px) {
-      .qc-head-nav { display: none; }
-      .qc-mobile-toggle { display: inline-flex; }
-      .qc-profile-name { display: none; }
-    }
-    .qc-mobile-sheet { display: none; padding: 12px var(--pad-x) 18px; background: #fff; border-bottom: 1px solid var(--qc-rule-soft); }
-    .qc-mobile-sheet.is-open { display: block; }
-    .qc-mobile-sheet a { display: block; padding: 12px 0; font-size: 14px; font-weight: 500; color: var(--qc-ink); border-bottom: 1px solid var(--qc-rule-soft); }
-    .qc-mobile-sheet a:last-child { border-bottom: 0; }
-    .qc-mobile-sheet a.is-active { color: var(--qc-green); }
-
-    /* ─── Page wrap ─── */
-    .qc-page { max-width: 1240px; margin: 0 auto; padding: 56px var(--pad-x) 96px; }
-
-    /* ─── Welcome banner ─── */
-    .qc-welcome { display: flex; justify-content: space-between; align-items: end; gap: 24px; margin-bottom: 48px; flex-wrap: wrap; }
-    .qc-welcome-text .qc-eyebrow { font-size: 11px; font-weight: 600; letter-spacing: 2.5px; text-transform: uppercase; color: var(--qc-green); display: inline-flex; align-items: center; gap: 10px; margin-bottom: 12px; }
-    .qc-welcome-text .qc-eyebrow .dot { width: 6px; height: 6px; background: var(--qc-gold); border-radius: 50%; }
-    .qc-welcome h1 { font-family: var(--serif); font-weight: 500; font-size: clamp(32px, 4.5vw, 48px); line-height: 1.05; letter-spacing: -1.2px; margin: 0 0 10px; color: var(--qc-ink); }
-    .qc-welcome h1 em { font-style: italic; color: var(--qc-green); }
-    .qc-welcome-sub { font-size: 14px; color: var(--qc-muted); margin: 0; }
-    .qc-welcome-cta { display: inline-flex; align-items: center; gap: 10px; padding: 14px 22px; background: var(--qc-green); color: #fff; font-size: 13px; font-weight: 600; letter-spacing: 0.4px; transition: background 0.2s, transform 0.2s; cursor: pointer; }
-    .qc-welcome-cta:hover { background: var(--qc-green-dark); transform: translateY(-1px); }
-
-    /* ─── KPI cards ─── */
-    .qc-kpis { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-bottom: 56px; }
-    @media (max-width: 920px) { .qc-kpis { grid-template-columns: repeat(2, 1fr); } }
-    @media (max-width: 480px) { .qc-kpis { grid-template-columns: 1fr; } }
-    .qc-kpi { background: #fff; border: 1px solid var(--qc-rule-soft); padding: 24px 24px 20px; transition: border-color 0.2s, box-shadow 0.2s; }
-    .qc-kpi:hover { border-color: rgba(27,94,59,0.18); box-shadow: 0 12px 28px rgba(0,0,0,0.04); }
-    .qc-kpi-label { font-size: 11px; font-weight: 600; letter-spacing: 1.8px; text-transform: uppercase; color: var(--qc-muted); margin-bottom: 14px; display: flex; align-items: center; gap: 8px; }
-    .qc-kpi-label .dot { width: 6px; height: 6px; border-radius: 50%; }
-    .qc-kpi-num { font-family: var(--serif); font-style: italic; font-weight: 500; font-size: 44px; line-height: 1; letter-spacing: -1.5px; color: var(--qc-ink); }
-    .qc-kpi-num.is-green { color: var(--qc-green); }
-    .qc-kpi-foot { font-size: 12px; color: var(--qc-muted); margin-top: 10px; }
-
-    /* ─── Section heads ─── */
-    .qc-section-head { display: flex; justify-content: space-between; align-items: end; margin-bottom: 24px; flex-wrap: wrap; gap: 12px; }
-    .qc-section-head h2 { font-family: var(--serif); font-weight: 500; font-size: clamp(24px, 3vw, 32px); line-height: 1.1; letter-spacing: -0.8px; margin: 0; color: var(--qc-ink); }
-    .qc-section-head h2 em { font-style: italic; color: var(--qc-green); }
-    .qc-section-link { font-size: 12px; font-weight: 500; color: var(--qc-green); border-bottom: 1px solid var(--qc-green); padding-bottom: 2px; }
-
-    /* ─── Recent projects table ─── */
-    .qc-projects { background: #fff; border: 1px solid var(--qc-rule-soft); margin-bottom: 56px; }
-    .qc-project-row { display: grid; grid-template-columns: 1.4fr 1.2fr 100px 110px 90px; gap: 16px; align-items: center; padding: 18px 24px; border-bottom: 1px solid var(--qc-rule-soft); cursor: pointer; transition: background 0.15s; }
-    .qc-project-row:last-child { border-bottom: 0; }
-    .qc-project-row:hover { background: var(--qc-cream); }
-    .qc-project-num { font-family: var(--serif); font-weight: 500; font-size: 15px; color: var(--qc-ink); }
-    .qc-project-meta { font-size: 12px; color: var(--qc-muted); margin-top: 2px; letter-spacing: 0.3px; text-transform: uppercase; }
-    .qc-project-type { font-size: 13px; color: var(--qc-ink); }
-    .qc-project-area { font-family: var(--serif); font-size: 16px; font-weight: 500; color: var(--qc-ink); }
-    .qc-project-area small { font-family: var(--sans); font-size: 11px; color: var(--qc-muted); display: block; letter-spacing: 1px; text-transform: uppercase; margin-top: 2px; }
-    .qc-status { display: inline-block; padding: 5px 11px; font-size: 10.5px; letter-spacing: 1.5px; font-weight: 600; text-transform: uppercase; }
-    .qc-status-new        { background: rgba(212,162,78,0.14); color: #8a6914; }
-    .qc-status-contacted  { background: rgba(70,98,133,0.12); color: #2c4660; }
-    .qc-status-quote_sent { background: rgba(27,94,59,0.12); color: var(--qc-green); }
-    .qc-status-accepted   { background: rgba(27,94,59,0.18); color: var(--qc-green-dark); }
-    .qc-status-rejected   { background: rgba(196,69,54,0.12); color: #8a2a1f; }
-    .qc-status-completed  { background: var(--qc-ink); color: var(--qc-cream); }
-    .qc-project-time { font-size: 11px; letter-spacing: 1px; text-transform: uppercase; color: var(--qc-muted); text-align: right; }
-    @media (max-width: 720px) {
-      .qc-project-row { grid-template-columns: 1fr auto; gap: 8px 16px; padding: 16px 20px; }
-      .qc-project-row > * { grid-column: auto; }
-      .qc-project-type { grid-column: 1 / -1; order: 3; }
-      .qc-project-area { grid-column: 1 / -1; order: 4; font-size: 14px; }
-      .qc-project-area small { display: inline; margin-top: 0; margin-left: 4px; }
-      .qc-status { order: 2; justify-self: end; }
-      .qc-project-time { order: 5; grid-column: 1 / -1; text-align: left; padding-top: 4px; border-top: 1px solid var(--qc-rule-soft); }
-    }
-    .qc-empty { padding: 60px 24px; text-align: center; }
-    .qc-empty-mark { font-family: var(--sans); font-weight: 600; font-size: 13px; letter-spacing: 2px; text-transform: uppercase; color: var(--qc-muted); margin-bottom: 14px; }
-    .qc-empty p { font-size: 14px; color: var(--qc-muted); margin: 0 0 22px; }
-
-    /* ─── Account info grid ─── */
-    .qc-account-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
-    @media (max-width: 720px) { .qc-account-grid { grid-template-columns: 1fr; } }
-    .qc-account-card { background: #fff; border: 1px solid var(--qc-rule-soft); padding: 28px 28px 24px; }
-    .qc-account-card h3 { font-family: var(--serif); font-weight: 500; font-size: 22px; margin: 0 0 18px; color: var(--qc-ink); }
-    .qc-account-row { display: flex; justify-content: space-between; align-items: baseline; padding: 12px 0; border-bottom: 1px solid var(--qc-rule-soft); font-size: 13px; }
-    .qc-account-row:last-child { border-bottom: 0; }
-    .qc-account-row .label { color: var(--qc-muted); font-weight: 500; }
-    .qc-account-row .value { color: var(--qc-ink); font-weight: 500; text-align: right; }
-    .qc-coming-soon { font-family: var(--serif); font-style: italic; font-size: 13px; color: var(--qc-gold); margin-top: 6px; display: block; }
-
-    /* ─── Loading / errors ─── */
-    .qc-skel { background: linear-gradient(90deg, #f0ede5 25%, #f6f4ee 50%, #f0ede5 75%); background-size: 200% 100%; animation: qcShim 1.4s infinite; }
-    @keyframes qcShim { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }
-    .qc-skel-row { height: 60px; }
-
-    /* ─── Footer ─── */
-    .qc-foot-bar { padding: 24px var(--pad-x); border-top: 1px solid var(--qc-rule-soft); font-size: 12px; color: var(--qc-muted); text-align: center; }
-    .qc-foot-bar .qc-tamil { font-family: var(--tamil); font-style: italic; color: var(--qc-gold); }
-  </style>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/css/engineer-portal.css">
 </head>
-<body>
+<body data-page="dashboard">
+  <div class="ep-shell" id="epShell">
+    <div id="epRailMount"></div>
 
-  <!-- HEADER -->
-  <!-- PENDING APPROVAL BANNER (shown only when status != approved) -->
-  <div id="qcStatusBanner" style="display:none; background: var(--qc-gold); color: var(--qc-ink); padding: 12px var(--pad-x); text-align: center; font-size: 13px; font-weight: 500;"></div>
-
-  <header class="qc-head">
-    <div class="qc-head-inner">
-      <a href="/" class="qc-head-logo">Quality Colours<small>Project Engineer Portal</small></a>
-      <nav class="qc-head-nav" aria-label="Primary">
-        <a href="/engineer-dashboard.html" class="is-active">Dashboard</a>
-        <a href="/engineer-catalog.html">Catalogue</a>
-        <a href="/engineer-dashboard.html#projects">Requisitions</a>
-        <a href="/engineer-new-quote.html" id="navNewQuote">Submit Quotation</a>
-        <a href="/engineer-profile.html">Profile</a>
-      </nav>
-      <div class="qc-head-profile" id="qcProfile">
-        <button class="qc-profile-btn" id="qcProfileBtn" aria-haspopup="true" aria-expanded="false">
-          <span class="qc-profile-avatar" id="qcProfileAvatar">E</span>
-          <span class="qc-profile-name" id="qcProfileName">Engineer</span>
-          <span class="qc-profile-caret"></span>
-        </button>
-        <div class="qc-profile-menu" role="menu">
-          <a href="/engineer-profile.html" role="menuitem">Edit Profile</a>
-          <a href="/engineer-dashboard.html#projects" role="menuitem">My Requisitions</a>
-          <button type="button" id="qcLogoutBtn" role="menuitem">Sign Out</button>
-        </div>
-      </div>
-      <button class="qc-mobile-toggle" id="qcMobileToggle" aria-label="Toggle menu">
-        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 6h16M4 12h16M4 18h16"/></svg>
+    <main class="ep-main">
+      <!-- Mobile rail toggle -->
+      <button class="ep-rail-mobile-btn" id="epRailMobileBtn" type="button" aria-label="Open menu" style="margin-bottom:12px;">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
       </button>
-    </div>
-    <div class="qc-mobile-sheet" id="qcMobileSheet">
-      <a href="/engineer-dashboard.html" class="is-active">Dashboard</a>
-      <a href="/engineer-catalog.html">Catalogue</a>
-      <a href="/engineer-dashboard.html#projects">My Requisitions</a>
-      <a href="/engineer-new-quote.html">Submit Quotation</a>
-      <a href="/engineer-profile.html">Profile</a>
-      <a href="#" id="qcLogoutMobile">Sign Out</a>
-    </div>
-  </header>
 
-  <main class="qc-page">
-    <!-- ACCOUNT OVERVIEW -->
-    <section class="qc-welcome">
-      <div class="qc-welcome-text">
-        <div class="qc-eyebrow"><span class="dot"></span>Project Engineer Portal</div>
-        <h1>Account Overview</h1>
-        <p class="qc-welcome-sub">Logged in as <span id="welcomeName">—</span><span id="welcomeCompany"></span>. Project requisitions, quotation status, and credit account summary below.</p>
+      <!-- Breadcrumb -->
+      <div class="ep-crumb">
+        <a href="/engineer-dashboard.html">Home</a>
+        <span class="sep">/</span>
+        <b>Dashboard</b>
       </div>
-      <a href="/engineer-new-quote.html" class="qc-welcome-cta">Submit Quotation Request</a>
-    </section>
 
-    <!-- KEY METRICS -->
-    <section class="qc-kpis" id="qcKpis">
-      <div class="qc-kpi">
-        <div class="qc-kpi-label"><span class="dot" style="background:#D4A24E"></span>Active Requisitions</div>
-        <div class="qc-kpi-num" id="kpiOpen">—</div>
-        <div class="qc-kpi-foot">Awaiting initial response</div>
-      </div>
-      <div class="qc-kpi">
-        <div class="qc-kpi-label"><span class="dot" style="background:#1B5E3B"></span>Quotations Issued</div>
-        <div class="qc-kpi-num is-green" id="kpiQuotes">—</div>
-        <div class="qc-kpi-foot">Pending acceptance</div>
-      </div>
-      <div class="qc-kpi">
-        <div class="qc-kpi-label"><span class="dot" style="background:#446285"></span>Approved &amp; In Progress</div>
-        <div class="qc-kpi-num" id="kpiAccepted">—</div>
-        <div class="qc-kpi-foot">Confirmed orders under execution</div>
-      </div>
-      <div class="qc-kpi">
-        <div class="qc-kpi-label"><span class="dot" style="background:#1A1A1A"></span>Completed Projects</div>
-        <div class="qc-kpi-num" id="kpiCompleted">—</div>
-        <div class="qc-kpi-foot">Lifetime, delivered &amp; closed</div>
-      </div>
-    </section>
+      <!-- Status banner (only for pending/rejected/suspended) -->
+      <div id="epStatusBanner" style="display:none;"></div>
 
-    <!-- RECENT PROJECT REQUISITIONS -->
-    <section style="margin-bottom: 56px;">
-      <div class="qc-section-head">
-        <h2>Recent Project Requisitions</h2>
-        <a href="/engineer-new-quote.html" class="qc-section-link">View all requisitions</a>
-      </div>
-      <div class="qc-projects" id="qcProjectsList">
-        <div class="qc-project-row qc-skel qc-skel-row"></div>
-        <div class="qc-project-row qc-skel qc-skel-row"></div>
-        <div class="qc-project-row qc-skel qc-skel-row"></div>
-      </div>
-    </section>
-
-    <!-- ACCOUNT INFORMATION -->
-    <section>
-      <div class="qc-section-head">
-        <h2>Account Information</h2>
-        <a href="/engineer-profile.html" class="qc-section-link">Edit profile</a>
-      </div>
-      <div class="qc-account-grid">
-        <div class="qc-account-card">
-          <h3>Primary Contact</h3>
-          <div class="qc-account-row"><span class="label">Registered name</span><span class="value" id="acctName">—</span></div>
-          <div class="qc-account-row"><span class="label">Mobile number</span><span class="value" id="acctPhone">—</span></div>
-          <div class="qc-account-row"><span class="label">Account class</span><span class="value">Project Engineer (B2B)</span></div>
-          <div class="qc-account-row"><span class="label">Account opened</span><span class="value" id="acctSince">—</span></div>
+      <!-- Page head -->
+      <header class="ep-pagehead">
+        <div>
+          <h1 class="ep-pagehead-title">Engineer Account Dashboard</h1>
+          <div class="ep-pagehead-sub">
+            Logged in: <b id="ephName">—</b>
+            <span class="sep" id="ephSep1" style="display:none;">·</span>
+            <b id="ephCompany" style="display:none;"></b>
+            <span class="sep">·</span>
+            <span>Account <b id="ephAcctId">#—</b></span>
+            <span class="sep">·</span>
+            <span class="ep-badge" id="ephStatus">—</span>
+          </div>
         </div>
-        <div class="qc-account-card">
-          <h3>Credit Facility &amp; Loyalty</h3>
-          <div class="qc-account-row"><span class="label">Approved credit limit</span><span class="value">— <small class="qc-coming-soon">Pending administrator activation</small></span></div>
-          <div class="qc-account-row"><span class="label">Outstanding balance</span><span class="value">₹ 0.00</span></div>
-          <div class="qc-account-row"><span class="label">Loyalty tier</span><span class="value">— <small class="qc-coming-soon">To be configured</small></span></div>
-          <div class="qc-account-row"><span class="label">Relationship manager</span><span class="value"><a href="tel:+917418831122" style="color:var(--qc-green);border-bottom:1px solid var(--qc-green);padding-bottom:1px;">+91 74188 31122</a></span></div>
+        <div class="ep-pagehead-actions">
+          <a href="/engineer-catalog.html" class="ep-btn outline">View Catalogue</a>
+          <a href="/engineer-new-quote.html" class="ep-btn primary">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+            New Quotation Request
+          </a>
         </div>
-      </div>
-    </section>
-  </main>
+      </header>
 
-  <footer class="qc-foot-bar">
-    <span>© 2026 Quality Colours, Ramanathapuram. All rights reserved.</span> &nbsp;·&nbsp; <span>Authorised distributor — Asian Paints, Berger, Birla Opus, Nippon, Jotun, JSW.</span>
-  </footer>
+      <!-- KPI tiles -->
+      <section class="ep-tiles">
+        <div class="ep-tile" style="--ac: var(--ep-amber);">
+          <div class="ep-tile-label">Active Requisitions</div>
+          <div class="ep-tile-num" id="kpiOpen">—</div>
+          <div class="ep-tile-delta flat">Awaiting initial response</div>
+        </div>
+        <div class="ep-tile" style="--ac: var(--ep-active);">
+          <div class="ep-tile-label">Quotations Issued</div>
+          <div class="ep-tile-num" id="kpiQuotes">—</div>
+          <div class="ep-tile-delta flat">Pending acceptance</div>
+        </div>
+        <div class="ep-tile" style="--ac: var(--ep-green-2);">
+          <div class="ep-tile-label">Approved &amp; In Progress</div>
+          <div class="ep-tile-num" id="kpiAccepted">—</div>
+          <div class="ep-tile-delta flat">Under execution</div>
+        </div>
+        <div class="ep-tile" style="--ac: var(--ep-muted);">
+          <div class="ep-tile-label">Completed (Lifetime)</div>
+          <div class="ep-tile-num" id="kpiCompleted">—</div>
+          <div class="ep-tile-delta flat">Delivered &amp; closed</div>
+        </div>
+      </section>
 
+      <!-- Two-column: recent table + account snapshot -->
+      <section class="ep-grid-2" id="requisitions">
+        <div class="ep-panel">
+          <div class="ep-panel-head">
+            <div class="ep-panel-title">Recent Project Requisitions</div>
+            <div class="ep-panel-tools">
+              <span class="ep-pill active" data-filter="">All</span>
+              <span class="ep-pill" data-filter="active">Active</span>
+              <span class="ep-pill" data-filter="closed">Closed</span>
+              <a href="/engineer-new-quote.html" class="ep-btn-link">+ New</a>
+            </div>
+          </div>
+          <div class="ep-panel-body no-pad">
+            <table class="ep-table" id="projTable">
+              <thead>
+                <tr>
+                  <th>Reference</th>
+                  <th>Project</th>
+                  <th class="num">Area</th>
+                  <th>Status</th>
+                  <th class="num">Submitted</th>
+                </tr>
+              </thead>
+              <tbody id="projBody">
+                <tr><td colspan="5" style="padding:0;"><div class="ep-skel ep-skel-row"></div></td></tr>
+                <tr><td colspan="5" style="padding:0;"><div class="ep-skel ep-skel-row"></div></td></tr>
+                <tr><td colspan="5" style="padding:0;"><div class="ep-skel ep-skel-row"></div></td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <aside class="ep-panel">
+          <div class="ep-panel-head">
+            <div class="ep-panel-title">Account Snapshot</div>
+            <a href="/engineer-profile.html" class="ep-btn-link">Edit →</a>
+          </div>
+          <div class="ep-panel-body no-pad">
+            <div class="ep-aside-item">
+              <div class="ep-aside-label">Approved Credit Limit</div>
+              <div class="ep-aside-value muted" id="acctCredit">Pending administrator activation</div>
+            </div>
+            <div class="ep-aside-item">
+              <div class="ep-aside-label">Outstanding Balance</div>
+              <div class="ep-aside-value">₹ 0.00</div>
+            </div>
+            <div class="ep-aside-item">
+              <div class="ep-aside-label">Loyalty Tier</div>
+              <div class="ep-aside-value muted">To be configured</div>
+            </div>
+            <div class="ep-aside-item">
+              <div class="ep-aside-label">Account Opened</div>
+              <div class="ep-aside-value" id="acctSince">—</div>
+            </div>
+            <div class="ep-aside-item">
+              <div class="ep-aside-label">Relationship Manager</div>
+              <div class="ep-aside-value">
+                <a href="tel:+917418831122">+91 74188 31122</a>
+              </div>
+            </div>
+          </div>
+        </aside>
+      </section>
+
+      <!-- Tertiary: Quick links -->
+      <section class="ep-panel">
+        <div class="ep-panel-head">
+          <div class="ep-panel-title">Quick Actions</div>
+        </div>
+        <div class="ep-panel-body">
+          <div class="ep-flex-row">
+            <a href="/engineer-catalog.html" class="ep-btn outline">Browse Product Catalogue</a>
+            <a href="/engineer-new-quote.html" class="ep-btn outline">Submit New Quotation Request</a>
+            <a href="/engineer-profile.html" class="ep-btn outline">Update Profile &amp; GST</a>
+            <a href="tel:+917418831122" class="ep-btn outline">Call Relationship Manager</a>
+          </div>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <script src="/js/engineer-portal.js"></script>
   <script>
-    var API_BASE = '/api/engineers';
-    var ENG_KEYS = ['engineer_token','engineer_logged_in','engineer_id','engineer_phone','engineer_name','engineer_company','engineer_status'];
+    (function () {
+      var allProjects = [];
+      var currentFilter = '';
 
-    function authHeaders(extra) {
-      var t = localStorage.getItem('engineer_token') || '';
-      var h = { 'X-Engineer-Token': t };
-      if (extra) Object.keys(extra).forEach(function (k) { h[k] = extra[k]; });
-      return h;
-    }
-    function handleAuthFail(r) {
-      if (r && (r.status === 401 || r.status === 403)) {
-        ENG_KEYS.forEach(function (k) { localStorage.removeItem(k); });
-        window.location.href = '/engineer-login.html';
-        return true;
-      }
-      return false;
-    }
+      function hydrateHead(e) {
+        var name = e ? e.full_name : (localStorage.getItem('engineer_name') || '—');
+        var company = e ? e.company_name : (localStorage.getItem('engineer_company') || '');
+        var id = e ? e.id : (localStorage.getItem('engineer_id') || '');
+        var status = e ? e.status : (localStorage.getItem('engineer_status') || 'pending');
+        var reason = e ? e.rejected_reason : null;
 
-    async function logout() {
-      try {
-        await fetch(API_BASE + '/logout', { method: 'POST', headers: authHeaders() });
-      } catch (_) {}
-      ENG_KEYS.forEach(function (k) { localStorage.removeItem(k); });
-      window.location.href = '/engineer-login.html';
-    }
+        document.getElementById('ephName').textContent = name;
+        if (company) {
+          document.getElementById('ephSep1').style.display = '';
+          var c = document.getElementById('ephCompany');
+          c.style.display = '';
+          c.textContent = company;
+        }
+        document.getElementById('ephAcctId').textContent = id ? ('#ENG-' + String(id).padStart(4, '0')) : '#—';
+        var st = document.getElementById('ephStatus');
+        st.className = 'ep-badge s-' + status;
+        st.textContent = EP.statusLabel(status);
 
-    function hydrateProfile() {
-      var name = localStorage.getItem('engineer_name') || '—';
-      var phone = localStorage.getItem('engineer_phone') || '';
-      var company = localStorage.getItem('engineer_company') || '';
-      document.getElementById('qcProfileName').textContent = name;
-      document.getElementById('qcProfileAvatar').textContent = (name || 'E').charAt(0).toUpperCase();
-      document.getElementById('welcomeName').textContent = name;
-      var welcomeCompany = document.getElementById('welcomeCompany');
-      if (welcomeCompany) welcomeCompany.textContent = company ? ' of ' + company : '';
-      document.getElementById('acctName').textContent = name;
-      document.getElementById('acctPhone').textContent = phone ? ('+91 ' + phone) : '—';
-    }
-
-    function showStatusBanner(status, reason) {
-      var bar = document.getElementById('qcStatusBanner');
-      if (!bar) return;
-      if (status === 'pending') {
-        bar.style.display = 'block';
-        bar.textContent = 'Notice: Account verification is in progress. You may submit quotation requests; credit and loyalty facilities will be released upon administrator approval.';
-      } else if (status === 'rejected') {
-        bar.style.display = 'block';
-        bar.style.background = '#b71c1c';
-        bar.style.color = '#fff';
-        bar.textContent = 'Account application declined' + (reason ? ' — Reason: ' + reason : '') + '. Please contact the relationship manager.';
-      } else if (status === 'suspended') {
-        bar.style.display = 'block';
-        bar.style.background = '#666';
-        bar.style.color = '#fff';
-        bar.textContent = 'This account is currently suspended. Contact the relationship manager to reinstate.';
-      }
-    }
-
-    async function loadMe() {
-      try {
-        // /me/status accepts pending/suspended too — safe for any status
-        var r = await fetch(API_BASE + '/me/status', { headers: authHeaders() });
-        if (r.status === 401) { handleAuthFail(r); return null; }
-        var json = await r.json();
-        if (!json.success) return null;
-        var e = json.engineer;
-        try {
-          localStorage.setItem('engineer_name', e.full_name || 'Engineer');
-          localStorage.setItem('engineer_phone', e.phone || '');
-          localStorage.setItem('engineer_company', e.company_name || '');
-          localStorage.setItem('engineer_status', e.status || 'pending');
-        } catch (_) {}
-        hydrateProfile();
-        showStatusBanner(e.status, e.rejected_reason);
-        // Refresh account section with fresh server data
-        if (e.created_at) document.getElementById('acctSince').textContent = fmtSince(e.created_at);
-        return e;
-      } catch (err) { console.error('loadMe', err); return null; }
-    }
-
-    function fmtStatus(s) {
-      var m = {
-        'new': 'Submitted',
-        'contacted': 'Under Review',
-        'quote_sent': 'Quotation Issued',
-        'accepted': 'Approved',
-        'rejected': 'Declined',
-        'completed': 'Completed'
-      };
-      return m[s] || s;
-    }
-    function fmtType(t) {
-      var m = {
-        'interior': 'Interior Painting',
-        'exterior': 'Exterior Painting',
-        'both': 'Interior & Exterior',
-        'commercial': 'Commercial Project',
-        'renovation': 'Renovation / Repainting',
-        'new_construction': 'New Construction'
-      };
-      return m[t] || (t || 'Project');
-    }
-    function fmtTimeAgo(d) {
-      if (!d) return '';
-      var diff = Date.now() - new Date(d).getTime();
-      var h = Math.floor(diff / 3600000);
-      if (h < 1) return 'Submitted just now';
-      if (h < 24) return 'Submitted ' + h + 'h ago';
-      var days = Math.floor(h / 24);
-      if (days === 1) return 'Submitted yesterday';
-      if (days < 7) return 'Submitted ' + days + 'd ago';
-      return 'Submitted ' + new Date(d).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
-    }
-    function fmtSince(d) {
-      if (!d) return '—';
-      return new Date(d).toLocaleDateString('en-IN', { month: 'short', year: 'numeric' });
-    }
-
-    async function loadProjects() {
-      var list = document.getElementById('qcProjectsList');
-      try {
-        var r = await fetch(API_BASE + '/me/projects?limit=100', { headers: authHeaders() });
-        if (handleAuthFail(r)) return;
-        var json = await r.json();
-        if (!json.success) throw new Error(json.message || 'Failed to load projects');
-        var data = json.data || [];
-
-        // KPIs
-        var open = data.filter(function (x) { return x.status === 'new' || x.status === 'contacted'; }).length;
-        var quoted = data.filter(function (x) { return x.status === 'quote_sent'; }).length;
-        var accepted = data.filter(function (x) { return x.status === 'accepted'; }).length;
-        var completed = data.filter(function (x) { return x.status === 'completed'; }).length;
-        document.getElementById('kpiOpen').textContent = open;
-        document.getElementById('kpiQuotes').textContent = quoted;
-        document.getElementById('kpiAccepted').textContent = accepted;
-        document.getElementById('kpiCompleted').textContent = completed;
-
-        // Member since: earliest created_at
-        if (data.length) {
-          var oldest = data.reduce(function (acc, x) {
-            var t = new Date(x.created_at).getTime();
-            return (!acc || t < acc) ? t : acc;
-          }, 0);
-          document.getElementById('acctSince').textContent = fmtSince(oldest);
-        } else {
-          document.getElementById('acctSince').textContent = 'New account';
+        if (e && e.created_at) document.getElementById('acctSince').textContent = EP.fmtDate(e.created_at);
+        if (e && e.credit_enabled && parseFloat(e.credit_limit) > 0) {
+          document.getElementById('acctCredit').classList.remove('muted');
+          document.getElementById('acctCredit').textContent = EP.fmtINR(e.credit_limit);
         }
 
-        // Recent 5
-        var recent = data.slice(0, 5);
-        if (!recent.length) {
-          list.innerHTML = '<div class="qc-empty">'
-            + '<div class="qc-empty-mark">No requisitions on record</div>'
-            + '<p>Submit a project quotation request to begin tracking it here.</p>'
-            + '<a class="qc-welcome-cta" href="/engineer-new-quote.html">Submit Quotation Request</a>'
-            + '</div>';
+        // Status banner
+        var bar = document.getElementById('epStatusBanner');
+        if (status === 'pending') {
+          bar.style.display = '';
+          bar.className = 'ep-notice warn';
+          bar.innerHTML = '<strong>Notice:</strong> Account verification is in progress. Quotation requests can be submitted; credit and loyalty facilities will be released upon administrator approval.';
+        } else if (status === 'rejected') {
+          bar.style.display = '';
+          bar.className = 'ep-notice err';
+          bar.innerHTML = '<strong>Account application declined.</strong> ' + (reason ? 'Reason on record: ' + EP.escapeHTML(reason) + '. ' : '') + 'Please contact the relationship manager.';
+        } else if (status === 'suspended') {
+          bar.style.display = '';
+          bar.className = 'ep-notice err';
+          bar.innerHTML = '<strong>Account suspended.</strong> Contact the relationship manager to reinstate.';
+        }
+      }
+
+      function renderProjects() {
+        var rows = allProjects;
+        if (currentFilter === 'active') {
+          rows = rows.filter(function (p) { return !['completed','rejected'].includes(p.status); });
+        } else if (currentFilter === 'closed') {
+          rows = rows.filter(function (p) { return ['completed','rejected'].includes(p.status); });
+        }
+        var tbody = document.getElementById('projBody');
+        if (!rows.length) {
+          tbody.innerHTML = '<tr><td colspan="5"><div class="ep-empty"><div class="ep-empty-mark">No Records</div><h3>No requisitions on record</h3><p>Submit a project quotation request to begin tracking.</p><a href="/engineer-new-quote.html" class="ep-btn primary">Submit Quotation Request</a></div></td></tr>';
+          // Update badge
+          var b = document.getElementById('epBadgeRequisitions');
+          if (b) b.style.display = 'none';
           return;
         }
-        list.innerHTML = recent.map(function (p) {
+        tbody.innerHTML = rows.slice(0, 6).map(function (p) {
           var status = p.status || 'new';
-          var safeNum = String(p.request_number || p.id || '').replace(/[<>&"']/g, '');
-          return '<div class="qc-project-row" onclick="window.location=\'/customer-requests.html?request=' + encodeURIComponent(safeNum) + '\'">'
-            + '<div><div class="qc-project-num">' + safeNum + '</div>'
-            +   '<div class="qc-project-meta">' + (p.location || p.city || 'Ramanathapuram') + '</div></div>'
-            + '<div class="qc-project-type">' + fmtType(p.project_type) + '</div>'
-            + '<div class="qc-project-area">' + (p.area_sqft || '—') + (p.area_sqft ? '<small>sq ft</small>' : '') + '</div>'
-            + '<div><span class="qc-status qc-status-' + status + '">' + fmtStatus(status) + '</span></div>'
-            + '<div class="qc-project-time">' + fmtTimeAgo(p.created_at) + '</div>'
-            + '</div>';
+          var ref = EP.escapeHTML(p.request_number || ('#' + p.id));
+          var proj = EP.escapeHTML(EP.projectTypeLabel(p.project_type));
+          var loc = EP.escapeHTML(p.location || p.city || 'Site location');
+          var area = p.area_sqft ? Number(p.area_sqft).toLocaleString('en-IN') + ' <small>sq ft</small>' : '—';
+          return '<tr class="clickable" onclick="window.location=\'/engineer-dashboard.html#' + ref + '\'">'
+            + '<td class="mono"><b>' + ref + '</b></td>'
+            + '<td><b>' + proj + '</b><br><small>' + loc + '</small></td>'
+            + '<td class="num">' + area + '</td>'
+            + '<td><span class="ep-badge s-' + status + '"><span class="dot"></span>' + EP.statusLabel(status) + '</span></td>'
+            + '<td class="num"><small>' + EP.fmtTimeAgo(p.created_at) + '</small></td>'
+            + '</tr>';
         }).join('');
-      } catch (e) {
-        console.error('loadProjects', e);
-        list.innerHTML = '<div class="qc-empty"><p>Unable to load project requisitions. Please refresh the page.</p></div>';
       }
-    }
 
-    // === Wire up ===
-    document.addEventListener('DOMContentLoaded', function () {
-      hydrateProfile();
-      loadMe();
-      loadProjects();
+      async function loadProjects() {
+        try {
+          var r = await fetch(EP.API_BASE + '/me/projects?limit=100', { headers: EP.authHeaders() });
+          if (EP.handleAuthFail(r)) return;
+          var json = await r.json();
+          if (!json.success) throw new Error(json.message || 'Failed');
+          allProjects = json.data || [];
+          var open = allProjects.filter(function (x) { return x.status === 'new' || x.status === 'contacted'; }).length;
+          var quoted = allProjects.filter(function (x) { return x.status === 'quote_sent'; }).length;
+          var accepted = allProjects.filter(function (x) { return x.status === 'accepted'; }).length;
+          var completed = allProjects.filter(function (x) { return x.status === 'completed'; }).length;
+          document.getElementById('kpiOpen').textContent = open;
+          document.getElementById('kpiQuotes').textContent = quoted;
+          document.getElementById('kpiAccepted').textContent = accepted;
+          document.getElementById('kpiCompleted').textContent = completed;
 
-      // Profile menu toggle
-      var profile = document.getElementById('qcProfile');
-      var profileBtn = document.getElementById('qcProfileBtn');
-      profileBtn.addEventListener('click', function (e) {
-        e.stopPropagation();
-        var open = profile.classList.toggle('is-open');
-        profileBtn.setAttribute('aria-expanded', open ? 'true' : 'false');
-      });
-      document.addEventListener('click', function (e) {
-        if (!profile.contains(e.target)) {
-          profile.classList.remove('is-open');
-          profileBtn.setAttribute('aria-expanded', 'false');
+          // Sidebar badge
+          var activeCount = open + quoted + accepted;
+          var b = document.getElementById('epBadgeRequisitions');
+          if (b) {
+            if (activeCount > 0) { b.style.display = ''; b.textContent = activeCount; }
+            else b.style.display = 'none';
+          }
+          renderProjects();
+        } catch (err) {
+          console.error('[ep-dash] loadProjects', err);
+          document.getElementById('projBody').innerHTML = '<tr><td colspan="5"><div class="ep-empty"><p>Unable to load requisitions. Please refresh.</p></div></td></tr>';
         }
-      });
-      document.addEventListener('keydown', function (e) {
-        if (e.key === 'Escape') profile.classList.remove('is-open');
-      });
+      }
 
-      // Mobile menu toggle
-      var mt = document.getElementById('qcMobileToggle');
-      var ms = document.getElementById('qcMobileSheet');
-      mt.addEventListener('click', function () { ms.classList.toggle('is-open'); });
+      document.addEventListener('DOMContentLoaded', async function () {
+        // Filter pills
+        document.querySelectorAll('.ep-pill[data-filter]').forEach(function (p) {
+          p.addEventListener('click', function () {
+            document.querySelectorAll('.ep-pill[data-filter]').forEach(function (q) { q.classList.remove('active'); });
+            p.classList.add('active');
+            currentFilter = p.getAttribute('data-filter');
+            renderProjects();
+          });
+        });
 
-      // Logout handlers
-      document.getElementById('qcLogoutBtn').addEventListener('click', logout);
-      document.getElementById('qcLogoutMobile').addEventListener('click', function (e) {
-        e.preventDefault(); logout();
+        hydrateHead(null);
+        var me = await EP.loadMe();
+        if (me) hydrateHead(me);
+        loadProjects();
       });
-    });
+    })();
   </script>
 </body>
 </html>

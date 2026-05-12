@@ -3,325 +3,244 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta name="theme-color" content="#1B5E3B">
-  <title>Request a Quote · Engineer · Quality Colours</title>
+  <meta name="theme-color" content="#1A2535">
+  <title>New Quotation Request · Project Engineer Portal · Quality Colours</title>
   <link rel="icon" type="image/png" sizes="192x192" href="/icons/icon-192x192.png">
-  <script>
-    (function () {
-      if (!localStorage.getItem('engineer_token') || localStorage.getItem('engineer_logged_in') !== 'true') {
-        window.location.href = '/engineer-login.html';
-      }
-    })();
-  </script>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,500;1,400;1,500&family=Inter:wght@300;400;500;600&family=Noto+Serif+Tamil:wght@400;500&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/css/engineer-portal.css">
   <style>
-    :root {
-      --qc-cream:#FBFAF7; --qc-green:#1B5E3B; --qc-green-dark:#154D31; --qc-gold:#D4A24E;
-      --qc-ink:#1A1A1A; --qc-muted:#666; --qc-rule-soft: rgba(26,26,26,0.08);
-      --serif:'Playfair Display',Georgia,serif;
-      --sans:'Inter',system-ui,sans-serif;
-      --tamil:'Noto Serif Tamil',serif;
-      --pad-x: clamp(20px, 4vw, 48px);
-    }
-    *, *::before, *::after { box-sizing: border-box; }
-    body { margin:0; font-family:var(--sans); color:var(--qc-ink); background:var(--qc-cream); min-height:100vh; -webkit-font-smoothing:antialiased; line-height:1.55; }
-    .qc-head { background:#fff; border-bottom:1px solid var(--qc-rule-soft); padding: 18px var(--pad-x); display:flex; justify-content:space-between; align-items:center; }
-    .qc-head .logo { font-family:var(--serif); font-weight:500; font-size:22px; letter-spacing:-0.3px; text-decoration:none; color:var(--qc-ink); }
-    .qc-head .logo small { font-family:var(--sans); display:block; font-size:9px; letter-spacing:2.2px; color:var(--qc-green); font-weight:600; margin-top:4px; text-transform:uppercase; }
-    .qc-back { font-size:13px; color:var(--qc-muted); font-weight:500; text-decoration:none; }
-    .qc-back:hover { color:var(--qc-ink); }
-    main { max-width: 760px; margin:0 auto; padding: 48px var(--pad-x) 80px; }
-    .qc-eyebrow { font-size:11px; font-weight:600; letter-spacing:2.5px; text-transform:uppercase; color:var(--qc-green); display:inline-flex; gap:10px; align-items:center; margin-bottom:14px; }
-    .qc-eyebrow .dot { width:6px; height:6px; background:var(--qc-gold); border-radius:50%; }
-    h1 { font-family:var(--serif); font-weight:500; font-size:clamp(34px, 4.5vw, 48px); line-height:1.05; letter-spacing:-1.2px; margin:0 0 10px; }
-    h1 em { font-style:italic; color:var(--qc-green); }
-    .lead { font-size:14px; color:var(--qc-muted); margin:0 0 36px; max-width: 520px; }
-    .lead .ta { font-family:var(--tamil); font-style:italic; color:var(--qc-gold); }
-    .qc-card { background:#fff; border:1px solid var(--qc-rule-soft); padding: 32px 32px 28px; margin-bottom: 20px; }
-    .qc-card h2 { font-family:var(--serif); font-weight:500; font-size:22px; margin:0 0 6px; }
-    .qc-card .sub { font-size:13px; color:var(--qc-muted); margin: 0 0 22px; }
-    .row { display:grid; grid-template-columns: 1fr 1fr; gap: 22px; }
-    @media (max-width: 600px) { .row { grid-template-columns: 1fr; } .qc-card { padding: 28px 22px 24px; } }
-    .field { margin-bottom: 22px; }
-    .field:last-child { margin-bottom: 0; }
-    label { display:block; font-size:11px; font-weight:600; letter-spacing:1.5px; text-transform:uppercase; color:var(--qc-muted); margin-bottom:6px; }
-    label .req { color: var(--qc-green); margin-left: 4px; }
-    .qc-input, .qc-select, .qc-textarea { width:100%; background:transparent; border:0; border-bottom:1px solid var(--qc-rule-soft); padding:10px 0; font-family:var(--sans); font-size:15px; outline:none; transition:border-color 0.2s; color:var(--qc-ink); }
-    .qc-input:focus, .qc-select:focus, .qc-textarea:focus { border-bottom-color: var(--qc-green); }
-    .qc-input[readonly] { color: var(--qc-muted); cursor: not-allowed; }
-    .qc-textarea { min-height: 88px; resize: vertical; line-height: 1.5; padding: 12px 0; }
-    .qc-select { appearance: none; -webkit-appearance: none; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath fill='%23666' d='M6 8L0 0h12z'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 8px center; padding-right: 28px; }
-    .hint { font-size:11px; color:var(--qc-muted); margin-top:6px; letter-spacing: 0.3px; }
-    .checkbox-row { display:flex; align-items:flex-start; gap: 12px; padding: 16px 0; border-top: 1px solid var(--qc-rule-soft); }
-    .checkbox-row input[type="checkbox"] { width: 20px; height: 20px; margin: 0; accent-color: var(--qc-green); flex-shrink: 0; margin-top: 2px; }
-    .checkbox-row .label-text { font-size: 14px; font-weight: 500; color: var(--qc-ink); margin: 0; }
-    .checkbox-row .desc { font-size: 12px; color: var(--qc-muted); margin-top: 4px; line-height: 1.5; }
-    .qc-actions { display:flex; gap: 14px; align-items:center; margin-top: 24px; flex-wrap: wrap; }
-    .qc-btn { padding: 16px 28px; background: var(--qc-green); color:#fff; font-family:var(--sans); font-size:13px; font-weight:600; letter-spacing:0.4px; border:0; cursor:pointer; transition:background 0.2s; display:inline-flex; align-items:center; gap: 10px; }
-    .qc-btn:hover { background: var(--qc-green-dark); }
-    .qc-btn:disabled { opacity:.45; cursor:not-allowed; }
-    .qc-cancel { color: var(--qc-muted); font-size:13px; font-weight:500; text-decoration:none; }
-    .qc-cancel:hover { color: var(--qc-ink); }
-    .qc-msg { padding: 14px 16px; margin-top:18px; font-size:14px; }
-    .qc-msg.ok { background: rgba(27,94,59,0.08); color: var(--qc-green-dark); border-left: 3px solid var(--qc-green); }
-    .qc-msg.err { background: rgba(183,28,28,0.06); color: #b71c1c; border-left: 3px solid #b71c1c; }
-    .qc-success { text-align: center; padding: 40px 0; }
-    .qc-success-mark { font-family:var(--sans); font-weight:600; font-size:13px; letter-spacing:3px; text-transform:uppercase; color:var(--qc-green); line-height:1; margin-bottom: 20px; padding: 8px 16px; background: rgba(27,94,59,0.08); display: inline-block; }
-    .qc-success-meta { display:inline-block; padding: 8px 14px; background: rgba(212,162,78,0.14); color: #8a6914; font-family: var(--sans); font-size: 12px; font-weight: 600; letter-spacing: 1.5px; text-transform: uppercase; margin: 18px 0 8px; }
-    .qc-foot-bar { padding: 24px var(--pad-x); border-top: 1px solid var(--qc-rule-soft); font-size: 12px; color: var(--qc-muted); text-align: center; background: var(--qc-cream); }
-    .qc-foot-bar .qc-tamil { font-family: var(--tamil); font-style: italic; color: var(--qc-gold); }
+    .nq-success { background: var(--ep-panel); border: 1px solid var(--ep-border); border-radius: var(--ep-radius); padding: 40px 32px; text-align: center; max-width: 560px; margin: 20px auto; }
+    .nq-success-mark { display: inline-block; padding: 6px 14px; background: var(--ep-green-soft); color: var(--ep-green-ink); font-size: 11px; font-weight: 700; letter-spacing: 1.8px; text-transform: uppercase; border-radius: 3px; margin-bottom: 14px; }
+    .nq-success h2 { font-size: 20px; font-weight: 600; color: var(--ep-ink); margin: 0 0 8px; }
+    .nq-success .ref { display: inline-block; padding: 8px 14px; background: var(--ep-active-soft); color: var(--ep-active-2); font-family: ui-monospace, monospace; font-size: 13px; font-weight: 600; border-radius: var(--ep-radius-sm); margin: 16px 0 18px; }
+    .nq-success p { font-size: 13px; color: var(--ep-muted); margin: 0 auto 24px; max-width: 460px; line-height: 1.6; }
   </style>
 </head>
-<body>
-  <header class="qc-head">
-    <a href="/engineer-dashboard.html" class="logo">Quality Colours<small>Project Engineer Portal — Quotation Request</small></a>
-    <a class="qc-back" href="/engineer-dashboard.html">← Back to Dashboard</a>
-  </header>
+<body data-page="new-quote">
+  <div class="ep-shell" id="epShell">
+    <div id="epRailMount"></div>
 
-  <main>
-    <div id="formWrap">
-      <div class="qc-eyebrow"><span class="dot"></span>Project Quotation Request</div>
-      <h1>Submit a Project Quotation Request</h1>
-      <p class="lead">Furnish the site particulars and scope of work below. Our project estimator will respond with a detailed bill of materials, brand recommendations, and an estimated delivery schedule within 24 working hours. Fields marked with an asterisk are mandatory.</p>
+    <main class="ep-main">
+      <button class="ep-rail-mobile-btn" id="epRailMobileBtn" type="button" aria-label="Open menu" style="margin-bottom:12px;">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+      </button>
 
-      <form id="qcQuoteForm" novalidate>
-        <!-- Engineer details (auto-filled, read-only summary) -->
-        <div class="qc-card">
-          <h2>Requestor Details</h2>
-          <p class="sub">Auto-populated from your registered engineer account. To amend, visit <a href="/engineer-profile.html" style="color:var(--qc-green);border-bottom:1px solid var(--qc-green);padding-bottom:1px;text-decoration:none;">Profile</a>.</p>
-          <div class="row">
-            <div class="field">
-              <label>Registered Name</label>
-              <input id="engName" class="qc-input" readonly>
-            </div>
-            <div class="field">
-              <label>Mobile Number</label>
-              <input id="engPhone" class="qc-input" readonly>
-            </div>
-          </div>
-          <div class="field" id="companyFieldWrap" style="margin-bottom:0;">
-            <label>Company / Firm</label>
-            <input id="engCompany" class="qc-input" readonly>
+      <div class="ep-crumb">
+        <a href="/engineer-dashboard.html">Home</a>
+        <span class="sep">/</span>
+        <a href="/engineer-dashboard.html#requisitions">Requisitions</a>
+        <span class="sep">/</span>
+        <b>New Quotation Request</b>
+      </div>
+
+      <header class="ep-pagehead">
+        <div>
+          <h1 class="ep-pagehead-title">Submit a Project Quotation Request</h1>
+          <div class="ep-pagehead-sub">
+            Provide site particulars and scope of work below. Our project estimator will respond with a detailed bill of materials, brand recommendations, and an estimated delivery schedule within 24 working hours.
           </div>
         </div>
+      </header>
 
-        <!-- Project basics -->
-        <div class="qc-card">
-          <h2>Project Identification</h2>
-          <p class="sub">A unique project reference name and the site location to which this quotation pertains.</p>
-          <div class="field">
-            <label for="project_name">Project Name <span class="req">*</span></label>
-            <input id="project_name" class="qc-input" placeholder="e.g. Apartment Block A, Paramakudi Phase II" maxlength="160" required>
-          </div>
-          <div class="field">
-            <label for="location">Site Address <span class="req">*</span></label>
-            <input id="location" class="qc-input" placeholder="Plot / Street, area, town" maxlength="240" required>
-            <div class="hint">The physical location at which the work is to be executed. The site estimator will conduct measurements at this address.</div>
-          </div>
-          <div class="row">
-            <div class="field" style="margin-bottom:0;">
-              <label for="property_type">Property / Building Type</label>
-              <select id="property_type" class="qc-select">
-                <option value="apartment">Apartment / Residential Block</option>
-                <option value="villa">Villa / Bungalow</option>
-                <option value="house">Single Dwelling House</option>
-                <option value="office">Office Building</option>
-                <option value="shop">Commercial / Retail</option>
-                <option value="warehouse">Warehouse / Industrial</option>
-                <option value="other">Other</option>
-              </select>
-            </div>
-            <div class="field" style="margin-bottom:0;">
-              <label for="project_type">Scope of Work</label>
-              <select id="project_type" class="qc-select">
-                <option value="new_construction">New Construction</option>
-                <option value="renovation">Renovation / Repainting</option>
-                <option value="interior">Interior Only</option>
-                <option value="exterior">Exterior Only</option>
-                <option value="both">Interior &amp; Exterior</option>
-                <option value="commercial">Commercial (Mixed)</option>
-              </select>
-            </div>
-          </div>
-        </div>
+      <div id="formWrap" style="max-width: 980px;">
+        <form id="qcQuoteForm" novalidate>
 
-        <!-- Quantities & preferences -->
-        <div class="qc-card">
-          <h2>Quantities &amp; Specifications</h2>
-          <p class="sub">Approximate values are acceptable at this stage and will be reconfirmed during the site survey.</p>
-          <div class="row">
-            <div class="field">
-              <label for="area_sqft">Paintable Area (sq ft) <span class="req">*</span></label>
-              <input id="area_sqft" class="qc-input" type="number" inputmode="numeric" min="50" max="10000000" placeholder="e.g. 12,000" required>
+          <!-- Requestor -->
+          <div class="ep-fieldset">
+            <div class="ep-fieldset-head">Requestor Details</div>
+            <div class="ep-fieldset-sub">Auto-populated from your registered engineer account. To amend, visit <a href="/engineer-profile.html" style="color:var(--ep-active);font-weight:500;">Profile</a>.</div>
+            <div class="ep-form-grid">
+              <div class="ep-field"><label>Registered Name</label><input id="engName" readonly></div>
+              <div class="ep-field"><label>Mobile Number</label><input id="engPhone" readonly></div>
             </div>
-            <div class="field">
-              <label for="preferred_brand">Preferred Brand</label>
-              <select id="preferred_brand" class="qc-select">
-                <option value="">No preference — recommend most suitable</option>
-                <option value="Asian Paints">Asian Paints</option>
-                <option value="Berger">Berger</option>
-                <option value="Birla Opus">Birla Opus</option>
-                <option value="Nippon">Nippon</option>
-                <option value="Jotun">Jotun</option>
-                <option value="JSW Paints">JSW Paints</option>
-              </select>
+            <div class="ep-spacer-12"></div>
+            <div class="ep-field" id="companyFieldWrap"><label>Company / Firm</label><input id="engCompany" readonly></div>
+          </div>
+
+          <!-- Project -->
+          <div class="ep-fieldset">
+            <div class="ep-fieldset-head">Project Identification</div>
+            <div class="ep-fieldset-sub">Unique project reference and the site location to which this quotation pertains.</div>
+            <div class="ep-field"><label>Project Name <span class="req">*</span></label><input id="project_name" placeholder="e.g. Apartment Block A, Paramakudi Phase II" maxlength="160" required></div>
+            <div class="ep-spacer-12"></div>
+            <div class="ep-field"><label>Site Address <span class="req">*</span></label><input id="location" placeholder="Plot / Street, area, town" maxlength="240" required>
+              <div class="hint">The physical location at which the work is to be executed. The site estimator will conduct measurements at this address.</div>
+            </div>
+            <div class="ep-spacer-12"></div>
+            <div class="ep-form-grid">
+              <div class="ep-field">
+                <label>Property / Building Type</label>
+                <select id="property_type">
+                  <option value="apartment">Apartment / Residential Block</option>
+                  <option value="villa">Villa / Bungalow</option>
+                  <option value="house">Single Dwelling House</option>
+                  <option value="office">Office Building</option>
+                  <option value="shop">Commercial / Retail</option>
+                  <option value="warehouse">Warehouse / Industrial</option>
+                  <option value="other">Other</option>
+                </select>
+              </div>
+              <div class="ep-field">
+                <label>Scope of Work</label>
+                <select id="project_type">
+                  <option value="new_construction">New Construction</option>
+                  <option value="renovation">Renovation / Repainting</option>
+                  <option value="interior">Interior Only</option>
+                  <option value="exterior">Exterior Only</option>
+                  <option value="both">Interior &amp; Exterior</option>
+                  <option value="commercial">Commercial (Mixed)</option>
+                </select>
+              </div>
             </div>
           </div>
-          <div class="row">
-            <div class="field">
-              <label for="timeline">Required Completion Window</label>
-              <select id="timeline" class="qc-select">
-                <option value="">Flexible / Not specified</option>
-                <option value="this_week">Within the current week (urgent)</option>
-                <option value="this_month">Within the current month</option>
-                <option value="1-3_months">1 to 3 months</option>
-                <option value="3_months_plus">Beyond 3 months</option>
-              </select>
+
+          <!-- Quantities -->
+          <div class="ep-fieldset">
+            <div class="ep-fieldset-head">Quantities &amp; Specifications</div>
+            <div class="ep-fieldset-sub">Approximate values are acceptable at this stage and will be reconfirmed during the site survey.</div>
+            <div class="ep-form-grid">
+              <div class="ep-field"><label>Paintable Area (sq ft) <span class="req">*</span></label><input id="area_sqft" type="number" inputmode="numeric" min="50" placeholder="e.g. 12000" required></div>
+              <div class="ep-field">
+                <label>Preferred Brand</label>
+                <select id="preferred_brand">
+                  <option value="">No preference — recommend most suitable</option>
+                  <option value="Asian Paints">Asian Paints</option>
+                  <option value="Berger">Berger</option>
+                  <option value="Birla Opus">Birla Opus</option>
+                  <option value="Nippon">Nippon</option>
+                  <option value="Jotun">Jotun</option>
+                  <option value="JSW Paints">JSW Paints</option>
+                </select>
+              </div>
             </div>
-            <div class="field">
-              <label for="budget_range">Indicative Budget</label>
-              <select id="budget_range" class="qc-select">
-                <option value="">To be advised</option>
-                <option value="0-50k">Under ₹50,000</option>
-                <option value="50k-1l">₹50,000 – ₹1,00,000</option>
-                <option value="1l-3l">₹1,00,000 – ₹3,00,000</option>
-                <option value="3l-10l">₹3,00,000 – ₹10,00,000</option>
-                <option value="10l-25l">₹10,00,000 – ₹25,00,000</option>
-                <option value="25l+">Above ₹25,00,000</option>
-              </select>
+            <div class="ep-spacer-12"></div>
+            <div class="ep-form-grid">
+              <div class="ep-field">
+                <label>Required Completion Window</label>
+                <select id="timeline">
+                  <option value="">Flexible / Not specified</option>
+                  <option value="this_week">Within the current week (urgent)</option>
+                  <option value="this_month">Within the current month</option>
+                  <option value="1-3_months">1 to 3 months</option>
+                  <option value="3_months_plus">Beyond 3 months</option>
+                </select>
+              </div>
+              <div class="ep-field">
+                <label>Indicative Budget</label>
+                <select id="budget_range">
+                  <option value="">To be advised</option>
+                  <option value="0-50k">Under ₹50,000</option>
+                  <option value="50k-1l">₹50,000 – ₹1,00,000</option>
+                  <option value="1l-3l">₹1,00,000 – ₹3,00,000</option>
+                  <option value="3l-10l">₹3,00,000 – ₹10,00,000</option>
+                  <option value="10l-25l">₹10,00,000 – ₹25,00,000</option>
+                  <option value="25l+">Above ₹25,00,000</option>
+                </select>
+              </div>
             </div>
+            <div class="ep-spacer-12"></div>
+            <div class="ep-field"><label>Additional Specifications &amp; Remarks</label><textarea id="additional_notes" placeholder="Surface conditions, specific finishes (e.g. enamel, waterproofing, texture), accessibility constraints, project stages, or any further technical requirements." maxlength="2000"></textarea></div>
           </div>
-          <div class="field" style="margin-bottom:0;">
-            <label for="additional_notes">Additional Specifications &amp; Remarks</label>
-            <textarea id="additional_notes" class="qc-textarea" placeholder="Surface conditions, specific finishes (e.g. enamel, waterproofing, texture), accessibility constraints, project stages, or any further technical requirements." maxlength="2000"></textarea>
+
+          <!-- Site visit -->
+          <div class="ep-fieldset">
+            <label class="ep-check-row" style="cursor: pointer;">
+              <input type="checkbox" id="site_visit" checked>
+              <div class="body">
+                <strong>Schedule a complimentary site survey</strong>
+                <span>An estimator from Quality Colours will inspect the site to record measurements and finalise the scope of work prior to issuing the formal quotation. Recommended for projects exceeding 1,000 sq ft.</span>
+              </div>
+            </label>
           </div>
-        </div>
 
-        <!-- Site visit checkbox -->
-        <div class="qc-card">
-          <label class="checkbox-row" style="cursor: pointer; border-top: 0; padding: 0;">
-            <input type="checkbox" id="site_visit" checked>
-            <div>
-              <div class="label-text">Schedule a complimentary site survey</div>
-              <div class="desc">An estimator from Quality Colours will inspect the site to record measurements and finalise the scope of work prior to issuing the formal quotation. Recommended for projects exceeding 1,000 sq ft.</div>
-            </div>
-          </label>
-        </div>
+          <div class="ep-flex-row" style="justify-content:flex-end; padding: 0 4px;">
+            <a href="/engineer-dashboard.html" class="ep-btn outline">Cancel</a>
+            <button type="submit" id="submitBtn" class="ep-btn primary">Submit Quotation Request</button>
+          </div>
+          <div id="msg" style="margin-top:14px;"></div>
+        </form>
+      </div>
 
-        <div class="qc-actions">
-          <button type="submit" id="submitBtn" class="qc-btn">Submit Quotation Request</button>
-          <a href="/engineer-dashboard.html" class="qc-cancel">Cancel</a>
-        </div>
-        <div id="msg"></div>
-      </form>
-    </div>
-
-    <div id="successWrap" style="display:none">
-      <div class="qc-success">
-        <div class="qc-success-mark">Request Received</div>
-        <h1>Quotation request lodged successfully</h1>
-        <p class="qc-success-meta" id="successRefNum">Reference Number · —</p>
-        <p class="lead" style="max-width: 540px; margin-left:auto; margin-right:auto;">Our project estimator will contact you on the registered mobile number within 24 working hours to confirm site details and schedule the survey. The status of this requisition can be monitored on your dashboard.</p>
-        <div class="qc-actions" style="justify-content:center;">
-          <a href="/engineer-dashboard.html" class="qc-btn" style="text-decoration:none;">Return to Dashboard</a>
-          <a href="/engineer-new-quote.html" class="qc-cancel" onclick="window.location.reload();return false;">Submit another request</a>
+      <div id="successWrap" style="display:none;">
+        <div class="nq-success">
+          <div class="nq-success-mark">Request Received</div>
+          <h2>Quotation request lodged successfully</h2>
+          <div class="ref" id="successRefNum">—</div>
+          <p>Our project estimator will contact you on the registered mobile number within 24 working hours to confirm site details and schedule the survey. The status of this requisition can be monitored on your dashboard.</p>
+          <div class="ep-flex-row" style="justify-content:center;">
+            <a href="/engineer-dashboard.html" class="ep-btn primary">Return to Dashboard</a>
+            <a href="/engineer-new-quote.html" class="ep-btn outline" onclick="window.location.reload();return false;">Submit Another</a>
+          </div>
         </div>
       </div>
-    </div>
-  </main>
+    </main>
+  </div>
 
-  <footer class="qc-foot-bar">
-    <span>© 2026 Quality Colours, Ramanathapuram. All rights reserved.</span> &nbsp;·&nbsp; <span>Authorised distributor — Asian Paints, Berger, Birla Opus, Nippon, Jotun, JSW.</span>
-  </footer>
-
+  <script src="/js/engineer-portal.js"></script>
   <script>
-    var API = '/api/engineers';
-    var ENG_KEYS = ['engineer_token','engineer_logged_in','engineer_id','engineer_phone','engineer_name','engineer_company','engineer_status'];
-
-    function authHeaders(extra) {
-      var t = localStorage.getItem('engineer_token') || '';
-      var h = { 'X-Engineer-Token': t };
-      if (extra) Object.keys(extra).forEach(function (k) { h[k] = extra[k]; });
-      return h;
-    }
-    function handleAuthFail(r) {
-      if (r && (r.status === 401 || r.status === 403)) {
-        ENG_KEYS.forEach(function (k) { localStorage.removeItem(k); });
-        window.location.href = '/engineer-login.html';
-        return true;
+    (function () {
+      function hydrate() {
+        var name = localStorage.getItem('engineer_name') || '';
+        var phone = localStorage.getItem('engineer_phone') || '';
+        var company = localStorage.getItem('engineer_company') || '';
+        document.getElementById('engName').value = name;
+        document.getElementById('engPhone').value = phone ? '+91 ' + phone : '';
+        if (company) document.getElementById('engCompany').value = company;
+        else document.getElementById('companyFieldWrap').style.display = 'none';
       }
-      return false;
-    }
-    function showMsg(text, kind) {
-      var m = document.getElementById('msg');
-      m.className = 'qc-msg ' + (kind === 'ok' ? 'ok' : 'err');
-      m.textContent = text;
-    }
-    function clearMsg() {
-      var m = document.getElementById('msg');
-      m.className = ''; m.textContent = '';
-    }
-
-    function hydrateEngineer() {
-      var name = localStorage.getItem('engineer_name') || 'Engineer';
-      var phone = localStorage.getItem('engineer_phone') || '';
-      var company = localStorage.getItem('engineer_company') || '';
-      document.getElementById('engName').value = name;
-      document.getElementById('engPhone').value = phone ? '+91 ' + phone : '—';
-      if (company) {
-        document.getElementById('engCompany').value = company;
-      } else {
-        document.getElementById('companyFieldWrap').style.display = 'none';
+      function showMsg(text, kind) {
+        var m = document.getElementById('msg');
+        m.className = 'ep-notice ' + (kind === 'ok' ? 'ok' : 'err');
+        m.textContent = text;
       }
-    }
+      function clearMsg() { var m = document.getElementById('msg'); m.className = ''; m.textContent = ''; }
 
-    document.getElementById('qcQuoteForm').addEventListener('submit', async function (e) {
-      e.preventDefault();
-      clearMsg();
-      var btn = document.getElementById('submitBtn');
+      document.getElementById('qcQuoteForm').addEventListener('submit', async function (e) {
+        e.preventDefault();
+        clearMsg();
+        var btn = document.getElementById('submitBtn');
+        var payload = {
+          project_name: document.getElementById('project_name').value.trim(),
+          location: document.getElementById('location').value.trim(),
+          property_type: document.getElementById('property_type').value,
+          project_type: document.getElementById('project_type').value,
+          area_sqft: parseInt(document.getElementById('area_sqft').value, 10),
+          preferred_brand: document.getElementById('preferred_brand').value || null,
+          timeline: document.getElementById('timeline').value || null,
+          budget_range: document.getElementById('budget_range').value || null,
+          additional_notes: document.getElementById('additional_notes').value.trim() || null,
+          site_visit: document.getElementById('site_visit').checked
+        };
+        if (!payload.project_name) { showMsg('A project name is required to proceed.', 'err'); return; }
+        if (!payload.location) { showMsg('A site address is required to proceed.', 'err'); return; }
+        if (!Number.isFinite(payload.area_sqft) || payload.area_sqft <= 0) {
+          showMsg('Please furnish an approximate paintable area in square feet.', 'err'); return;
+        }
 
-      var payload = {
-        project_name: document.getElementById('project_name').value.trim(),
-        location: document.getElementById('location').value.trim(),
-        property_type: document.getElementById('property_type').value,
-        project_type: document.getElementById('project_type').value,
-        area_sqft: parseInt(document.getElementById('area_sqft').value, 10),
-        preferred_brand: document.getElementById('preferred_brand').value || null,
-        timeline: document.getElementById('timeline').value || null,
-        budget_range: document.getElementById('budget_range').value || null,
-        additional_notes: document.getElementById('additional_notes').value.trim() || null,
-        site_visit: document.getElementById('site_visit').checked
-      };
+        btn.disabled = true; btn.textContent = 'Submitting...';
+        try {
+          var r = await fetch(EP.API_BASE + '/me/quotes', {
+            method: 'POST', headers: EP.authHeaders({ 'Content-Type': 'application/json' }),
+            body: JSON.stringify(payload)
+          });
+          if (EP.handleAuthFail(r)) return;
+          var data = await r.json();
+          if (!data.success) throw new Error(data.message || 'Submission unsuccessful.');
+          document.getElementById('formWrap').style.display = 'none';
+          document.getElementById('successRefNum').textContent = data.request_number || '—';
+          document.getElementById('successWrap').style.display = 'block';
+          window.scrollTo({ top: 0, behavior: 'smooth' });
+        } catch (err) {
+          showMsg(err.message || 'Connection error. Please retry.', 'err');
+        } finally {
+          btn.disabled = false; btn.textContent = 'Submit Quotation Request';
+        }
+      });
 
-      if (!payload.project_name) { showMsg('A project name is required to proceed.', 'err'); return; }
-      if (!payload.location) { showMsg('A site address is required to proceed.', 'err'); return; }
-      if (!Number.isFinite(payload.area_sqft) || payload.area_sqft <= 0) {
-        showMsg('Please furnish an approximate paintable area in square feet.', 'err'); return;
-      }
-
-      btn.disabled = true; btn.textContent = 'Submitting request...';
-      try {
-        var r = await fetch(API + '/me/quotes', {
-          method: 'POST', headers: authHeaders({ 'Content-Type': 'application/json' }),
-          body: JSON.stringify(payload)
-        });
-        if (handleAuthFail(r)) return;
-        var data = await r.json();
-        if (!data.success) throw new Error(data.message || 'Submission unsuccessful. Please retry.');
-        document.getElementById('formWrap').style.display = 'none';
-        document.getElementById('successRefNum').textContent = 'Reference Number · ' + (data.request_number || '—');
-        document.getElementById('successWrap').style.display = 'block';
-        window.scrollTo({ top: 0, behavior: 'smooth' });
-      } catch (err) {
-        showMsg(err.message || 'Connection error. Please retry.', 'err');
-      } finally {
-        btn.disabled = false; btn.textContent = 'Submit Quotation Request';
-      }
-    });
-
-    hydrateEngineer();
+      document.addEventListener('DOMContentLoaded', function () { hydrate(); EP.loadMe(); });
+    })();
   </script>
 </body>
 </html>
