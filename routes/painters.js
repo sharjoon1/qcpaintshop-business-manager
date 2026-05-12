@@ -1751,14 +1751,37 @@ router.get('/me/catalog', requirePainterAuth, async (req, res) => {
         const offset = (pageNum - 1) * limitNum;
         const filterHasOffer = hasOffer === 'true' || hasOffer === '1';
 
+        // ---- catalog admin ordering + visibility -----------------------
+        // Six LEFT JOINs (3 global + 3 painter override). Hidden filters
+        // are added to WHERE via COALESCE(override, global, 0)=0. Ordering
+        // is applied in the products query via MAX() over the same COALESCE.
+        // TRIM both sides on string keys: seed data is TRIMMED but the raw
+        // zoho_brand / zoho_category_name columns can contain trailing space.
+        const painterId = (req.painter && req.painter.id) || 0;
+        const catalogJoins = `
+            LEFT JOIN painter_catalog_brand_order        gb ON TRIM(gb.brand) = TRIM(zim.zoho_brand)
+            LEFT JOIN painter_catalog_brand_overrides    bo ON bo.painter_id = ? AND TRIM(bo.brand) = TRIM(zim.zoho_brand)
+            LEFT JOIN painter_catalog_category_order     gc ON TRIM(gc.brand) = TRIM(zim.zoho_brand) AND TRIM(gc.category) = TRIM(zim.zoho_category_name)
+            LEFT JOIN painter_catalog_category_overrides co ON co.painter_id = ? AND TRIM(co.brand) = TRIM(zim.zoho_brand) AND TRIM(co.category) = TRIM(zim.zoho_category_name)
+            LEFT JOIN painter_catalog_product_order      gp ON gp.product_id = p.id
+            LEFT JOIN painter_catalog_product_overrides  ppo ON ppo.painter_id = ? AND ppo.product_id = p.id
+        `;
+        const catalogJoinParams = [painterId, painterId, painterId];
+        const catalogHiddenWhere = `
+            AND COALESCE(bo.is_hidden,  gb.is_hidden, 0) = 0
+            AND COALESCE(co.is_hidden,  gc.is_hidden, 0) = 0
+            AND COALESCE(ppo.is_hidden, gp.is_hidden, 0) = 0
+        `;
+
         const joins = `
             FROM products p
             INNER JOIN pack_sizes ps ON ps.product_id = p.id AND ps.is_active = 1
             INNER JOIN zoho_items_map zim ON zim.zoho_item_id = ps.zoho_item_id
                 AND (zim.zoho_status = 'active' OR zim.zoho_status IS NULL)
+            ${catalogJoins}
         `;
-        let where = "WHERE p.status = 'active'";
-        const params = [];
+        let where = "WHERE p.status = 'active' " + catalogHiddenWhere;
+        const params = [...catalogJoinParams];
 
         // Pre-fetch active offers so we can add SQL filter when hasOffer=true
         const now = new Date();
@@ -1847,15 +1870,18 @@ router.get('/me/catalog', requirePainterAuth, async (req, res) => {
                         WHERE ps3.product_id = p.id AND ps3.is_active = 1
                     )) as total_stock,
                    COUNT(DISTINCT ps.id) as variant_count,
-                   MAX(zim.zoho_brand) as brand,
-                   MAX(zim.zoho_category_name) as category,
+                   MAX(TRIM(zim.zoho_brand))         as brand,
+                   MAX(TRIM(zim.zoho_category_name)) as category,
                    (SELECT z2.image_url FROM pack_sizes ps2
                     INNER JOIN zoho_items_map z2 ON z2.zoho_item_id = ps2.zoho_item_id
                     WHERE ps2.product_id = p.id AND ps2.is_active = 1 AND z2.image_url IS NOT NULL
                     LIMIT 1) as image_url,
                    MAX(ppr.regular_points_per_unit) as points_per_unit,
                    MAX(ppr.annual_eligible) as annual_eligible,
-                   MAX(ppr.annual_pct) as annual_pct
+                   MAX(ppr.annual_pct) as annual_pct,
+                   MAX(COALESCE(bo.sort_order,  gb.sort_order, 999)) as _brand_sort,
+                   MAX(COALESCE(co.sort_order,  gc.sort_order, 999)) as _cat_sort,
+                   MAX(COALESCE(ppo.sort_order, gp.sort_order, 999)) as _prod_sort
             ${joins}
             ${filterHasPoints ? 'INNER' : 'LEFT'} JOIN painter_product_point_rates ppr
                 ON ppr.item_id = zim.zoho_item_id COLLATE utf8mb4_unicode_ci
@@ -1867,7 +1893,9 @@ router.get('/me/catalog', requirePainterAuth, async (req, res) => {
                     SELECT ps3.zoho_item_id FROM pack_sizes ps3
                     WHERE ps3.product_id = p.id AND ps3.is_active = 1
                 )) > 0` : ''}
-            ORDER BY p.name
+            ORDER BY _brand_sort ASC, brand ASC,
+                     _cat_sort   ASC, category ASC,
+                     _prod_sort  ASC, p.name ASC
             LIMIT ? OFFSET ?
         `, [...params, limitNum, offset]);
 
@@ -6365,6 +6393,335 @@ router.post('/admin/visualizations/:id/upload-result', requirePermission('painte
     } catch (error) {
         console.error('Visualization upload error:', error);
         res.status(500).json({ success: false, message: 'Failed to upload visualization' });
+    }
+});
+
+// ═══════════════════════════════════════════════════════════════
+// ADMIN PAINTER CATALOG (ordering + visibility)
+// ═══════════════════════════════════════════════════════════════
+//
+// Six tables back this feature:
+//   painter_catalog_brand_order    / _category_order    / _product_order
+//   painter_catalog_brand_overrides / _category_overrides / _product_overrides
+//
+// Globals: NOT NULL sort_order + is_hidden. Overrides: nullable columns —
+// NULL means "inherit from global". The painter-facing /me/catalog query
+// COALESCEs in the order: override → global → (999, 0).
+
+// ----- helpers ----------------------------------------------------------
+function _toBool(v) { return v === true || v === 1 || v === '1' || v === 'true' ? 1 : 0; }
+function _toNullableBool(v) { return (v === null || v === undefined || v === '') ? null : _toBool(v); }
+function _toNullableInt(v) {
+    if (v === null || v === undefined || v === '') return null;
+    const n = parseInt(v, 10);
+    return Number.isFinite(n) ? n : null;
+}
+
+// ----- GLOBAL: brands ---------------------------------------------------
+router.get('/admin/catalog/brands', requireAuth, requirePermission('painters', 'manage'), async (req, res) => {
+    try {
+        const [rows] = await pool.query(`
+            SELECT b.brand,
+                   b.sort_order,
+                   b.is_hidden,
+                   (SELECT COUNT(DISTINCT p.id)
+                      FROM products p
+                      JOIN pack_sizes ps ON ps.product_id = p.id AND ps.is_active = 1
+                      JOIN zoho_items_map zim ON zim.zoho_item_id = ps.zoho_item_id
+                     WHERE p.status = 'active'
+                       AND TRIM(zim.zoho_brand) = b.brand) AS product_count
+              FROM painter_catalog_brand_order b
+             ORDER BY b.sort_order ASC, b.brand ASC
+        `);
+        res.json({ success: true, brands: rows });
+    } catch (e) {
+        console.error('GET /admin/catalog/brands:', e);
+        res.status(500).json({ success: false, message: e.message });
+    }
+});
+
+router.put('/admin/catalog/brands/order', requireAuth, requirePermission('painters', 'manage'), async (req, res) => {
+    try {
+        const items = Array.isArray(req.body && req.body.items) ? req.body.items : [];
+        if (!items.length) return res.status(400).json({ success: false, message: 'items[] required' });
+        const conn = await pool.getConnection();
+        try {
+            await conn.beginTransaction();
+            for (const it of items) {
+                if (!it.brand) continue;
+                await conn.query(
+                    `INSERT INTO painter_catalog_brand_order (brand, sort_order, is_hidden)
+                     VALUES (?, ?, ?)
+                     ON DUPLICATE KEY UPDATE sort_order = VALUES(sort_order), is_hidden = VALUES(is_hidden)`,
+                    [String(it.brand), parseInt(it.sort_order, 10) || 999, _toBool(it.is_hidden)]
+                );
+            }
+            await conn.commit();
+        } catch (e) { await conn.rollback(); throw e; }
+        finally { conn.release(); }
+        res.json({ success: true, updated: items.length });
+    } catch (e) {
+        console.error('PUT /admin/catalog/brands/order:', e);
+        res.status(500).json({ success: false, message: e.message });
+    }
+});
+
+// ----- GLOBAL: categories ----------------------------------------------
+router.get('/admin/catalog/categories', requireAuth, requirePermission('painters', 'manage'), async (req, res) => {
+    try {
+        const brand = req.query.brand || null;
+        const params = [];
+        let where = '';
+        if (brand) { where = 'WHERE c.brand = ?'; params.push(brand); }
+        const [rows] = await pool.query(`
+            SELECT c.brand, c.category, c.sort_order, c.is_hidden,
+                   (SELECT COUNT(DISTINCT p.id)
+                      FROM products p
+                      JOIN pack_sizes ps ON ps.product_id = p.id AND ps.is_active = 1
+                      JOIN zoho_items_map zim ON zim.zoho_item_id = ps.zoho_item_id
+                     WHERE p.status = 'active'
+                       AND TRIM(zim.zoho_brand) = c.brand
+                       AND TRIM(zim.zoho_category_name) = c.category) AS product_count
+              FROM painter_catalog_category_order c
+              ${where}
+             ORDER BY c.brand ASC, c.sort_order ASC, c.category ASC
+        `, params);
+        res.json({ success: true, categories: rows });
+    } catch (e) {
+        console.error('GET /admin/catalog/categories:', e);
+        res.status(500).json({ success: false, message: e.message });
+    }
+});
+
+router.put('/admin/catalog/categories/order', requireAuth, requirePermission('painters', 'manage'), async (req, res) => {
+    try {
+        const items = Array.isArray(req.body && req.body.items) ? req.body.items : [];
+        if (!items.length) return res.status(400).json({ success: false, message: 'items[] required' });
+        const conn = await pool.getConnection();
+        try {
+            await conn.beginTransaction();
+            for (const it of items) {
+                if (!it.brand || !it.category) continue;
+                await conn.query(
+                    `INSERT INTO painter_catalog_category_order (brand, category, sort_order, is_hidden)
+                     VALUES (?, ?, ?, ?)
+                     ON DUPLICATE KEY UPDATE sort_order = VALUES(sort_order), is_hidden = VALUES(is_hidden)`,
+                    [String(it.brand), String(it.category), parseInt(it.sort_order, 10) || 999, _toBool(it.is_hidden)]
+                );
+            }
+            await conn.commit();
+        } catch (e) { await conn.rollback(); throw e; }
+        finally { conn.release(); }
+        res.json({ success: true, updated: items.length });
+    } catch (e) {
+        console.error('PUT /admin/catalog/categories/order:', e);
+        res.status(500).json({ success: false, message: e.message });
+    }
+});
+
+// ----- GLOBAL: products -------------------------------------------------
+router.get('/admin/catalog/products', requireAuth, requirePermission('painters', 'manage'), async (req, res) => {
+    try {
+        const { brand, category } = req.query;
+        const params = [];
+        const filters = [];
+        if (brand)    { filters.push('TRIM(zim.zoho_brand) = ?');         params.push(brand); }
+        if (category) { filters.push('TRIM(zim.zoho_category_name) = ?'); params.push(category); }
+        const where = filters.length ? ('AND ' + filters.join(' AND ')) : '';
+        const [rows] = await pool.query(`
+            SELECT p.id AS product_id, p.name,
+                   MAX(TRIM(zim.zoho_brand))         AS brand,
+                   MAX(TRIM(zim.zoho_category_name)) AS category,
+                   COALESCE(po.sort_order, 999) AS sort_order,
+                   COALESCE(po.is_hidden, 0)    AS is_hidden,
+                   COUNT(DISTINCT ps.id) AS variant_count
+              FROM products p
+              JOIN pack_sizes ps ON ps.product_id = p.id AND ps.is_active = 1
+              JOIN zoho_items_map zim ON zim.zoho_item_id = ps.zoho_item_id
+                AND (zim.zoho_status = 'active' OR zim.zoho_status IS NULL)
+              LEFT JOIN painter_catalog_product_order po ON po.product_id = p.id
+             WHERE p.status = 'active'
+               ${where}
+             GROUP BY p.id, p.name, po.sort_order, po.is_hidden
+             ORDER BY brand ASC, category ASC, sort_order ASC, p.name ASC
+        `, params);
+        res.json({ success: true, products: rows });
+    } catch (e) {
+        console.error('GET /admin/catalog/products:', e);
+        res.status(500).json({ success: false, message: e.message });
+    }
+});
+
+router.put('/admin/catalog/products/order', requireAuth, requirePermission('painters', 'manage'), async (req, res) => {
+    try {
+        const items = Array.isArray(req.body && req.body.items) ? req.body.items : [];
+        if (!items.length) return res.status(400).json({ success: false, message: 'items[] required' });
+        const conn = await pool.getConnection();
+        try {
+            await conn.beginTransaction();
+            for (const it of items) {
+                const pid = parseInt(it.product_id, 10);
+                if (!pid) continue;
+                await conn.query(
+                    `INSERT INTO painter_catalog_product_order (product_id, sort_order, is_hidden)
+                     VALUES (?, ?, ?)
+                     ON DUPLICATE KEY UPDATE sort_order = VALUES(sort_order), is_hidden = VALUES(is_hidden)`,
+                    [pid, parseInt(it.sort_order, 10) || 999, _toBool(it.is_hidden)]
+                );
+            }
+            await conn.commit();
+        } catch (e) { await conn.rollback(); throw e; }
+        finally { conn.release(); }
+        res.json({ success: true, updated: items.length });
+    } catch (e) {
+        console.error('PUT /admin/catalog/products/order:', e);
+        res.status(500).json({ success: false, message: e.message });
+    }
+});
+
+// ----- PER-PAINTER OVERRIDES -------------------------------------------
+// One GET that returns the painter's view of either brands, categories or
+// products with both the global value and the painter-specific override.
+router.get('/admin/catalog/painters/:id/overrides', requireAuth, requirePermission('painters', 'manage'), async (req, res) => {
+    try {
+        const painterId = parseInt(req.params.id, 10);
+        if (!painterId) return res.status(400).json({ success: false, message: 'invalid painter id' });
+        const level = String(req.query.level || 'brand');
+        const brand = req.query.brand || null;
+        const category = req.query.category || null;
+
+        if (level === 'brand') {
+            const [rows] = await pool.query(`
+                SELECT g.brand,
+                       g.sort_order AS global_sort, g.is_hidden AS global_hidden,
+                       o.sort_order AS override_sort, o.is_hidden AS override_hidden
+                  FROM painter_catalog_brand_order g
+                  LEFT JOIN painter_catalog_brand_overrides o
+                    ON o.painter_id = ? AND o.brand = g.brand
+                 ORDER BY g.sort_order ASC, g.brand ASC
+            `, [painterId]);
+            return res.json({ success: true, level, rows });
+        }
+        if (level === 'category') {
+            const params = [painterId];
+            let where = '';
+            if (brand) { where = 'WHERE g.brand = ?'; params.push(brand); }
+            const [rows] = await pool.query(`
+                SELECT g.brand, g.category,
+                       g.sort_order AS global_sort, g.is_hidden AS global_hidden,
+                       o.sort_order AS override_sort, o.is_hidden AS override_hidden
+                  FROM painter_catalog_category_order g
+                  LEFT JOIN painter_catalog_category_overrides o
+                    ON o.painter_id = ? AND o.brand = g.brand AND o.category = g.category
+                  ${where}
+                 ORDER BY g.brand ASC, g.sort_order ASC, g.category ASC
+            `, params);
+            return res.json({ success: true, level, rows });
+        }
+        if (level === 'product') {
+            // Products joined to product_order; brand+category come from zim aggregate.
+            const params = [painterId];
+            const filters = [];
+            if (brand)    { filters.push('TRIM(zim.zoho_brand) = ?');         params.push(brand); }
+            if (category) { filters.push('TRIM(zim.zoho_category_name) = ?'); params.push(category); }
+            const where = filters.length ? ('AND ' + filters.join(' AND ')) : '';
+            const [rows] = await pool.query(`
+                SELECT p.id AS product_id, p.name,
+                       MAX(TRIM(zim.zoho_brand))         AS brand,
+                       MAX(TRIM(zim.zoho_category_name)) AS category,
+                       COALESCE(g.sort_order, 999) AS global_sort,
+                       COALESCE(g.is_hidden, 0)    AS global_hidden,
+                       o.sort_order AS override_sort,
+                       o.is_hidden  AS override_hidden
+                  FROM products p
+                  JOIN pack_sizes ps ON ps.product_id = p.id AND ps.is_active = 1
+                  JOIN zoho_items_map zim ON zim.zoho_item_id = ps.zoho_item_id
+                    AND (zim.zoho_status = 'active' OR zim.zoho_status IS NULL)
+                  LEFT JOIN painter_catalog_product_order g ON g.product_id = p.id
+                  LEFT JOIN painter_catalog_product_overrides o
+                    ON o.painter_id = ? AND o.product_id = p.id
+                 WHERE p.status = 'active'
+                   ${where}
+                 GROUP BY p.id, p.name, g.sort_order, g.is_hidden, o.sort_order, o.is_hidden
+                 ORDER BY brand ASC, category ASC, global_sort ASC, p.name ASC
+            `, params);
+            return res.json({ success: true, level, rows });
+        }
+        return res.status(400).json({ success: false, message: 'invalid level' });
+    } catch (e) {
+        console.error('GET /admin/catalog/painters/:id/overrides:', e);
+        res.status(500).json({ success: false, message: e.message });
+    }
+});
+
+// PUT bulk save for brand / category / product overrides. NULL means
+// "inherit from global"; sending an empty/missing field clears the override
+// for that column. Sending neither sort_order nor is_hidden → delete the row.
+router.put('/admin/catalog/painters/:id/overrides/:level', requireAuth, requirePermission('painters', 'manage'), async (req, res) => {
+    try {
+        const painterId = parseInt(req.params.id, 10);
+        const level = req.params.level;
+        if (!painterId) return res.status(400).json({ success: false, message: 'invalid painter id' });
+        if (!['brand','category','product'].includes(level)) return res.status(400).json({ success: false, message: 'invalid level' });
+        const items = Array.isArray(req.body && req.body.items) ? req.body.items : [];
+        if (!items.length) return res.status(400).json({ success: false, message: 'items[] required' });
+
+        const conn = await pool.getConnection();
+        try {
+            await conn.beginTransaction();
+            for (const it of items) {
+                const sort   = _toNullableInt(it.sort_order);
+                const hidden = _toNullableBool(it.is_hidden);
+                const bothNull = (sort === null && hidden === null);
+
+                if (level === 'brand') {
+                    if (!it.brand) continue;
+                    if (bothNull) {
+                        await conn.query(`DELETE FROM painter_catalog_brand_overrides WHERE painter_id = ? AND brand = ?`, [painterId, String(it.brand)]);
+                    } else {
+                        await conn.query(
+                            `INSERT INTO painter_catalog_brand_overrides (painter_id, brand, sort_order, is_hidden)
+                             VALUES (?, ?, ?, ?)
+                             ON DUPLICATE KEY UPDATE sort_order = VALUES(sort_order), is_hidden = VALUES(is_hidden)`,
+                            [painterId, String(it.brand), sort, hidden]
+                        );
+                    }
+                } else if (level === 'category') {
+                    if (!it.brand || !it.category) continue;
+                    if (bothNull) {
+                        await conn.query(`DELETE FROM painter_catalog_category_overrides WHERE painter_id = ? AND brand = ? AND category = ?`,
+                            [painterId, String(it.brand), String(it.category)]);
+                    } else {
+                        await conn.query(
+                            `INSERT INTO painter_catalog_category_overrides (painter_id, brand, category, sort_order, is_hidden)
+                             VALUES (?, ?, ?, ?, ?)
+                             ON DUPLICATE KEY UPDATE sort_order = VALUES(sort_order), is_hidden = VALUES(is_hidden)`,
+                            [painterId, String(it.brand), String(it.category), sort, hidden]
+                        );
+                    }
+                } else { // product
+                    const pid = parseInt(it.product_id, 10);
+                    if (!pid) continue;
+                    if (bothNull) {
+                        await conn.query(`DELETE FROM painter_catalog_product_overrides WHERE painter_id = ? AND product_id = ?`, [painterId, pid]);
+                    } else {
+                        await conn.query(
+                            `INSERT INTO painter_catalog_product_overrides (painter_id, product_id, sort_order, is_hidden)
+                             VALUES (?, ?, ?, ?)
+                             ON DUPLICATE KEY UPDATE sort_order = VALUES(sort_order), is_hidden = VALUES(is_hidden)`,
+                            [painterId, pid, sort, hidden]
+                        );
+                    }
+                }
+            }
+            await conn.commit();
+        } catch (e) { await conn.rollback(); throw e; }
+        finally { conn.release(); }
+
+        res.json({ success: true, updated: items.length });
+    } catch (e) {
+        console.error('PUT /admin/catalog/painters/:id/overrides/:level:', e);
+        res.status(500).json({ success: false, message: e.message });
     }
 });
 
