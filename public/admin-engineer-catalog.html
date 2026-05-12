@@ -1,0 +1,449 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="theme-color" content="#667eea">
+  <link rel="manifest" href="/manifest.json">
+  <link rel="icon" type="image/png" sizes="192x192" href="/icons/icon-192x192.png">
+  <title>Engineer Catalogue &amp; Pricing — Quality Colours</title>
+  <link rel="stylesheet" href="/css/tailwind.css">
+  <link rel="stylesheet" href="/css/design-system.css">
+  <script src="/universal-nav-loader.js"></script>
+  <script src="/js/auth-helper.js"></script>
+  <script>requireAdminOrRedirect();</script>
+  <style>
+    body { background: #f9fafb; }
+    .tab-btn { padding: 10px 20px; font-size: 13px; font-weight: 600; color: #64748b; cursor: pointer; border: 0; background: transparent; border-bottom: 2px solid transparent; transition: color 0.15s, border-color 0.15s; }
+    .tab-btn:hover { color: #334155; }
+    .tab-btn.active { color: #667eea; border-bottom-color: #667eea; }
+    .tab-pane { display: none; }
+    .tab-pane.active { display: block; }
+
+    .panel { background: #fff; border: 1px solid #e8ecf1; border-radius: 10px; }
+    .panel-head { padding: 14px 20px; border-bottom: 1px solid #e8ecf1; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px; }
+    .panel-title { font-size: 14px; font-weight: 700; color: #1e293b; }
+    .panel-body { padding: 20px; }
+
+    .data-table { width: 100%; border-collapse: collapse; }
+    .data-table th { text-align: left; padding: 9px 14px; font-size: 10px; font-weight: 700; letter-spacing: 0.5px; text-transform: uppercase; color: #64748b; border-bottom: 1px solid #e8ecf1; background: #f9fafb; }
+    .data-table th.num, .data-table td.num { text-align: right; }
+    .data-table td { padding: 11px 14px; font-size: 13px; border-bottom: 1px solid #f1f5f9; vertical-align: middle; }
+    .data-table tr:last-child td { border-bottom: 0; }
+    .data-table tr:hover { background: #fafbfd; }
+
+    .badge { display: inline-flex; align-items: center; padding: 2px 9px; border-radius: 9999px; font-size: 10.5px; font-weight: 600; }
+    .badge-item     { background: #e0e7ff; color: #4338ca; }
+    .badge-brand    { background: #dbeafe; color: #1d4ed8; }
+    .badge-category { background: #dcfce7; color: #15803d; }
+
+    .btn { padding: 8px 14px; border-radius: 6px; font-size: 12px; font-weight: 600; cursor: pointer; transition: all 0.15s; border: 1px solid transparent; }
+    .btn-primary { background: #667eea; color: #fff; }
+    .btn-primary:hover { background: #5a6fd6; }
+    .btn-outline { background: #fff; border-color: #d1d5db; color: #1f2937; }
+    .btn-outline:hover { background: #f9fafb; border-color: #9ca3af; }
+    .btn-danger { background: #ef4444; color: #fff; }
+    .btn-danger:hover { background: #dc2626; }
+    .btn-sm { padding: 4px 10px; font-size: 11px; }
+
+    .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+    @media (max-width: 720px) { .form-row { grid-template-columns: 1fr; } }
+    .field label { display: block; font-size: 10.5px; font-weight: 600; letter-spacing: 0.5px; color: #64748b; margin-bottom: 4px; text-transform: uppercase; }
+    .field input, .field select, .field textarea { width: 100%; padding: 8px 12px; border: 1px solid #d1d5db; border-radius: 6px; font-size: 13px; color: #1e293b; font-family: inherit; }
+    .field input:focus, .field select:focus, .field textarea:focus { outline: none; border-color: #667eea; box-shadow: 0 0 0 3px rgba(102,126,234,0.12); }
+
+    /* Item picker */
+    .picker-wrap { position: relative; }
+    .picker-results { position: absolute; top: 100%; left: 0; right: 0; background: #fff; border: 1px solid #d1d5db; border-radius: 6px; box-shadow: 0 10px 28px rgba(0,0,0,0.10); margin-top: 4px; max-height: 320px; overflow-y: auto; z-index: 10; display: none; }
+    .picker-results.is-open { display: block; }
+    .picker-row { padding: 8px 14px; cursor: pointer; border-bottom: 1px solid #f1f5f9; }
+    .picker-row:last-child { border-bottom: 0; }
+    .picker-row:hover { background: #f0f5ff; }
+    .picker-row .name { font-size: 13px; font-weight: 600; color: #1e293b; }
+    .picker-row .meta { font-size: 11px; color: #64748b; margin-top: 2px; }
+
+    .toast { position: fixed; bottom: 20px; right: 20px; background: #111827; color: #fff; padding: 12px 18px; border-radius: 8px; font-size: 0.875rem; box-shadow: 0 10px 30px rgba(0,0,0,0.2); z-index: 1100; opacity: 0; transform: translateY(8px); transition: opacity 0.18s, transform 0.18s; }
+    .toast.show { opacity: 1; transform: translateY(0); }
+    .toast.err { background: #b91c1c; }
+
+    .empty { padding: 60px 20px; text-align: center; color: #94a3b8; font-size: 13px; }
+    .empty .mark { font-size: 11px; font-weight: 700; letter-spacing: 1.5px; text-transform: uppercase; margin-bottom: 8px; }
+  </style>
+</head>
+<body>
+  <div id="universal-nav-placeholder"></div>
+
+  <main class="px-4 sm:px-6 lg:px-8 py-6 max-w-7xl mx-auto">
+    <header class="mb-5">
+      <div class="flex justify-between items-end flex-wrap gap-3">
+        <div>
+          <h1 class="text-2xl font-bold text-gray-900">Engineer Catalogue &amp; Pricing</h1>
+          <p class="text-sm text-gray-500 mt-1">Set default discounts that apply to every engineer, and control which products appear on the engineer-facing catalogue.</p>
+        </div>
+        <div class="flex gap-2">
+          <a href="/admin-engineers.html" class="btn btn-outline">← Engineers List</a>
+        </div>
+      </div>
+    </header>
+
+    <!-- Tabs -->
+    <div class="border-b border-gray-200 mb-5">
+      <button class="tab-btn active" data-tab="rates">Default Discount Rates</button>
+      <button class="tab-btn" data-tab="hidden">Catalogue Visibility</button>
+    </div>
+
+    <!-- Tab: Default Rates -->
+    <div class="tab-pane active" data-tab-pane="rates">
+      <div class="panel mb-4">
+        <div class="panel-head">
+          <div>
+            <div class="panel-title">Add a default discount rule</div>
+            <p class="text-xs text-gray-500 mt-1">These rates apply to <strong>every approved engineer</strong> as a baseline. Per-engineer overrides (set on the engineer's detail modal) take priority. Item rates win over brand rates, which win over category rates.</p>
+          </div>
+        </div>
+        <div class="panel-body">
+          <div class="form-row">
+            <div class="field">
+              <label>Scope</label>
+              <select id="rateScope">
+                <option value="brand">Brand</option>
+                <option value="category">Category</option>
+                <option value="item">Specific item (Zoho item ID)</option>
+              </select>
+            </div>
+            <div class="field">
+              <label>Target</label>
+              <div id="brandWrap"><select id="rateBrand"><option value="">Select brand...</option></select></div>
+              <div id="categoryWrap" style="display:none;"><select id="rateCategory"><option value="">Select category...</option></select></div>
+              <div id="itemWrap" class="picker-wrap" style="display:none;">
+                <input id="rateItemSearch" type="text" placeholder="Type to search products...">
+                <div class="picker-results" id="rateItemResults"></div>
+                <input type="hidden" id="rateItemId">
+                <div id="rateItemSelected" class="text-xs text-gray-600 mt-1"></div>
+              </div>
+            </div>
+          </div>
+          <div class="form-row mt-3">
+            <div class="field">
+              <label>Discount %</label>
+              <input id="rateDiscount" type="number" min="0" max="100" step="0.5" placeholder="0.00">
+            </div>
+            <div class="field">
+              <label>Notes (optional)</label>
+              <input id="rateNotes" placeholder="Internal note">
+            </div>
+          </div>
+          <div class="flex justify-end mt-4">
+            <button class="btn btn-primary" id="addRateBtn">+ Add / Update Default Rate</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="panel">
+        <div class="panel-head">
+          <div class="panel-title">Current default rates</div>
+          <span class="text-xs text-gray-500" id="ratesCount">—</span>
+        </div>
+        <div style="overflow-x:auto;">
+          <table class="data-table">
+            <thead><tr>
+              <th>Scope</th><th>Target</th><th class="num">Discount</th><th>Notes</th><th>Updated</th><th></th>
+            </tr></thead>
+            <tbody id="ratesBody">
+              <tr><td colspan="6" class="empty"><div class="mark">Loading</div>Loading default rates…</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- Tab: Hidden -->
+    <div class="tab-pane" data-tab-pane="hidden">
+      <div class="panel mb-4">
+        <div class="panel-head">
+          <div>
+            <div class="panel-title">Hide an item from the engineer catalogue</div>
+            <p class="text-xs text-gray-500 mt-1">Hidden items are excluded from <code>/engineer-catalog.html</code>. Use this for painter-only SKUs, discontinued lines, or stock not available to B2B engineer accounts.</p>
+          </div>
+        </div>
+        <div class="panel-body">
+          <div class="form-row">
+            <div class="field picker-wrap">
+              <label>Find item</label>
+              <input id="hideItemSearch" type="text" placeholder="Type to search products...">
+              <div class="picker-results" id="hideItemResults"></div>
+              <input type="hidden" id="hideItemId">
+              <div id="hideItemSelected" class="text-xs text-gray-600 mt-1"></div>
+            </div>
+            <div class="field">
+              <label>Reason (optional)</label>
+              <input id="hideReason" placeholder="e.g. Painter-exclusive, Discontinued">
+            </div>
+          </div>
+          <div class="flex justify-end mt-4">
+            <button class="btn btn-primary" id="hideBtn">+ Hide From Engineers</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="panel">
+        <div class="panel-head">
+          <div class="panel-title">Currently hidden items</div>
+          <span class="text-xs text-gray-500" id="hiddenCount">—</span>
+        </div>
+        <div style="overflow-x:auto;">
+          <table class="data-table">
+            <thead><tr>
+              <th>Item</th><th>Brand / Category</th><th class="num">List Rate</th><th>Reason</th><th>Hidden Since</th><th></th>
+            </tr></thead>
+            <tbody id="hiddenBody">
+              <tr><td colspan="6" class="empty"><div class="mark">Loading</div>Loading hidden items…</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <div class="toast" id="toast"></div>
+
+  <script>
+    var API = '/api/engineers';
+
+    function authHeaders(extra) {
+      var t = localStorage.getItem('auth_token') || '';
+      var h = { 'Authorization': 'Bearer ' + t };
+      if (extra) Object.keys(extra).forEach(function (k) { h[k] = extra[k]; });
+      return h;
+    }
+    function toast(msg, kind) {
+      var t = document.getElementById('toast');
+      t.textContent = msg;
+      t.classList.toggle('err', kind === 'err');
+      t.classList.add('show');
+      setTimeout(function () { t.classList.remove('show'); }, 2400);
+    }
+    function escHTML(s) {
+      return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) {
+        return { '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c];
+      });
+    }
+    function fmtINR(n) {
+      if (n == null || isNaN(n)) return '—';
+      return '₹ ' + Math.round(parseFloat(n)).toLocaleString('en-IN');
+    }
+    function fmtDate(d) {
+      if (!d) return '—';
+      return new Date(d).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
+    }
+
+    /* ─── Tabs ─── */
+    document.querySelectorAll('.tab-btn').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        var tab = btn.dataset.tab;
+        document.querySelectorAll('.tab-btn').forEach(function (b) { b.classList.toggle('active', b === btn); });
+        document.querySelectorAll('.tab-pane').forEach(function (p) {
+          p.classList.toggle('active', p.dataset.tabPane === tab);
+        });
+        if (tab === 'rates') loadRates();
+        if (tab === 'hidden') loadHidden();
+      });
+    });
+
+    /* ─── Load filter dropdowns ─── */
+    async function loadFilters() {
+      try {
+        var r = await fetch(API + '/admin/filters', { headers: authHeaders() });
+        var data = await r.json();
+        if (!data.success) return;
+        var b = document.getElementById('rateBrand');
+        var c = document.getElementById('rateCategory');
+        (data.brands || []).forEach(function (br) {
+          var o = document.createElement('option'); o.value = br; o.textContent = br; b.appendChild(o);
+        });
+        (data.categories || []).forEach(function (cat) {
+          var o = document.createElement('option'); o.value = cat; o.textContent = cat; c.appendChild(o);
+        });
+      } catch (e) { console.error(e); }
+    }
+
+    /* ─── Scope switcher ─── */
+    document.getElementById('rateScope').addEventListener('change', function (e) {
+      var s = e.target.value;
+      document.getElementById('brandWrap').style.display    = s === 'brand'    ? '' : 'none';
+      document.getElementById('categoryWrap').style.display = s === 'category' ? '' : 'none';
+      document.getElementById('itemWrap').style.display     = s === 'item'     ? '' : 'none';
+    });
+
+    /* ─── Item picker (shared) ─── */
+    function wireItemPicker(searchId, resultsId, hiddenId, selectedId) {
+      var input = document.getElementById(searchId);
+      var results = document.getElementById(resultsId);
+      var hidden = document.getElementById(hiddenId);
+      var selected = document.getElementById(selectedId);
+      var timer;
+      input.addEventListener('input', function () {
+        var q = input.value.trim();
+        clearTimeout(timer);
+        if (q.length < 2) { results.classList.remove('is-open'); return; }
+        timer = setTimeout(async function () {
+          try {
+            var r = await fetch(API + '/admin/items/search?q=' + encodeURIComponent(q), { headers: authHeaders() });
+            var data = await r.json();
+            if (!data.success) return;
+            if (!data.items.length) {
+              results.innerHTML = '<div class="picker-row" style="cursor:default;color:#94a3b8;">No matching items.</div>';
+            } else {
+              results.innerHTML = data.items.map(function (it) {
+                return '<div class="picker-row" data-id="' + escHTML(it.zoho_item_id) + '" data-name="' + escHTML(it.zoho_item_name) + '" data-brand="' + escHTML(it.zoho_brand || '') + '">'
+                  + '<div class="name">' + escHTML(it.zoho_item_name) + '</div>'
+                  + '<div class="meta">' + escHTML(it.zoho_brand || '—') + ' · ' + fmtINR(it.zoho_rate) + ' · ' + escHTML(it.zoho_item_id) + '</div>'
+                  + '</div>';
+              }).join('');
+              results.querySelectorAll('[data-id]').forEach(function (row) {
+                row.addEventListener('click', function () {
+                  hidden.value = row.dataset.id;
+                  selected.innerHTML = 'Selected: <strong>' + escHTML(row.dataset.name) + '</strong> <span class="text-gray-400">(' + escHTML(row.dataset.id) + ')</span>';
+                  input.value = row.dataset.name;
+                  results.classList.remove('is-open');
+                });
+              });
+            }
+            results.classList.add('is-open');
+          } catch (e) { console.error(e); }
+        }, 240);
+      });
+      document.addEventListener('click', function (e) {
+        if (!input.contains(e.target) && !results.contains(e.target)) results.classList.remove('is-open');
+      });
+    }
+    wireItemPicker('rateItemSearch', 'rateItemResults', 'rateItemId', 'rateItemSelected');
+    wireItemPicker('hideItemSearch', 'hideItemResults', 'hideItemId', 'hideItemSelected');
+
+    /* ─── Default rates ─── */
+    async function loadRates() {
+      var tbody = document.getElementById('ratesBody');
+      try {
+        var r = await fetch(API + '/admin/default-rates', { headers: authHeaders() });
+        var data = await r.json();
+        if (!data.success) throw new Error(data.message || 'Failed');
+        var rates = data.rates || [];
+        document.getElementById('ratesCount').textContent = rates.length + ' rule' + (rates.length === 1 ? '' : 's');
+        if (!rates.length) {
+          tbody.innerHTML = '<tr><td colspan="6" class="empty"><div class="mark">No Rules</div>No default rates configured. Engineers see list prices unless per-engineer rates are set.</td></tr>';
+          return;
+        }
+        tbody.innerHTML = rates.map(function (rt) {
+          return '<tr>'
+            + '<td><span class="badge badge-' + rt.scope + '">' + escHTML(rt.scope) + '</span></td>'
+            + '<td><div class="font-semibold text-gray-900">' + escHTML(rt.display_name || rt.target_id) + '</div></td>'
+            + '<td class="num"><strong style="color:#10b981;">' + parseFloat(rt.discount_pct).toFixed(2) + '%</strong></td>'
+            + '<td class="text-gray-500 text-xs">' + escHTML(rt.notes || '—') + '</td>'
+            + '<td class="text-gray-500 text-xs">' + fmtDate(rt.updated_at) + '</td>'
+            + '<td class="num"><button class="btn btn-danger btn-sm" onclick="deleteRate(' + rt.id + ')">Remove</button></td>'
+            + '</tr>';
+        }).join('');
+      } catch (err) {
+        tbody.innerHTML = '<tr><td colspan="6" class="empty" style="color:#b71c1c;">' + escHTML(err.message) + '</td></tr>';
+      }
+    }
+    document.getElementById('addRateBtn').addEventListener('click', async function () {
+      var scope = document.getElementById('rateScope').value;
+      var disc = parseFloat(document.getElementById('rateDiscount').value);
+      var notes = document.getElementById('rateNotes').value.trim();
+      var target = '';
+      if (scope === 'brand') target = document.getElementById('rateBrand').value;
+      else if (scope === 'category') target = document.getElementById('rateCategory').value;
+      else if (scope === 'item') target = document.getElementById('rateItemId').value;
+      if (!target) { toast('Choose a target (brand/category/item)', 'err'); return; }
+      if (!Number.isFinite(disc) || disc < 0 || disc > 100) { toast('Discount must be 0-100', 'err'); return; }
+      try {
+        var r = await fetch(API + '/admin/default-rates', {
+          method: 'POST', headers: authHeaders({ 'Content-Type': 'application/json' }),
+          body: JSON.stringify({ scope: scope, target_id: target, discount_pct: disc, notes: notes || null })
+        });
+        var data = await r.json();
+        if (!data.success) throw new Error(data.message);
+        toast('Default rate saved.');
+        document.getElementById('rateDiscount').value = '';
+        document.getElementById('rateNotes').value = '';
+        document.getElementById('rateItemSearch').value = '';
+        document.getElementById('rateItemId').value = '';
+        document.getElementById('rateItemSelected').innerHTML = '';
+        await loadRates();
+      } catch (err) { toast(err.message, 'err'); }
+    });
+    window.deleteRate = async function (id) {
+      if (!confirm('Remove this default rate?')) return;
+      try {
+        var r = await fetch(API + '/admin/default-rates/' + id, { method: 'DELETE', headers: authHeaders() });
+        var data = await r.json();
+        if (!data.success) throw new Error(data.message);
+        toast('Removed.');
+        await loadRates();
+      } catch (err) { toast(err.message, 'err'); }
+    };
+
+    /* ─── Hidden items ─── */
+    async function loadHidden() {
+      var tbody = document.getElementById('hiddenBody');
+      try {
+        var r = await fetch(API + '/admin/hidden-items', { headers: authHeaders() });
+        var data = await r.json();
+        if (!data.success) throw new Error(data.message || 'Failed');
+        var items = data.items || [];
+        document.getElementById('hiddenCount').textContent = items.length + ' item' + (items.length === 1 ? '' : 's') + ' hidden';
+        if (!items.length) {
+          tbody.innerHTML = '<tr><td colspan="6" class="empty"><div class="mark">All Visible</div>No items hidden from the engineer catalogue. Every active Zoho item is visible by default.</td></tr>';
+          return;
+        }
+        tbody.innerHTML = items.map(function (it) {
+          return '<tr>'
+            + '<td><div class="font-semibold text-gray-900">' + escHTML(it.zoho_item_name || it.zoho_item_id) + '</div><div class="text-xs text-gray-400 font-mono">' + escHTML(it.zoho_item_id) + '</div></td>'
+            + '<td class="text-gray-600">' + escHTML(it.zoho_brand || '—') + (it.zoho_category_name ? ' · ' + escHTML(it.zoho_category_name) : '') + '</td>'
+            + '<td class="num">' + fmtINR(it.zoho_rate) + '</td>'
+            + '<td class="text-gray-500 text-xs">' + escHTML(it.reason || '—') + '</td>'
+            + '<td class="text-gray-500 text-xs">' + fmtDate(it.created_at) + '</td>'
+            + '<td class="num"><button class="btn btn-outline btn-sm" onclick="restoreItem(\'' + escHTML(it.zoho_item_id) + '\')">Restore</button></td>'
+            + '</tr>';
+        }).join('');
+      } catch (err) {
+        tbody.innerHTML = '<tr><td colspan="6" class="empty" style="color:#b71c1c;">' + escHTML(err.message) + '</td></tr>';
+      }
+    }
+    document.getElementById('hideBtn').addEventListener('click', async function () {
+      var id = document.getElementById('hideItemId').value;
+      var reason = document.getElementById('hideReason').value.trim();
+      if (!id) { toast('Pick an item from the search results', 'err'); return; }
+      try {
+        var r = await fetch(API + '/admin/hidden-items', {
+          method: 'POST', headers: authHeaders({ 'Content-Type': 'application/json' }),
+          body: JSON.stringify({ zoho_item_id: id, reason: reason || null })
+        });
+        var data = await r.json();
+        if (!data.success) throw new Error(data.message);
+        toast('Item hidden.');
+        document.getElementById('hideItemSearch').value = '';
+        document.getElementById('hideItemId').value = '';
+        document.getElementById('hideItemSelected').innerHTML = '';
+        document.getElementById('hideReason').value = '';
+        await loadHidden();
+      } catch (err) { toast(err.message, 'err'); }
+    });
+    window.restoreItem = async function (id) {
+      if (!confirm('Restore this item to the engineer catalogue?')) return;
+      try {
+        var r = await fetch(API + '/admin/hidden-items/' + encodeURIComponent(id), { method: 'DELETE', headers: authHeaders() });
+        var data = await r.json();
+        if (!data.success) throw new Error(data.message);
+        toast('Restored.');
+        await loadHidden();
+      } catch (err) { toast(err.message, 'err'); }
+    };
+
+    // Initial load
+    loadFilters();
+    loadRates();
+  </script>
+</body>
+</html>
