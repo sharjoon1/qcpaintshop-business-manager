@@ -1765,6 +1765,23 @@ async function processBulkJob(jobId) {
                 UPDATE zoho_bulk_job_items SET status = 'completed', response_data = ?, processed_at = NOW(), attempts = attempts + 1 WHERE id = ?
             `, [JSON.stringify(result), item.id]);
 
+            // Deferred SKU mirror: only write zoho_items_map.zoho_sku now that
+            // Zoho has confirmed the update. Writing it optimistically (before
+            // this point) caused the "duplicate-SKU corruption" bug where a
+            // partial bulk job left several local rows sharing one SKU, which
+            // the DPL proposer then re-pushed to Zoho on the next run and got
+            // rejected with "error 1001". See routes/zoho.js bulk-edit handler.
+            if (payload && Object.prototype.hasOwnProperty.call(payload, 'sku')) {
+                try {
+                    await pool.query(
+                        `UPDATE zoho_items_map SET zoho_sku = ? WHERE zoho_item_id = ?`,
+                        [String(payload.sku), item.zoho_item_id]
+                    );
+                } catch (skuErr) {
+                    console.error(`[BulkJob] post-confirm SKU mirror failed for ${item.zoho_item_id}:`, skuErr.message);
+                }
+            }
+
             processed++;
         } catch (e) {
             failed++;

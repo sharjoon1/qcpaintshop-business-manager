@@ -618,6 +618,192 @@
     function esc(s) { if (s == null) return ''; return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
     function getToken() { return localStorage.getItem('auth_token') || ''; }
 
+    // ============ DUPLICATE-SKU GUARD ============
+    // Zoho enforces SKU uniqueness. If we push the same SKU twice in one bulk
+    // job, only the first item gets it and the rest fail with "1001: SKU
+    // already exists". This guard catches that *before* the push:
+    //   1. Group the batch by changes.sku
+    //   2. For any group of size >1, derive a unique suggestion per row using
+    //      the shade word in the proposed/Zoho name (OPCL01 + "ORANGE" → OPCL01-OR)
+    //   3. Show a modal letting the user accept the suggestions or edit them
+    //   4. Apply the new SKUs back into the items array, then push
+    function findDuplicateSkuGroups(items) {
+        var bySku = {};
+        items.forEach(function(it) {
+            var sku = it.changes && it.changes.sku ? String(it.changes.sku).trim().toUpperCase() : '';
+            if (!sku) return;
+            (bySku[sku] = bySku[sku] || []).push(it);
+        });
+        return Object.keys(bySku).filter(function(k){ return bySku[k].length > 1; }).map(function(k){ return bySku[k]; });
+    }
+
+    // Pull the shade word(s) out of an item name like
+    //   "OPCL01 ORANGE BIRLA OPUS 01 L"  → "ORANGE"
+    //   "OPCL01 YELLOW OXIDE BIRLA OPUS 01 L" → "YELLOW OXIDE"
+    function extractShadePhrase(itemName, baseSku) {
+        var n = String(itemName || '').toUpperCase().trim();
+        var sku = String(baseSku || '').toUpperCase().trim();
+        if (sku && n.indexOf(sku) === 0) n = n.slice(sku.length).trim();
+        // Strip brand block "BIRLA OPUS" + everything after
+        n = n.replace(/\s+BIRLA\s+OPUS.*$/, '').trim();
+        // Strip a leading category word that isn't a colour ("EMULSION", etc.)
+        n = n.replace(/\s+(EMULSION|PRIMER|PUTTY|COLORANT|PAINT)\s*$/i, '').trim();
+        // Strip trailing pack tokens like " 01 L", " 200 ML"
+        n = n.replace(/\s+\d+(\.\d+)?\s*[A-Z]+\s*$/, '').trim();
+        return n;
+    }
+
+    // 2–3 letter code: single-word shade → first 2 chars (ORANGE → OR);
+    // multi-word shade → initials (YELLOW OXIDE → YO, EXT. HD YELLOW → EHY → trimmed to 3).
+    function shadeToCode(shade) {
+        if (!shade) return null;
+        var words = shade.replace(/[^A-Z\s]/g, ' ').split(/\s+/).filter(Boolean);
+        if (!words.length) return null;
+        if (words.length === 1) return words[0].slice(0, 2);
+        return words.map(function(w){ return w.charAt(0); }).join('').slice(0, 3);
+    }
+
+    function suggestUniqueSkuFor(item, baseSku, takenSet) {
+        var shade = extractShadePhrase(item.item_name, baseSku);
+        var code = shadeToCode(shade);
+        var attempt = code ? (baseSku + '-' + code) : baseSku;
+        var n = 2;
+        while (takenSet.has(attempt.toUpperCase())) {
+            attempt = (code ? (baseSku + '-' + code) : baseSku) + '-' + n;
+            n++;
+        }
+        return attempt;
+    }
+
+    // Build a {zoho_item_id: suggested_sku} map for every row in every dup group.
+    // The first row in each group keeps its original SKU (presumed canonical).
+    function suggestUniqueSkusForDupGroups(dupGroups) {
+        var taken = new Set();
+        // First pass: lock in the "winners" (first item of each group keeps SKU)
+        dupGroups.forEach(function(grp){ taken.add(String(grp[0].changes.sku).toUpperCase()); });
+        var suggestions = {};
+        dupGroups.forEach(function(grp) {
+            var baseSku = String(grp[0].changes.sku).toUpperCase();
+            for (var i = 1; i < grp.length; i++) {
+                var newSku = suggestUniqueSkuFor(grp[i], baseSku, taken);
+                taken.add(newSku.toUpperCase());
+                suggestions[grp[i].zoho_item_id] = newSku;
+            }
+        });
+        return suggestions;
+    }
+
+    // Render a modal asking the user to confirm/edit the auto-suggested SKUs.
+    // Resolves to { zoho_item_id → new_sku }, or null on cancel.
+    function showDupResolverModal(dupGroups, suggestions) {
+        return new Promise(function(resolve) {
+            var overlay = document.createElement('div');
+            overlay.style.cssText = 'position:fixed;inset:0;background:rgba(15,23,42,0.55);display:flex;align-items:center;justify-content:center;z-index:9999;padding:20px';
+            var box = document.createElement('div');
+            box.style.cssText = 'background:#fff;border-radius:12px;max-width:760px;width:100%;max-height:90vh;display:flex;flex-direction:column;box-shadow:0 20px 60px rgba(0,0,0,0.35)';
+            var totalDupes = dupGroups.reduce(function(s,g){ return s + (g.length - 1); }, 0);
+            var head =
+                '<div style="padding:18px 22px;border-bottom:1px solid #e5e7eb">' +
+                '  <div style="font-size:16px;font-weight:700;color:#b91c1c;display:flex;align-items:center;gap:8px">' +
+                '    <svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01M5 19h14a2 2 0 0 0 1.84-2.75L13.74 4a2 2 0 0 0-3.48 0L3.16 16.25A2 2 0 0 0 5 19z"/></svg>' +
+                '    Duplicate SKUs detected' +
+                '  </div>' +
+                '  <div style="font-size:13px;color:#475569;margin-top:6px">' +
+                       totalDupes + ' item(s) in this push share an existing SKU with another row. Zoho would reject the duplicates. ' +
+                '    We auto-suggested unique SKUs based on each item\'s shade — review or edit, then continue.' +
+                '  </div>' +
+                '</div>';
+            var body = '<div style="overflow:auto;padding:6px 22px 14px">';
+            dupGroups.forEach(function(grp) {
+                var baseSku = String(grp[0].changes.sku);
+                body += '<div style="margin-top:14px"><div style="font-size:11px;font-weight:700;color:#64748b;letter-spacing:0.4px;text-transform:uppercase;margin-bottom:6px">Conflict on SKU \'' + esc(baseSku) + '\' — ' + grp.length + ' rows</div>';
+                body += '<table style="width:100%;border-collapse:collapse;font-size:12.5px">';
+                body += '<thead><tr style="background:#f8fafc"><th style="text-align:left;padding:7px 10px;font-size:11px;color:#475569;font-weight:600">Item</th><th style="text-align:left;padding:7px 10px;font-size:11px;color:#475569;font-weight:600;width:180px">SKU to push</th></tr></thead><tbody>';
+                grp.forEach(function(it, idx) {
+                    var isWinner = (idx === 0);
+                    var suggested = isWinner ? baseSku : (suggestions[it.zoho_item_id] || baseSku);
+                    body += '<tr style="border-top:1px solid #f1f5f9">' +
+                            '<td style="padding:8px 10px;color:#0f172a">' + esc(it.item_name || '(no name)') +
+                              (isWinner ? ' <span style="font-size:10px;color:#15803d;font-weight:600;margin-left:4px">KEEPS ORIGINAL</span>' : '') +
+                            '</td>' +
+                            '<td style="padding:8px 10px">' +
+                              '<input data-dup-zid="' + esc(it.zoho_item_id) + '" value="' + esc(suggested) + '" ' +
+                                (isWinner ? 'readonly style="width:100%;padding:5px 8px;border:1px solid #e2e8f0;border-radius:5px;background:#f8fafc;color:#64748b;font-family:monospace"' :
+                                 'style="width:100%;padding:5px 8px;border:1px solid #6366f1;border-radius:5px;background:#eef2ff;color:#3730a3;font-family:monospace;font-weight:600"') + '>' +
+                            '</td></tr>';
+                });
+                body += '</tbody></table></div>';
+            });
+            body += '<div style="margin-top:14px;padding:10px 12px;background:#fef9c3;border:1px solid #fde047;border-radius:6px;font-size:12px;color:#78350f"><strong>Note:</strong> The first row in each group keeps its original SKU. Edit the suggested SKUs above if a different convention is preferred. SKUs must be unique across all active Zoho items.</div>';
+            body += '</div>';
+            var foot =
+                '<div style="padding:14px 22px;border-top:1px solid #e5e7eb;display:flex;gap:10px;justify-content:flex-end;background:#fafafa;border-radius:0 0 12px 12px">' +
+                '  <button id="dupCancelBtn" style="padding:9px 18px;border-radius:6px;border:1px solid #d1d5db;background:#fff;color:#1f2937;font-size:13px;font-weight:600;cursor:pointer">Cancel push</button>' +
+                '  <button id="dupConfirmBtn" style="padding:9px 18px;border-radius:6px;border:0;background:#1B5E3B;color:#fff;font-size:13px;font-weight:600;cursor:pointer">Apply unique SKUs & push</button>' +
+                '</div>';
+            box.innerHTML = head + body + foot;
+            overlay.appendChild(box);
+            document.body.appendChild(overlay);
+            function close(val) { document.body.removeChild(overlay); resolve(val); }
+            box.querySelector('#dupCancelBtn').onclick = function() { close(null); };
+            box.querySelector('#dupConfirmBtn').onclick = function() {
+                var out = {};
+                var seen = new Set();
+                var bad = null;
+                box.querySelectorAll('input[data-dup-zid]').forEach(function(inp) {
+                    var zid = inp.getAttribute('data-dup-zid');
+                    var sku = String(inp.value || '').trim();
+                    if (!sku) { bad = bad || ('Empty SKU for item ' + zid); return; }
+                    var up = sku.toUpperCase();
+                    if (seen.has(up)) { bad = bad || ('Still duplicate: ' + sku); return; }
+                    seen.add(up);
+                    out[zid] = sku;
+                });
+                if (bad) { showToast(bad, 'error'); return; }
+                close(out);
+            };
+        });
+    }
+
+    // Single wrapper that all three "push" call sites use. Runs the dup-SKU
+    // guard, then POSTs to the bulk-edit endpoint. Surfaces backend dup
+    // rejection codes (DUPLICATE_SKUS_IN_BATCH / SKU_HELD_BY_OTHER_ITEM)
+    // with a clearer message than the generic 400.
+    async function postBulkEditWithDupCheck(items) {
+        var groups = findDuplicateSkuGroups(items);
+        if (groups.length) {
+            var suggestions = suggestUniqueSkusForDupGroups(groups);
+            var resolution = await showDupResolverModal(groups, suggestions);
+            if (resolution === null) {
+                var err = new Error('Cancelled — duplicate SKUs need to be resolved before push');
+                err.cancelled = true;
+                throw err;
+            }
+            items.forEach(function(it) { if (resolution[it.zoho_item_id]) it.changes.sku = resolution[it.zoho_item_id]; });
+        }
+        var resp = await fetch('/api/zoho/items/bulk-edit', {
+            method: 'POST',
+            headers: { 'Authorization': 'Bearer ' + getToken(), 'Content-Type': 'application/json' },
+            body: JSON.stringify({ items: items })
+        });
+        var data = await resp.json().catch(function(){ return {}; });
+        if (!resp.ok) {
+            if (data.code === 'DUPLICATE_SKUS_IN_BATCH') {
+                var msg = 'Duplicate SKUs in batch — server-side check:\n' +
+                          (data.duplicates || []).map(function(grp){ return grp.map(function(it){ return it.sku + ' → ' + it.item_name; }).join('  |  '); }).join('\n');
+                throw new Error(msg);
+            }
+            if (data.code === 'SKU_HELD_BY_OTHER_ITEM') {
+                var msg2 = 'SKU(s) already held by other items in Zoho:\n' +
+                           (data.conflicts || []).map(function(c){ return c.batch_item.sku + ' for "' + c.batch_item.item_name + '" is held by "' + c.already_held_by.item_name + '"'; }).join('\n');
+                throw new Error(msg2);
+            }
+            throw new Error(data.message || ('HTTP ' + resp.status));
+        }
+        if (!data.success) throw new Error(data.message || 'Push failed');
+        return data;
+    }
+
     function setStep(n) {
         [1,2,3].forEach(function(i) {
             document.getElementById('step' + i).classList.toggle('hidden', i !== n);
@@ -1991,20 +2177,15 @@
         var btn = document.getElementById('aiApplyBtn'), sp = document.getElementById('aiApplySpinner');
         btn.disabled = true; sp.classList.remove('hidden');
         try {
-            var resp = await fetch('/api/zoho/items/bulk-edit', {
-                method: 'POST',
-                headers: { 'Authorization': 'Bearer ' + getToken(), 'Content-Type': 'application/json' },
-                body: JSON.stringify({ items: items })
-            });
-            var data = await resp.json();
-            if (!resp.ok || !data.success) throw new Error(data.message || 'Push failed');
+            await postBulkEditWithDupCheck(items);
             setStep(3);
             document.getElementById('doneTitle').textContent = 'Items Updated & Queued!';
             document.getElementById('doneMsg').textContent = items.length + ' items updated. Zoho Books sync running in background.';
             document.getElementById('bulkJobLink').classList.remove('hidden');
             showToast('Bulk job created for ' + items.length + ' items', 'success');
         } catch (err) {
-            showToast('Push error: ' + err.message, 'error');
+            if (err && err.cancelled) showToast(err.message, 'info');
+            else showToast('Push error: ' + err.message, 'error');
         } finally {
             btn.disabled = false; sp.classList.add('hidden');
         }
@@ -2310,13 +2491,7 @@
                 };
             });
 
-            var resp = await fetch('/api/zoho/items/bulk-edit', {
-                method: 'POST',
-                headers: { 'Authorization': 'Bearer ' + getToken(), 'Content-Type': 'application/json' },
-                body: JSON.stringify({ items: bulkItems })
-            });
-            var data = await resp.json();
-            if (!resp.ok || !data.success) throw new Error(data.message || 'Push failed');
+            await postBulkEditWithDupCheck(bulkItems);
 
             setStep(3);
             document.getElementById('doneTitle').textContent = 'Items Updated & Queued for Zoho Sync!';
@@ -2324,7 +2499,8 @@
             document.getElementById('bulkJobLink').classList.remove('hidden');
             showToast('Bulk job created for ' + selected.length + ' items', 'success');
         } catch (err) {
-            showToast('Push error: ' + err.message, 'error');
+            if (err && err.cancelled) showToast(err.message, 'info');
+            else showToast('Push error: ' + err.message, 'error');
         } finally {
             btn.disabled = false; sp.classList.add('hidden');
         }
@@ -2629,20 +2805,15 @@
         var btn = document.getElementById('apApplyBtn'), sp = document.getElementById('apApplySpinner');
         btn.disabled = true; sp.classList.remove('hidden');
         try {
-            var resp = await fetch('/api/zoho/items/bulk-edit', {
-                method: 'POST',
-                headers: { 'Authorization': 'Bearer ' + getToken(), 'Content-Type': 'application/json' },
-                body: JSON.stringify({ items: items })
-            });
-            var data = await resp.json();
-            if (!resp.ok || !data.success) throw new Error(data.message || 'Push failed');
+            await postBulkEditWithDupCheck(items);
             setStep(3);
             document.getElementById('doneTitle').textContent = 'Items Updated & Queued!';
             document.getElementById('doneMsg').textContent = items.length + ' items updated. Zoho Books sync running in background.';
             document.getElementById('bulkJobLink').classList.remove('hidden');
             showToast('Bulk job created for ' + items.length + ' items', 'success');
         } catch (err) {
-            showToast('Push error: ' + err.message, 'error');
+            if (err && err.cancelled) showToast(err.message, 'info');
+            else showToast('Push error: ' + err.message, 'error');
         } finally {
             btn.disabled = false; sp.classList.add('hidden');
         }

@@ -2681,6 +2681,73 @@ router.post('/items/bulk-edit', requirePermission('zoho', 'manage'), async (req,
             }
         }
 
+        // Reject batches that would push the same SKU to multiple distinct
+        // Zoho items — Zoho enforces SKU uniqueness, so the first item wins
+        // and the rest fail with "error 1001: SKU already exists", and the
+        // partial failure leaves the local mirror in a corrupted state.
+        //
+        // We also reject when a SKU in the batch is already held by a
+        // DIFFERENT active item in our local mirror (the classic
+        // OPCL01-WHITE vs OPCL01-ORANGE situation): the only thing that
+        // would happen on Zoho is a rejection anyway, and we'd rather the
+        // user fix it now than discover it 6 minutes into a 200-item job.
+        {
+            const skuToItems = new Map();
+            for (const it of items) {
+                const sku = it.changes && it.changes.sku ? String(it.changes.sku).trim() : '';
+                if (!sku) continue;
+                const key = sku.toUpperCase();
+                if (!skuToItems.has(key)) skuToItems.set(key, []);
+                skuToItems.get(key).push({ zoho_item_id: it.zoho_item_id, item_name: it.item_name || '', sku });
+            }
+            const batchDupes = [];
+            for (const [_, list] of skuToItems) {
+                if (list.length > 1) batchDupes.push(list);
+            }
+            if (batchDupes.length) {
+                return res.status(400).json({
+                    success: false,
+                    code: 'DUPLICATE_SKUS_IN_BATCH',
+                    message: 'Batch contains multiple items being pushed with the same SKU. Zoho enforces SKU uniqueness, so this would fail. Edit the SKUs to make them unique.',
+                    duplicates: batchDupes
+                });
+            }
+            // Cross-check against the local mirror for SKUs already held by
+            // ANOTHER active item that is NOT in this batch.
+            const skuList = Array.from(skuToItems.keys());
+            if (skuList.length) {
+                const batchIds = items.map(i => i.zoho_item_id);
+                const [held] = await pool.query(
+                    `SELECT zoho_item_id, zoho_sku, zoho_item_name
+                       FROM zoho_items_map
+                      WHERE zoho_status = 'active'
+                        AND UPPER(zoho_sku) IN (${skuList.map(() => '?').join(',')})`,
+                    skuList
+                );
+                const conflicts = [];
+                for (const row of held) {
+                    const rowSku = String(row.zoho_sku || '').toUpperCase();
+                    const batchEntries = skuToItems.get(rowSku) || [];
+                    for (const be of batchEntries) {
+                        if (be.zoho_item_id !== row.zoho_item_id) {
+                            conflicts.push({
+                                batch_item: be,
+                                already_held_by: { zoho_item_id: row.zoho_item_id, item_name: row.zoho_item_name }
+                            });
+                        }
+                    }
+                }
+                if (conflicts.length) {
+                    return res.status(400).json({
+                        success: false,
+                        code: 'SKU_HELD_BY_OTHER_ITEM',
+                        message: 'One or more SKUs in the batch are already held by a different active item in Zoho. Push would fail with "SKU already exists". Edit to use unique SKUs.',
+                        conflicts
+                    });
+                }
+            }
+        }
+
         // Create bulk job
         const [jobResult] = await pool.query(`
             INSERT INTO zoho_bulk_jobs (job_type, filter_criteria, update_fields, total_items, created_by)
@@ -2714,9 +2781,17 @@ router.post('/items/bulk-edit', requirePermission('zoho', 'manage'), async (req,
             `, [jobId, item.zoho_item_id, itemName, JSON.stringify(item.changes)]);
         }
 
-        // Also update local zoho_items_map so edits persist before Zoho sync
+        // Also update local zoho_items_map so edits persist before Zoho sync.
+        // NOTE: `sku` is deliberately excluded here — Zoho enforces SKU
+        // uniqueness, so an optimistic local SKU write can leave us with two
+        // active items sharing the same SKU when Zoho rejects the second push
+        // ("error 1001: SKU already exists"). On the next admin-dpl run, the
+        // proposer reads the corrupted SKU and proposes another colliding
+        // push. The SKU write now lives in services/zoho-api.js inside the
+        // bulk-job worker, fired only after Zoho confirms the row.
         const FIELD_MAP = {
-            name: 'zoho_item_name', sku: 'zoho_sku', rate: 'zoho_rate',
+            name: 'zoho_item_name', /* sku intentionally NOT here — see comment above */
+            rate: 'zoho_rate',
             purchase_rate: 'zoho_purchase_rate', cf_dpl: 'zoho_cf_dpl',
             label_rate: 'zoho_label_rate',
             unit: 'zoho_unit', hsn_or_sac: 'zoho_hsn_or_sac',
