@@ -207,9 +207,16 @@
         });
         var data = await r.json();
         if (!r.ok || !data.success) throw new Error(data.message || 'Invalid OTP. Try again.');
-        if (data.token) { try { localStorage.setItem('customer_token', data.token); } catch (_) {} }
-        try { localStorage.setItem('qc_user_type', 'engineer'); } catch (_) {}
-        window.location.href = data.redirect || '/customer-dashboard.html';
+        var d = data.data || {};
+        try {
+          localStorage.setItem('customer_phone', currentPhone);
+          localStorage.setItem('customer_name', d.name || 'Engineer');
+          localStorage.setItem('customer_logged_in', 'true');
+          localStorage.setItem('customer_token', d.token || '');
+          localStorage.setItem('customer_id', d.customer_id || '');
+          localStorage.setItem('qc_user_type', 'engineer');
+        } catch (_) {}
+        window.location.href = '/engineer-dashboard.html';
       } catch (e) {
         showErr(otpErr, e.message || 'Could not verify. Try again.');
       } finally {
