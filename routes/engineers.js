@@ -392,6 +392,210 @@ router.post('/me/quotes', requireEngineerSession, async (req, res) => {
   }
 });
 
+// ───── Engineer rate resolver ─────
+// Loads engineer's discount overrides and returns
+// (zohoItemId, brand, category) -> { discount_pct } with priority item > brand > category.
+async function getEngineerRateResolver(engineerId) {
+  if (!engineerId) return () => ({ discount_pct: 0 });
+  let rows;
+  try {
+    [rows] = await pool.query(
+      `SELECT scope, target_id, zoho_item_id, discount_pct
+         FROM engineer_custom_rates WHERE engineer_id = ?`,
+      [engineerId]
+    );
+  } catch (err) {
+    if (err && err.code === 'ER_NO_SUCH_TABLE') return () => ({ discount_pct: 0 });
+    throw err;
+  }
+  const byItem = new Map();
+  const byBrand = new Map();
+  const byCategory = new Map();
+  for (const r of rows) {
+    const pct = parseFloat(r.discount_pct || 0);
+    if (r.scope === 'item' && r.zoho_item_id) byItem.set(String(r.zoho_item_id), pct);
+    else if (r.scope === 'brand') byBrand.set(r.target_id, pct);
+    else if (r.scope === 'category') byCategory.set(r.target_id, pct);
+  }
+  return (zohoItemId, brand, category) => {
+    let pct = 0;
+    if (zohoItemId && byItem.has(String(zohoItemId))) pct = byItem.get(String(zohoItemId));
+    else if (brand && byBrand.has(brand)) pct = byBrand.get(brand);
+    else if (category && byCategory.has(category)) pct = byCategory.get(category);
+    return { discount_pct: pct };
+  };
+}
+
+function applyDiscount(rate, pct) {
+  const r = parseFloat(rate || 0);
+  const d = parseFloat(pct || 0);
+  if (!r || !d) return r;
+  return Math.round(r * (100 - d)) / 100;
+}
+
+// ───── Engineer catalog ─────
+// Browse products with engineer's effective price (after applicable discount).
+router.get('/me/catalog', requireEngineerAuth, async (req, res) => {
+  try {
+    const { search = '', brand = '', category = '' } = req.query;
+    const page = Math.max(1, parseInt(req.query.page) || 1);
+    const limit = Math.min(60, Math.max(1, parseInt(req.query.limit) || 24));
+    const offset = (page - 1) * limit;
+
+    const where = ["p.status = 'active'"];
+    const params = [];
+    if (search) {
+      where.push('(p.name LIKE ? OR zim.zoho_item_name LIKE ? OR zim.zoho_brand LIKE ?)');
+      const like = `%${search}%`;
+      params.push(like, like, like);
+    }
+    if (brand) { where.push('zim.zoho_brand = ?'); params.push(brand); }
+    if (category) { where.push('zim.zoho_category_name = ?'); params.push(category); }
+
+    const joins = `
+      FROM products p
+      INNER JOIN pack_sizes ps ON ps.product_id = p.id AND ps.is_active = 1
+      INNER JOIN zoho_items_map zim ON zim.zoho_item_id = ps.zoho_item_id
+        AND (zim.zoho_status = 'active' OR zim.zoho_status IS NULL)
+    `;
+    const whereSql = 'WHERE ' + where.join(' AND ');
+
+    const [[{ total }]] = await pool.query(
+      `SELECT COUNT(DISTINCT p.id) AS total ${joins} ${whereSql}`,
+      params
+    );
+
+    const [products] = await pool.query(
+      `SELECT p.id AS product_id, p.name,
+              MAX(zim.zoho_brand) AS brand,
+              MAX(zim.zoho_category_name) AS category,
+              MIN(CAST(zim.zoho_rate AS DECIMAL(10,2))) AS min_rate,
+              MAX(CAST(zim.zoho_rate AS DECIMAL(10,2))) AS max_rate,
+              COUNT(DISTINCT ps.id) AS variant_count,
+              (SELECT z2.image_url FROM pack_sizes ps2
+               INNER JOIN zoho_items_map z2 ON z2.zoho_item_id = ps2.zoho_item_id
+               WHERE ps2.product_id = p.id AND ps2.is_active = 1 AND z2.image_url IS NOT NULL
+               LIMIT 1) AS image_url,
+              GROUP_CONCAT(DISTINCT ps.zoho_item_id) AS variant_zoho_ids
+       ${joins} ${whereSql}
+       GROUP BY p.id, p.name
+       ORDER BY p.name ASC
+       LIMIT ? OFFSET ?`,
+      [...params, limit, offset]
+    );
+
+    const resolver = await getEngineerRateResolver(req.engineer.id);
+    const enriched = products.map(p => {
+      const ids = (p.variant_zoho_ids || '').split(',').filter(Boolean);
+      let bestPct = 0;
+      for (const id of ids) {
+        const { discount_pct } = resolver(id, p.brand, p.category);
+        if (discount_pct > bestPct) bestPct = discount_pct;
+      }
+      if (!bestPct && (p.brand || p.category)) {
+        bestPct = Math.max(
+          resolver(null, p.brand, null).discount_pct,
+          resolver(null, null, p.category).discount_pct
+        );
+      }
+      return {
+        product_id: p.product_id,
+        name: p.name,
+        brand: p.brand,
+        category: p.category,
+        image_url: p.image_url,
+        variant_count: p.variant_count,
+        list_min: p.min_rate,
+        list_max: p.max_rate,
+        discount_pct: bestPct,
+        effective_min: applyDiscount(p.min_rate, bestPct),
+        effective_max: applyDiscount(p.max_rate, bestPct)
+      };
+    });
+
+    res.json({
+      success: true,
+      products: enriched,
+      total,
+      page,
+      limit,
+      hasMore: offset + enriched.length < total
+    });
+  } catch (err) {
+    console.error('[engineers] me/catalog error:', err);
+    res.status(500).json({ success: false, message: 'Failed to load catalog' });
+  }
+});
+
+// Filter options (brands + categories present in active products)
+router.get('/me/catalog-filters', requireEngineerAuth, async (req, res) => {
+  try {
+    const [brands] = await pool.query(`
+      SELECT DISTINCT zim.zoho_brand AS brand
+        FROM products p
+        INNER JOIN pack_sizes ps ON ps.product_id = p.id AND ps.is_active = 1
+        INNER JOIN zoho_items_map zim ON zim.zoho_item_id = ps.zoho_item_id
+       WHERE p.status = 'active' AND zim.zoho_brand IS NOT NULL AND zim.zoho_brand <> ''
+       ORDER BY zim.zoho_brand
+    `);
+    const [categories] = await pool.query(`
+      SELECT DISTINCT zim.zoho_category_name AS category
+        FROM products p
+        INNER JOIN pack_sizes ps ON ps.product_id = p.id AND ps.is_active = 1
+        INNER JOIN zoho_items_map zim ON zim.zoho_item_id = ps.zoho_item_id
+       WHERE p.status = 'active' AND zim.zoho_category_name IS NOT NULL AND zim.zoho_category_name <> ''
+       ORDER BY zim.zoho_category_name
+    `);
+    res.json({
+      success: true,
+      brands: brands.map(b => b.brand),
+      categories: categories.map(c => c.category)
+    });
+  } catch (err) {
+    console.error('[engineers] me/catalog-filters error:', err);
+    res.status(500).json({ success: false, message: 'Failed to load filters' });
+  }
+});
+
+// Product detail with pack-size variants and engineer's effective price each
+router.get('/me/catalog/:productId', requireEngineerAuth, async (req, res) => {
+  try {
+    const [[product]] = await pool.query(
+      `SELECT id AS product_id, name, description, product_type, status
+         FROM products WHERE id = ? AND status = 'active'`,
+      [req.params.productId]
+    );
+    if (!product) return res.status(404).json({ success: false, message: 'Product not found' });
+
+    const [variants] = await pool.query(`
+      SELECT ps.id AS pack_size_id, ps.size_label, ps.size_value, ps.unit, ps.color_name, ps.color_code,
+             zim.zoho_item_id, zim.zoho_item_name, zim.zoho_brand AS brand,
+             zim.zoho_category_name AS category, CAST(zim.zoho_rate AS DECIMAL(10,2)) AS list_rate,
+             zim.image_url
+        FROM pack_sizes ps
+        INNER JOIN zoho_items_map zim ON zim.zoho_item_id = ps.zoho_item_id
+       WHERE ps.product_id = ? AND ps.is_active = 1
+         AND (zim.zoho_status = 'active' OR zim.zoho_status IS NULL)
+       ORDER BY CAST(zim.zoho_rate AS DECIMAL(10,2)) ASC
+    `, [req.params.productId]);
+
+    const resolver = await getEngineerRateResolver(req.engineer.id);
+    const out = variants.map(v => {
+      const { discount_pct } = resolver(v.zoho_item_id, v.brand, v.category);
+      return {
+        ...v,
+        discount_pct,
+        effective_rate: applyDiscount(v.list_rate, discount_pct)
+      };
+    });
+
+    res.json({ success: true, product, variants: out });
+  } catch (err) {
+    console.error('[engineers] me/catalog/:id error:', err);
+    res.status(500).json({ success: false, message: 'Failed to load product' });
+  }
+});
+
 // Engineer's project requests (reads from estimate_requests by phone)
 router.get('/me/projects', requireEngineerAuth, async (req, res) => {
   try {
@@ -576,6 +780,90 @@ router.put('/:id/credit', requirePermission('engineers', 'manage'), async (req, 
   } catch (err) {
     console.error('[engineers] credit error:', err);
     res.status(500).json({ success: false, message: 'Credit update failed' });
+  }
+});
+
+// ───── Admin: engineer custom rates ─────
+router.get('/:id/rates', requirePermission('engineers', 'view'), async (req, res) => {
+  try {
+    const [rows] = await pool.query(
+      `SELECT id, scope, target_id, zoho_item_id, discount_pct, notes, created_at, updated_at
+         FROM engineer_custom_rates
+        WHERE engineer_id = ?
+        ORDER BY scope ASC, updated_at DESC`,
+      [req.params.id]
+    );
+    // Enrich item-scope rows with product/item names
+    const itemIds = rows.filter(r => r.scope === 'item').map(r => r.zoho_item_id).filter(Boolean);
+    let nameById = new Map();
+    if (itemIds.length) {
+      const placeholders = itemIds.map(() => '?').join(',');
+      const [items] = await pool.query(
+        `SELECT zoho_item_id, zoho_item_name, zoho_brand
+           FROM zoho_items_map WHERE zoho_item_id IN (${placeholders})`,
+        itemIds
+      );
+      nameById = new Map(items.map(i => [i.zoho_item_id, i]));
+    }
+    const enriched = rows.map(r => {
+      const info = r.scope === 'item' && r.zoho_item_id ? nameById.get(r.zoho_item_id) : null;
+      return {
+        ...r,
+        display_name: r.scope === 'item'
+          ? (info ? `${info.zoho_item_name}${info.zoho_brand ? ' · ' + info.zoho_brand : ''}` : r.zoho_item_id)
+          : r.target_id
+      };
+    });
+    res.json({ success: true, rates: enriched });
+  } catch (err) {
+    console.error('[engineers] rates list error:', err);
+    res.status(500).json({ success: false, message: 'Failed to load rates' });
+  }
+});
+
+router.post('/:id/rates', requirePermission('engineers', 'manage'), async (req, res) => {
+  try {
+    const SCOPES = ['item', 'brand', 'category'];
+    const scope = SCOPES.includes(req.body.scope) ? req.body.scope : null;
+    if (!scope) return res.status(400).json({ success: false, message: "scope must be 'item', 'brand', or 'category'" });
+
+    const target_id = (req.body.target_id || '').toString().trim();
+    if (!target_id) return res.status(400).json({ success: false, message: 'target_id is required' });
+
+    const discount_pct = parseFloat(req.body.discount_pct);
+    if (Number.isNaN(discount_pct) || discount_pct < 0 || discount_pct > 100) {
+      return res.status(400).json({ success: false, message: 'discount_pct must be between 0 and 100' });
+    }
+
+    const zoho_item_id = scope === 'item' ? target_id : (req.body.zoho_item_id || null);
+
+    // Verify engineer exists
+    const [[eng]] = await pool.query('SELECT id FROM engineers WHERE id = ?', [req.params.id]);
+    if (!eng) return res.status(404).json({ success: false, message: 'Engineer not found' });
+
+    await pool.query(
+      `INSERT INTO engineer_custom_rates (engineer_id, scope, target_id, zoho_item_id, discount_pct, notes, created_by)
+       VALUES (?, ?, ?, ?, ?, ?, ?)
+       ON DUPLICATE KEY UPDATE discount_pct = VALUES(discount_pct), notes = VALUES(notes), zoho_item_id = VALUES(zoho_item_id), updated_at = NOW()`,
+      [req.params.id, scope, target_id, zoho_item_id, discount_pct, req.body.notes || null, req.user?.id || null]
+    );
+    res.json({ success: true, message: 'Rate saved' });
+  } catch (err) {
+    console.error('[engineers] rate save error:', err);
+    res.status(500).json({ success: false, message: 'Failed to save rate' });
+  }
+});
+
+router.delete('/:id/rates/:rateId', requirePermission('engineers', 'manage'), async (req, res) => {
+  try {
+    await pool.query(
+      'DELETE FROM engineer_custom_rates WHERE id = ? AND engineer_id = ?',
+      [req.params.rateId, req.params.id]
+    );
+    res.json({ success: true, message: 'Rate removed' });
+  } catch (err) {
+    console.error('[engineers] rate delete error:', err);
+    res.status(500).json({ success: false, message: 'Failed to remove rate' });
   }
 });
 

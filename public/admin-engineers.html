@@ -182,6 +182,40 @@
         </div>
 
         <hr style="margin: 18px 0; border-color: #e8ecf1;" />
+        <h3 class="text-sm font-semibold text-gray-800 mb-3">Custom Discount Rates</h3>
+        <p class="text-xs text-gray-500 mb-3">Per-engineer overrides applied to catalogue prices. Item-level rates take priority over brand, then category.</p>
+        <div id="ratesListWrap" style="background:#f9fafb; border:1px solid #e8ecf1; border-radius:8px; padding:8px; margin-bottom: 14px; max-height: 200px; overflow-y: auto;">
+          <div style="padding: 20px; text-align:center; color:#94a3b8; font-size: 13px;">Loading rates...</div>
+        </div>
+        <div class="row2" style="margin-top: 10px;">
+          <div class="field" style="margin-bottom:0;">
+            <label>Scope</label>
+            <select id="r_scope">
+              <option value="brand">Brand</option>
+              <option value="category">Category</option>
+              <option value="item">Specific item (Zoho item ID)</option>
+            </select>
+          </div>
+          <div class="field" style="margin-bottom:0;">
+            <label>Target (brand name / category / Zoho item ID)</label>
+            <input id="r_target" placeholder="e.g. Asian Paints, Emulsion, 310000123456789">
+          </div>
+        </div>
+        <div class="row2" style="margin-top: 10px;">
+          <div class="field" style="margin-bottom:0;">
+            <label>Discount %</label>
+            <input id="r_discount" type="number" min="0" max="100" step="0.5" placeholder="0.00">
+          </div>
+          <div class="field" style="margin-bottom:0; display:flex; align-items:end;">
+            <button class="btn-sm btn-primary" type="button" onclick="addRate()" style="width:100%;">+ Add / Update Rate</button>
+          </div>
+        </div>
+        <div class="field" style="margin-bottom:0; margin-top: 10px;">
+          <label>Notes (optional)</label>
+          <input id="r_notes" placeholder="Optional internal note">
+        </div>
+
+        <hr style="margin: 18px 0; border-color: #e8ecf1;" />
         <div class="field"><label>Internal notes</label><textarea id="m_notes" rows="3" placeholder="Visible only to admin"></textarea></div>
         <div id="m_rejected_block" style="display:none; padding: 10px 14px; background: #fee2e2; color: #991b1b; border-radius: 8px; font-size: 0.875rem; margin-top: 10px;">
           <strong>Rejected reason:</strong> <span id="m_rejected_reason"></span>
@@ -354,6 +388,7 @@
         document.getElementById('mActions').innerHTML = actions.join('');
 
         document.getElementById('engModal').classList.add('open');
+        loadRates();
       } catch (err) {
         toast('Failed to load engineer', 'err');
       }
@@ -447,6 +482,77 @@
         await reload(); closeModal();
       } catch (err) { toast(err.message, 'err'); }
     });
+
+    // === Rates management ===
+    async function loadRates() {
+      if (!state.current) return;
+      var wrap = document.getElementById('ratesListWrap');
+      wrap.innerHTML = '<div style="padding:14px;text-align:center;color:#94a3b8;font-size:13px;">Loading rates...</div>';
+      try {
+        var r = await fetch(API + '/' + state.current.id + '/rates', { headers: authHeaders() });
+        var data = await r.json();
+        if (!data.success) throw new Error(data.message || 'Failed to load rates');
+        var rates = data.rates || [];
+        if (!rates.length) {
+          wrap.innerHTML = '<div style="padding:14px; text-align:center; color:#94a3b8; font-size: 13px;">No custom rates configured. Engineer sees list prices.</div>';
+          return;
+        }
+        wrap.innerHTML = '<table style="width:100%;border-collapse:collapse;font-size:13px;">'
+          + '<thead><tr style="border-bottom:1px solid #e8ecf1;">'
+          +   '<th style="text-align:left;padding:6px 8px;font-size:11px;color:#64748b;text-transform:uppercase;letter-spacing:0.5px;">Scope</th>'
+          +   '<th style="text-align:left;padding:6px 8px;font-size:11px;color:#64748b;text-transform:uppercase;letter-spacing:0.5px;">Target</th>'
+          +   '<th style="text-align:right;padding:6px 8px;font-size:11px;color:#64748b;text-transform:uppercase;letter-spacing:0.5px;">Discount</th>'
+          +   '<th style="padding:6px 8px;"></th>'
+          + '</tr></thead><tbody>'
+          + rates.map(function (rt) {
+              var badge = '<span class="badge" style="background:#e0f2fe;color:#0369a1;font-size:0.65rem;">' + escHTML(rt.scope) + '</span>';
+              return '<tr style="border-bottom:1px solid #f1f5f9;">'
+                + '<td style="padding:8px;">' + badge + '</td>'
+                + '<td style="padding:8px;color:#1e293b;font-weight:500;">' + escHTML(rt.display_name || rt.target_id) + (rt.notes ? '<div style="font-size:11px;color:#64748b;">' + escHTML(rt.notes) + '</div>' : '') + '</td>'
+                + '<td style="padding:8px;text-align:right;color:#10b981;font-weight:700;">' + parseFloat(rt.discount_pct).toFixed(2) + '%</td>'
+                + '<td style="padding:8px;text-align:right;"><button class="btn-sm btn-danger" type="button" onclick="deleteRate(' + rt.id + ')" style="padding:3px 8px;font-size:0.7rem;">Remove</button></td>'
+                + '</tr>';
+            }).join('')
+          + '</tbody></table>';
+      } catch (err) {
+        wrap.innerHTML = '<div style="padding:14px;text-align:center;color:#b71c1c;font-size:13px;">' + escHTML(err.message) + '</div>';
+      }
+    }
+    async function addRate() {
+      if (!state.current) return;
+      var scope = document.getElementById('r_scope').value;
+      var target = document.getElementById('r_target').value.trim();
+      var disc = parseFloat(document.getElementById('r_discount').value);
+      var notes = document.getElementById('r_notes').value.trim();
+      if (!target) { toast('Enter a target value', 'err'); return; }
+      if (!Number.isFinite(disc) || disc < 0 || disc > 100) { toast('Discount must be 0-100', 'err'); return; }
+      try {
+        var r = await fetch(API + '/' + state.current.id + '/rates', {
+          method: 'POST', headers: authHeaders({ 'Content-Type': 'application/json' }),
+          body: JSON.stringify({ scope: scope, target_id: target, discount_pct: disc, notes: notes || null })
+        });
+        var data = await r.json();
+        if (!data.success) throw new Error(data.message);
+        document.getElementById('r_target').value = '';
+        document.getElementById('r_discount').value = '';
+        document.getElementById('r_notes').value = '';
+        toast('Rate saved.');
+        await loadRates();
+      } catch (err) { toast(err.message, 'err'); }
+    }
+    async function deleteRate(rateId) {
+      if (!state.current) return;
+      if (!confirm('Remove this rate?')) return;
+      try {
+        var r = await fetch(API + '/' + state.current.id + '/rates/' + rateId, { method: 'DELETE', headers: authHeaders() });
+        var data = await r.json();
+        if (!data.success) throw new Error(data.message);
+        toast('Rate removed.');
+        await loadRates();
+      } catch (err) { toast(err.message, 'err'); }
+    }
+    window.addRate = addRate;
+    window.deleteRate = deleteRate;
 
     // === Filter & search wiring ===
     document.getElementById('statusPills').addEventListener('click', function (e) {
