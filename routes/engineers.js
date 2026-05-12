@@ -568,7 +568,7 @@ router.get('/me/catalog/:productId', requireEngineerAuth, async (req, res) => {
     if (!product) return res.status(404).json({ success: false, message: 'Product not found' });
 
     const [variants] = await pool.query(`
-      SELECT ps.id AS pack_size_id, ps.size_label, ps.size_value, ps.unit, ps.color_name, ps.color_code,
+      SELECT ps.id AS pack_size_id, ps.size_label, ps.size, ps.unit, ps.color_name, ps.color_code,
              zim.zoho_item_id, zim.zoho_item_name, zim.zoho_brand AS brand,
              zim.zoho_category_name AS category, CAST(zim.zoho_rate AS DECIMAL(10,2)) AS list_rate,
              zim.image_url
@@ -767,7 +767,7 @@ router.get('/me/projects', requireEngineerAuth, async (req, res) => {
     let rows = [];
     try {
       const [r] = await pool.query(
-        `SELECT id, request_number, project_type, area_sqft, status, location, city, created_at
+        `SELECT id, request_number, project_type, area_sqft, status, location, created_at
            FROM estimate_requests
           WHERE phone = ?
           ORDER BY id DESC LIMIT ?`,
