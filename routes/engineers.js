@@ -291,6 +291,107 @@ router.put('/me', requireEngineerAuth, async (req, res) => {
   }
 });
 
+// Submit a new B2B quote request for the logged-in engineer.
+// Pre-fills customer_name + phone from the engineer record, maps to the
+// existing estimate_requests table so the staff workflow stays unified.
+router.post('/me/quotes', requireEngineerSession, async (req, res) => {
+  try {
+    const PROJECT_TYPES = ['interior','exterior','both','commercial','renovation','new_construction'];
+    const PROPERTY_TYPES = ['house','apartment','villa','office','shop','warehouse','other'];
+
+    const project_type = PROJECT_TYPES.includes(req.body.project_type) ? req.body.project_type : 'commercial';
+    const property_type = PROPERTY_TYPES.includes(req.body.property_type) ? req.body.property_type : 'other';
+    const project_name = (req.body.project_name || '').toString().trim();
+    const location_input = (req.body.location || '').toString().trim();
+    const area_sqft = parseInt(req.body.area_sqft, 10);
+
+    if (!project_name) {
+      return res.status(400).json({ success: false, message: 'Project name is required' });
+    }
+    if (!location_input) {
+      return res.status(400).json({ success: false, message: 'Site address / location is required' });
+    }
+    if (!Number.isFinite(area_sqft) || area_sqft <= 0) {
+      return res.status(400).json({ success: false, message: 'Enter a valid area in square feet' });
+    }
+
+    const [eng] = await pool.query(
+      'SELECT id, full_name, phone, email, company_name FROM engineers WHERE id = ?',
+      [req.engineer.id]
+    );
+    if (!eng.length) return res.status(404).json({ success: false, message: 'Engineer record not found' });
+    const me = eng[0];
+
+    const site_visit = req.body.site_visit ? 'YES' : 'NO';
+    const company_line = me.company_name ? `Company: ${me.company_name}\n` : '';
+    const notes_input = (req.body.additional_notes || '').toString().trim();
+    const additional_notes = [
+      `Engineer quote — Project: ${project_name}`,
+      company_line.trim(),
+      `Site visit requested: ${site_visit}`,
+      notes_input ? `\nNotes:\n${notes_input}` : null
+    ].filter(Boolean).join('\n');
+
+    // Generate request_number (same pattern as routes/estimate-requests.js)
+    const today = new Date();
+    const yyyymm = today.getFullYear().toString() + String(today.getMonth() + 1).padStart(2, '0');
+    const prefix = `ENG-${yyyymm}-`;
+    const [last] = await pool.query(
+      'SELECT request_number FROM estimate_requests WHERE request_number LIKE ? ORDER BY id DESC LIMIT 1',
+      [prefix + '%']
+    );
+    let seq = 1;
+    if (last.length) {
+      const m = String(last[0].request_number).match(/-(\d+)$/);
+      if (m) seq = parseInt(m[1], 10) + 1;
+    }
+    const request_number = prefix + String(seq).padStart(4, '0');
+
+    const [result] = await pool.query(
+      `INSERT INTO estimate_requests
+        (request_number, customer_name, phone, email,
+         project_type, property_type, location, area_sqft,
+         preferred_brand, timeline, budget_range, additional_notes,
+         status, priority, source, request_method)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'new', 'medium', 'engineer_portal', 'simple')`,
+      [
+        request_number,
+        me.full_name,
+        me.phone,
+        me.email || null,
+        project_type,
+        property_type,
+        location_input,
+        area_sqft,
+        req.body.preferred_brand || null,
+        req.body.timeline || null,
+        req.body.budget_range || null,
+        additional_notes
+      ]
+    );
+
+    // Notify staff
+    try {
+      const [admins] = await pool.query(
+        "SELECT id FROM users WHERE role IN ('admin','manager','staff') AND status = 'active' LIMIT 50"
+      );
+      for (const admin of admins) {
+        await notificationService.send(admin.id, {
+          type: 'engineer_quote_requested',
+          title: 'New Engineer Quote Request',
+          body: `${me.full_name}${me.company_name ? ' (' + me.company_name + ')' : ''} requested a quote for "${project_name}" — ${area_sqft} sq ft.`,
+          data: { page: 'estimate-requests', filter: 'new', request_number }
+        });
+      }
+    } catch (nErr) { console.error('[engineers] quote notify error:', nErr.message); }
+
+    res.json({ success: true, message: 'Quote request submitted', request_number, id: result.insertId });
+  } catch (err) {
+    console.error('[engineers] me/quotes error:', err);
+    res.status(500).json({ success: false, message: 'Could not submit quote request' });
+  }
+});
+
 // Engineer's project requests (reads from estimate_requests by phone)
 router.get('/me/projects', requireEngineerAuth, async (req, res) => {
   try {
