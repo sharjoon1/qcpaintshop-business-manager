@@ -1386,8 +1386,12 @@ async function syncItems(triggeredBy = null) {
                         zoho_ean = VALUES(zoho_ean),
                         zoho_isbn = VALUES(zoho_isbn),
                         zoho_part_number = VALUES(zoho_part_number),
-                        zoho_cf_product_name = VALUES(zoho_cf_product_name),
-                        zoho_cf_dpl = VALUES(zoho_cf_dpl),
+                        -- Zoho's GET /items LIST endpoint omits custom_fields, so VALUES()
+                        -- for these is NULL on every sync. COALESCE preserves the
+                        -- previously-pushed value (written immediately by /items/bulk-edit
+                        -- and /items/apply-price-list) instead of clobbering it.
+                        zoho_cf_product_name = COALESCE(VALUES(zoho_cf_product_name), zoho_cf_product_name),
+                        zoho_cf_dpl = COALESCE(VALUES(zoho_cf_dpl), zoho_cf_dpl),
                         zoho_status = 'active',
                         last_synced_at = NOW()
                 `, [
