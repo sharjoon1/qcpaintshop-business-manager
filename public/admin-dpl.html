@@ -1033,11 +1033,20 @@
         var isFuzzy = !!row._fuzzyMatched;
         var btnLbl, btnBorder, btnBg, btnColor, btnTitle;
         if (mz) {
-            btnLbl    = (mz.sku ? mz.sku+' — ' : '') + mz.name;
+            // Avoid the misleading "SKU — Name" prefix when the Zoho name already
+            // begins with the SKU (very common for Birla items, e.g. sku=OPCL01
+            // and name="OPCL01 WHITE BIRLA OPUS 01 L"). Prepending SKU here would
+            // make the button read "OPCL01 — OPCL01 WHITE..." which users misread
+            // as a duplicated prefix on the Zoho item.
+            var nameU = String(mz.name || '').toUpperCase().trimStart();
+            var skuU  = String(mz.sku  || '').toUpperCase().trimStart();
+            var prefixNeeded = !!mz.sku && skuU.length > 0 && !nameU.startsWith(skuU);
+            btnLbl    = prefixNeeded ? (mz.sku + ' — ' + mz.name) : mz.name;
             btnBorder = isFuzzy ? '#fbbf24' : '#a5b4fc';
             btnBg     = isFuzzy ? '#fffbeb' : '#eef2ff';
             btnColor  = isFuzzy ? '#92400e' : '#4338ca';
-            btnTitle  = (isFuzzy ? '⚠ Fuzzy-matched — verify: ' : '') + esc(btnLbl);
+            btnTitle  = (isFuzzy ? '⚠ Fuzzy-matched — verify: ' : 'Matched Zoho item · ')
+                      + (mz.sku ? ('SKU ' + mz.sku + ' · ') : '') + esc(mz.name || '');
         } else {
             btnLbl    = '+ Click to match or leave as NEW ITEM';
             btnBorder = '#d1fae5';
@@ -1812,18 +1821,25 @@
         var editVal = (p.proposedName != null) ? p.proposedName : curName;
         var isSame = editVal.trim().toUpperCase() === curName.trim().toUpperCase();
         var html = '';
-        // When proposed differs from current, show the old name struck through above the input.
-        if (!isSame && curName) {
-            html += '<div style="font-size:10px;color:#9ca3af;text-decoration:line-through;white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="' + esc(curName) + '">' + esc(curName) + '</div>';
+        // Always show the current Zoho name above the input so the user can compare.
+        // Use strike-through ONLY when proposed differs (visually conveying "will be replaced").
+        if (curName) {
+            var curStyle = 'font-size:10px;color:#9ca3af;white-space:nowrap;overflow:hidden;text-overflow:ellipsis'
+                         + (isSame ? '' : ';text-decoration:line-through');
+            html += '<div id="ai-name-current-' + idx + '" style="' + curStyle + '" title="Current Zoho name: ' + esc(curName) + '">'
+                  + '<span style="color:#6b7280">Current:</span> ' + esc(curName) + '</div>';
         }
-        var borderColor = isSame ? '#d1d5db' : '#6366f1';
-        var inputColor  = isSame ? '#374151' : '#4338ca';
+        // Editable input — always styled as an editable field. Differs → indigo accent.
+        var borderColor = isSame ? '#9ca3af' : '#6366f1';
+        var inputColor  = isSame ? '#111827' : '#4338ca';
+        var bgColor     = isSame ? '#ffffff' : '#eef2ff';
         html += '<div style="display:flex;gap:4px;align-items:center">';
         html += '<input type="text" id="ai-name-input-' + idx + '" value="' + esc(editVal) + '" ' +
                 'oninput="aiOnNameEdit(' + idx + ',this.value)" ' +
-                'style="flex:1;min-width:0;font-size:11px;padding:2px 5px;border:1px solid ' + borderColor + ';border-radius:3px;outline:none;color:' + inputColor + '" ' +
-                'title="' + esc(editVal) + '">';
-        html += '<span id="ai-name-badge-' + idx + '" style="font-size:10px;color:#9ca3af;font-weight:600;flex-shrink:0;display:' + (isSame ? 'inline' : 'none') + '">same</span>';
+                'placeholder="Edit name to push to Zoho…" ' +
+                'style="flex:1;min-width:0;font-size:11px;padding:3px 6px;border:1px solid ' + borderColor + ';border-radius:3px;outline:none;color:' + inputColor + ';background:' + bgColor + '" ' +
+                'title="Editable — change this to update the Zoho item name on push">';
+        html += '<span id="ai-name-badge-' + idx + '" style="font-size:10px;color:#6b7280;font-weight:500;flex-shrink:0;display:' + (isSame ? 'inline' : 'none') + '" title="Proposed name matches the current Zoho name — only cf_dpl will change on push">no change</span>';
         html += '</div>';
         return html;
     }
@@ -1833,15 +1849,21 @@
         row._proposed.proposedName = value;
         var input = document.getElementById('ai-name-input-' + idx);
         var badge = document.getElementById('ai-name-badge-' + idx);
+        var curEl = document.getElementById('ai-name-current-' + idx);
         var zoho = row._matchedZohoId ? (aiData.zohoItems || []).find(function(z){ return z.zoho_item_id === row._matchedZohoId; }) : null;
         var curName = zoho ? (zoho.name || '') : '';
         var same = value.trim().toUpperCase() === curName.trim().toUpperCase();
         if (input) {
-            input.style.borderColor = same ? '#d1d5db' : '#6366f1';
-            input.style.color = same ? '#374151' : '#4338ca';
+            input.style.borderColor = same ? '#9ca3af' : '#6366f1';
+            input.style.color = same ? '#111827' : '#4338ca';
+            input.style.background = same ? '#ffffff' : '#eef2ff';
         }
         if (badge) {
             badge.style.display = same ? 'inline' : 'none';
+        }
+        // Toggle strike-through on the "Current:" line to reflect whether it will be replaced.
+        if (curEl) {
+            curEl.style.textDecoration = same ? 'none' : 'line-through';
         }
     }
     function aiOnSkuEdit(idx, value) {
