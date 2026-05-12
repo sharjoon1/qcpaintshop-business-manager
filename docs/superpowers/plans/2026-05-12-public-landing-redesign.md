@@ -1,3 +1,142 @@
+# Public Landing Page Redesign — Implementation Plan
+
+> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+
+**Goal:** Replace the JSON stub at `GET /` and the AI-generated landing page at `public/index.html` with one international-standard, designer-feeling public landing page that matches the locked spec at `docs/superpowers/specs/2026-05-12-public-landing-redesign-design.md`.
+
+**Architecture:** Single static HTML file (`public/index.html`) served by Express's existing `express.static('public')` middleware (already mounted at `server.js:214`). All CSS inline in one `<style>` block — no Tailwind dependency, no build step, no JS framework. Vanilla JS only for nav-on-scroll, scroll-reveal IntersectionObserver, and Leaflet map init. JSON API status moves from `GET /` to `GET /api/status`.
+
+**Tech Stack:** Vanilla HTML/CSS/JS · Google Fonts (Playfair Display, Inter, Noto Serif Tamil) · Leaflet 1.9 (via CDN, for branches map only).
+
+**Files touched:**
+- Modify: `server.js` (~line 3671 — relocate JSON handler)
+- Replace: `public/index.html` (full rewrite)
+- Create: `public/images/landing/hero-room.jpg` (downloaded stock photo)
+
+---
+
+## Task 1: Move JSON status from `/` to `/api/status`
+
+**Files:**
+- Modify: `server.js:3671-3701`
+
+- [ ] **Step 1: Open `server.js` and locate the `app.get('/')` handler (~line 3671).**
+
+- [ ] **Step 2: Replace the handler. Use this exact Edit:**
+
+`old_string`:
+```js
+app.get('/', (req, res) => {
+    res.json({
+        service: 'Quality Colours Business Manager API',
+        version: '2.0.0',
+        modules: [
+            'auth', 'roles', 'permissions', 'branches', 'users',
+            'customers', 'leads', 'products', 'estimates',
+            'attendance', 'salary', 'activities', 'tasks', 'settings',
+            'zoho-books'
+        ],
+        endpoints: {
+            auth: '/api/auth/*',
+            brands: '/api/brands',
+            categories: '/api/categories',
+            products: '/api/products',
+            customers: '/api/customers',
+            estimates: '/api/estimates',
+            roles: '/api/roles',
+            branches: '/api/branches',
+            leads: '/api/leads',
+            attendance: '/api/attendance',
+            salary: '/api/salary',
+            activities: '/api/activities',
+            tasks: '/api/tasks',
+            settings: '/api/settings',
+            dashboard: '/api/dashboard/stats',
+            zoho: '/api/zoho/*',
+            health: '/health'
+        }
+    });
+});
+```
+
+`new_string`:
+```js
+// API status (moved off `/` so Express static can serve public/index.html as the public landing page)
+app.get('/api/status', (req, res) => {
+    res.json({
+        service: 'Quality Colours Business Manager API',
+        version: '2.0.0',
+        modules: [
+            'auth', 'roles', 'permissions', 'branches', 'users',
+            'customers', 'leads', 'products', 'estimates',
+            'attendance', 'salary', 'activities', 'tasks', 'settings',
+            'zoho-books'
+        ],
+        endpoints: {
+            auth: '/api/auth/*',
+            brands: '/api/brands',
+            categories: '/api/categories',
+            products: '/api/products',
+            customers: '/api/customers',
+            estimates: '/api/estimates',
+            roles: '/api/roles',
+            branches: '/api/branches',
+            leads: '/api/leads',
+            attendance: '/api/attendance',
+            salary: '/api/salary',
+            activities: '/api/activities',
+            tasks: '/api/tasks',
+            settings: '/api/settings',
+            dashboard: '/api/dashboard/stats',
+            zoho: '/api/zoho/*',
+            health: '/health'
+        }
+    });
+});
+```
+
+- [ ] **Step 3: Restart the server.**
+
+```bash
+# In a separate terminal that's running the dev server, hit Ctrl+C then:
+node server.js
+# Or if pm2 is in use:
+pm2 restart business-manager
+```
+
+- [ ] **Step 4: Verify the route change.**
+
+```bash
+curl -s http://localhost:3000/api/status | head -3
+# Expected: JSON starting with {"service":"Quality Colours Business Manager API"
+
+curl -sI http://localhost:3000/ | head -2
+# Expected: HTTP/1.1 200 OK and Content-Type: text/html (Express static serving the existing public/index.html)
+```
+
+- [ ] **Step 5: Verify nothing in the codebase relied on `GET /` returning JSON.**
+
+Run from project root:
+```bash
+grep -rn "act\.qcpaintshop\.com/'" routes services public/js 2>/dev/null || true
+grep -rn "fetch(['\"]/['\"]" routes services public/js 2>/dev/null || true
+```
+Expected: no results. (If any internal code did `fetch('/')` expecting JSON, update it to `fetch('/api/status')`.)
+
+---
+
+## Task 2: Lay down the new `public/index.html` — full document scaffold + complete CSS
+
+**Files:**
+- Replace: `public/index.html`
+
+This is the biggest single task. Once this lands, every subsequent task only inserts HTML *inside* an existing `<section>` — no CSS edits needed beyond this task.
+
+- [ ] **Step 1: Overwrite `public/index.html` with the following exact content.**
+
+(Use the Write tool — the existing file is in git history if rollback is needed.)
+
+```html
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -83,6 +222,7 @@
       .qc-nav-links { display: none; }
       .qc-nav-cta { display: none; }
       .qc-nav-mobile-btn { display: inline-flex; }
+      .qc-nav.is-solid + .qc-nav-mobile { background: var(--qc-cream); }
     }
 
     /* ───────────────────────── Hero (V2 Cinematic Full-Bleed) ───────────────────────── */
@@ -156,10 +296,10 @@
     .qc-gallery { padding: var(--pad-y) 0; background: var(--qc-cream); border-top: 1px solid var(--qc-rule-soft); }
     .qc-gallery-head { display: flex; justify-content: space-between; align-items: end; margin-bottom: 40px; flex-wrap: wrap; gap: 16px; }
     .qc-gallery-grid { display: grid; grid-template-columns: repeat(12, 1fr); gap: 16px; }
-    .qc-gallery-item { position: relative; overflow: hidden; border-radius: 4px; aspect-ratio: 4/3; margin: 0; }
+    .qc-gallery-item { position: relative; overflow: hidden; border-radius: 4px; aspect-ratio: 4/3; }
     .qc-gallery-item img { width: 100%; height: 100%; object-fit: cover; transition: transform 0.5s ease; opacity: 0.96; }
     .qc-gallery-item:hover img { transform: scale(1.04); opacity: 1; }
-    .qc-gallery-item .qc-gal-caption { position: absolute; left: 14px; bottom: 12px; font-family: var(--sans); font-size: 10px; letter-spacing: 1.5px; text-transform: uppercase; color: #fff; background: rgba(0,0,0,0.45); padding: 5px 10px; backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); margin: 0; }
+    .qc-gallery-item .qc-gal-caption { position: absolute; left: 14px; bottom: 12px; font-family: var(--sans); font-size: 10px; letter-spacing: 1.5px; text-transform: uppercase; color: #fff; background: rgba(0,0,0,0.45); padding: 5px 10px; backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); }
     .qc-gal-1 { grid-column: span 7; grid-row: span 2; aspect-ratio: 7/6; }
     .qc-gal-2 { grid-column: span 5; }
     .qc-gal-3 { grid-column: span 5; }
@@ -240,6 +380,95 @@
   </nav>
 
   <!-- 2. HERO -->
+  <section class="qc-hero" id="hero"></section>
+
+  <!-- 3. BRAND STRIP -->
+  <section class="qc-brands" id="brands"></section>
+
+  <!-- 4. ABOUT + STATS -->
+  <section class="qc-about" id="about"></section>
+
+  <!-- 5. SERVICES -->
+  <section class="qc-services" id="services"></section>
+
+  <!-- 6. BRANCHES -->
+  <section class="qc-branches" id="branches"></section>
+
+  <!-- 7. GALLERY -->
+  <section class="qc-gallery" id="gallery"></section>
+
+  <!-- 8. DESIGN REQUEST -->
+  <section class="qc-design" id="design-request"></section>
+
+  <!-- 9. FOOTER -->
+  <footer class="qc-foot"></footer>
+
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin="" defer></script>
+  <script>
+    // === Mobile nav toggle ===
+    (function () {
+      var btn = document.getElementById('qcNavMobileBtn');
+      var sheet = document.getElementById('qcNavMobile');
+      if (!btn || !sheet) return;
+      btn.addEventListener('click', function () {
+        var open = sheet.classList.toggle('is-open');
+        btn.setAttribute('aria-expanded', open ? 'true' : 'false');
+      });
+      sheet.querySelectorAll('a').forEach(function (a) {
+        a.addEventListener('click', function () {
+          sheet.classList.remove('is-open');
+          btn.setAttribute('aria-expanded', 'false');
+        });
+      });
+    })();
+
+    // === Scroll-aware nav ===
+    (function () {
+      var nav = document.getElementById('qcNav');
+      if (!nav) return;
+      function update() {
+        if (window.scrollY > 80) nav.classList.add('is-solid');
+        else nav.classList.remove('is-solid');
+      }
+      update();
+      window.addEventListener('scroll', update, { passive: true });
+    })();
+
+    // === Scroll reveal ===
+    (function () {
+      if (!('IntersectionObserver' in window)) {
+        document.querySelectorAll('.qc-reveal').forEach(function (el) { el.classList.add('is-visible'); });
+        return;
+      }
+      var io = new IntersectionObserver(function (entries) {
+        entries.forEach(function (e) {
+          if (e.isIntersecting) { e.target.classList.add('is-visible'); io.unobserve(e.target); }
+        });
+      }, { threshold: 0.1, rootMargin: '0px 0px -60px 0px' });
+      document.querySelectorAll('.qc-reveal').forEach(function (el) { io.observe(el); });
+    })();
+  </script>
+</body>
+</html>
+```
+
+- [ ] **Step 2: Open `http://localhost:3000/` in a browser and confirm:**
+  - No console errors.
+  - Page loads, all 7 section containers exist (empty for now), fonts load.
+  - The nav appears, transparent at the top, but logo will be invisible against the empty cream background — that's expected until the hero gets a photo.
+
+- [ ] **Step 3: No commit yet — we'll commit after the page is fully filled in.**
+
+---
+
+## Task 3: Fill in Hero section content
+
+**Files:**
+- Modify: `public/index.html` (inside `<section class="qc-hero" id="hero">`)
+
+- [ ] **Step 1: Edit `public/index.html`. Replace the empty `<section class="qc-hero" id="hero"></section>` with:**
+
+```html
   <section class="qc-hero" id="hero">
     <div class="qc-hero-inner qc-reveal">
       <div class="qc-eyebrow"><span class="dot"></span>Authorised dealer · Asian · Berger · Birla · Nippon</div>
@@ -251,13 +480,25 @@
         <a href="#gallery" class="qc-cta-ghost">Browse recent work →</a>
       </div>
     </div>
-    <div class="qc-hero-foot" style="max-width:none;">
+    <div class="qc-hero-foot qc-wrap" style="padding-left:0;padding-right:0;">
       <span>Scroll ↓</span>
       <span class="right">— painted 2,400+ homes since 2018.</span>
     </div>
   </section>
+```
 
-  <!-- 3. BRAND STRIP -->
+- [ ] **Step 2: Verify in browser.** The hero will show with a dark fallback background (`#1a1a1a`) until the photo is downloaded in Task 11. Text should be legible white-on-dark.
+
+---
+
+## Task 4: Fill in Brand strip
+
+**Files:**
+- Modify: `public/index.html` (inside `<section class="qc-brands" id="brands">`)
+
+- [ ] **Step 1: Replace the empty `<section class="qc-brands" id="brands">` with:**
+
+```html
   <section class="qc-brands" id="brands">
     <div class="qc-wrap qc-reveal">
       <span class="qc-eyebrow qc-brands-eyebrow">Authorised dealer of <span class="qc-tamil" style="font-weight:400;letter-spacing:0;text-transform:none;font-size:13px;margin-left:6px;opacity:0.7;">அங்கீகரிக்கப்பட்ட விற்பனையாளர்</span></span>
@@ -271,14 +512,26 @@
       </div>
     </div>
   </section>
+```
 
-  <!-- 4. ABOUT + STATS -->
+- [ ] **Step 2: Verify in browser.** A thin cream strip below the hero with 6 italic Playfair brand names, low opacity, hairline rules above and below.
+
+---
+
+## Task 5: Fill in About + Stats
+
+**Files:**
+- Modify: `public/index.html` (inside `<section class="qc-about" id="about">`)
+
+- [ ] **Step 1: Replace the empty `<section class="qc-about" id="about">` with:**
+
+```html
   <section class="qc-about" id="about">
     <div class="qc-wrap qc-reveal">
       <div class="qc-about-grid">
         <div class="qc-about-prose">
           <div class="qc-eyebrow"><span class="dot"></span>Our story</div>
-          <h2 class="qc-section-head">Started by two brothers in 2018.<br><em>Same standard, every branch.</em></h2>
+          <h2 class="qc-section-head">Started by two brothers in 2018.<br/><em>Same standard, every branch.</em></h2>
           <p>Quality Colours began with one shop in Ramanathapuram town. Seven years on, we run five branches across the district — and the people who finish your walls are still the people we trained ourselves.</p>
           <p>We're an authorised dealer for every major Indian paint brand, but we don't sell paint by itself. We pair the right product with the right finish, send an estimator to your site, and stand behind the work. Free quotes, honest pricing, and a phone number that picks up on the second ring.</p>
         </div>
@@ -299,8 +552,20 @@
       </div>
     </div>
   </section>
+```
 
-  <!-- 5. SERVICES -->
+- [ ] **Step 2: Verify in browser.** Two-column editorial layout, large italic green numerals on the right, paragraph prose on the left.
+
+---
+
+## Task 6: Fill in Services
+
+**Files:**
+- Modify: `public/index.html` (inside `<section class="qc-services" id="services">`)
+
+- [ ] **Step 1: Replace the empty `<section class="qc-services" id="services">` with:**
+
+```html
   <section class="qc-services" id="services">
     <div class="qc-wrap qc-reveal">
       <div class="qc-eyebrow"><span class="dot"></span>What we do</div>
@@ -333,8 +598,20 @@
       </div>
     </div>
   </section>
+```
 
-  <!-- 6. BRANCHES -->
+- [ ] **Step 2: Verify in browser.** Four numbered editorial rows, hairline dividers between, gold "01–04" markers.
+
+---
+
+## Task 7: Fill in Branches (HTML + Leaflet map init)
+
+**Files:**
+- Modify: `public/index.html` (inside `<section class="qc-branches" id="branches">` and append to the existing `<script>`)
+
+- [ ] **Step 1: Replace the empty `<section class="qc-branches" id="branches">` with:**
+
+```html
   <section class="qc-branches" id="branches">
     <div class="qc-wrap qc-reveal">
       <div class="qc-branches-head">
@@ -386,8 +663,68 @@
       </div>
     </div>
   </section>
+```
 
-  <!-- 7. GALLERY -->
+> **Note:** Phone numbers and addresses above are placeholders that match the established business pattern (`+91 74188 31122` is the UPI/contact number from memory). Confirm with user before production; the layout works with any address content.
+
+- [ ] **Step 2: Append the Leaflet map init to the existing `<script>` block, just before the closing `</script>` tag:**
+
+```js
+    // === Leaflet branches map (lazy-init on viewport enter) ===
+    (function () {
+      var mapEl = document.getElementById('qcBranchMap');
+      if (!mapEl) return;
+      var branches = [
+        { name: 'Ramanathapuram', latlng: [9.3716, 78.8307] },
+        { name: 'Paramakudi',     latlng: [9.5481, 78.5905] },
+        { name: 'Mudukulathur',   latlng: [9.3539, 78.5076] },
+        { name: 'Kamuthi',        latlng: [9.4317, 78.3941] },
+        { name: 'Rameswaram',     latlng: [9.2876, 79.3129] }
+      ];
+      function init() {
+        if (typeof L === 'undefined') { setTimeout(init, 120); return; }
+        var map = L.map(mapEl, { zoomControl: true, scrollWheelZoom: false, attributionControl: true })
+                   .setView([9.40, 78.75], 10);
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+          attribution: '&copy; OpenStreetMap',
+          maxZoom: 18
+        }).addTo(map);
+        var icon = L.divIcon({
+          className: 'qc-branch-pin',
+          html: '<div style="width:14px;height:14px;background:#1B5E3B;border:2px solid #FBFAF7;border-radius:50%;box-shadow:0 0 0 1px rgba(0,0,0,0.15)"></div>',
+          iconSize: [14, 14],
+          iconAnchor: [7, 7]
+        });
+        branches.forEach(function (b) {
+          L.marker(b.latlng, { icon: icon }).addTo(map).bindPopup('<b>' + b.name + '</b>');
+        });
+      }
+      if ('IntersectionObserver' in window) {
+        var io = new IntersectionObserver(function (entries) {
+          if (entries.some(function (e) { return e.isIntersecting; })) {
+            init();
+            io.disconnect();
+          }
+        }, { rootMargin: '200px' });
+        io.observe(mapEl);
+      } else {
+        init();
+      }
+    })();
+```
+
+- [ ] **Step 3: Verify in browser.** Branches section shows a tile map with 5 green pins, then a 3-column branch card grid below.
+
+---
+
+## Task 8: Fill in Gallery
+
+**Files:**
+- Modify: `public/index.html` (inside `<section class="qc-gallery" id="gallery">`)
+
+- [ ] **Step 1: Replace the empty `<section class="qc-gallery" id="gallery">` with:**
+
+```html
   <section class="qc-gallery" id="gallery">
     <div class="qc-wrap qc-reveal">
       <div class="qc-gallery-head">
@@ -425,8 +762,22 @@
       </div>
     </div>
   </section>
+```
 
-  <!-- 8. DESIGN REQUEST -->
+> **Note:** Gallery uses Unsplash CDN URLs as placeholders. These will be replaced with real Quality Colours job photos from the painter-app library in a follow-up.
+
+- [ ] **Step 2: Verify in browser.** Asymmetric 6-photo grid (1 large + 5 smaller), captions in the bottom-left of each tile.
+
+---
+
+## Task 9: Fill in Design Request form
+
+**Files:**
+- Modify: `public/index.html` (inside `<section class="qc-design" id="design-request">`)
+
+- [ ] **Step 1: Replace the empty `<section class="qc-design" id="design-request">` with:**
+
+```html
   <section class="qc-design" id="design-request">
     <div class="qc-wrap qc-reveal">
       <div class="qc-design-inner">
@@ -447,8 +798,50 @@
       </div>
     </div>
   </section>
+```
 
-  <!-- 9. FOOTER -->
+- [ ] **Step 2: Append the drop-zone JS to the existing `<script>` block, before `</script>`:**
+
+```js
+    // === Design request drop zone ===
+    (function () {
+      var drop = document.getElementById('qcDrop');
+      var input = document.getElementById('qcDropInput');
+      if (!drop || !input) return;
+      ['dragenter','dragover'].forEach(function (ev) {
+        drop.addEventListener(ev, function (e) { e.preventDefault(); drop.classList.add('is-drag'); });
+      });
+      ['dragleave','drop'].forEach(function (ev) {
+        drop.addEventListener(ev, function (e) { e.preventDefault(); drop.classList.remove('is-drag'); });
+      });
+      drop.addEventListener('drop', function (e) {
+        if (e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0]) {
+          input.files = e.dataTransfer.files;
+          drop.querySelector('.qc-drop-label').textContent = e.dataTransfer.files[0].name;
+        }
+      });
+      input.addEventListener('change', function () {
+        if (input.files && input.files[0]) {
+          drop.querySelector('.qc-drop-label').textContent = input.files[0].name;
+        }
+      });
+    })();
+```
+
+- [ ] **Step 3: Verify in browser.** Ink-background section with cream paper-feel drop zone, three underline-only inputs, cream pill submit button with Tamil split.
+
+> **Note on the form action:** This plan ships the form pointing at `POST /api/design-requests`. Existing route `routes/website.js` already handles design-request uploads (confirmed in memory). If the existing endpoint is named differently, update the `action` attribute to match — do not write new backend code here. If no backend exists yet, leave the action as-is and add a backend route in a follow-up plan.
+
+---
+
+## Task 10: Fill in Footer
+
+**Files:**
+- Modify: `public/index.html` (inside `<footer class="qc-foot">`)
+
+- [ ] **Step 1: Replace the empty `<footer class="qc-foot"></footer>` with:**
+
+```html
   <footer class="qc-foot">
     <div class="qc-wrap qc-reveal">
       <div class="qc-foot-grid">
@@ -494,117 +887,166 @@
       </div>
     </div>
   </footer>
+```
 
-  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin="" defer></script>
-  <script>
-    // === Mobile nav toggle ===
-    (function () {
-      var btn = document.getElementById('qcNavMobileBtn');
-      var sheet = document.getElementById('qcNavMobile');
-      if (!btn || !sheet) return;
-      btn.addEventListener('click', function () {
-        var open = sheet.classList.toggle('is-open');
-        btn.setAttribute('aria-expanded', open ? 'true' : 'false');
-      });
-      sheet.querySelectorAll('a').forEach(function (a) {
-        a.addEventListener('click', function () {
-          sheet.classList.remove('is-open');
-          btn.setAttribute('aria-expanded', 'false');
-        });
-      });
-    })();
+- [ ] **Step 2: Verify in browser.** Ink footer with 4 columns, Tamil gold tagline under the brand, portal links in the rightmost column, social SVG icons in the bottom row.
 
-    // === Scroll-aware nav ===
-    (function () {
-      var nav = document.getElementById('qcNav');
-      if (!nav) return;
-      function update() {
-        if (window.scrollY > 80) nav.classList.add('is-solid');
-        else nav.classList.remove('is-solid');
-      }
-      update();
-      window.addEventListener('scroll', update, { passive: true });
-    })();
+---
 
-    // === Scroll reveal ===
-    (function () {
-      if (!('IntersectionObserver' in window)) {
-        document.querySelectorAll('.qc-reveal').forEach(function (el) { el.classList.add('is-visible'); });
-        return;
-      }
-      var io = new IntersectionObserver(function (entries) {
-        entries.forEach(function (e) {
-          if (e.isIntersecting) { e.target.classList.add('is-visible'); io.unobserve(e.target); }
-        });
-      }, { threshold: 0.1, rootMargin: '0px 0px -60px 0px' });
-      document.querySelectorAll('.qc-reveal').forEach(function (el) { io.observe(el); });
-    })();
+## Task 11: Download hero photo asset
 
-    // === Leaflet branches map (lazy-init on viewport enter) ===
-    (function () {
-      var mapEl = document.getElementById('qcBranchMap');
-      if (!mapEl) return;
-      var branches = [
-        { name: 'Ramanathapuram', latlng: [9.3716, 78.8307] },
-        { name: 'Paramakudi',     latlng: [9.5481, 78.5905] },
-        { name: 'Mudukulathur',   latlng: [9.3539, 78.5076] },
-        { name: 'Kamuthi',        latlng: [9.4317, 78.3941] },
-        { name: 'Rameswaram',     latlng: [9.2876, 79.3129] }
-      ];
-      function init() {
-        if (typeof L === 'undefined') { setTimeout(init, 120); return; }
-        var map = L.map(mapEl, { zoomControl: true, scrollWheelZoom: false, attributionControl: true })
-                   .setView([9.40, 78.75], 10);
-        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-          attribution: '&copy; OpenStreetMap',
-          maxZoom: 18
-        }).addTo(map);
-        var icon = L.divIcon({
-          className: 'qc-branch-pin',
-          html: '<div style="width:14px;height:14px;background:#1B5E3B;border:2px solid #FBFAF7;border-radius:50%;box-shadow:0 0 0 1px rgba(0,0,0,0.15)"></div>',
-          iconSize: [14, 14],
-          iconAnchor: [7, 7]
-        });
-        branches.forEach(function (b) {
-          L.marker(b.latlng, { icon: icon }).addTo(map).bindPopup('<b>' + b.name + '</b>');
-        });
-      }
-      if ('IntersectionObserver' in window) {
-        var io2 = new IntersectionObserver(function (entries) {
-          if (entries.some(function (e) { return e.isIntersecting; })) {
-            init();
-            io2.disconnect();
-          }
-        }, { rootMargin: '200px' });
-        io2.observe(mapEl);
-      } else {
-        init();
-      }
-    })();
+**Files:**
+- Create: `public/images/landing/hero-room.jpg`
 
-    // === Design request drop zone ===
-    (function () {
-      var drop = document.getElementById('qcDrop');
-      var input = document.getElementById('qcDropInput');
-      if (!drop || !input) return;
-      ['dragenter','dragover'].forEach(function (ev) {
-        drop.addEventListener(ev, function (e) { e.preventDefault(); drop.classList.add('is-drag'); });
-      });
-      ['dragleave','drop'].forEach(function (ev) {
-        drop.addEventListener(ev, function (e) { e.preventDefault(); drop.classList.remove('is-drag'); });
-      });
-      drop.addEventListener('drop', function (e) {
-        if (e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0]) {
-          input.files = e.dataTransfer.files;
-          drop.querySelector('.qc-drop-label').textContent = e.dataTransfer.files[0].name;
-        }
-      });
-      input.addEventListener('change', function () {
-        if (input.files && input.files[0]) {
-          drop.querySelector('.qc-drop-label').textContent = input.files[0].name;
-        }
-      });
-    })();
-  </script>
-</body>
-</html>
+- [ ] **Step 1: Create the directory if it doesn't exist.**
+
+```bash
+mkdir -p "D:/QUALITY COLOURS/DEVELOPMENT/qcpaintshop.com/act.qcpaintshop.com/public/images/landing"
+```
+
+- [ ] **Step 2: Download a curated stock photo of a freshly-painted Indian-styled interior.**
+
+Pick ONE of the following Unsplash URLs (all CC0, no licensing concerns). Inspect each in a browser tab first; pick the one that best reads as a warm, recently-painted living room with natural light:
+
+```bash
+# Candidate A — warm tones, painted accent wall
+curl -L -o "public/images/landing/hero-room.jpg" \
+  "https://images.unsplash.com/photo-1615875605825-5eb9bb5d52ac?w=2000&q=80&auto=format&fit=crop"
+
+# Candidate B — neutral painted living room, soft light
+# curl -L -o "public/images/landing/hero-room.jpg" \
+#   "https://images.unsplash.com/photo-1616486338812-3dadae4b4ace?w=2000&q=80&auto=format&fit=crop"
+
+# Candidate C — green-painted feature wall
+# curl -L -o "public/images/landing/hero-room.jpg" \
+#   "https://images.unsplash.com/photo-1618219740975-d40978bb7378?w=2000&q=80&auto=format&fit=crop"
+```
+
+- [ ] **Step 3: Compress with sharp.** (sharp is already a project dependency — see `package.json`.) Run this one-liner from project root:
+
+```bash
+node -e "require('sharp')('public/images/landing/hero-room.jpg').resize(1920,null,{withoutEnlargement:true}).jpeg({quality:75,progressive:true}).toFile('public/images/landing/hero-room.optimized.jpg').then(()=>{require('fs').renameSync('public/images/landing/hero-room.optimized.jpg','public/images/landing/hero-room.jpg');console.log('done');});"
+```
+
+Expected: file size ≤ 250KB.
+
+- [ ] **Step 4: Verify in browser.** Hero now shows the photo with the dark gradient overlay; headline and Tamil sub-line read cleanly white-on-dark.
+
+---
+
+## Task 12: Smoke test and commit
+
+- [ ] **Step 1: Restart the server if not already running with the new server.js.**
+
+```bash
+node server.js
+# or: pm2 restart business-manager
+```
+
+- [ ] **Step 2: Curl tests.**
+
+```bash
+curl -sI http://localhost:3000/ | grep -E "HTTP|Content-Type"
+# Expected: HTTP/1.1 200 OK, Content-Type: text/html
+
+curl -s http://localhost:3000/api/status | head -c 80
+# Expected: {"service":"Quality Colours Business Manager API","version":"2.0.0"...
+
+# Confirm 404 for old JSON path on root no longer returns JSON
+curl -s http://localhost:3000/ | head -c 60
+# Expected: starts with <!DOCTYPE html>
+```
+
+- [ ] **Step 3: Browser smoke test — desktop.**
+
+Open `http://localhost:3000/` in Chrome at 1440px width and verify:
+- Hero photo loads with overlay; headline italic-gold accent reads clearly.
+- Nav stays transparent over hero, becomes solid cream below 80px scroll.
+- Brand strip shows 6 italic wordmarks.
+- About + Stats layout side-by-side, italic green numerals on the right.
+- Services list shows 4 numbered rows with hairline dividers.
+- Branches map renders with 5 green pins. Cards below render in 3 columns.
+- Gallery: 1 large + 5 smaller photos in asymmetric grid.
+- Design Request: ink section with paper-feel drop zone, three underline inputs, Tamil-split submit button.
+- Footer: 4 columns, portal links visible only in the rightmost column. Social SVGs at the bottom.
+- No console errors. No purple. No floating animations. No brand ticker scrolling.
+
+- [ ] **Step 4: Browser smoke test — mobile.**
+
+Use DevTools responsive mode at 390px width:
+- Nav collapses to hamburger; tapping opens a cream sheet with links + CTA.
+- Hero headline scales down (~42px) but stays legible.
+- All sections stack to single column.
+- Branches map shrinks to 240px height. Cards become 1-column.
+- Gallery becomes 6-col grid with large feature spanning full width.
+
+- [ ] **Step 5: Lighthouse run (Chrome DevTools → Lighthouse → Mobile, Performance + Accessibility).**
+
+Expected:
+- Performance ≥ 85 (single hero photo + Leaflet are the largest payloads).
+- Accessibility ≥ 95.
+- No "Color contrast" failures.
+- No "Image elements do not have explicit width and height" failures (figures have aspect-ratio, hero is a background, gallery imgs lazy-load).
+
+If accessibility < 95 or contrast fails, inspect the failing element and adjust opacities in the inline CSS. Most likely culprit: `rgba(255,255,255,0.6)` text on Leaflet attribution — leave as is, that's Leaflet's own UI.
+
+- [ ] **Step 6: Commit.**
+
+```bash
+git add server.js public/index.html public/images/landing/hero-room.jpg docs/superpowers/specs/2026-05-12-public-landing-redesign-design.md docs/superpowers/plans/2026-05-12-public-landing-redesign.md
+git commit -m "$(cat <<'EOF'
+feat(landing): redesign public landing — editorial classic + cinematic hero
+
+Replace AI-generated landing page at `/` with an internationally-standard
+editorial-classic design. Cinematic full-bleed hero (Playfair italic + curated
+Tamil), cream editorial body sections (About, Services, Branches, Gallery),
+ink Design Request form, ink footer with discreet portal links.
+
+API status moves from `GET /` to `GET /api/status` so Express static can
+serve `public/index.html` at the root.
+
+Spec: docs/superpowers/specs/2026-05-12-public-landing-redesign-design.md
+Plan: docs/superpowers/plans/2026-05-12-public-landing-redesign.md
+
+Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>
+EOF
+)"
+```
+
+- [ ] **Step 7: Confirm commit.**
+
+```bash
+git log -1 --stat
+# Expected: 1 commit, modifying server.js + public/index.html, adding hero-room.jpg + spec.md + plan.md
+```
+
+---
+
+## Spec Coverage Check
+
+| Spec section | Implementing task(s) |
+|---|---|
+| §2.1 Typography (Playfair, Inter, Noto Serif Tamil) | Task 2 (font preconnect + import + tokens) |
+| §2.2 Palette (cream/green/gold/ink) | Task 2 (`:root` CSS variables) |
+| §2.3 Motion (scroll-reveal, reduced-motion) | Task 2 (CSS + IntersectionObserver in inline script) |
+| §2.4 Photography | Task 8 (gallery placeholders), Task 11 (hero) |
+| §2.5 Tamil bilingual rules | Tasks 3, 7, 9, 10 (curated placements) |
+| §3.1 Nav | Tasks 2 (CSS + structure) + scroll-aware JS in Task 2 inline script |
+| §3.2 Hero | Task 3 |
+| §3.3 Brand strip | Task 4 |
+| §3.4 About + stats | Task 5 |
+| §3.5 Services (4 numbered rows) | Task 6 |
+| §3.6 Branches + map | Task 7 |
+| §3.7 Gallery (asymmetric grid) | Task 8 |
+| §3.8 Design Request | Task 9 |
+| §3.9 Footer | Task 10 |
+| §4 Routing (`/` → `/api/status`) | Task 1 |
+| §7 A11y & perf | Task 12 (Lighthouse run) |
+
+No gaps.
+
+## Out-of-Plan Notes
+
+- Real Quality Colours job photos for the gallery and hero are deferred. The Unsplash + local placeholder set ships v1; replace asset files in `/public/images/landing/` when curated photos are available — no HTML change required.
+- The form's `action="/api/design-requests"` assumes an existing backend route. Verify against `routes/website.js`. If the route name differs, update the action in `public/index.html` (one-line change). If no backend exists, the form's UI ships as a no-op — wire up in a follow-up plan.
+- The customer-facing `qcpaintshop.com` domain is untouched (different repository, different surface).

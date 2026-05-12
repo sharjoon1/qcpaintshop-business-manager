@@ -3668,7 +3668,8 @@ app.get('/api/test', async (req, res) => {
     }
 });
 
-app.get('/', (req, res) => {
+// API status (moved off `/` so Express static can serve public/index.html as the public landing page)
+app.get('/api/status', (req, res) => {
     res.json({
         service: 'Quality Colours Business Manager API',
         version: '2.0.0',
