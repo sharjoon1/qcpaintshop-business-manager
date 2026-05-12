@@ -1,0 +1,491 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="theme-color" content="#667eea">
+  <link rel="manifest" href="/manifest.json">
+  <link rel="icon" type="image/png" sizes="192x192" href="/icons/icon-192x192.png">
+  <title>Engineers — Quality Colours Business Manager</title>
+  <link rel="stylesheet" href="/css/tailwind.css">
+  <link rel="stylesheet" href="/css/design-system.css">
+  <script src="/universal-nav-loader.js"></script>
+  <script src="/js/auth-helper.js"></script>
+  <script>requireAdminOrRedirect();</script>
+  <style>
+    body { background: #f9fafb; }
+    .stat-card { background: #fff; border-radius: 12px; padding: 1.25rem; border: 1px solid #e8ecf1; }
+    .stat-value { font-size: 1.75rem; font-weight: 700; color: #1e293b; }
+    .stat-label { font-size: 0.8125rem; color: #64748b; margin-top: 2px; }
+    .data-table { width: 100%; border-collapse: collapse; }
+    .data-table th { text-align: left; padding: 0.75rem; font-size: 0.75rem; font-weight: 600; color: #64748b; text-transform: uppercase; border-bottom: 2px solid #e8ecf1; }
+    .data-table td { padding: 0.75rem; font-size: 0.875rem; border-bottom: 1px solid #f1f5f9; vertical-align: middle; }
+    .data-table tr:hover { background: #fafbfd; }
+    .badge { display: inline-flex; align-items: center; padding: 2px 10px; border-radius: 9999px; font-size: 0.7rem; font-weight: 600; text-transform: capitalize; }
+    .badge-pending { background: #fef3c7; color: #92400e; }
+    .badge-approved { background: #d1fae5; color: #065f46; }
+    .badge-rejected { background: #fee2e2; color: #991b1b; }
+    .badge-suspended { background: #e2e8f0; color: #475569; }
+    .btn-sm { padding: 0.375rem 0.75rem; border-radius: 0.375rem; font-size: 0.8125rem; font-weight: 500; cursor: pointer; transition: all 0.15s; border: none; }
+    .btn-primary { background: #667eea; color: #fff; }
+    .btn-primary:hover { background: #5a6fd6; }
+    .btn-success { background: #10b981; color: #fff; }
+    .btn-success:hover { background: #059669; }
+    .btn-danger { background: #ef4444; color: #fff; }
+    .btn-danger:hover { background: #dc2626; }
+    .btn-outline { background: transparent; border: 1px solid #d1d5db; color: #374151; }
+    .btn-outline:hover { background: #f9fafb; }
+    .pill-filter { display: inline-flex; gap: 6px; flex-wrap: wrap; }
+    .pill { padding: 6px 14px; border-radius: 9999px; font-size: 0.8125rem; cursor: pointer; background: #fff; border: 1px solid #e2e8f0; color: #64748b; transition: all 0.15s; }
+    .pill.active { background: #667eea; color: #fff; border-color: #667eea; }
+    .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 1000; display: none; align-items: center; justify-content: center; padding: 20px; }
+    .modal-overlay.open { display: flex; }
+    .modal-card { background: #fff; border-radius: 14px; max-width: 720px; width: 100%; max-height: 90vh; overflow-y: auto; }
+    .modal-head { padding: 20px 24px; border-bottom: 1px solid #e8ecf1; display: flex; justify-content: space-between; align-items: center; }
+    .modal-body { padding: 24px; }
+    .modal-foot { padding: 16px 24px; border-top: 1px solid #e8ecf1; display: flex; justify-content: flex-end; gap: 10px; flex-wrap: wrap; }
+    .field { margin-bottom: 14px; }
+    .field label { display: block; font-size: 0.75rem; font-weight: 600; color: #64748b; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px; }
+    .field input, .field textarea, .field select { width: 100%; border: 1px solid #d1d5db; border-radius: 8px; padding: 8px 12px; font-size: 0.9rem; font-family: inherit; }
+    .field input:focus, .field textarea:focus, .field select:focus { outline: none; border-color: #667eea; box-shadow: 0 0 0 3px rgba(102,126,234,0.12); }
+    .field .static { padding: 8px 0; font-size: 0.9rem; color: #1e293b; }
+    .row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+    @media (max-width: 600px) { .row2 { grid-template-columns: 1fr; } .data-table th:nth-child(4), .data-table td:nth-child(4) { display:none; } }
+    .toast { position: fixed; bottom: 20px; right: 20px; background: #111827; color: #fff; padding: 12px 18px; border-radius: 8px; font-size: 0.875rem; box-shadow: 0 10px 30px rgba(0,0,0,0.2); z-index: 1100; opacity: 0; transform: translateY(8px); transition: opacity 0.18s, transform 0.18s; }
+    .toast.show { opacity: 1; transform: translateY(0); }
+    .toast.err { background: #b91c1c; }
+    .empty { padding: 60px 20px; text-align: center; color: #64748b; }
+    .empty .em { font-size: 28px; margin-bottom: 8px; color: #94a3b8; }
+  </style>
+</head>
+<body>
+  <div id="universal-nav-placeholder"></div>
+
+  <main class="px-4 sm:px-6 lg:px-8 py-6 max-w-7xl mx-auto">
+    <header class="mb-6">
+      <div class="flex flex-wrap items-end justify-between gap-3">
+        <div>
+          <h1 class="text-2xl font-bold text-gray-900">Engineers</h1>
+          <p class="text-sm text-gray-500 mt-1">B2B account holders — site engineers, contractors, project buyers.</p>
+        </div>
+        <div class="flex gap-2">
+          <a class="btn-sm btn-outline" href="/admin-painters.html">View Painters →</a>
+          <button class="btn-sm btn-primary" id="refreshBtn">↻ Refresh</button>
+        </div>
+      </div>
+    </header>
+
+    <!-- Stats -->
+    <div class="grid grid-cols-2 md:grid-cols-4 gap-3 mb-5">
+      <div class="stat-card"><div class="stat-value" id="stTotal">—</div><div class="stat-label">Total engineers</div></div>
+      <div class="stat-card"><div class="stat-value text-amber-600" id="stPending">—</div><div class="stat-label">Pending approval</div></div>
+      <div class="stat-card"><div class="stat-value text-emerald-600" id="stApproved">—</div><div class="stat-label">Approved</div></div>
+      <div class="stat-card"><div class="stat-value text-slate-500" id="stSuspended">—</div><div class="stat-label">Suspended / rejected</div></div>
+    </div>
+
+    <!-- Filter + search -->
+    <div class="bg-white border border-gray-200 rounded-xl p-3 mb-3 flex flex-wrap items-center gap-3">
+      <div class="pill-filter" id="statusPills">
+        <span class="pill active" data-status="">All</span>
+        <span class="pill" data-status="pending">Pending</span>
+        <span class="pill" data-status="approved">Approved</span>
+        <span class="pill" data-status="suspended">Suspended</span>
+        <span class="pill" data-status="rejected">Rejected</span>
+      </div>
+      <div class="flex-1 min-w-[200px]">
+        <input id="searchInput" type="search" placeholder="Search name, phone, company, GST..."
+          class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-indigo-400">
+      </div>
+    </div>
+
+    <!-- Table -->
+    <div class="bg-white border border-gray-200 rounded-xl overflow-hidden">
+      <div style="overflow-x:auto;">
+        <table class="data-table" id="engineersTable">
+          <thead>
+            <tr>
+              <th>Engineer</th>
+              <th>Phone</th>
+              <th>Company / GST</th>
+              <th>City</th>
+              <th>Credit limit</th>
+              <th>Status</th>
+              <th style="text-align:right;">Actions</th>
+            </tr>
+          </thead>
+          <tbody id="engBody">
+            <tr><td colspan="7" class="empty"><div>Loading engineers…</div></td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div id="pagerWrap" class="flex items-center justify-between p-3 text-sm text-gray-500" style="display:none;">
+        <span id="pagerInfo"></span>
+        <div class="flex gap-2">
+          <button class="btn-sm btn-outline" id="prevBtn">← Prev</button>
+          <button class="btn-sm btn-outline" id="nextBtn">Next →</button>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <!-- DETAIL MODAL -->
+  <div class="modal-overlay" id="engModal">
+    <div class="modal-card">
+      <div class="modal-head">
+        <div>
+          <h2 id="mTitle" class="text-lg font-bold text-gray-900">Engineer</h2>
+          <p id="mSubtitle" class="text-sm text-gray-500 mt-0.5"></p>
+        </div>
+        <button class="btn-sm btn-outline" onclick="closeModal()">Close ×</button>
+      </div>
+      <div class="modal-body">
+        <div class="row2">
+          <div class="field"><label>Full name</label><input id="m_full_name" /></div>
+          <div class="field"><label>Phone (read-only)</label><div class="static" id="m_phone">—</div></div>
+        </div>
+        <div class="row2">
+          <div class="field"><label>Email</label><input id="m_email" type="email"/></div>
+          <div class="field"><label>Designation</label><input id="m_designation"/></div>
+        </div>
+        <div class="row2">
+          <div class="field"><label>Company</label><input id="m_company_name"/></div>
+          <div class="field"><label>GST number</label><input id="m_gst_number" style="text-transform:uppercase"/></div>
+        </div>
+        <div class="field"><label>Address</label><input id="m_address"/></div>
+        <div class="row2">
+          <div class="field"><label>City</label><input id="m_city"/></div>
+          <div class="field"><label>District</label><input id="m_district"/></div>
+        </div>
+        <div class="row2">
+          <div class="field"><label>Pincode</label><input id="m_pincode"/></div>
+          <div class="field"><label>PAN number</label><input id="m_pan_number" style="text-transform:uppercase"/></div>
+        </div>
+
+        <hr style="margin: 18px 0; border-color: #e8ecf1;" />
+        <h3 class="text-sm font-semibold text-gray-800 mb-2">Credit account</h3>
+        <div class="row2">
+          <div class="field">
+            <label>Credit limit (₹)</label>
+            <input id="m_credit_limit" type="number" min="0" step="100" placeholder="0"/>
+          </div>
+          <div class="field">
+            <label>Credit enabled</label>
+            <select id="m_credit_enabled">
+              <option value="0">Disabled</option>
+              <option value="1">Enabled</option>
+            </select>
+          </div>
+        </div>
+        <div class="row2">
+          <div class="field"><label>Credit used</label><div class="static" id="m_credit_used">₹ 0</div></div>
+          <div class="field"><label>Total lifetime spend</label><div class="static" id="m_total_spend">₹ 0</div></div>
+        </div>
+
+        <hr style="margin: 18px 0; border-color: #e8ecf1;" />
+        <div class="field"><label>Internal notes</label><textarea id="m_notes" rows="3" placeholder="Visible only to admin"></textarea></div>
+        <div id="m_rejected_block" style="display:none; padding: 10px 14px; background: #fee2e2; color: #991b1b; border-radius: 8px; font-size: 0.875rem; margin-top: 10px;">
+          <strong>Rejected reason:</strong> <span id="m_rejected_reason"></span>
+        </div>
+      </div>
+      <div class="modal-foot" id="mActions">
+        <!-- buttons rendered per status -->
+      </div>
+    </div>
+  </div>
+
+  <!-- REJECT REASON MODAL -->
+  <div class="modal-overlay" id="rejectModal">
+    <div class="modal-card" style="max-width: 460px;">
+      <div class="modal-head"><h2 class="text-lg font-bold text-gray-900">Reject engineer</h2></div>
+      <div class="modal-body">
+        <p class="text-sm text-gray-600 mb-3">Provide a reason — this will be shown to the engineer.</p>
+        <textarea id="rejectReason" rows="3" class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm" placeholder="Reason for rejection..."></textarea>
+      </div>
+      <div class="modal-foot">
+        <button class="btn-sm btn-outline" onclick="closeRejectModal()">Cancel</button>
+        <button class="btn-sm btn-danger" id="rejectConfirm">Reject</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="toast" id="toast"></div>
+
+  <script>
+    var API = '/api/engineers';
+    var state = {
+      page: 1,
+      perPage: 20,
+      status: '',
+      q: '',
+      total: 0,
+      current: null
+    };
+
+    function authHeaders(extra) {
+      var t = localStorage.getItem('auth_token') || '';
+      var h = { 'Authorization': 'Bearer ' + t };
+      if (extra) Object.keys(extra).forEach(function (k) { h[k] = extra[k]; });
+      return h;
+    }
+    function toast(msg, kind) {
+      var t = document.getElementById('toast');
+      t.textContent = msg;
+      t.classList.toggle('err', kind === 'err');
+      t.classList.add('show');
+      setTimeout(function () { t.classList.remove('show'); }, 2400);
+    }
+    function escHTML(s) {
+      return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) {
+        return { '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c];
+      });
+    }
+    function fmtINR(n) {
+      var num = Number(n || 0);
+      return '₹ ' + num.toLocaleString('en-IN', { maximumFractionDigits: 0 });
+    }
+
+    async function fetchList() {
+      var params = new URLSearchParams();
+      params.set('page', state.page);
+      params.set('per_page', state.perPage);
+      if (state.status) params.set('status', state.status);
+      if (state.q) params.set('q', state.q);
+      var r = await fetch(API + '?' + params.toString(), { headers: authHeaders() });
+      if (r.status === 401 || r.status === 403) {
+        toast('Session expired — sign in again', 'err');
+        setTimeout(function () { window.location.href = '/login.html'; }, 1200);
+        return null;
+      }
+      return r.json();
+    }
+
+    function renderStats(counts) {
+      var p = +counts.pending || 0, a = +counts.approved || 0, s = +counts.suspended || 0, r = +counts.rejected || 0;
+      document.getElementById('stTotal').textContent = (p + a + s + r);
+      document.getElementById('stPending').textContent = p;
+      document.getElementById('stApproved').textContent = a;
+      document.getElementById('stSuspended').textContent = (s + r);
+    }
+
+    function renderRows(rows) {
+      var tbody = document.getElementById('engBody');
+      if (!rows.length) {
+        tbody.innerHTML = '<tr><td colspan="7"><div class="empty"><div class="em">— No engineers found —</div><div>Adjust your filter or wait for new registrations.</div></div></td></tr>';
+        return;
+      }
+      tbody.innerHTML = rows.map(function (e) {
+        var initial = (e.full_name || 'E').charAt(0).toUpperCase();
+        var status = e.status || 'pending';
+        var company = e.company_name || '<span class="text-gray-400">—</span>';
+        var gst = e.gst_number ? '<div class="text-xs text-gray-500 mt-0.5">GST ' + escHTML(e.gst_number) + '</div>' : '';
+        return '<tr>'
+          + '<td><div class="flex items-center gap-3">'
+          +   '<div class="w-9 h-9 rounded-full bg-indigo-100 text-indigo-700 flex items-center justify-center font-bold text-sm">' + escHTML(initial) + '</div>'
+          +   '<div><div class="font-semibold text-gray-900">' + escHTML(e.full_name || '—') + '</div>'
+          +     (e.designation ? '<div class="text-xs text-gray-500">' + escHTML(e.designation) + '</div>' : '')
+          +   '</div></div></td>'
+          + '<td>+91 ' + escHTML(e.phone) + '</td>'
+          + '<td>' + (typeof company === 'string' ? escHTML(company) : company) + gst + '</td>'
+          + '<td>' + escHTML(e.city || '—') + '</td>'
+          + '<td>' + (e.credit_enabled ? fmtINR(e.credit_limit) : '<span class="text-gray-400">Disabled</span>') + '</td>'
+          + '<td><span class="badge badge-' + status + '">' + status + '</span></td>'
+          + '<td style="text-align:right;">'
+          +   '<button class="btn-sm btn-outline" onclick="openModal(' + e.id + ')">Manage</button>'
+          + '</td>'
+          + '</tr>';
+      }).join('');
+    }
+
+    function renderPager(total) {
+      var pages = Math.max(1, Math.ceil(total / state.perPage));
+      var info = document.getElementById('pagerInfo');
+      var w = document.getElementById('pagerWrap');
+      if (total <= state.perPage) { w.style.display = 'none'; return; }
+      w.style.display = 'flex';
+      info.textContent = 'Page ' + state.page + ' of ' + pages + ' · ' + total + ' total';
+      document.getElementById('prevBtn').disabled = state.page <= 1;
+      document.getElementById('nextBtn').disabled = state.page >= pages;
+    }
+
+    async function reload() {
+      var data = await fetchList();
+      if (!data) return;
+      if (!data.success) { toast(data.message || 'Failed to load', 'err'); return; }
+      state.total = data.total || 0;
+      renderStats(data.counts || {});
+      renderRows(data.data || []);
+      renderPager(data.total || 0);
+    }
+
+    // === Modal ===
+    async function openModal(id) {
+      try {
+        var r = await fetch(API + '/' + id, { headers: authHeaders() });
+        var data = await r.json();
+        if (!data.success) { toast(data.message || 'Failed to load', 'err'); return; }
+        var e = data.engineer;
+        state.current = e;
+
+        document.getElementById('mTitle').textContent = e.full_name || 'Engineer';
+        document.getElementById('mSubtitle').textContent = (e.designation || '—') + ' · ' + (e.company_name || 'no company');
+        document.getElementById('m_phone').textContent = '+91 ' + e.phone;
+        ['full_name','email','designation','company_name','gst_number','address','city','district','pincode','pan_number','notes'].forEach(function (k) {
+          var el = document.getElementById('m_' + k);
+          if (el) el.value = e[k] || '';
+        });
+        document.getElementById('m_credit_limit').value = e.credit_limit || 0;
+        document.getElementById('m_credit_enabled').value = e.credit_enabled ? '1' : '0';
+        document.getElementById('m_credit_used').textContent = fmtINR(e.credit_used);
+        document.getElementById('m_total_spend').textContent = fmtINR(e.total_spend);
+        document.getElementById('m_rejected_block').style.display = e.rejected_reason ? 'block' : 'none';
+        document.getElementById('m_rejected_reason').textContent = e.rejected_reason || '';
+
+        var actions = [];
+        if (e.status === 'pending') {
+          actions.push('<button class="btn-sm btn-success" onclick="doApprove()">✓ Approve</button>');
+          actions.push('<button class="btn-sm btn-danger" onclick="openRejectModal()">✗ Reject</button>');
+        } else if (e.status === 'approved') {
+          actions.push('<button class="btn-sm btn-outline" onclick="doSuspend()">Suspend</button>');
+        } else if (e.status === 'suspended' || e.status === 'rejected') {
+          actions.push('<button class="btn-sm btn-success" onclick="doReinstate()">Re-approve</button>');
+        }
+        actions.push('<button class="btn-sm btn-danger" onclick="doDelete()">Delete</button>');
+        actions.push('<button class="btn-sm btn-primary" onclick="doSave()">Save changes</button>');
+        document.getElementById('mActions').innerHTML = actions.join('');
+
+        document.getElementById('engModal').classList.add('open');
+      } catch (err) {
+        toast('Failed to load engineer', 'err');
+      }
+    }
+    function closeModal() { document.getElementById('engModal').classList.remove('open'); state.current = null; }
+
+    async function doSave() {
+      if (!state.current) return;
+      var payload = {};
+      ['full_name','email','designation','company_name','gst_number','address','city','district','pincode','pan_number','notes'].forEach(function (k) {
+        var el = document.getElementById('m_' + k);
+        if (!el) return;
+        payload[k] = el.value === '' ? null : el.value.trim();
+      });
+      if (payload.gst_number) payload.gst_number = payload.gst_number.toUpperCase();
+      if (payload.pan_number) payload.pan_number = payload.pan_number.toUpperCase();
+      payload.credit_limit = parseFloat(document.getElementById('m_credit_limit').value) || 0;
+      payload.credit_enabled = document.getElementById('m_credit_enabled').value === '1' ? 1 : 0;
+
+      try {
+        var r = await fetch(API + '/' + state.current.id, {
+          method: 'PUT', headers: authHeaders({ 'Content-Type': 'application/json' }),
+          body: JSON.stringify(payload)
+        });
+        var data = await r.json();
+        if (!data.success) throw new Error(data.message || 'Save failed');
+        toast('Saved.');
+        await reload();
+        closeModal();
+      } catch (err) { toast(err.message, 'err'); }
+    }
+
+    async function doApprove() {
+      if (!state.current) return;
+      try {
+        var r = await fetch(API + '/' + state.current.id + '/approve', { method: 'POST', headers: authHeaders() });
+        var data = await r.json();
+        if (!data.success) throw new Error(data.message || 'Approve failed');
+        toast('Engineer approved.');
+        await reload(); closeModal();
+      } catch (err) { toast(err.message, 'err'); }
+    }
+    async function doSuspend() {
+      if (!state.current) return;
+      if (!confirm('Suspend this engineer?')) return;
+      try {
+        var r = await fetch(API + '/' + state.current.id + '/suspend', { method: 'POST', headers: authHeaders() });
+        var data = await r.json();
+        if (!data.success) throw new Error(data.message || 'Suspend failed');
+        toast('Engineer suspended.');
+        await reload(); closeModal();
+      } catch (err) { toast(err.message, 'err'); }
+    }
+    async function doReinstate() {
+      if (!state.current) return;
+      try {
+        var r = await fetch(API + '/' + state.current.id + '/reinstate', { method: 'POST', headers: authHeaders() });
+        var data = await r.json();
+        if (!data.success) throw new Error(data.message || 'Reinstate failed');
+        toast('Engineer reinstated.');
+        await reload(); closeModal();
+      } catch (err) { toast(err.message, 'err'); }
+    }
+    async function doDelete() {
+      if (!state.current) return;
+      if (!confirm('Permanently delete ' + (state.current.full_name || 'this engineer') + '? This cannot be undone.')) return;
+      try {
+        var r = await fetch(API + '/' + state.current.id, { method: 'DELETE', headers: authHeaders() });
+        var data = await r.json();
+        if (!data.success) throw new Error(data.message || 'Delete failed');
+        toast('Engineer deleted.');
+        await reload(); closeModal();
+      } catch (err) { toast(err.message, 'err'); }
+    }
+
+    function openRejectModal() { document.getElementById('rejectReason').value = ''; document.getElementById('rejectModal').classList.add('open'); }
+    function closeRejectModal() { document.getElementById('rejectModal').classList.remove('open'); }
+    document.getElementById('rejectConfirm').addEventListener('click', async function () {
+      if (!state.current) return;
+      var reason = document.getElementById('rejectReason').value.trim();
+      if (!reason) { toast('Please provide a reason', 'err'); return; }
+      try {
+        var r = await fetch(API + '/' + state.current.id + '/reject', {
+          method: 'POST', headers: authHeaders({ 'Content-Type': 'application/json' }),
+          body: JSON.stringify({ reason: reason })
+        });
+        var data = await r.json();
+        if (!data.success) throw new Error(data.message || 'Reject failed');
+        toast('Engineer rejected.');
+        closeRejectModal();
+        await reload(); closeModal();
+      } catch (err) { toast(err.message, 'err'); }
+    });
+
+    // === Filter & search wiring ===
+    document.getElementById('statusPills').addEventListener('click', function (e) {
+      var t = e.target.closest('.pill');
+      if (!t) return;
+      document.querySelectorAll('#statusPills .pill').forEach(function (p) { p.classList.remove('active'); });
+      t.classList.add('active');
+      state.status = t.getAttribute('data-status') || '';
+      state.page = 1;
+      reload();
+    });
+    var sTimer;
+    document.getElementById('searchInput').addEventListener('input', function (e) {
+      clearTimeout(sTimer);
+      sTimer = setTimeout(function () { state.q = e.target.value.trim(); state.page = 1; reload(); }, 280);
+    });
+    document.getElementById('refreshBtn').addEventListener('click', reload);
+    document.getElementById('prevBtn').addEventListener('click', function () { if (state.page > 1) { state.page--; reload(); } });
+    document.getElementById('nextBtn').addEventListener('click', function () { state.page++; reload(); });
+
+    // Close modal on backdrop click
+    document.getElementById('engModal').addEventListener('click', function (e) { if (e.target.id === 'engModal') closeModal(); });
+    document.getElementById('rejectModal').addEventListener('click', function (e) { if (e.target.id === 'rejectModal') closeRejectModal(); });
+    document.addEventListener('keydown', function (e) {
+      if (e.key === 'Escape') { closeModal(); closeRejectModal(); }
+    });
+
+    // Initial: honor ?status= deep link
+    (function initFromUrl() {
+      var u = new URLSearchParams(window.location.search);
+      var s = u.get('status');
+      if (s && ['pending','approved','suspended','rejected'].indexOf(s) !== -1) {
+        state.status = s;
+        document.querySelectorAll('#statusPills .pill').forEach(function (p) {
+          p.classList.toggle('active', p.getAttribute('data-status') === s);
+        });
+      }
+    })();
+    reload();
+  </script>
+</body>
+</html>

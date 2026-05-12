@@ -112,12 +112,13 @@
       </div>
     </div>
 
+    <p style="font-size:13px;color:var(--qc-muted);text-align:center;margin:24px 0 0;">New here? <a href="/engineer-register.html" style="color:var(--qc-green);font-weight:500;border-bottom:1px solid var(--qc-green);padding-bottom:1px;">Register as an engineer →</a></p>
     <a class="qc-back" href="/">← Back to home</a>
     <p class="qc-tagline" style="text-align:center">தரமான வண்ணங்கள், சிறந்த முடிவு.</p>
   </div>
 
   <script>
-    var API_BASE = '/api/customer/auth';
+    var API_BASE = '/api/engineers';
     var phoneEl = document.getElementById('phone');
     var sendBtn = document.getElementById('sendBtn');
     var verifyBtn = document.getElementById('verifyBtn');
@@ -151,15 +152,19 @@
       try {
         var r = await fetch(API_BASE + '/send-otp', {
           method: 'POST', headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ phone: phone, user_type: 'engineer' })
+          body: JSON.stringify({ phone: phone })
         });
         var data = await r.json();
+        if (r.status === 404 && data.code === 'NOT_REGISTERED') {
+          showErr(phoneErr, 'No engineer account for this number. Register first to receive an OTP.');
+          return;
+        }
         if (!r.ok || !data.success) throw new Error(data.message || 'Could not send OTP. Try again.');
         currentPhone = phone;
         phoneStep.style.display = 'none';
         otpStep.style.display = 'block';
-        otpHint.textContent = 'We sent a 6-digit code to +91 ' + phone + '.';
-        try { localStorage.setItem('qc_user_type', 'engineer'); } catch (_) {}
+        var statusHint = data.status === 'approved' ? '' : ' (account status: ' + data.status + ')';
+        otpHint.textContent = 'We sent a 6-digit code to +91 ' + phone + '.' + statusHint;
         setTimeout(function () { otpInputs[0].focus(); }, 50);
       } catch (e) {
         showErr(phoneErr, e.message || 'Network error. Please try again.');
@@ -203,20 +208,30 @@
       try {
         var r = await fetch(API_BASE + '/verify-otp', {
           method: 'POST', headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ phone: currentPhone, otp: otp, user_type: 'engineer' })
+          body: JSON.stringify({ phone: currentPhone, otp: otp })
         });
         var data = await r.json();
         if (!r.ok || !data.success) throw new Error(data.message || 'Invalid OTP. Try again.');
-        var d = data.data || {};
+        var eng = data.engineer || {};
         try {
-          localStorage.setItem('customer_phone', currentPhone);
-          localStorage.setItem('customer_name', d.name || 'Engineer');
-          localStorage.setItem('customer_logged_in', 'true');
-          localStorage.setItem('customer_token', d.token || '');
-          localStorage.setItem('customer_id', d.customer_id || '');
-          localStorage.setItem('qc_user_type', 'engineer');
+          localStorage.setItem('engineer_token', data.token || '');
+          localStorage.setItem('engineer_id', eng.id || '');
+          localStorage.setItem('engineer_phone', eng.phone || currentPhone);
+          localStorage.setItem('engineer_name', eng.full_name || 'Engineer');
+          localStorage.setItem('engineer_company', eng.company_name || '');
+          localStorage.setItem('engineer_status', eng.status || 'pending');
+          localStorage.setItem('engineer_logged_in', 'true');
         } catch (_) {}
-        window.location.href = '/engineer-dashboard.html';
+        if (eng.status === 'pending') {
+          window.location.href = '/engineer-dashboard.html?welcome=1';
+        } else if (eng.status === 'rejected' || eng.status === 'suspended') {
+          showErr(otpErr, 'Your account is ' + eng.status + '. Please contact us.');
+          verifyBtn.disabled = false;
+          verifyBtn.textContent = 'Verify & sign in';
+          return;
+        } else {
+          window.location.href = '/engineer-dashboard.html';
+        }
       } catch (e) {
         showErr(otpErr, e.message || 'Could not verify. Try again.');
       } finally {

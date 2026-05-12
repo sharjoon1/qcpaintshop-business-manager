@@ -1,0 +1,239 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="theme-color" content="#1B5E3B">
+  <title>Engineer Profile · Quality Colours</title>
+  <link rel="icon" type="image/png" sizes="192x192" href="/icons/icon-192x192.png">
+  <script>
+    (function () {
+      if (!localStorage.getItem('engineer_token') || localStorage.getItem('engineer_logged_in') !== 'true') {
+        window.location.href = '/engineer-login.html';
+      }
+    })();
+  </script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,500;1,400;1,500&family=Inter:wght@300;400;500;600&family=Noto+Serif+Tamil:wght@400;500&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --qc-cream:#FBFAF7; --qc-green:#1B5E3B; --qc-green-dark:#154D31; --qc-gold:#D4A24E;
+      --qc-ink:#1A1A1A; --qc-muted:#666; --qc-rule-soft: rgba(26,26,26,0.08);
+      --serif:'Playfair Display',Georgia,serif;
+      --sans:'Inter',system-ui,sans-serif;
+      --tamil:'Noto Serif Tamil',serif;
+    }
+    *, *::before, *::after { box-sizing: border-box; }
+    body { margin:0; font-family:var(--sans); color:var(--qc-ink); background:var(--qc-cream); min-height:100vh; -webkit-font-smoothing:antialiased; line-height:1.55; }
+    .qc-head { background:#fff; border-bottom:1px solid var(--qc-rule-soft); padding: 18px clamp(20px,4vw,48px); display:flex; justify-content:space-between; align-items:center; }
+    .qc-head .logo { font-family:var(--serif); font-weight:500; font-size:22px; letter-spacing:-0.3px; }
+    .qc-head .logo small { font-family:var(--sans); display:block; font-size:9px; letter-spacing:2.2px; color:var(--qc-green); font-weight:600; margin-top:4px; text-transform:uppercase; }
+    .qc-head a { color: var(--qc-ink); text-decoration: none; }
+    .qc-back { font-size:13px; color:var(--qc-muted); font-weight:500; }
+    .qc-back:hover { color: var(--qc-ink); }
+    main { max-width: 720px; margin: 0 auto; padding: 48px clamp(20px,4vw,48px) 80px; }
+    .qc-eyebrow { font-size:11px; font-weight:600; letter-spacing:2.5px; text-transform:uppercase; color:var(--qc-green); display:inline-flex; gap:10px; align-items:center; margin-bottom:14px; }
+    .qc-eyebrow .dot { width:6px; height:6px; background:var(--qc-gold); border-radius:50%; }
+    h1 { font-family:var(--serif); font-weight:500; font-size:42px; line-height:1.05; letter-spacing:-1.2px; margin:0 0 10px; }
+    h1 em { font-style:italic; color:var(--qc-green); }
+    .lead { font-size:14px; color:var(--qc-muted); margin:0 0 32px; }
+    .qc-card { background:#fff; border:1px solid var(--qc-rule-soft); padding: 32px 32px 28px; margin-bottom: 20px; }
+    .qc-card h2 { font-family:var(--serif); font-weight:500; font-size:22px; margin:0 0 22px; color:var(--qc-ink); }
+    .row { display:grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+    @media (max-width: 600px) { .row { grid-template-columns: 1fr; } }
+    label { display:block; font-size:11px; font-weight:600; letter-spacing:1.5px; text-transform:uppercase; color:var(--qc-muted); margin-bottom:6px; }
+    .qc-input { width:100%; background:transparent; border:0; border-bottom:1px solid var(--qc-rule-soft); padding:10px 0; font-family:var(--sans); font-size:15px; outline:none; transition:border-color 0.2s; color:var(--qc-ink); }
+    .qc-input:focus { border-bottom-color: var(--qc-green); }
+    .qc-input[readonly] { color: var(--qc-muted); cursor: not-allowed; }
+    .qc-static { font-size:15px; color:var(--qc-ink); padding:10px 0; border-bottom: 1px solid var(--qc-rule-soft); }
+    .qc-static .badge { display:inline-block; padding: 3px 10px; font-size:10.5px; letter-spacing:1.5px; font-weight:600; text-transform:uppercase; margin-left:8px; }
+    .badge.approved { background: rgba(27,94,59,0.12); color: var(--qc-green-dark); }
+    .badge.pending  { background: rgba(212,162,78,0.18); color: #8a6914; }
+    .badge.rejected { background: rgba(183,28,28,0.12); color: #8a2a1f; }
+    .badge.suspended { background: #ddd; color: #555; }
+    .field-group { margin-bottom: 22px; }
+    .field-group:last-of-type { margin-bottom: 0; }
+    .qc-btn { padding: 16px 28px; background: var(--qc-green); color:#fff; font-family:var(--sans); font-size:13px; font-weight:600; letter-spacing:0.4px; border:0; cursor:pointer; transition:background 0.2s; }
+    .qc-btn:hover { background: var(--qc-green-dark); }
+    .qc-btn:disabled { opacity:.45; cursor:not-allowed; }
+    .qc-actions { display:flex; gap: 14px; align-items:center; margin-top: 18px; flex-wrap: wrap; }
+    .qc-cancel { color: var(--qc-muted); font-size:13px; font-weight:500; }
+    .qc-cancel:hover { color: var(--qc-ink); }
+    .qc-msg { padding: 14px 16px; margin-top:18px; font-size:14px; }
+    .qc-msg.ok { background: rgba(27,94,59,0.08); color: var(--qc-green-dark); border-left: 3px solid var(--qc-green); }
+    .qc-msg.err { background: rgba(183,28,28,0.06); color: #b71c1c; border-left: 3px solid #b71c1c; }
+  </style>
+</head>
+<body>
+  <header class="qc-head">
+    <a href="/engineer-dashboard.html" class="logo">Quality Colours.<small>Engineer · Profile</small></a>
+    <a class="qc-back" href="/engineer-dashboard.html">← Back to dashboard</a>
+  </header>
+
+  <main>
+    <div class="qc-eyebrow"><span class="dot"></span>Your account</div>
+    <h1>Profile &amp; <em>company details.</em></h1>
+    <p class="lead">Keep these up to date so we can prepare accurate quotes and invoices for your firm.</p>
+
+    <form id="qcProfileForm">
+      <div class="qc-card">
+        <h2>Account</h2>
+        <div class="field-group">
+          <label>Account status</label>
+          <div class="qc-static" id="statusLine">Loading...</div>
+        </div>
+        <div class="row">
+          <div class="field-group">
+            <label for="phone">Mobile number</label>
+            <input id="phone" type="tel" class="qc-input" readonly>
+            <small style="font-size:11px; color:var(--qc-muted); letter-spacing:0.5px;">Phone is your login — contact us to change it.</small>
+          </div>
+          <div class="field-group">
+            <label for="email">Email</label>
+            <input id="email" type="email" class="qc-input" autocomplete="email">
+          </div>
+        </div>
+      </div>
+
+      <div class="qc-card">
+        <h2>Personal</h2>
+        <div class="field-group">
+          <label for="full_name">Full name *</label>
+          <input id="full_name" type="text" class="qc-input" required maxlength="120">
+        </div>
+        <div class="row">
+          <div class="field-group">
+            <label for="designation">Designation</label>
+            <input id="designation" type="text" class="qc-input" maxlength="80" placeholder="e.g. Site Engineer">
+          </div>
+          <div class="field-group">
+            <label for="city">City / town</label>
+            <input id="city" type="text" class="qc-input" maxlength="60">
+          </div>
+        </div>
+      </div>
+
+      <div class="qc-card">
+        <h2>Company</h2>
+        <div class="row">
+          <div class="field-group">
+            <label for="company_name">Company / firm</label>
+            <input id="company_name" type="text" class="qc-input" maxlength="120">
+          </div>
+          <div class="field-group">
+            <label for="gst_number">GST number</label>
+            <input id="gst_number" type="text" class="qc-input" maxlength="20" style="text-transform:uppercase">
+          </div>
+        </div>
+        <div class="field-group">
+          <label for="address">Office / site address</label>
+          <input id="address" type="text" class="qc-input" maxlength="240">
+        </div>
+        <div class="row">
+          <div class="field-group">
+            <label for="district">District</label>
+            <input id="district" type="text" class="qc-input" maxlength="60">
+          </div>
+          <div class="field-group">
+            <label for="pincode">PIN code</label>
+            <input id="pincode" type="text" class="qc-input" inputmode="numeric" maxlength="10">
+          </div>
+        </div>
+      </div>
+
+      <div class="qc-actions">
+        <button type="submit" id="saveBtn" class="qc-btn">Save changes</button>
+        <a href="/engineer-dashboard.html" class="qc-cancel">Cancel</a>
+      </div>
+      <div id="msg"></div>
+    </form>
+  </main>
+
+  <script>
+    var API = '/api/engineers';
+    var ENG_KEYS = ['engineer_token','engineer_logged_in','engineer_id','engineer_phone','engineer_name','engineer_company','engineer_status'];
+
+    function authHeaders(extra) {
+      var t = localStorage.getItem('engineer_token') || '';
+      var h = { 'X-Engineer-Token': t };
+      if (extra) Object.keys(extra).forEach(function (k) { h[k] = extra[k]; });
+      return h;
+    }
+    function handleAuthFail(r) {
+      if (r && (r.status === 401 || r.status === 403)) {
+        ENG_KEYS.forEach(function (k) { localStorage.removeItem(k); });
+        window.location.href = '/engineer-login.html';
+        return true;
+      }
+      return false;
+    }
+
+    function setStatusLine(status, reason) {
+      var line = document.getElementById('statusLine');
+      var label = status ? status.charAt(0).toUpperCase() + status.slice(1) : '—';
+      line.innerHTML = '<span>' + label + '</span><span class="badge ' + (status || '') + '">' + (status || '—') + '</span>';
+      if (status === 'rejected' && reason) {
+        line.innerHTML += '<div style="font-size:12px;color:#b71c1c;margin-top:8px;">Reason: ' + reason.replace(/[<>&]/g, '') + '</div>';
+      }
+    }
+
+    async function load() {
+      try {
+        var r = await fetch(API + '/me/status', { headers: authHeaders() });
+        if (handleAuthFail(r)) return;
+        var json = await r.json();
+        if (!json.success) throw new Error(json.message || 'Failed to load profile');
+        var e = json.engineer;
+        document.getElementById('phone').value = e.phone ? '+91 ' + e.phone : '';
+        ['email','full_name','designation','city','company_name','gst_number','address','district','pincode'].forEach(function (k) {
+          var el = document.getElementById(k);
+          if (el) el.value = e[k] || '';
+        });
+        setStatusLine(e.status, e.rejected_reason);
+      } catch (err) {
+        console.error(err);
+        document.getElementById('statusLine').textContent = 'Could not load — please reload.';
+      }
+    }
+
+    function showMsg(text, kind) {
+      var m = document.getElementById('msg');
+      m.className = 'qc-msg ' + (kind === 'ok' ? 'ok' : 'err');
+      m.textContent = text;
+    }
+
+    document.getElementById('qcProfileForm').addEventListener('submit', async function (e) {
+      e.preventDefault();
+      var btn = document.getElementById('saveBtn');
+      btn.disabled = true; btn.textContent = 'Saving...';
+      try {
+        var payload = {};
+        ['email','full_name','designation','city','company_name','gst_number','address','district','pincode'].forEach(function (k) {
+          var el = document.getElementById(k);
+          payload[k] = el && el.value !== '' ? el.value.trim() : null;
+        });
+        if (payload.gst_number) payload.gst_number = payload.gst_number.toUpperCase();
+        var r = await fetch(API + '/me', {
+          method: 'PUT', headers: authHeaders({ 'Content-Type': 'application/json' }),
+          body: JSON.stringify(payload)
+        });
+        if (handleAuthFail(r)) return;
+        var data = await r.json();
+        if (!data.success) throw new Error(data.message || 'Save failed');
+        try {
+          if (payload.full_name) localStorage.setItem('engineer_name', payload.full_name);
+          if (payload.company_name !== null) localStorage.setItem('engineer_company', payload.company_name || '');
+        } catch (_) {}
+        showMsg('Saved. Your profile is up to date.', 'ok');
+      } catch (err) {
+        showMsg(err.message || 'Could not save. Try again.', 'err');
+      } finally {
+        btn.disabled = false; btn.textContent = 'Save changes';
+      }
+    });
+
+    load();
+  </script>
+</body>
+</html>

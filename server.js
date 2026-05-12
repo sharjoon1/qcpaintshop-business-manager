@@ -61,6 +61,7 @@ const waContactsRoutes = require('./routes/wa-contacts');
 const aiRoutes = require('./routes/ai');
 const aiScheduler = require('./services/ai-scheduler');
 const paintersRoutes = require('./routes/painters');
+const engineersRoutes = require('./routes/engineers');
 const painterMarketingRoutes = require('./routes/painter-marketing');
 const adminNotificationsRoutes = require('./routes/admin-notifications');
 const billingRoutes = require('./routes/billing');
@@ -286,6 +287,8 @@ if (typeof painterMarketingRoutes.setSessionManager === 'function') {
     painterMarketingRoutes.setSessionManager(whatsappSessionManager);
 }
 paintersRoutes.setSessionManager(whatsappSessionManager);
+engineersRoutes.setPool(pool);
+engineersRoutes.setSessionManager(whatsappSessionManager);
 adminNotificationsRoutes.setPool(pool);
 billingRoutes.setPool(pool);
 billingRoutes.setPointsEngine(require('./services/painter-points-engine'));
@@ -376,6 +379,7 @@ app.use('/api/whatsapp-chat', whatsappChatRoutes.router);
 app.use('/api/wa-contacts', waContactsRoutes.router);
 app.use('/api/ai', aiRoutes.router);
 app.use('/api/painters', paintersRoutes.router);
+app.use('/api/engineers', engineersRoutes.router);
 app.use('/api/painter-marketing', painterMarketingRoutes.router);
 app.use('/api/admin-notifications', adminNotificationsRoutes.router);
 app.use('/api/billing', billingRoutes.router);

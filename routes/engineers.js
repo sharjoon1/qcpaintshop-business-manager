@@ -1,0 +1,491 @@
+/**
+ * Engineer Program — Phase 1 routes
+ *
+ * Public:  /register, /send-otp, /verify-otp
+ * Self:    /me, /me/* (requires X-Engineer-Token)
+ * Admin:   /, /:id, /:id/approve, /:id/reject, /:id/credit, /:id/suspend
+ *          (requires engineers.view or engineers.manage permission)
+ *
+ * Mirrors the painter pattern (separate auth, sha256-hashed session token,
+ * 30-day session, 10-min OTP). Engineers are B2B project-buyer accounts.
+ */
+
+const express = require('express');
+const router = express.Router();
+const crypto = require('crypto');
+const { requirePermission } = require('../middleware/permissionMiddleware');
+const { otpLimiter } = require('../middleware/rateLimiter');
+const notificationService = require('../services/notification-service');
+
+let pool;
+let sessionManager;
+
+function setPool(p) { pool = p; }
+function setSessionManager(sm) { sessionManager = sm; }
+
+// ═══════════════════════════════════════════════════════════════
+// AUTH MIDDLEWARE
+// ═══════════════════════════════════════════════════════════════
+
+async function requireEngineerAuth(req, res, next) {
+  const token = req.headers['x-engineer-token'];
+  if (!token) return res.status(401).json({ success: false, message: 'Engineer authentication required' });
+  try {
+    const [rows] = await pool.query(
+      `SELECT s.engineer_id, e.status, e.full_name
+         FROM engineer_sessions s
+         JOIN engineers e ON s.engineer_id = e.id
+        WHERE s.token_hash = LOWER(SHA2(?, 256)) AND s.expires_at > NOW()`,
+      [token]
+    );
+    if (!rows.length) return res.status(401).json({ success: false, message: 'Invalid or expired session' });
+    if (rows[0].status !== 'approved') {
+      return res.status(403).json({ success: false, message: `Account is ${rows[0].status}` });
+    }
+    req.engineer = { id: rows[0].engineer_id, name: rows[0].full_name };
+    next();
+  } catch (err) {
+    console.error('[engineers] auth error:', err);
+    res.status(500).json({ success: false, message: 'Authentication error' });
+  }
+}
+
+// Accepts pending/suspended too — used by /me/status during onboarding.
+async function requireEngineerSession(req, res, next) {
+  const token = req.headers['x-engineer-token'];
+  if (!token) return res.status(401).json({ success: false, message: 'Engineer authentication required' });
+  try {
+    const [rows] = await pool.query(
+      `SELECT s.engineer_id, e.status, e.full_name
+         FROM engineer_sessions s
+         JOIN engineers e ON s.engineer_id = e.id
+        WHERE s.token_hash = LOWER(SHA2(?, 256)) AND s.expires_at > NOW()`,
+      [token]
+    );
+    if (!rows.length) return res.status(401).json({ success: false, message: 'Invalid or expired session' });
+    req.engineer = { id: rows[0].engineer_id, name: rows[0].full_name, status: rows[0].status };
+    next();
+  } catch (err) {
+    console.error('[engineers] session auth error:', err);
+    res.status(500).json({ success: false, message: 'Authentication error' });
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════
+// PUBLIC ENDPOINTS
+// ═══════════════════════════════════════════════════════════════
+
+router.post('/register', async (req, res) => {
+  try {
+    const { full_name, phone, email, company_name, designation, gst_number, address, city, district, pincode } = req.body;
+    if (!full_name || !phone) {
+      return res.status(400).json({ success: false, message: 'Name and phone are required' });
+    }
+    const cleanPhone = String(phone).replace(/\D/g, '').slice(-10);
+    if (!/^[6-9]\d{9}$/.test(cleanPhone)) {
+      return res.status(400).json({ success: false, message: 'Enter a valid 10-digit Indian mobile number' });
+    }
+
+    const [existing] = await pool.query('SELECT id, status FROM engineers WHERE phone = ?', [cleanPhone]);
+    if (existing.length) {
+      return res.status(400).json({ success: false, message: `Phone already registered (status: ${existing[0].status})` });
+    }
+
+    const [result] = await pool.query(
+      `INSERT INTO engineers (full_name, phone, email, company_name, designation, gst_number, address, city, district, pincode)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [full_name.trim(), cleanPhone, email || null, company_name || null, designation || null,
+       gst_number || null, address || null, city || null, district || null, pincode || null]
+    );
+
+    // Notify admins
+    try {
+      const [admins] = await pool.query(
+        "SELECT id FROM users WHERE role IN ('admin','manager') AND status = 'active'"
+      );
+      for (const admin of admins) {
+        await notificationService.send(admin.id, {
+          type: 'engineer_registered',
+          title: 'New Engineer Registration',
+          body: `${full_name}${company_name ? ' (' + company_name + ')' : ''} registered and is awaiting approval.`,
+          data: { page: 'engineers', filter: 'pending' }
+        });
+      }
+    } catch (nErr) {
+      console.error('[engineers] registration notify error:', nErr.message);
+    }
+
+    res.json({ success: true, message: 'Registration submitted. Awaiting approval.', engineerId: result.insertId });
+  } catch (err) {
+    console.error('[engineers] register error:', err);
+    res.status(500).json({ success: false, message: 'Registration failed' });
+  }
+});
+
+router.post('/send-otp', otpLimiter, async (req, res) => {
+  try {
+    const phone = String(req.body.phone || '').replace(/\D/g, '').slice(-10);
+    if (!/^[6-9]\d{9}$/.test(phone)) {
+      return res.status(400).json({ success: false, message: 'Enter a valid 10-digit Indian mobile number' });
+    }
+
+    const [rows] = await pool.query('SELECT id, status, full_name FROM engineers WHERE phone = ?', [phone]);
+    if (!rows.length) {
+      return res.status(404).json({ success: false, code: 'NOT_REGISTERED', message: 'No engineer account found for this number. Please register first.' });
+    }
+    const eng = rows[0];
+
+    const allowTestBypass = process.env.NODE_ENV !== 'production';
+    const isTestAccount = allowTestBypass && (phone === '9999999999');
+    const otp = isTestAccount ? '123456' : String(crypto.randomInt(100000, 1000000));
+    const token = crypto.randomBytes(32).toString('hex');
+    const tokenHash = crypto.createHash('sha256').update(token).digest('hex');
+
+    await pool.query('DELETE FROM engineer_sessions WHERE engineer_id = ? AND expires_at < NOW()', [eng.id]);
+
+    await pool.query(
+      `INSERT INTO engineer_sessions (engineer_id, token, token_hash, otp, otp_expires_at, expires_at)
+       VALUES (?, ?, ?, ?, DATE_ADD(NOW(), INTERVAL 10 MINUTE), DATE_ADD(NOW(), INTERVAL 30 DAY))`,
+      [eng.id, token, tokenHash, otp]
+    );
+
+    if (process.env.NODE_ENV !== 'production') console.log(`[Engineer OTP] ${phone} → ${otp}`);
+
+    if (!isTestAccount) {
+      // SMS (DLT-registered template; same wording as customer/painter OTP)
+      if (process.env.SMS_USER && process.env.SMS_PASSWORD) {
+        const https = require('https');
+        const querystring = require('querystring');
+        const smsText = `Your verification OTP for Quality Colours registration is ${otp}. Please enter this code at https://qcpaintshop.com/ to complete setup. - QUALITY COLOURS.`;
+        const number = phone.startsWith('91') ? phone : '91' + phone;
+        const smsParams = querystring.stringify({
+          user: process.env.SMS_USER, password: process.env.SMS_PASSWORD,
+          senderid: process.env.SMS_SENDER_ID || 'QUALTQ',
+          channel: 'Trans', DCS: '0', flashsms: '0',
+          number, text: smsText, route: '4'
+        });
+        https.get(`https://retailsms.nettyfish.com/api/mt/SendSMS?${smsParams}`, (r) => {
+          let d = ''; r.on('data', c => d += c); r.on('end', () => console.log(`[Engineer OTP] SMS resp ${phone}: ${d}`));
+        }).on('error', (e) => console.error('[Engineer OTP] SMS error:', e.message));
+      }
+      // WhatsApp secondary
+      if (sessionManager) {
+        try {
+          const msg = `🏗️ *Quality Colours Engineer Program*\n\nYour OTP is: *${otp}*\n\nValid for 10 minutes. Do not share this code with anyone.`;
+          await sessionManager.sendMessage(0, phone, msg, { source: 'engineer_otp' });
+        } catch (e) { console.error('[Engineer OTP] WA failed:', e.message); }
+      }
+    }
+
+    res.json({ success: true, message: 'OTP sent', status: eng.status });
+  } catch (err) {
+    console.error('[engineers] send-otp error:', err);
+    res.status(500).json({ success: false, message: 'Failed to send OTP' });
+  }
+});
+
+router.post('/verify-otp', otpLimiter, async (req, res) => {
+  try {
+    const phone = String(req.body.phone || '').replace(/\D/g, '').slice(-10);
+    const otp = String(req.body.otp || '').trim();
+    if (!phone || !otp) return res.status(400).json({ success: false, message: 'Phone and OTP are required' });
+
+    const [rows] = await pool.query(
+      `SELECT s.id, s.token, s.engineer_id, e.status, e.full_name, e.phone, e.profile_photo, e.company_name
+         FROM engineer_sessions s
+         JOIN engineers e ON s.engineer_id = e.id
+        WHERE e.phone = ? AND s.otp = ? AND s.otp_expires_at > NOW()
+        ORDER BY s.id DESC LIMIT 1`,
+      [phone, otp]
+    );
+    if (!rows.length) return res.status(400).json({ success: false, message: 'Invalid or expired OTP' });
+
+    const session = rows[0];
+    await pool.query('UPDATE engineer_sessions SET otp = NULL, otp_expires_at = NULL WHERE id = ?', [session.id]);
+
+    res.json({
+      success: true,
+      token: session.token,
+      engineer: {
+        id: session.engineer_id,
+        full_name: session.full_name,
+        phone: session.phone,
+        company_name: session.company_name,
+        profile_photo: session.profile_photo || null,
+        status: session.status
+      }
+    });
+  } catch (err) {
+    console.error('[engineers] verify-otp error:', err);
+    res.status(500).json({ success: false, message: 'Verification failed' });
+  }
+});
+
+router.post('/logout', requireEngineerSession, async (req, res) => {
+  try {
+    const token = req.headers['x-engineer-token'];
+    await pool.query('DELETE FROM engineer_sessions WHERE token_hash = LOWER(SHA2(?, 256))', [token]);
+    res.json({ success: true });
+  } catch (err) {
+    console.error('[engineers] logout error:', err);
+    res.status(500).json({ success: false, message: 'Logout failed' });
+  }
+});
+
+// ═══════════════════════════════════════════════════════════════
+// SELF (X-Engineer-Token)
+// ═══════════════════════════════════════════════════════════════
+
+router.get('/me/status', requireEngineerSession, async (req, res) => {
+  try {
+    const [rows] = await pool.query(
+      `SELECT id, full_name, phone, email, company_name, designation, gst_number,
+              address, city, district, pincode, status, credit_enabled, credit_limit,
+              credit_used, total_spend, profile_photo, rejected_reason, created_at
+         FROM engineers WHERE id = ?`,
+      [req.engineer.id]
+    );
+    if (!rows.length) return res.status(404).json({ success: false, message: 'Engineer not found' });
+    res.json({ success: true, engineer: rows[0] });
+  } catch (err) {
+    console.error('[engineers] me/status error:', err);
+    res.status(500).json({ success: false, message: 'Failed to load profile' });
+  }
+});
+
+router.get('/me', requireEngineerAuth, async (req, res) => {
+  try {
+    const [rows] = await pool.query(
+      `SELECT id, full_name, phone, email, company_name, designation, gst_number,
+              address, city, district, state, pincode, status, credit_enabled, credit_limit,
+              credit_used, total_spend, profile_photo, created_at
+         FROM engineers WHERE id = ?`,
+      [req.engineer.id]
+    );
+    if (!rows.length) return res.status(404).json({ success: false, message: 'Engineer not found' });
+    res.json({ success: true, engineer: rows[0] });
+  } catch (err) {
+    console.error('[engineers] me error:', err);
+    res.status(500).json({ success: false, message: 'Failed to load profile' });
+  }
+});
+
+router.put('/me', requireEngineerAuth, async (req, res) => {
+  try {
+    const allowed = ['full_name', 'email', 'company_name', 'designation', 'gst_number',
+                     'address', 'city', 'district', 'pincode'];
+    const sets = []; const vals = [];
+    for (const k of allowed) {
+      if (req.body[k] !== undefined) {
+        sets.push(`${k} = ?`);
+        vals.push(req.body[k] === '' ? null : req.body[k]);
+      }
+    }
+    if (!sets.length) return res.json({ success: true, message: 'No changes' });
+    vals.push(req.engineer.id);
+    await pool.query(`UPDATE engineers SET ${sets.join(', ')} WHERE id = ?`, vals);
+    res.json({ success: true, message: 'Profile updated' });
+  } catch (err) {
+    console.error('[engineers] me update error:', err);
+    res.status(500).json({ success: false, message: 'Update failed' });
+  }
+});
+
+// Engineer's project requests (reads from estimate_requests by phone)
+router.get('/me/projects', requireEngineerAuth, async (req, res) => {
+  try {
+    const limit = Math.min(parseInt(req.query.limit) || 100, 200);
+    const [me] = await pool.query('SELECT phone FROM engineers WHERE id = ?', [req.engineer.id]);
+    if (!me.length) return res.json({ success: true, data: [] });
+
+    let rows = [];
+    try {
+      const [r] = await pool.query(
+        `SELECT id, request_number, project_type, area_sqft, status, location, city, created_at
+           FROM estimate_requests
+          WHERE phone = ?
+          ORDER BY id DESC LIMIT ?`,
+        [me[0].phone, limit]
+      );
+      rows = r;
+    } catch (e) {
+      // estimate_requests schema may differ — degrade gracefully
+      if (e && e.code === 'ER_NO_SUCH_TABLE') rows = [];
+      else throw e;
+    }
+    res.json({ success: true, data: rows });
+  } catch (err) {
+    console.error('[engineers] me/projects error:', err);
+    res.status(500).json({ success: false, message: 'Failed to load projects' });
+  }
+});
+
+// ═══════════════════════════════════════════════════════════════
+// ADMIN ENDPOINTS
+// ═══════════════════════════════════════════════════════════════
+
+// List with filters
+router.get('/', requirePermission('engineers', 'view'), async (req, res) => {
+  try {
+    const { status, q, branch_id, page = 1, per_page = 20 } = req.query;
+    const perPage = Math.min(parseInt(per_page) || 20, 100);
+    const offset = (Math.max(parseInt(page) || 1, 1) - 1) * perPage;
+
+    const where = []; const params = [];
+    if (status) { where.push('status = ?'); params.push(status); }
+    if (branch_id) { where.push('branch_id = ?'); params.push(branch_id); }
+    if (q) {
+      where.push('(full_name LIKE ? OR phone LIKE ? OR company_name LIKE ? OR gst_number LIKE ?)');
+      const like = `%${q}%`;
+      params.push(like, like, like, like);
+    }
+    const whereSql = where.length ? `WHERE ${where.join(' AND ')}` : '';
+
+    const [rows] = await pool.query(
+      `SELECT id, full_name, phone, company_name, designation, gst_number, city,
+              status, credit_enabled, credit_limit, credit_used, total_spend,
+              profile_photo, created_at
+         FROM engineers ${whereSql}
+        ORDER BY id DESC LIMIT ? OFFSET ?`,
+      [...params, perPage, offset]
+    );
+    const [[{ total }]] = await pool.query(
+      `SELECT COUNT(*) AS total FROM engineers ${whereSql}`, params
+    );
+    const [[counts]] = await pool.query(
+      `SELECT
+         SUM(status='pending')   AS pending,
+         SUM(status='approved')  AS approved,
+         SUM(status='suspended') AS suspended,
+         SUM(status='rejected')  AS rejected
+       FROM engineers`
+    );
+    res.json({ success: true, data: rows, total, counts, page: parseInt(page) || 1, per_page: perPage });
+  } catch (err) {
+    console.error('[engineers] list error:', err);
+    res.status(500).json({ success: false, message: 'Failed to list engineers' });
+  }
+});
+
+router.get('/:id', requirePermission('engineers', 'view'), async (req, res) => {
+  try {
+    const [rows] = await pool.query('SELECT * FROM engineers WHERE id = ?', [req.params.id]);
+    if (!rows.length) return res.status(404).json({ success: false, message: 'Engineer not found' });
+    res.json({ success: true, engineer: rows[0] });
+  } catch (err) {
+    console.error('[engineers] get error:', err);
+    res.status(500).json({ success: false, message: 'Failed to load engineer' });
+  }
+});
+
+router.post('/:id/approve', requirePermission('engineers', 'manage'), async (req, res) => {
+  try {
+    const [rows] = await pool.query('SELECT id, full_name, phone, status FROM engineers WHERE id = ?', [req.params.id]);
+    if (!rows.length) return res.status(404).json({ success: false, message: 'Engineer not found' });
+    if (rows[0].status === 'approved') return res.json({ success: true, message: 'Already approved' });
+
+    await pool.query(
+      `UPDATE engineers SET status = 'approved', approved_by = ?, approved_at = NOW(), rejected_reason = NULL WHERE id = ?`,
+      [req.user?.id || null, req.params.id]
+    );
+
+    // Notify the engineer (if a notification mechanism exists for the phone)
+    try {
+      if (sessionManager) {
+        const msg = `🏗️ *Quality Colours Engineer Program*\n\nGood news ${rows[0].full_name} — your engineer account has been approved! Sign in any time at https://act.qcpaintshop.com/engineer-login.html`;
+        await sessionManager.sendMessage(0, rows[0].phone, msg, { source: 'engineer_approved' });
+      }
+    } catch (_) {}
+    res.json({ success: true, message: 'Engineer approved' });
+  } catch (err) {
+    console.error('[engineers] approve error:', err);
+    res.status(500).json({ success: false, message: 'Approval failed' });
+  }
+});
+
+router.post('/:id/reject', requirePermission('engineers', 'manage'), async (req, res) => {
+  try {
+    const reason = (req.body.reason || '').trim();
+    if (!reason) return res.status(400).json({ success: false, message: 'Rejection reason is required' });
+    await pool.query(
+      'UPDATE engineers SET status = "rejected", rejected_reason = ? WHERE id = ?',
+      [reason, req.params.id]
+    );
+    res.json({ success: true, message: 'Engineer rejected' });
+  } catch (err) {
+    console.error('[engineers] reject error:', err);
+    res.status(500).json({ success: false, message: 'Reject failed' });
+  }
+});
+
+router.post('/:id/suspend', requirePermission('engineers', 'manage'), async (req, res) => {
+  try {
+    await pool.query('UPDATE engineers SET status = "suspended" WHERE id = ?', [req.params.id]);
+    res.json({ success: true, message: 'Engineer suspended' });
+  } catch (err) {
+    console.error('[engineers] suspend error:', err);
+    res.status(500).json({ success: false, message: 'Suspend failed' });
+  }
+});
+
+router.post('/:id/reinstate', requirePermission('engineers', 'manage'), async (req, res) => {
+  try {
+    await pool.query('UPDATE engineers SET status = "approved" WHERE id = ?', [req.params.id]);
+    res.json({ success: true, message: 'Engineer reinstated' });
+  } catch (err) {
+    console.error('[engineers] reinstate error:', err);
+    res.status(500).json({ success: false, message: 'Reinstate failed' });
+  }
+});
+
+router.put('/:id', requirePermission('engineers', 'manage'), async (req, res) => {
+  try {
+    const allowed = ['full_name','email','company_name','designation','gst_number','pan_number',
+                     'address','city','district','state','pincode','branch_id','notes',
+                     'credit_enabled','credit_limit'];
+    const sets = []; const vals = [];
+    for (const k of allowed) {
+      if (req.body[k] !== undefined) {
+        sets.push(`${k} = ?`);
+        vals.push(req.body[k] === '' ? null : req.body[k]);
+      }
+    }
+    if (!sets.length) return res.json({ success: true, message: 'No changes' });
+    vals.push(req.params.id);
+    await pool.query(`UPDATE engineers SET ${sets.join(', ')} WHERE id = ?`, vals);
+    res.json({ success: true, message: 'Engineer updated' });
+  } catch (err) {
+    console.error('[engineers] update error:', err);
+    res.status(500).json({ success: false, message: 'Update failed' });
+  }
+});
+
+router.put('/:id/credit', requirePermission('engineers', 'manage'), async (req, res) => {
+  try {
+    const limit = parseFloat(req.body.credit_limit);
+    const enabled = req.body.credit_enabled ? 1 : 0;
+    if (Number.isNaN(limit) || limit < 0) {
+      return res.status(400).json({ success: false, message: 'credit_limit must be a non-negative number' });
+    }
+    await pool.query(
+      'UPDATE engineers SET credit_limit = ?, credit_enabled = ? WHERE id = ?',
+      [limit, enabled, req.params.id]
+    );
+    res.json({ success: true, message: 'Credit settings updated' });
+  } catch (err) {
+    console.error('[engineers] credit error:', err);
+    res.status(500).json({ success: false, message: 'Credit update failed' });
+  }
+});
+
+router.delete('/:id', requirePermission('engineers', 'manage'), async (req, res) => {
+  try {
+    await pool.query('DELETE FROM engineers WHERE id = ?', [req.params.id]);
+    res.json({ success: true, message: 'Engineer deleted' });
+  } catch (err) {
+    console.error('[engineers] delete error:', err);
+    res.status(500).json({ success: false, message: 'Delete failed' });
+  }
+});
+
+module.exports = { router, setPool, setSessionManager };

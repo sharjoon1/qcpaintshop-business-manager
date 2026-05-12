@@ -11,8 +11,8 @@
   <script>
     // Auth gate
     (function () {
-      var hasToken = localStorage.getItem('customer_token');
-      var loggedIn = localStorage.getItem('customer_logged_in') === 'true';
+      var hasToken = localStorage.getItem('engineer_token');
+      var loggedIn = localStorage.getItem('engineer_logged_in') === 'true';
       if (!hasToken || !loggedIn) {
         window.location.href = '/engineer-login.html';
       }
@@ -161,13 +161,17 @@
 <body>
 
   <!-- HEADER -->
+  <!-- PENDING APPROVAL BANNER (shown only when status != approved) -->
+  <div id="qcStatusBanner" style="display:none; background: var(--qc-gold); color: var(--qc-ink); padding: 12px var(--pad-x); text-align: center; font-size: 13px; font-weight: 500;"></div>
+
   <header class="qc-head">
     <div class="qc-head-inner">
       <a href="/" class="qc-head-logo">Quality Colours.<small>Engineer · Portal</small></a>
       <nav class="qc-head-nav" aria-label="Primary">
         <a href="/engineer-dashboard.html" class="is-active">Dashboard</a>
-        <a href="/customer-requests.html">Projects</a>
-        <a href="/request-estimate.html">New Quote</a>
+        <a href="/engineer-dashboard.html#projects">Projects</a>
+        <a href="/engineer-dashboard.html#new-quote" id="navNewQuote">New Quote</a>
+        <a href="/engineer-profile.html">Profile</a>
       </nav>
       <div class="qc-head-profile" id="qcProfile">
         <button class="qc-profile-btn" id="qcProfileBtn" aria-haspopup="true" aria-expanded="false">
@@ -176,8 +180,8 @@
           <span class="qc-profile-caret"></span>
         </button>
         <div class="qc-profile-menu" role="menu">
-          <a href="/customer-requests.html" role="menuitem">My projects</a>
-          <a href="/request-estimate.html" role="menuitem">Request a quote</a>
+          <a href="/engineer-profile.html" role="menuitem">Edit profile</a>
+          <a href="/engineer-dashboard.html#projects" role="menuitem">My projects</a>
           <button type="button" id="qcLogoutBtn" role="menuitem">Sign out</button>
         </div>
       </div>
@@ -187,8 +191,8 @@
     </div>
     <div class="qc-mobile-sheet" id="qcMobileSheet">
       <a href="/engineer-dashboard.html" class="is-active">Dashboard</a>
-      <a href="/customer-requests.html">My projects</a>
-      <a href="/request-estimate.html">Request a quote</a>
+      <a href="/engineer-dashboard.html#projects">My projects</a>
+      <a href="/engineer-profile.html">Profile</a>
       <a href="#" id="qcLogoutMobile">Sign out</a>
     </div>
   </header>
@@ -271,36 +275,86 @@
   </footer>
 
   <script>
-    var API_BASE = '/api';
+    var API_BASE = '/api/engineers';
+    var ENG_KEYS = ['engineer_token','engineer_logged_in','engineer_id','engineer_phone','engineer_name','engineer_company','engineer_status'];
 
-    function authHeaders() {
-      var t = localStorage.getItem('customer_token') || '';
-      return { 'Authorization': 'Bearer ' + t };
+    function authHeaders(extra) {
+      var t = localStorage.getItem('engineer_token') || '';
+      var h = { 'X-Engineer-Token': t };
+      if (extra) Object.keys(extra).forEach(function (k) { h[k] = extra[k]; });
+      return h;
     }
     function handleAuthFail(r) {
-      if (r && r.status === 401) {
-        ['customer_token','customer_logged_in','customer_phone','customer_name','customer_id','qc_user_type']
-          .forEach(function (k) { localStorage.removeItem(k); });
+      if (r && (r.status === 401 || r.status === 403)) {
+        ENG_KEYS.forEach(function (k) { localStorage.removeItem(k); });
         window.location.href = '/engineer-login.html';
         return true;
       }
       return false;
     }
 
-    function logout() {
-      ['customer_token','customer_logged_in','customer_phone','customer_name','customer_id','qc_user_type']
-        .forEach(function (k) { localStorage.removeItem(k); });
+    async function logout() {
+      try {
+        await fetch(API_BASE + '/logout', { method: 'POST', headers: authHeaders() });
+      } catch (_) {}
+      ENG_KEYS.forEach(function (k) { localStorage.removeItem(k); });
       window.location.href = '/engineer-login.html';
     }
 
     function hydrateProfile() {
-      var name = localStorage.getItem('customer_name') || 'Engineer';
-      var phone = localStorage.getItem('customer_phone') || '—';
+      var name = localStorage.getItem('engineer_name') || 'Engineer';
+      var phone = localStorage.getItem('engineer_phone') || '';
+      var company = localStorage.getItem('engineer_company') || '';
       document.getElementById('qcProfileName').textContent = name;
       document.getElementById('qcProfileAvatar').textContent = (name || 'E').charAt(0).toUpperCase();
       document.getElementById('welcomeName').textContent = name;
       document.getElementById('acctName').textContent = name;
       document.getElementById('acctPhone').textContent = phone ? ('+91 ' + phone) : '—';
+      if (company) {
+        var subEl = document.querySelector('.qc-welcome-sub');
+        if (subEl) subEl.textContent = company + ' · A snapshot of your projects, quotes, and account.';
+      }
+    }
+
+    function showStatusBanner(status, reason) {
+      var bar = document.getElementById('qcStatusBanner');
+      if (!bar) return;
+      if (status === 'pending') {
+        bar.style.display = 'block';
+        bar.textContent = 'Your engineer account is awaiting admin approval. You can browse and submit quote requests; full account features unlock once approved.';
+      } else if (status === 'rejected') {
+        bar.style.display = 'block';
+        bar.style.background = '#b71c1c';
+        bar.style.color = '#fff';
+        bar.textContent = 'Account rejected' + (reason ? ': ' + reason : '') + '. Please contact us.';
+      } else if (status === 'suspended') {
+        bar.style.display = 'block';
+        bar.style.background = '#666';
+        bar.style.color = '#fff';
+        bar.textContent = 'Your account is suspended. Please contact us to reinstate.';
+      }
+    }
+
+    async function loadMe() {
+      try {
+        // /me/status accepts pending/suspended too — safe for any status
+        var r = await fetch(API_BASE + '/me/status', { headers: authHeaders() });
+        if (r.status === 401) { handleAuthFail(r); return null; }
+        var json = await r.json();
+        if (!json.success) return null;
+        var e = json.engineer;
+        try {
+          localStorage.setItem('engineer_name', e.full_name || 'Engineer');
+          localStorage.setItem('engineer_phone', e.phone || '');
+          localStorage.setItem('engineer_company', e.company_name || '');
+          localStorage.setItem('engineer_status', e.status || 'pending');
+        } catch (_) {}
+        hydrateProfile();
+        showStatusBanner(e.status, e.rejected_reason);
+        // Refresh account section with fresh server data
+        if (e.created_at) document.getElementById('acctSince').textContent = fmtSince(e.created_at);
+        return e;
+      } catch (err) { console.error('loadMe', err); return null; }
     }
 
     function fmtStatus(s) {
@@ -330,7 +384,7 @@
     async function loadProjects() {
       var list = document.getElementById('qcProjectsList');
       try {
-        var r = await fetch(API_BASE + '/customer/me/requests?limit=100', { headers: authHeaders() });
+        var r = await fetch(API_BASE + '/me/projects?limit=100', { headers: authHeaders() });
         if (handleAuthFail(r)) return;
         var json = await r.json();
         if (!json.success) throw new Error(json.message || 'Failed to load projects');
@@ -388,6 +442,7 @@
     // === Wire up ===
     document.addEventListener('DOMContentLoaded', function () {
       hydrateProfile();
+      loadMe();
       loadProjects();
 
       // Profile menu toggle
