@@ -88,13 +88,15 @@ async function migrate() {
     // 3. Permissions — register engineers.* so RBAC can gate the admin page
     console.log('3. Registering engineers.* permissions...');
     const perms = [
-      ['engineers.view',   'View engineers list and details'],
-      ['engineers.manage', 'Create, approve, edit, suspend engineers and set credit limits']
+      ['engineers', 'view',   'View Engineers',   'View engineers list and details'],
+      ['engineers', 'manage', 'Manage Engineers', 'Create, approve, edit, suspend engineers and set credit limits']
     ];
-    for (const [name, description] of perms) {
+    for (const [module, action, display_name, description] of perms) {
       await pool.query(
-        'INSERT IGNORE INTO permissions (permission_name, description) VALUES (?, ?)',
-        [name, description]
+        `INSERT INTO permissions (module, action, display_name, description)
+         VALUES (?, ?, ?, ?)
+         ON DUPLICATE KEY UPDATE display_name = VALUES(display_name), description = VALUES(description)`,
+        [module, action, display_name, description]
       );
     }
     console.log('   ✓ engineers.view, engineers.manage');
@@ -102,16 +104,16 @@ async function migrate() {
     // 4. Grant new permissions to admin / manager roles if those rows exist
     console.log('4. Granting permissions to admin & manager roles...');
     const [perm_rows] = await pool.query(
-      "SELECT id, permission_name FROM permissions WHERE permission_name IN ('engineers.view','engineers.manage')"
+      "SELECT id, module, action FROM permissions WHERE module = 'engineers'"
     );
     const [role_rows] = await pool.query(
-      "SELECT id, role_name FROM roles WHERE role_name IN ('admin','manager')"
+      "SELECT id, name FROM roles WHERE name IN ('admin','manager')"
     );
     let granted = 0;
     for (const role of role_rows) {
       for (const perm of perm_rows) {
         // managers get view-only; admins get both
-        if (role.role_name === 'manager' && perm.permission_name === 'engineers.manage') continue;
+        if (role.name === 'manager' && perm.action === 'manage') continue;
         const [res] = await pool.query(
           'INSERT IGNORE INTO role_permissions (role_id, permission_id) VALUES (?, ?)',
           [role.id, perm.id]
