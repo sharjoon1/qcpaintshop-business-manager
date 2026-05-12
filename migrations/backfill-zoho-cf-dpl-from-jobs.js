@@ -33,7 +33,9 @@ async function backfill() {
 
     console.log('Backfilling zoho_cf_dpl from bulk-job payloads...\n');
 
-    // Latest completed payload per zoho_item_id whose payload mentions cf_dpl.
+    // Latest completed payload per zoho_item_id WHERE that specific payload
+    // contains "cf_dpl". A later rename-only job for the same item would
+    // otherwise win the MAX(id) and erase a real cf_dpl row from the candidate.
     const [rows] = await pool.query(`
       SELECT ji1.zoho_item_id, ji1.payload, ji1.processed_at
         FROM zoho_bulk_job_items ji1
@@ -41,9 +43,10 @@ async function backfill() {
           SELECT zoho_item_id, MAX(id) AS max_id
             FROM zoho_bulk_job_items
            WHERE status = 'completed'
-             AND payload LIKE '%"cf_dpl"%'
+             AND payload LIKE '%"cf_dpl":%'
            GROUP BY zoho_item_id
         ) latest ON latest.max_id = ji1.id
+       WHERE ji1.payload LIKE '%"cf_dpl":%'
     `);
     console.log(`Found ${rows.length} item(s) with a previously-pushed cf_dpl payload.`);
 
@@ -56,8 +59,21 @@ async function backfill() {
       try { parsed = typeof row.payload === 'string' ? JSON.parse(row.payload) : row.payload; }
       catch (_) { skipped++; continue; }
 
-      if (parsed.cf_dpl == null) { skipped++; continue; }
-      const cfDpl = String(parsed.cf_dpl);
+      // Payload shapes seen on this server:
+      //   1) { cf_dpl: 552, rate: 717, ... }                                 (newer top-level)
+      //   2) { rate: 333, ..., custom_field_hash: { cf_dpl: 256 } }          (older nested)
+      //   3) { rate: "155.76", ..., custom_fields: [{api_name, value}] }     (array form)
+      let cfDplVal = null;
+      if (parsed.cf_dpl != null) {
+        cfDplVal = parsed.cf_dpl;
+      } else if (parsed.custom_field_hash && parsed.custom_field_hash.cf_dpl != null) {
+        cfDplVal = parsed.custom_field_hash.cf_dpl;
+      } else if (Array.isArray(parsed.custom_fields)) {
+        const f = parsed.custom_fields.find(x => x && (x.api_name === 'cf_dpl' || x.label === 'DPL'));
+        if (f && f.value != null) cfDplVal = f.value;
+      }
+      if (cfDplVal == null) { skipped++; continue; }
+      const cfDpl = String(cfDplVal);
 
       // Only restore where the column is currently NULL or empty — don't overwrite
       // a value Zoho has already echoed back to us correctly.
