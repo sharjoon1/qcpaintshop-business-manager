@@ -596,6 +596,167 @@ router.get('/me/catalog/:productId', requireEngineerAuth, async (req, res) => {
   }
 });
 
+// ───── Cart-based order/quotation submission ─────
+// Engineer builds a cart of catalogue items in the browser, then submits
+// it as a single quotation requisition tagged with all line items in
+// estimate_requests.products_json.
+router.post('/me/orders', requireEngineerSession, async (req, res) => {
+  try {
+    const items = Array.isArray(req.body.items) ? req.body.items : [];
+    if (!items.length) {
+      return res.status(400).json({ success: false, message: 'Cart is empty. Add at least one product before submitting.' });
+    }
+    const project_name = (req.body.project_name || '').toString().trim();
+    const location_input = (req.body.location || '').toString().trim();
+    if (!project_name) {
+      return res.status(400).json({ success: false, message: 'Project name is required.' });
+    }
+    if (!location_input) {
+      return res.status(400).json({ success: false, message: 'Site / delivery address is required.' });
+    }
+
+    // Re-fetch engineer's authoritative discount for each item so the
+    // server-side total can't be tampered with from the browser.
+    const resolver = await getEngineerRateResolver(req.engineer.id);
+    let total_qty = 0;
+    let subtotal_list = 0;
+    let subtotal_net = 0;
+    const safe_items = [];
+    for (const raw of items) {
+      const qty = parseInt(raw.quantity, 10);
+      if (!Number.isFinite(qty) || qty < 1) continue;
+      // Look up the variant row so we trust DB names/rates, not client values
+      const [[v]] = await pool.query(
+        `SELECT ps.id AS pack_size_id, ps.size_label, ps.color_name,
+                zim.zoho_item_id, zim.zoho_item_name, zim.zoho_brand AS brand,
+                zim.zoho_category_name AS category, CAST(zim.zoho_rate AS DECIMAL(10,2)) AS list_rate,
+                p.id AS product_id, p.name AS product_name
+           FROM pack_sizes ps
+           INNER JOIN zoho_items_map zim ON zim.zoho_item_id = ps.zoho_item_id
+           INNER JOIN products p ON p.id = ps.product_id
+          WHERE ps.id = ? AND ps.is_active = 1`,
+        [raw.pack_size_id]
+      );
+      if (!v) continue;
+      const { discount_pct } = resolver(v.zoho_item_id, v.brand, v.category);
+      const list_rate = parseFloat(v.list_rate || 0);
+      const eff_rate = discount_pct ? Math.round(list_rate * (100 - discount_pct)) / 100 : list_rate;
+      total_qty += qty;
+      subtotal_list += list_rate * qty;
+      subtotal_net  += eff_rate  * qty;
+      safe_items.push({
+        product_id: v.product_id,
+        product_name: v.product_name,
+        pack_size_id: v.pack_size_id,
+        zoho_item_id: v.zoho_item_id,
+        zoho_item_name: v.zoho_item_name,
+        size_label: v.size_label,
+        color_name: v.color_name,
+        brand: v.brand,
+        category: v.category,
+        quantity: qty,
+        list_rate,
+        discount_pct,
+        effective_rate: eff_rate,
+        line_total: Math.round(eff_rate * qty * 100) / 100
+      });
+    }
+    if (!safe_items.length) {
+      return res.status(400).json({ success: false, message: 'None of the cart items could be validated. Please re-add items.' });
+    }
+
+    // Engineer's profile for invoice/contact details
+    const [[me]] = await pool.query(
+      'SELECT id, full_name, phone, email, company_name FROM engineers WHERE id = ?',
+      [req.engineer.id]
+    );
+    if (!me) return res.status(404).json({ success: false, message: 'Engineer record not found.' });
+
+    // Build request_number (ENG-YYYYMM-####)
+    const today = new Date();
+    const yyyymm = today.getFullYear().toString() + String(today.getMonth() + 1).padStart(2, '0');
+    const prefix = `ENG-${yyyymm}-`;
+    const [last] = await pool.query(
+      'SELECT request_number FROM estimate_requests WHERE request_number LIKE ? ORDER BY id DESC LIMIT 1',
+      [prefix + '%']
+    );
+    let seq = 1;
+    if (last.length) {
+      const m = String(last[0].request_number).match(/-(\d+)$/);
+      if (m) seq = parseInt(m[1], 10) + 1;
+    }
+    const request_number = prefix + String(seq).padStart(4, '0');
+
+    const products_json = JSON.stringify({
+      source: 'engineer_cart',
+      items: safe_items,
+      subtotal_list: Math.round(subtotal_list * 100) / 100,
+      subtotal_net:  Math.round(subtotal_net  * 100) / 100,
+      total_qty
+    });
+
+    const company_line = me.company_name ? `Company: ${me.company_name}\n` : '';
+    const note_input = (req.body.additional_notes || '').toString().trim();
+    const additional_notes = [
+      `Engineer cart order — Project: ${project_name}`,
+      company_line.trim(),
+      `Total items: ${total_qty} units across ${safe_items.length} SKUs`,
+      `Subtotal (list): ₹ ${Math.round(subtotal_list).toLocaleString('en-IN')}`,
+      `Subtotal (after discount): ₹ ${Math.round(subtotal_net).toLocaleString('en-IN')}`,
+      note_input ? `\nRemarks:\n${note_input}` : null
+    ].filter(Boolean).join('\n');
+
+    const [result] = await pool.query(
+      `INSERT INTO estimate_requests
+        (request_number, customer_name, phone, email,
+         project_type, property_type, location, area_sqft,
+         preferred_brand, additional_notes, products_json,
+         estimated_amount, status, priority, source, request_method)
+       VALUES (?, ?, ?, ?, 'commercial', 'other', ?, 0,
+               NULL, ?, ?, ?, 'new', 'medium', 'engineer_portal', 'product')`,
+      [
+        request_number,
+        me.full_name,
+        me.phone,
+        me.email || null,
+        location_input,
+        additional_notes,
+        products_json,
+        Math.round(subtotal_net * 100) / 100
+      ]
+    );
+
+    // Notify staff
+    try {
+      const [admins] = await pool.query(
+        "SELECT id FROM users WHERE role IN ('admin','manager','staff') AND status = 'active' LIMIT 50"
+      );
+      for (const admin of admins) {
+        await notificationService.send(admin.id, {
+          type: 'engineer_order_submitted',
+          title: 'Engineer Cart Order',
+          body: `${me.full_name}${me.company_name ? ' (' + me.company_name + ')' : ''} submitted ${safe_items.length} SKUs (${total_qty} units, ₹${Math.round(subtotal_net).toLocaleString('en-IN')}) for project "${project_name}".`,
+          data: { page: 'estimate-requests', filter: 'new', request_number }
+        });
+      }
+    } catch (nErr) { console.error('[engineers] order notify error:', nErr.message); }
+
+    res.json({
+      success: true,
+      message: 'Order submitted',
+      request_number,
+      id: result.insertId,
+      subtotal_list: Math.round(subtotal_list * 100) / 100,
+      subtotal_net:  Math.round(subtotal_net  * 100) / 100,
+      total_qty,
+      item_count: safe_items.length
+    });
+  } catch (err) {
+    console.error('[engineers] me/orders error:', err);
+    res.status(500).json({ success: false, message: 'Could not submit order' });
+  }
+});
+
 // Engineer's project requests (reads from estimate_requests by phone)
 router.get('/me/projects', requireEngineerAuth, async (req, res) => {
   try {

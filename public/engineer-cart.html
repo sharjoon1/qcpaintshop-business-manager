@@ -1,0 +1,299 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="theme-color" content="#1A2535">
+  <title>Cart · Project Engineer Portal · Quality Colours</title>
+  <link rel="icon" type="image/png" sizes="192x192" href="/icons/icon-192x192.png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/css/engineer-portal.css">
+  <style>
+    .cart-grid { display: grid; grid-template-columns: 1.6fr 1fr; gap: 16px; align-items: start; }
+    @media (max-width: 1000px) { .cart-grid { grid-template-columns: 1fr; } }
+
+    .cart-line { display: grid; grid-template-columns: 72px 1fr 140px 140px 110px auto; gap: 14px; padding: 14px 16px; border-bottom: 1px solid var(--ep-border-2); align-items: center; }
+    @media (max-width: 720px) {
+      .cart-line { grid-template-columns: 60px 1fr; row-gap: 6px; }
+      .cart-line .col-qty, .cart-line .col-rate, .cart-line .col-line, .cart-line .col-rm { grid-column: 2; }
+    }
+    .cart-line:last-child { border-bottom: 0; }
+    .cart-thumb { width: 72px; height: 72px; background: #F3F4F6; border-radius: var(--ep-radius-sm); overflow: hidden; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+    .cart-thumb img { width: 100%; height: 100%; object-fit: cover; }
+    .cart-thumb .ph { font-size: 10px; color: var(--ep-muted-2); padding: 0 6px; text-align: center; font-weight: 600; }
+    .cart-info .brand { font-size: 9.5px; font-weight: 700; color: var(--ep-muted); letter-spacing: 1px; text-transform: uppercase; margin-bottom: 2px; }
+    .cart-info .name { font-size: 13.5px; font-weight: 600; color: var(--ep-ink); line-height: 1.3; margin-bottom: 4px; }
+    .cart-info .meta { font-size: 11.5px; color: var(--ep-muted); }
+    .col-rate, .col-line { font-feature-settings: "tnum"; font-size: 13px; }
+    .col-line { font-weight: 700; color: var(--ep-ink); }
+    .col-rate .was { font-size: 11px; color: var(--ep-muted); text-decoration: line-through; display: block; }
+    .col-rate .disc { display: inline-block; font-size: 10px; color: var(--ep-green-2); font-weight: 700; padding: 1px 5px; background: var(--ep-green-soft); border-radius: 3px; margin-top: 2px; }
+
+    .qty-stepper { display: inline-flex; align-items: center; border: 1px solid var(--ep-border); border-radius: var(--ep-radius-sm); overflow: hidden; }
+    .qty-stepper button { width: 28px; height: 32px; background: #F9FAFB; color: var(--ep-text); border: 0; cursor: pointer; font-size: 14px; font-weight: 600; }
+    .qty-stepper button:hover { background: #E5E7EB; }
+    .qty-stepper input { width: 44px; height: 32px; border: 0; border-left: 1px solid var(--ep-border); border-right: 1px solid var(--ep-border); text-align: center; font-size: 13px; font-weight: 600; color: var(--ep-ink); }
+
+    .col-rm button { background: transparent; color: var(--ep-red); border: 0; font-size: 11px; font-weight: 600; cursor: pointer; padding: 4px 8px; }
+    .col-rm button:hover { text-decoration: underline; }
+
+    .totals-list { font-size: 13px; }
+    .totals-list .r { display: flex; justify-content: space-between; padding: 8px 16px; border-bottom: 1px solid var(--ep-border-2); }
+    .totals-list .r:last-child { border-bottom: 0; }
+    .totals-list .r.savings { color: var(--ep-green-2); font-weight: 600; }
+    .totals-list .r.total { background: #F9FAFB; font-weight: 700; font-size: 15px; color: var(--ep-ink); padding: 12px 16px; }
+    .totals-list .v { font-feature-settings: "tnum"; }
+
+    .checkout-form { padding: 16px; display: flex; flex-direction: column; gap: 12px; }
+    .checkout-form input, .checkout-form textarea { padding: 9px 12px; font-size: 13px; border: 1px solid var(--ep-border); border-radius: var(--ep-radius-sm); background: #fff; color: var(--ep-ink); }
+    .checkout-form input:focus, .checkout-form textarea:focus { outline: none; border-color: var(--ep-active); box-shadow: 0 0 0 3px rgba(37,99,235,0.10); }
+    .checkout-form label { font-size: 11px; color: var(--ep-muted); font-weight: 600; letter-spacing: 0.5px; }
+
+    .big-empty { padding: 60px 20px; text-align: center; }
+
+    .submit-success { padding: 40px 32px; text-align: center; }
+    .submit-success .badge-ok { display: inline-block; padding: 6px 14px; background: var(--ep-green-soft); color: var(--ep-green-ink); font-size: 11px; font-weight: 700; letter-spacing: 1.8px; text-transform: uppercase; border-radius: 3px; margin-bottom: 14px; }
+    .submit-success h2 { font-size: 22px; font-weight: 600; color: var(--ep-ink); margin: 0 0 8px; }
+    .submit-success .ref { display: inline-block; padding: 8px 14px; background: var(--ep-active-soft); color: var(--ep-active-2); font-family: ui-monospace, monospace; font-size: 13px; font-weight: 600; border-radius: var(--ep-radius-sm); margin: 16px 0; }
+    .submit-success p { font-size: 13px; color: var(--ep-muted); margin: 0 auto 24px; max-width: 460px; line-height: 1.6; }
+  </style>
+</head>
+<body data-page="cart">
+  <div class="ep-shell" id="epShell">
+    <div id="epRailMount"></div>
+
+    <main class="ep-main">
+      <button class="ep-rail-mobile-btn" id="epRailMobileBtn" type="button" aria-label="Open menu" style="margin-bottom:12px;">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+      </button>
+
+      <div class="ep-crumb">
+        <a href="/engineer-dashboard.html">Home</a>
+        <span class="sep">/</span>
+        <a href="/engineer-catalog.html">Catalogue</a>
+        <span class="sep">/</span>
+        <b>Quotation Cart</b>
+      </div>
+
+      <header class="ep-pagehead">
+        <div>
+          <h1 class="ep-pagehead-title">Quotation Cart</h1>
+          <div class="ep-pagehead-sub" id="cartPageSub">Review selected items and submit as a project quotation request.</div>
+        </div>
+        <div class="ep-pagehead-actions">
+          <a href="/engineer-catalog.html" class="ep-btn outline">← Continue Shopping</a>
+        </div>
+      </header>
+
+      <div id="cartContent">
+        <!-- Empty state -->
+        <div id="emptyState" class="ep-panel" style="display:none;">
+          <div class="big-empty">
+            <div class="ep-empty-mark">Cart Empty</div>
+            <h3 style="font-size:18px;color:var(--ep-ink);font-weight:600;margin:0 0 8px;">No items in your quotation cart</h3>
+            <p style="font-size:13px;color:var(--ep-muted);margin:0 0 18px;">Browse the catalogue and add products to build a quotation request.</p>
+            <a href="/engineer-catalog.html" class="ep-btn primary">Browse Catalogue</a>
+          </div>
+        </div>
+
+        <!-- Cart -->
+        <div id="cartView" class="cart-grid" style="display:none;">
+          <!-- Lines -->
+          <div class="ep-panel">
+            <div class="ep-panel-head">
+              <div class="ep-panel-title" id="cartLinesTitle">Line Items</div>
+              <button class="ep-btn-link" id="clearAllBtn" type="button">Clear All</button>
+            </div>
+            <div id="lineRows"></div>
+          </div>
+
+          <!-- Right column: totals + checkout -->
+          <aside>
+            <div class="ep-panel" style="margin-bottom: 14px;">
+              <div class="ep-panel-head"><div class="ep-panel-title">Order Summary</div></div>
+              <div class="totals-list">
+                <div class="r"><span>Subtotal (list price)</span><span class="v" id="totalList">₹ 0</span></div>
+                <div class="r savings" id="savingsRow" style="display:none;"><span>Engineer discount</span><span class="v" id="totalSavings">–₹ 0</span></div>
+                <div class="r"><span>Tax (GST)</span><span class="v" style="color:var(--ep-muted);font-size:11px;">Computed on final invoice</span></div>
+                <div class="r total"><span>Subtotal (after discount)</span><span class="v" id="totalNet">₹ 0</span></div>
+              </div>
+            </div>
+            <div class="ep-panel">
+              <div class="ep-panel-head"><div class="ep-panel-title">Project Details</div></div>
+              <div class="checkout-form">
+                <div>
+                  <label>Project Name <span style="color:var(--ep-red)">*</span></label>
+                  <input id="coProject" type="text" placeholder="e.g. Apartment Block A, Paramakudi" maxlength="160">
+                </div>
+                <div>
+                  <label>Site / Delivery Address <span style="color:var(--ep-red)">*</span></label>
+                  <input id="coLocation" type="text" placeholder="Plot / Street, area, town" maxlength="240">
+                </div>
+                <div>
+                  <label>Additional Remarks</label>
+                  <textarea id="coNotes" rows="3" placeholder="Optional — delivery timing, specific finishes, etc." maxlength="1000" style="resize:vertical;"></textarea>
+                </div>
+                <button id="submitBtn" type="button" class="ep-btn primary" style="margin-top: 4px; justify-content:center; padding: 12px;">Submit Order Request</button>
+                <p style="font-size:11px;color:var(--ep-muted);margin:6px 0 0;text-align:center;">Our estimator will confirm availability, delivery timing, and final invoice (incl. GST) within 24 working hours.</p>
+              </div>
+            </div>
+          </aside>
+        </div>
+
+        <!-- Success -->
+        <div id="successState" class="ep-panel" style="display:none;">
+          <div class="submit-success">
+            <div class="badge-ok">Order Submitted</div>
+            <h2>Order request lodged successfully</h2>
+            <div class="ref" id="successRef">—</div>
+            <p>Our project estimator will verify stock availability and contact you on the registered mobile number within 24 working hours. The status of this requisition can be monitored on your dashboard.</p>
+            <div class="ep-flex-row" style="justify-content:center;">
+              <a href="/engineer-dashboard.html" class="ep-btn primary">Return to Dashboard</a>
+              <a href="/engineer-catalog.html" class="ep-btn outline">Continue Shopping</a>
+            </div>
+          </div>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <script src="/js/engineer-portal.js"></script>
+  <script>
+    (function () {
+      var emptyEl = document.getElementById('emptyState');
+      var cartEl  = document.getElementById('cartView');
+      var successEl = document.getElementById('successState');
+
+      function render() {
+        var cart = EP.cart.read();
+        var n = cart.items.length;
+        document.getElementById('cartLinesTitle').textContent = 'Line Items · ' + n + (n === 1 ? ' SKU' : ' SKUs');
+
+        if (!n) {
+          emptyEl.style.display = '';
+          cartEl.style.display  = 'none';
+          return;
+        }
+        emptyEl.style.display = 'none';
+        cartEl.style.display  = 'grid';
+
+        var rows = document.getElementById('lineRows');
+        rows.innerHTML = cart.items.map(function (it) {
+          var img = it.image_url
+            ? '<img src="' + EP.escapeHTML(it.image_url) + '" alt="">'
+            : '<div class="ph">' + EP.escapeHTML((it.product_name || '').slice(0, 14)) + '</div>';
+          var hasDisc = parseFloat(it.discount_pct) > 0;
+          var qty = parseInt(it.quantity, 10) || 0;
+          var lineTotal = parseFloat(it.effective_rate || 0) * qty;
+          return '<div class="cart-line">'
+            + '<div class="cart-thumb">' + img + '</div>'
+            + '<div class="cart-info">'
+            +   (it.brand ? '<div class="brand">' + EP.escapeHTML(it.brand) + '</div>' : '')
+            +   '<div class="name">' + EP.escapeHTML(it.product_name) + '</div>'
+            +   '<div class="meta">' + EP.escapeHTML(it.size_label || it.zoho_item_name || '') + (it.color_name ? ' · ' + EP.escapeHTML(it.color_name) : '') + ' · <span class="ep-text-mono">' + EP.escapeHTML(it.zoho_item_id || '') + '</span></div>'
+            + '</div>'
+            + '<div class="col-rate">'
+            +   '<strong>' + EP.fmtINR(it.effective_rate) + '</strong>'
+            +   (hasDisc ? '<span class="was">' + EP.fmtINR(it.list_rate) + '</span>' : '')
+            +   (hasDisc ? '<span class="disc">' + it.discount_pct + '% off</span>' : '')
+            + '</div>'
+            + '<div class="col-qty">'
+            +   '<div class="qty-stepper">'
+            +     '<button type="button" data-step="-1" data-pid="' + it.pack_size_id + '">−</button>'
+            +     '<input type="number" min="1" max="9999" value="' + qty + '" data-qty data-pid="' + it.pack_size_id + '">'
+            +     '<button type="button" data-step="+1" data-pid="' + it.pack_size_id + '">+</button>'
+            +   '</div>'
+            + '</div>'
+            + '<div class="col-line">' + EP.fmtINR(lineTotal) + '</div>'
+            + '<div class="col-rm"><button type="button" data-remove="' + it.pack_size_id + '">Remove</button></div>'
+            + '</div>';
+        }).join('');
+
+        // Wire row controls
+        rows.querySelectorAll('[data-step]').forEach(function (b) {
+          b.addEventListener('click', function () {
+            var pid = parseInt(b.dataset.pid, 10);
+            var step = parseInt(b.dataset.step, 10);
+            var c = EP.cart.read();
+            var f = c.items.find(function (it) { return it.pack_size_id === pid; });
+            if (!f) return;
+            EP.cart.setQty(pid, (parseInt(f.quantity, 10) || 1) + step);
+            render();
+          });
+        });
+        rows.querySelectorAll('[data-qty]').forEach(function (inp) {
+          inp.addEventListener('change', function () {
+            var pid = parseInt(inp.dataset.pid, 10);
+            EP.cart.setQty(pid, parseInt(inp.value, 10));
+            render();
+          });
+        });
+        rows.querySelectorAll('[data-remove]').forEach(function (rm) {
+          rm.addEventListener('click', function () {
+            var pid = parseInt(rm.dataset.remove, 10);
+            EP.cart.remove(pid);
+            render();
+            EP.toast('Item removed from cart.');
+          });
+        });
+
+        // Totals
+        var subList = 0, subNet = 0;
+        cart.items.forEach(function (it) {
+          var q = parseInt(it.quantity, 10) || 0;
+          subList += parseFloat(it.list_rate || 0) * q;
+          subNet  += parseFloat(it.effective_rate || it.list_rate || 0) * q;
+        });
+        var savings = subList - subNet;
+        document.getElementById('totalList').textContent = EP.fmtINR(subList);
+        document.getElementById('totalNet').textContent  = EP.fmtINR(subNet);
+        if (savings > 0) {
+          document.getElementById('savingsRow').style.display = '';
+          document.getElementById('totalSavings').textContent = '–' + EP.fmtINR(savings);
+        } else {
+          document.getElementById('savingsRow').style.display = 'none';
+        }
+      }
+
+      document.getElementById('clearAllBtn').addEventListener('click', function () {
+        if (!confirm('Remove all items from the cart?')) return;
+        EP.cart.clear();
+        render();
+        EP.toast('Cart cleared.');
+      });
+
+      document.getElementById('submitBtn').addEventListener('click', async function () {
+        var btn = this;
+        var project = document.getElementById('coProject').value.trim();
+        var location = document.getElementById('coLocation').value.trim();
+        var notes = document.getElementById('coNotes').value.trim();
+        if (!project) { EP.toast('Project name is required.', 'err'); document.getElementById('coProject').focus(); return; }
+        if (!location) { EP.toast('Site / delivery address is required.', 'err'); document.getElementById('coLocation').focus(); return; }
+        btn.disabled = true; btn.textContent = 'Submitting…';
+        try {
+          var data = await EP.cart.submit({ project_name: project, location: location, additional_notes: notes });
+          if (!data) return;
+          document.getElementById('cartView').style.display = 'none';
+          document.getElementById('emptyState').style.display = 'none';
+          document.getElementById('successRef').textContent = data.request_number || '—';
+          successEl.style.display = '';
+          document.getElementById('cartPageSub').textContent = 'Your order has been submitted to our project estimator.';
+          window.scrollTo({ top: 0, behavior: 'smooth' });
+        } catch (err) {
+          EP.toast(err.message || 'Submission failed.', 'err');
+        } finally {
+          btn.disabled = false; btn.textContent = 'Submit Order Request';
+        }
+      });
+
+      document.addEventListener('ep:cart-changed', render);
+      document.addEventListener('DOMContentLoaded', function () {
+        EP.loadMe();
+        render();
+      });
+    })();
+  </script>
+</body>
+</html>
