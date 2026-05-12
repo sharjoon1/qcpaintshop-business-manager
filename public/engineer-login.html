@@ -1,0 +1,236 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="theme-color" content="#1B5E3B">
+  <meta name="description" content="Engineer portal — Quality Colours">
+  <title>Engineer Login · Quality Colours</title>
+  <link rel="icon" type="image/png" sizes="192x192" href="/icons/icon-192x192.png">
+  <link rel="apple-touch-icon" href="/icons/icon-192x192.png">
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,500;1,400&family=Inter:wght@300;400;500;600&family=Noto+Serif+Tamil:wght@400;500&display=swap" rel="stylesheet">
+
+  <style>
+    :root {
+      --qc-cream: #FBFAF7;
+      --qc-green: #1B5E3B;
+      --qc-green-dark: #154D31;
+      --qc-gold: #D4A24E;
+      --qc-ink: #1A1A1A;
+      --qc-muted: #666666;
+      --qc-rule-soft: rgba(26,26,26,0.08);
+      --serif: 'Playfair Display', Georgia, serif;
+      --sans: 'Inter', system-ui, -apple-system, sans-serif;
+      --tamil: 'Noto Serif Tamil', serif;
+    }
+    *, *::before, *::after { box-sizing: border-box; }
+    html { -webkit-font-smoothing: antialiased; }
+    body { margin: 0; font-family: var(--sans); color: var(--qc-ink); background: var(--qc-cream); min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 24px; line-height: 1.5; }
+
+    .qc-card { width: 100%; max-width: 440px; background: #fff; padding: 48px 40px; border: 1px solid var(--qc-rule-soft); }
+    .qc-eyebrow { font-size: 11px; font-weight: 600; letter-spacing: 2.5px; text-transform: uppercase; color: var(--qc-green); display: inline-flex; align-items: center; gap: 10px; }
+    .qc-eyebrow .dot { width: 6px; height: 6px; background: var(--qc-gold); border-radius: 50%; }
+    h1 { font-family: var(--serif); font-weight: 500; font-size: 38px; line-height: 1.08; letter-spacing: -1px; color: var(--qc-ink); margin: 16px 0 10px; }
+    h1 em { font-style: italic; color: var(--qc-green); }
+    .lead { font-size: 14px; color: var(--qc-muted); margin: 0 0 32px; line-height: 1.6; }
+    .lead .ta { font-family: var(--tamil); font-style: italic; }
+
+    label { display: block; font-size: 11px; font-weight: 600; letter-spacing: 1.5px; text-transform: uppercase; color: var(--qc-muted); margin-bottom: 8px; }
+    .qc-input { width: 100%; background: transparent; border: 0; border-bottom: 1px solid var(--qc-rule-soft); padding: 12px 0; font-family: var(--sans); font-size: 16px; outline: none; transition: border-color 0.2s; color: var(--qc-ink); }
+    .qc-input:focus { border-bottom-color: var(--qc-green); }
+    .qc-input::placeholder { color: #aaa; }
+    .qc-phone-row { display: flex; align-items: center; gap: 0; border-bottom: 1px solid var(--qc-rule-soft); transition: border-color 0.2s; }
+    .qc-phone-row:focus-within { border-bottom-color: var(--qc-green); }
+    .qc-phone-row .cc { font-family: var(--sans); font-size: 16px; color: var(--qc-muted); padding: 12px 12px 12px 0; }
+    .qc-phone-row .qc-input { border: 0; flex: 1; }
+
+    .qc-btn { display: inline-flex; align-items: center; justify-content: center; width: 100%; padding: 16px 24px; background: var(--qc-green); color: #fff; font-family: var(--sans); font-size: 13px; font-weight: 600; letter-spacing: 0.4px; transition: background 0.2s; cursor: pointer; border: 0; margin-top: 28px; }
+    .qc-btn:hover { background: var(--qc-green-dark); }
+    .qc-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+    .qc-otp-row { display: flex; gap: 10px; justify-content: space-between; margin: 4px 0 8px; }
+    .qc-otp-input { width: 48px; height: 56px; text-align: center; font-family: var(--serif); font-size: 22px; font-weight: 500; border: 0; border-bottom: 2px solid var(--qc-rule-soft); background: transparent; outline: none; transition: border-color 0.2s; color: var(--qc-ink); }
+    .qc-otp-input:focus { border-bottom-color: var(--qc-green); }
+
+    .qc-err { display: none; font-size: 13px; color: #b71c1c; margin-top: 12px; padding: 10px 14px; background: rgba(183,28,28,0.05); border-left: 2px solid #b71c1c; }
+    .qc-err.show { display: block; }
+
+    .qc-foot-row { display: flex; justify-content: space-between; align-items: center; margin-top: 24px; font-size: 13px; }
+    .qc-foot-row a { color: var(--qc-green); font-weight: 500; text-decoration: none; border-bottom: 1px solid var(--qc-green); padding-bottom: 1px; }
+    .qc-foot-row a:hover { color: var(--qc-green-dark); }
+    .qc-foot-row a[disabled] { color: var(--qc-muted); border-bottom-color: var(--qc-muted); pointer-events: none; }
+
+    .qc-back { display: block; text-align: center; margin-top: 24px; font-size: 12px; color: var(--qc-muted); letter-spacing: 0.5px; text-decoration: none; }
+    .qc-back:hover { color: var(--qc-ink); }
+
+    .qc-tagline { font-family: var(--tamil); font-style: italic; font-size: 13px; color: var(--qc-gold); margin-top: 14px; }
+
+    @media (max-width: 480px) {
+      .qc-card { padding: 36px 24px; }
+      h1 { font-size: 30px; }
+      .qc-otp-input { width: 40px; height: 50px; font-size: 19px; }
+    }
+  </style>
+</head>
+<body>
+  <div class="qc-card">
+    <div class="qc-eyebrow"><span class="dot"></span>Engineer Portal</div>
+    <h1>Sign in to your <em>engineer account.</em></h1>
+    <p class="lead">Enter your registered phone number. We'll send a one-time password to verify it's you.<br><span class="ta">பொறியாளர் கணக்கில் உள்நுழைக.</span></p>
+
+    <!-- Phone step -->
+    <div id="phoneStep">
+      <label for="phone">Mobile number</label>
+      <div class="qc-phone-row">
+        <span class="cc">+91</span>
+        <input type="tel" id="phone" inputmode="numeric" autocomplete="tel" class="qc-input" placeholder="10-digit number" maxlength="10">
+      </div>
+      <button id="sendBtn" class="qc-btn" type="button">Send OTP</button>
+      <div id="phoneErr" class="qc-err"></div>
+    </div>
+
+    <!-- OTP step -->
+    <div id="otpStep" style="display:none">
+      <label>One-time password</label>
+      <div class="qc-otp-row">
+        <input type="tel" inputmode="numeric" class="qc-otp-input" maxlength="1" data-otp="0">
+        <input type="tel" inputmode="numeric" class="qc-otp-input" maxlength="1" data-otp="1">
+        <input type="tel" inputmode="numeric" class="qc-otp-input" maxlength="1" data-otp="2">
+        <input type="tel" inputmode="numeric" class="qc-otp-input" maxlength="1" data-otp="3">
+        <input type="tel" inputmode="numeric" class="qc-otp-input" maxlength="1" data-otp="4">
+        <input type="tel" inputmode="numeric" class="qc-otp-input" maxlength="1" data-otp="5">
+      </div>
+      <p class="lead" id="otpHint" style="margin: 14px 0 0; font-size: 12px;"></p>
+      <button id="verifyBtn" class="qc-btn" type="button">Verify &amp; sign in</button>
+      <div id="otpErr" class="qc-err"></div>
+      <div class="qc-foot-row">
+        <a href="#" id="changeNumber">Change number</a>
+        <a href="#" id="resendOtp">Resend OTP</a>
+      </div>
+    </div>
+
+    <a class="qc-back" href="/">← Back to home</a>
+    <p class="qc-tagline" style="text-align:center">தரமான வண்ணங்கள், சிறந்த முடிவு.</p>
+  </div>
+
+  <script>
+    var API_BASE = '/api/customer/auth';
+    var phoneEl = document.getElementById('phone');
+    var sendBtn = document.getElementById('sendBtn');
+    var verifyBtn = document.getElementById('verifyBtn');
+    var phoneStep = document.getElementById('phoneStep');
+    var otpStep = document.getElementById('otpStep');
+    var phoneErr = document.getElementById('phoneErr');
+    var otpErr = document.getElementById('otpErr');
+    var otpHint = document.getElementById('otpHint');
+    var otpInputs = document.querySelectorAll('.qc-otp-input');
+    var currentPhone = '';
+
+    function showErr(el, msg) { el.textContent = msg; el.classList.add('show'); }
+    function clearErr(el) { el.textContent = ''; el.classList.remove('show'); }
+
+    phoneEl.addEventListener('input', function () {
+      this.value = this.value.replace(/[^0-9]/g, '').slice(0, 10);
+    });
+
+    sendBtn.addEventListener('click', sendOtp);
+    phoneEl.addEventListener('keydown', function (e) { if (e.key === 'Enter') sendOtp(); });
+
+    async function sendOtp() {
+      clearErr(phoneErr);
+      var phone = phoneEl.value.trim();
+      if (!/^[6-9]\d{9}$/.test(phone)) {
+        showErr(phoneErr, 'Please enter a valid 10-digit mobile number.');
+        return;
+      }
+      sendBtn.disabled = true;
+      sendBtn.textContent = 'Sending OTP...';
+      try {
+        var r = await fetch(API_BASE + '/send-otp', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ phone: phone, user_type: 'engineer' })
+        });
+        var data = await r.json();
+        if (!r.ok || !data.success) throw new Error(data.message || 'Could not send OTP. Try again.');
+        currentPhone = phone;
+        phoneStep.style.display = 'none';
+        otpStep.style.display = 'block';
+        otpHint.textContent = 'We sent a 6-digit code to +91 ' + phone + '.';
+        try { localStorage.setItem('qc_user_type', 'engineer'); } catch (_) {}
+        setTimeout(function () { otpInputs[0].focus(); }, 50);
+      } catch (e) {
+        showErr(phoneErr, e.message || 'Network error. Please try again.');
+      } finally {
+        sendBtn.disabled = false;
+        sendBtn.textContent = 'Send OTP';
+      }
+    }
+
+    otpInputs.forEach(function (inp, idx) {
+      inp.addEventListener('input', function (e) {
+        e.target.value = e.target.value.replace(/[^0-9]/g, '').slice(0, 1);
+        if (e.target.value && idx < otpInputs.length - 1) otpInputs[idx + 1].focus();
+      });
+      inp.addEventListener('keydown', function (e) {
+        if (e.key === 'Backspace' && !inp.value && idx > 0) otpInputs[idx - 1].focus();
+        if (e.key === 'Enter') verifyOtp();
+      });
+      inp.addEventListener('paste', function (e) {
+        var data = (e.clipboardData || window.clipboardData).getData('text').replace(/\D/g, '').slice(0, 6);
+        if (!data) return;
+        e.preventDefault();
+        for (var i = 0; i < data.length && idx + i < otpInputs.length; i++) {
+          otpInputs[idx + i].value = data[i];
+        }
+        otpInputs[Math.min(idx + data.length, otpInputs.length - 1)].focus();
+      });
+    });
+
+    verifyBtn.addEventListener('click', verifyOtp);
+
+    async function verifyOtp() {
+      clearErr(otpErr);
+      var otp = Array.prototype.map.call(otpInputs, function (i) { return i.value; }).join('');
+      if (otp.length !== 6) {
+        showErr(otpErr, 'Please enter the full 6-digit code.');
+        return;
+      }
+      verifyBtn.disabled = true;
+      verifyBtn.textContent = 'Verifying...';
+      try {
+        var r = await fetch(API_BASE + '/verify-otp', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ phone: currentPhone, otp: otp, user_type: 'engineer' })
+        });
+        var data = await r.json();
+        if (!r.ok || !data.success) throw new Error(data.message || 'Invalid OTP. Try again.');
+        if (data.token) { try { localStorage.setItem('customer_token', data.token); } catch (_) {} }
+        try { localStorage.setItem('qc_user_type', 'engineer'); } catch (_) {}
+        window.location.href = data.redirect || '/customer-dashboard.html';
+      } catch (e) {
+        showErr(otpErr, e.message || 'Could not verify. Try again.');
+      } finally {
+        verifyBtn.disabled = false;
+        verifyBtn.textContent = 'Verify & sign in';
+      }
+    }
+
+    document.getElementById('changeNumber').addEventListener('click', function (e) {
+      e.preventDefault();
+      otpStep.style.display = 'none';
+      phoneStep.style.display = 'block';
+      otpInputs.forEach(function (i) { i.value = ''; });
+      clearErr(otpErr);
+      phoneEl.focus();
+    });
+
+    document.getElementById('resendOtp').addEventListener('click', function (e) {
+      e.preventDefault();
+      sendOtp();
+    });
+  </script>
+</body>
+</html>

@@ -70,18 +70,36 @@
     .qc-nav-cta:hover { background: #fff; }
     .qc-nav.is-solid { background: var(--qc-cream); border-bottom: 1px solid var(--qc-rule); }
     .qc-nav.is-solid .qc-nav-logo,
-    .qc-nav.is-solid .qc-nav-links a { color: var(--qc-ink); }
+    .qc-nav.is-solid .qc-nav-links a,
+    .qc-nav.is-solid .qc-nav-signin { color: var(--qc-ink); }
     .qc-nav.is-solid .qc-nav-cta { background: var(--qc-green); color: #fff; }
     .qc-nav.is-solid .qc-nav-cta:hover { background: var(--qc-green-dark); }
     .qc-nav-mobile-btn { display: none; color: #fff; padding: 8px; }
     .qc-nav.is-solid .qc-nav-mobile-btn { color: var(--qc-ink); }
-    .qc-nav-mobile { display: none; padding: 16px var(--pad-x) 20px; background: var(--qc-cream); border-top: 1px solid var(--qc-rule); }
+    .qc-nav-mobile { display: none; padding: 16px var(--pad-x) 24px; background: var(--qc-cream); border-top: 1px solid var(--qc-rule); }
     .qc-nav-mobile.is-open { display: block; }
     .qc-nav-mobile a { display: block; padding: 10px 0; font-size: 15px; font-weight: 500; color: var(--qc-ink); }
     .qc-nav-mobile .qc-nav-cta { display: block; text-align: center; margin-top: 12px; background: var(--qc-green); color: #fff; padding: 14px; }
+    .qc-nav-mobile-portal-label { display: block; font-family: var(--sans); font-size: 10px; font-weight: 600; letter-spacing: 2px; text-transform: uppercase; color: var(--qc-muted); padding: 18px 0 6px; border-top: 1px solid var(--qc-rule-soft); margin-top: 14px; }
+    .qc-nav-mobile-portal { font-size: 13px !important; letter-spacing: 0.5px; color: var(--qc-green) !important; padding: 7px 0 !important; }
+
+    /* Sign-in dropdown */
+    .qc-nav-signin-wrap { position: relative; }
+    .qc-nav-signin { font-family: var(--sans); font-size: 13px; font-weight: 500; color: #fff; opacity: 0.92; cursor: pointer; padding: 8px 0; display: inline-flex; align-items: center; gap: 4px; transition: opacity 0.2s, color 0.3s; }
+    .qc-nav-signin:hover { opacity: 1; }
+    .qc-nav-signin .caret { width: 8px; height: 8px; border-right: 1.5px solid currentColor; border-bottom: 1.5px solid currentColor; transform: rotate(45deg); margin-bottom: 3px; margin-left: 2px; transition: transform 0.2s; }
+    .qc-nav-signin-wrap.is-open .qc-nav-signin .caret { transform: rotate(-135deg); margin-bottom: -2px; }
+    .qc-nav-signin-menu { position: absolute; top: calc(100% + 12px); right: 0; min-width: 220px; background: #fff; border: 1px solid var(--qc-rule-soft); box-shadow: 0 14px 40px rgba(0,0,0,0.10); padding: 8px 0; opacity: 0; pointer-events: none; transform: translateY(-6px); transition: opacity 0.18s, transform 0.18s; z-index: 60; }
+    .qc-nav-signin-wrap.is-open .qc-nav-signin-menu { opacity: 1; pointer-events: auto; transform: translateY(0); }
+    .qc-nav-signin-menu .label { display: block; font-size: 10px; font-weight: 600; letter-spacing: 2px; text-transform: uppercase; color: var(--qc-muted); padding: 10px 20px 8px; }
+    .qc-nav-signin-menu a { display: flex; justify-content: space-between; align-items: baseline; padding: 11px 20px; font-family: var(--sans); font-size: 14px; font-weight: 500; color: var(--qc-ink); text-decoration: none; transition: background 0.15s, color 0.15s; }
+    .qc-nav-signin-menu a:hover { background: var(--qc-cream); color: var(--qc-green); }
+    .qc-nav-signin-menu a .arrow { font-size: 12px; color: var(--qc-gold); }
+
     @media (max-width: 860px) {
       .qc-nav-links { display: none; }
       .qc-nav-cta { display: none; }
+      .qc-nav-signin-wrap { display: none; }
       .qc-nav-mobile-btn { display: inline-flex; }
     }
 
@@ -224,6 +242,16 @@
         <a href="#gallery">Gallery</a>
         <a href="#brands">Brands</a>
       </div>
+      <div class="qc-nav-signin-wrap" id="qcSigninWrap">
+        <button type="button" class="qc-nav-signin" id="qcSigninBtn" aria-haspopup="true" aria-expanded="false">Sign in<span class="caret"></span></button>
+        <div class="qc-nav-signin-menu" role="menu" aria-label="Sign in to a portal">
+          <span class="label">Sign in to</span>
+          <a href="/customer-login.html" role="menuitem">Customer <span class="arrow">→</span></a>
+          <a href="/login.html" role="menuitem">Staff <span class="arrow">→</span></a>
+          <a href="/painter-login.html" role="menuitem">Painter <span class="arrow">→</span></a>
+          <a href="/engineer-login.html" role="menuitem">Engineer <span class="arrow">→</span></a>
+        </div>
+      </div>
       <a href="#design-request" class="qc-nav-cta">Get a Quote</a>
       <button class="qc-nav-mobile-btn" id="qcNavMobileBtn" aria-label="Toggle menu" aria-expanded="false">
         <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 6h16M4 12h16M4 18h16"/></svg>
@@ -236,6 +264,11 @@
       <a href="#gallery">Gallery</a>
       <a href="#brands">Brands</a>
       <a href="#design-request" class="qc-nav-cta">Get a Quote</a>
+      <span class="qc-nav-mobile-portal-label">Sign in to</span>
+      <a href="/customer-login.html" class="qc-nav-mobile-portal">Customer →</a>
+      <a href="/login.html" class="qc-nav-mobile-portal">Staff →</a>
+      <a href="/painter-login.html" class="qc-nav-mobile-portal">Painter →</a>
+      <a href="/engineer-login.html" class="qc-nav-mobile-portal">Engineer →</a>
     </div>
   </nav>
 
@@ -475,6 +508,7 @@
           <a href="/customer-login.html" class="qc-foot-portal">Customer portal →</a>
           <a href="/login.html" class="qc-foot-portal">Staff portal →</a>
           <a href="/painter-login.html" class="qc-foot-portal">Painter portal →</a>
+          <a href="/engineer-login.html" class="qc-foot-portal">Engineer portal →</a>
         </div>
       </div>
       <hr class="qc-foot-rule">
@@ -511,6 +545,31 @@
           sheet.classList.remove('is-open');
           btn.setAttribute('aria-expanded', 'false');
         });
+      });
+    })();
+
+    // === Sign-in dropdown ===
+    (function () {
+      var wrap = document.getElementById('qcSigninWrap');
+      var btn = document.getElementById('qcSigninBtn');
+      if (!wrap || !btn) return;
+      btn.addEventListener('click', function (e) {
+        e.stopPropagation();
+        var open = wrap.classList.toggle('is-open');
+        btn.setAttribute('aria-expanded', open ? 'true' : 'false');
+      });
+      document.addEventListener('click', function (e) {
+        if (!wrap.contains(e.target)) {
+          wrap.classList.remove('is-open');
+          btn.setAttribute('aria-expanded', 'false');
+        }
+      });
+      document.addEventListener('keydown', function (e) {
+        if (e.key === 'Escape' && wrap.classList.contains('is-open')) {
+          wrap.classList.remove('is-open');
+          btn.setAttribute('aria-expanded', 'false');
+          btn.focus();
+        }
       });
     })();
 
