@@ -293,6 +293,30 @@ describe('matchWithZohoItems — Birla Opus colorant all-letter SKUs', () => {
         expect(matched[0].zoho_item_id).toBe('opclswt');
     });
 
+    test('"Black" prefers OPCLBL over K2 BITUCOAT (single-letter abbrev collision)', () => {
+        // "Black" → pdfAbbrev "B"; cleanZohoName turns OPCLBL into "BLACK" (abbrev "B"),
+        // and the existing digit-prefix rule turns K2BC01 into "BITUCOAT" (also abbrev "B").
+        // Both land in zohoFamilyIndex["B"], so Strategy 0b sees a multi-hit. Without the
+        // exact-name preference, K2 BITUCOAT (listed FIRST here) would win on order.
+        const parsed = [{
+            brand: 'Birla Opus',
+            product: 'Black',
+            dpl: 347,
+            packSize: '1L',
+            category: 'COLORANT',
+        }];
+        const zoho = [
+            // K2 BITUCOAT — adversarial: listed FIRST so the order-based pick would lose.
+            { zoho_item_id: 'k2', sku: 'K2BC01', name: 'K2 BITUCOAT 01 L', rate: 250,
+              brand: 'K2 WATERPROOFING CHEMICALS', category: '', cf_dpl: 0, description: '' },
+            colorantZoho({ id: 'opclbl', sku: 'OPCLBL', name: 'OPCLBL BLACK BIRLA OPUS 01 L' }),
+        ];
+
+        const { matched } = matchWithZohoItems(parsed, zoho);
+        expect(matched).toHaveLength(1);
+        expect(matched[0].zoho_item_id).toBe('opclbl');
+    });
+
     test('"Yellow Oxide" prefers OPCLYO over an unrelated GERMAN YELLOW OXIDE item', () => {
         const parsed = [{
             brand: 'Birla Opus',

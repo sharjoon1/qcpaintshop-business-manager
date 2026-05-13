@@ -1605,6 +1605,7 @@ function matchWithZohoItems(parsedItems, zohoItems) {
                 if (!match && pdfAbbrev) {
                     const famEntries = zohoFamilyIndex.get(pdfAbbrev) || [];
                     const pdfCatStr0b = (parsed.category || '').toUpperCase();
+                    const pdfBaseStr0b = parsed.product.toUpperCase().split(/\s*-\s*/)[0].trim();
                     const isEmul0b = /EMULSION/i.test(pdfCatStr0b);
                     const hits = [];
                     for (const ent of famEntries) {
@@ -1612,10 +1613,17 @@ function matchWithZohoItems(parsedItems, zohoItems) {
                         if (pdfFinish && ent.finish && pdfFinish !== ent.finish) continue;
                         if (!catCompatible(pdfCatStr0b, ent.zi.category || ent.zi.zoho_category_name || '')) continue;
                         if (!baseVariantCompatible(parsed.product, ent.zi.sku || ent.zi.zoho_sku || '', isEmul0b)) continue;
-                        hits.push(ent.zi);
+                        hits.push(ent);
                     }
-                    if (hits.length === 1) match = hits[0];
-                    else if (hits.length > 1) match = hits[0];
+                    if (hits.length === 1) match = hits[0].zi;
+                    else if (hits.length > 1) {
+                        // Multi-hit on a short abbrev (typical for one-word colorant shades
+                        // like "Black" → "B" which collides with K2 BITUCOAT). Prefer the
+                        // entry whose cleaned name exactly equals the PDF product base —
+                        // matches "BLACK" (OPCLBL cleaned) ahead of "BITUCOAT".
+                        const exact = hits.find(h => h.cleaned && h.cleaned === pdfBaseStr0b);
+                        match = (exact ? exact.zi : hits[0].zi);
+                    }
                 }
             }
         }
