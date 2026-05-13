@@ -1703,46 +1703,250 @@
             + cats.map(function(c){ return '<option value="'+esc(c)+'">'+esc(c)+'</option>'; }).join('');
     }
 
+    // ============ ZOHO UNCOVERED — INLINE BRAND/CATEGORY EDITOR ============
+    // Lazy-init the per-zoho-item edit state. Stored on aiData so it survives
+    // table re-renders but is wiped when a fresh AI parse populates new data.
+    function uncovStateFor(zid) {
+        if (!aiData) return null;
+        if (!aiData._uncovEdits) aiData._uncovEdits = {};
+        if (!aiData._uncovEdits[zid]) aiData._uncovEdits[zid] = { selected: false, brand: null, category: null };
+        return aiData._uncovEdits[zid];
+    }
+
+    // Name-based brand suggestion. Mirrors the brand-fallback used by
+    // services/price-list-parser.js so the suggestion stays consistent with
+    // what the matcher would itself infer from the name.
+    function suggestUncovBrand(name) {
+        var n = String(name || '').toUpperCase();
+        if (/BIRLA|OPUS/.test(n))   return 'BIRLA OPUS';
+        if (/ASIAN/.test(n))        return 'ASIAN PAINTS';
+        if (/BERGER/.test(n))       return 'BERGER PAINTS';
+        if (/NIPPON/.test(n))       return 'NIPPON PAINT';
+        if (/JSW/.test(n))          return 'JSW PAINTS';
+        if (/GEM|ASTRAL/.test(n))   return 'GEM PAINTS';
+        return '';
+    }
+    function suggestUncovCat(name) {
+        var n = String(name || '').toUpperCase();
+        if (/COLORANT/.test(n))     return 'COLORANT';
+        if (/STAINER/.test(n))      return 'STAINER';
+        if (/ENAMEL/.test(n))       return 'ENAMEL';
+        if (/EMULSION|DISTEMPER/.test(n)) return 'INTERIOR EMULSION';
+        if (/PRIMER/.test(n))       return 'INTERIOR PRIMER';
+        if (/PUTTY/.test(n))        return 'PUTTY';
+        if (/WATERPROOF/.test(n))   return 'WATERPROOFING';
+        if (/POLISH|WOOD/.test(n))  return 'WOOD POLISH';
+        return '';
+    }
+
+    // Pick the effective value: edit > current > suggestion (when current blank).
+    function uncovEffectiveBrand(z) {
+        var st = uncovStateFor(z.zoho_item_id);
+        if (st && st.brand != null) return st.brand;
+        if (z.brand) return z.brand;
+        return suggestUncovBrand(z.name);
+    }
+    function uncovEffectiveCat(z) {
+        var st = uncovStateFor(z.zoho_item_id);
+        if (st && st.category != null) return st.category;
+        if (z.category) return z.category;
+        return suggestUncovCat(z.name);
+    }
+
+    // Build <option> markup for a brand/category dropdown. `current` flags the
+    // selected option. Includes an extra option for the current value when the
+    // value is not yet present in the cached aiZoho* list (e.g. legacy spelling).
+    function uncovBrandOpts(current) {
+        var opts = '<option value="">— Brand —</option>';
+        var list = aiZohoBrands.slice();
+        if (current && list.indexOf(current) === -1) list.push(current);
+        list.sort();
+        list.forEach(function(b) {
+            opts += '<option value="' + esc(b) + '"' + (b === current ? ' selected' : '') + '>' + esc(b) + '</option>';
+        });
+        return opts;
+    }
+    function uncovCatOpts(current) {
+        var opts = '<option value="">— Category —</option>';
+        var list = aiZohoCategories.slice();
+        if (current && list.indexOf(current) === -1) list.push(current);
+        list.sort();
+        list.forEach(function(c) {
+            opts += '<option value="' + esc(c) + '"' + (c === current ? ' selected' : '') + '>' + esc(c) + '</option>';
+        });
+        return opts;
+    }
+
+    // Has this row's effective brand or category diverged from the Zoho-stored value?
+    // Used to drive the "Push selected" count and per-row visual cues.
+    function uncovIsChanged(z) {
+        var b = uncovEffectiveBrand(z);
+        var c = uncovEffectiveCat(z);
+        return (b && b !== (z.brand || '')) || (c && c !== (z.category || ''));
+    }
+
+    function uncovToggle(zid, checked) {
+        var st = uncovStateFor(zid);
+        if (!st) return;
+        st.selected = !!checked;
+        uncovUpdateBtn();
+    }
+    function uncovSetBrand(zid, val) {
+        var st = uncovStateFor(zid);
+        if (!st) return;
+        st.brand = val;
+        var z = (aiData.zohoItems || []).find(function(x){ return x.zoho_item_id === zid; });
+        // Auto-tick the row when its effective value diverges from Zoho's stored one.
+        st.selected = !!(z && uncovIsChanged(z));
+        var cb = document.getElementById('uncov-cb-' + zid);
+        if (cb) cb.checked = st.selected;
+        uncovUpdateBtn();
+    }
+    function uncovSetCat(zid, val) {
+        var st = uncovStateFor(zid);
+        if (!st) return;
+        st.category = val;
+        var z = (aiData.zohoItems || []).find(function(x){ return x.zoho_item_id === zid; });
+        st.selected = !!(z && uncovIsChanged(z));
+        var cb = document.getElementById('uncov-cb-' + zid);
+        if (cb) cb.checked = st.selected;
+        uncovUpdateBtn();
+    }
+
+    // Count selected-with-changes rows and update the push button label/disabled state.
+    function uncovUpdateBtn() {
+        if (!aiData) return;
+        var uncov = computeZohoUncovered(aiData.items, aiData.zohoItems);
+        var n = 0;
+        uncov.forEach(function(z) {
+            var st = aiData._uncovEdits && aiData._uncovEdits[z.zoho_item_id];
+            if (st && st.selected && uncovIsChanged(z)) n++;
+        });
+        var btn = document.getElementById('uncovPushBtn');
+        if (btn) {
+            btn.textContent = n > 0 ? ('Push ' + n + ' selected to Zoho') : 'Push selected to Zoho';
+            btn.disabled = n === 0;
+            btn.style.opacity = n === 0 ? '0.5' : '1';
+            btn.style.cursor = n === 0 ? 'not-allowed' : 'pointer';
+        }
+    }
+
+    async function uncovPushSelected() {
+        if (!aiData) return;
+        var uncov = computeZohoUncovered(aiData.items, aiData.zohoItems);
+        var items = [];
+        uncov.forEach(function(z) {
+            var st = aiData._uncovEdits && aiData._uncovEdits[z.zoho_item_id];
+            if (!st || !st.selected) return;
+            var newBrand = uncovEffectiveBrand(z);
+            var newCat   = uncovEffectiveCat(z);
+            var changes = {};
+            if (newBrand && newBrand !== (z.brand || ''))    changes.brand    = newBrand;
+            if (newCat   && newCat   !== (z.category || '')) changes.category = newCat;
+            if (Object.keys(changes).length === 0) return;
+            items.push({ zoho_item_id: z.zoho_item_id, item_name: z.name || '', changes: changes });
+        });
+        if (!items.length) {
+            showToast('No selected rows with brand/category changes', 'error');
+            return;
+        }
+        if (!confirm('Push brand/category updates for ' + items.length + ' items to Zoho Books?')) return;
+
+        var btn = document.getElementById('uncovPushBtn');
+        if (btn) { btn.disabled = true; btn.textContent = 'Pushing…'; }
+        try {
+            await postBulkEditWithDupCheck(items);
+            showToast('Bulk job created for ' + items.length + ' items', 'success');
+            // Patch local zohoItems mirror so subsequent re-render hides these rows
+            // from the "changed" badge — the page state matches what was just pushed.
+            items.forEach(function(it) {
+                var z = (aiData.zohoItems || []).find(function(x){ return x.zoho_item_id === it.zoho_item_id; });
+                if (z) {
+                    if (it.changes.brand)    z.brand    = it.changes.brand;
+                    if (it.changes.category) z.category = it.changes.category;
+                }
+                if (aiData._uncovEdits) delete aiData._uncovEdits[it.zoho_item_id];
+            });
+            // Rebuild brand/category caches so any new values appear in the dropdowns.
+            aiBuildZohoOptionsHtml();
+            renderAiTable();
+        } catch (err) {
+            if (err && err.cancelled) showToast(err.message, 'info');
+            else showToast('Push error: ' + err.message, 'error');
+        } finally {
+            uncovUpdateBtn();
+        }
+    }
+
     // Render the table-view body for Zoho-uncovered mode.
     // Replaces aiMatchBody innerHTML with a different column layout and a
-    // small explanatory banner above the rows.
+    // small explanatory banner + push toolbar above the rows.
     function renderZohoUncoveredTable() {
         var uncov = computeZohoUncovered(aiData && aiData.items, aiData && aiData.zohoItems);
         var bodyEl = document.getElementById('aiMatchBody');
         if (!bodyEl) return;
 
-        // Replace the table head columns first by writing a header row inside thead.
-        // Simpler: render everything inside tbody as colspan rows so we keep one DOM tree.
         var html = '';
-        // Banner row spanning all columns of the existing thead (8 columns).
+        // Banner + toolbar row spanning all columns of the existing thead (8 columns).
         html += '<tr><td colspan="8" style="padding:10px;background:#fffbeb;border-bottom:1px solid #fde68a;font-size:12px;color:#92400e">'
-              + '📋 ' + uncov.length + ' Birla Opus Zoho items have no row in the latest DPL paste. Likely discontinued, missing from the vendor PDF, or a naming mismatch.'
+              + '<div style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap">'
+              +   '<div>📋 ' + uncov.length + ' Birla Opus Zoho items have no row in the latest DPL paste. Assign brand/category and push to fix.</div>'
+              +   '<button id="uncovPushBtn" onclick="uncovPushSelected()" disabled style="padding:6px 14px;border:0;background:#1B5E3B;color:#fff;font-size:12px;font-weight:600;border-radius:6px;cursor:not-allowed;opacity:0.5">Push selected to Zoho</button>'
+              + '</div>'
               + '</td></tr>';
         if (uncov.length === 0) {
             html += '<tr><td colspan="8" style="padding:24px;text-align:center;color:#9ca3af;font-size:12px">No uncovered items — every Birla Opus Zoho item is matched by a DPL row. ✅</td></tr>';
         } else {
             // Header row inside tbody (colspan-driven layout — avoids touching the static thead).
             html += '<tr style="background:#f1f5f9;font-weight:600;color:#475569;font-size:11px">'
-                  + '<td colspan="2" style="padding:7px 8px">SKU</td>'
-                  + '<td colspan="3" style="padding:7px 8px">Name</td>'
-                  + '<td style="padding:7px 8px;text-align:right">Current Rate</td>'
-                  + '<td style="padding:7px 8px;text-align:right">Current DPL</td>'
-                  + '<td style="padding:7px 8px">DPL last updated</td>'
+                  + '<td style="padding:7px 6px;width:28px"></td>'
+                  + '<td style="padding:7px 8px">SKU</td>'
+                  + '<td colspan="2" style="padding:7px 8px">Name</td>'
+                  + '<td style="padding:7px 8px">Brand</td>'
+                  + '<td style="padding:7px 8px">Category</td>'
+                  + '<td style="padding:7px 8px;text-align:right">Rate / DPL</td>'
+                  + '<td style="padding:7px 8px">DPL date</td>'
                   + '</tr>';
             uncov.forEach(function(z) {
                 var dplDate = z.dpl_updated_at ? new Date(z.dpl_updated_at).toLocaleDateString('en-IN', { day:'2-digit', month:'short', year:'numeric' }) : '—';
-                html += '<tr>'
-                      + '<td colspan="2" style="padding:5px 8px;font-family:monospace;font-size:11px;color:#4338ca">' + esc(z.sku || '—') + '</td>'
-                      + '<td colspan="3" style="padding:5px 8px;font-size:12px"><div class="break-words" title="' + esc(z.name || '') + '">' + esc(z.name || '') + '</div></td>'
-                      + '<td style="padding:5px 8px;text-align:right;font-size:12px;color:#374151">' + (z.rate > 0 ? fmt(z.rate) : '—') + '</td>'
-                      + '<td style="padding:5px 8px;text-align:right;font-size:12px;color:#059669;font-weight:600">' + (z.cf_dpl > 0 ? fmt(z.cf_dpl) : '—') + '</td>'
-                      + '<td style="padding:5px 8px;font-size:11px;color:#64748b">' + esc(dplDate) + '</td>'
+                var st = uncovStateFor(z.zoho_item_id);
+                var effBrand = uncovEffectiveBrand(z);
+                var effCat   = uncovEffectiveCat(z);
+                var brandIsSuggestion = (st.brand == null) && !z.brand && !!effBrand;
+                var catIsSuggestion   = (st.category == null) && !z.category && !!effCat;
+                var brandChanged = effBrand && effBrand !== (z.brand || '');
+                var catChanged   = effCat   && effCat   !== (z.category || '');
+                var rowBg        = (brandChanged || catChanged) ? '#fffbeb' : 'transparent';
+                html += '<tr style="background:' + rowBg + ';border-top:1px solid #f1f5f9">'
+                      + '<td style="padding:5px 6px;text-align:center">'
+                      +   '<input type="checkbox" id="uncov-cb-' + esc(z.zoho_item_id) + '" '
+                      +     (st.selected ? 'checked' : '')
+                      +     ' onchange="uncovToggle(\'' + esc(z.zoho_item_id) + '\', this.checked)">'
+                      + '</td>'
+                      + '<td style="padding:5px 8px;font-family:monospace;font-size:11px;color:#4338ca;white-space:nowrap">' + esc(z.sku || '—') + '</td>'
+                      + '<td colspan="2" style="padding:5px 8px;font-size:12px"><div class="break-words" title="' + esc(z.name || '') + '">' + esc(z.name || '') + '</div></td>'
+                      + '<td style="padding:5px 6px">'
+                      +   '<select onchange="uncovSetBrand(\'' + esc(z.zoho_item_id) + '\', this.value)" '
+                      +     'style="width:100%;font-size:10px;padding:3px 4px;border:1px solid ' + (brandChanged ? '#f59e0b' : '#e5e7eb') + ';border-radius:4px;outline:none;'
+                      +     'color:' + (brandChanged ? '#92400e' : '#374151') + ';background:' + (brandIsSuggestion ? '#fef9c3' : '#fff') + '" '
+                      +     'title="' + (brandIsSuggestion ? 'Auto-suggested from name' : 'Brand') + '">' + uncovBrandOpts(effBrand) + '</select>'
+                      + '</td>'
+                      + '<td style="padding:5px 6px">'
+                      +   '<select onchange="uncovSetCat(\'' + esc(z.zoho_item_id) + '\', this.value)" '
+                      +     'style="width:100%;font-size:10px;padding:3px 4px;border:1px solid ' + (catChanged ? '#f59e0b' : '#e5e7eb') + ';border-radius:4px;outline:none;'
+                      +     'color:' + (catChanged ? '#92400e' : '#374151') + ';background:' + (catIsSuggestion ? '#fef9c3' : '#fff') + '" '
+                      +     'title="' + (catIsSuggestion ? 'Auto-suggested from name' : 'Category') + '">' + uncovCatOpts(effCat) + '</select>'
+                      + '</td>'
+                      + '<td style="padding:5px 8px;text-align:right;font-size:11px">'
+                      +   '<div style="color:#374151">' + (z.rate  > 0 ? fmt(z.rate)   : '—') + '</div>'
+                      +   '<div style="color:#059669;font-weight:600">' + (z.cf_dpl > 0 ? fmt(z.cf_dpl) : '—') + '</div>'
+                      + '</td>'
+                      + '<td style="padding:5px 8px;font-size:11px;color:#64748b;white-space:nowrap">' + esc(dplDate) + '</td>'
                       + '</tr>';
             });
         }
         bodyEl.innerHTML = html;
-
-        // Update the "selected" counter label so it doesn't lie about DPL row state.
+        uncovUpdateBtn();
         aiUpdateSelectedCount();
     }
 
@@ -1751,27 +1955,49 @@
         var uncov = computeZohoUncovered(aiData && aiData.items, aiData && aiData.zohoItems);
         var html = '';
         html += '<div style="padding:10px;background:#fffbeb;border:1px solid #fde68a;border-radius:8px;margin-bottom:10px;font-size:12px;color:#92400e">'
-              + '📋 ' + uncov.length + ' Birla Opus Zoho items have no row in the latest DPL paste.</div>';
+              + '<div style="margin-bottom:6px">📋 ' + uncov.length + ' Birla Opus Zoho items have no row in the latest DPL paste.</div>'
+              + '<button id="uncovPushBtn" onclick="uncovPushSelected()" disabled style="width:100%;padding:8px;border:0;background:#1B5E3B;color:#fff;font-size:13px;font-weight:600;border-radius:6px;cursor:not-allowed;opacity:0.5">Push selected to Zoho</button>'
+              + '</div>';
         if (uncov.length === 0) {
             html += '<div style="padding:24px;text-align:center;color:#9ca3af;font-size:12px">No uncovered items — every Birla Opus Zoho item is matched. ✅</div>';
         } else {
             uncov.forEach(function(z) {
                 var dplDate = z.dpl_updated_at ? new Date(z.dpl_updated_at).toLocaleDateString('en-IN', { day:'2-digit', month:'short', year:'numeric' }) : '—';
-                html += '<div class="ai-card">'
+                var st = uncovStateFor(z.zoho_item_id);
+                var effBrand = uncovEffectiveBrand(z);
+                var effCat   = uncovEffectiveCat(z);
+                var brandChanged = effBrand && effBrand !== (z.brand || '');
+                var catChanged   = effCat   && effCat   !== (z.category || '');
+                var cardBg       = (brandChanged || catChanged) ? '#fffbeb' : '#fff';
+                html += '<div class="ai-card" style="background:' + cardBg + '">'
                       + '<div style="display:flex;justify-content:space-between;gap:8px;align-items:flex-start">'
-                      +   '<div style="flex:1;min-width:0">'
-                      +     '<div style="font-family:monospace;font-size:11px;color:#4338ca">' + esc(z.sku || '—') + '</div>'
-                      +     '<div class="ai-card-name">' + esc(z.name || '') + '</div>'
-                      +   '</div>'
+                      +   '<label style="display:flex;gap:8px;align-items:flex-start;flex:1;min-width:0;cursor:pointer">'
+                      +     '<input type="checkbox" id="uncov-cb-' + esc(z.zoho_item_id) + '" ' + (st.selected ? 'checked' : '')
+                      +       ' onchange="uncovToggle(\'' + esc(z.zoho_item_id) + '\', this.checked)" style="margin-top:3px">'
+                      +     '<div style="flex:1;min-width:0">'
+                      +       '<div style="font-family:monospace;font-size:11px;color:#4338ca">' + esc(z.sku || '—') + '</div>'
+                      +       '<div class="ai-card-name">' + esc(z.name || '') + '</div>'
+                      +     '</div>'
+                      +   '</label>'
                       +   '<div style="text-align:right;font-size:11px;flex-shrink:0">'
                       +     '<div>Rate: <span style="color:#374151;font-weight:600">' + (z.rate > 0 ? fmt(z.rate) : '—') + '</span></div>'
                       +     '<div>DPL: <span style="color:#059669;font-weight:600">' + (z.cf_dpl > 0 ? fmt(z.cf_dpl) : '—') + '</span></div>'
                       +   '</div>'
                       + '</div>'
+                      + '<div style="display:flex;gap:6px;margin-top:8px">'
+                      +   '<select onchange="uncovSetBrand(\'' + esc(z.zoho_item_id) + '\', this.value)" '
+                      +     'style="flex:1;min-width:0;font-size:12px;padding:6px 8px;border:1px solid ' + (brandChanged ? '#f59e0b' : '#e5e7eb') + ';border-radius:6px;outline:none;color:' + (brandChanged ? '#92400e' : '#374151') + ';background:#fff" '
+                      +     'title="Brand">' + uncovBrandOpts(effBrand) + '</select>'
+                      +   '<select onchange="uncovSetCat(\'' + esc(z.zoho_item_id) + '\', this.value)" '
+                      +     'style="flex:1;min-width:0;font-size:12px;padding:6px 8px;border:1px solid ' + (catChanged ? '#f59e0b' : '#e5e7eb') + ';border-radius:6px;outline:none;color:' + (catChanged ? '#92400e' : '#374151') + ';background:#fff" '
+                      +     'title="Category">' + uncovCatOpts(effCat) + '</select>'
+                      + '</div>'
                       + '<div class="ai-card-meta" style="margin-top:6px">DPL last updated: ' + esc(dplDate) + '</div>'
                       + '</div>';
             });
         }
+        // Defer button-state sync until the cards land in the DOM.
+        setTimeout(uncovUpdateBtn, 0);
         return html;
     }
 
