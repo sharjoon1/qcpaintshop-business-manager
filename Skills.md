@@ -1,9 +1,9 @@
 # QC Paint Shop Business Manager - System Skills & Capabilities
 
 > **Platform**: act.qcpaintshop.com
-> **Version**: 3.3.7
-> **Last Updated**: 2026-04-17
-> **Total Codebase**: ~20,000+ lines (server) | 80+ frontend pages | Android app (2 flavors)
+> **Version**: Web on master HEAD · Staff Android 3.3.9 vc18 (internal) · Painter Android 3.3.0 vc32 (internal)
+> **Last Updated**: 2026-05-13
+> **Total Codebase**: ~205,000 LOC (web) | 106 frontend pages | Android app (3 flavors: staff / customer / painter)
 
 ---
 
@@ -3666,7 +3666,51 @@ Two-spec brainstorm → plan → subagent-driven-development cycle fixing Birla 
 3. Surface "no DPL update available" rows for Zoho SKUs whose size isn't in PDF (e.g., `ADSS10` 10L Salt Seal — Zoho doesn't have that SKU but if it did, PDF doesn't list 10L for Salt Seal so currently silent).
 4. `stripPackSuffixForDescription` greedy regex on 99-base SKUs (`TL9920` → `TL9` instead of `TL`) — affects only `proposed_description` advisory field. Final reviewer flagged as follow-up not blocker.
 
+### Birla Opus colorant matcher fixes (2026-05-13)
+
+Series of 3 commits that hardened `services/price-list-parser.js::matchWithZohoItems` against the all-letter OPCL-family colorant SKUs (OPCLWT, OPCLBL, OPCLOR, OPCLMG, OPCLVI, OPCLGR, OPCLINY, OPCLINR, OPCLRO, OPCLYO, OPCLEXR, OPCLEXY, OPCLEXHR, OPCLEXHDY, OPCLSWT). These SKUs lack digits, so `parseSkuStructure` returns null and they fall out of `zohoBySku` → Strategy 0 misses → keyword-fallback (Strategy 2) decides → wrong items win on order or HD/non-HD confusion.
+
+- **`0707c97`** — `cleanZohoName(name, sku)` now drops the leading token when it equals the item SKU verbatim (catches all-letter SKUs the digit pattern misses + long compound SKUs like `CSTDOR01` that exceed the {1,4}-letter prefix limit). Strategy 2 gets an exact-name bonus (+100) when `entry.cleaned === pdfProductBase`, so `EXT. YELLOW` beats `EXT. HD YELLOW` and `WHITE` (OPCLWT cleaned) beats `AP APEX ULTIMA BR WHITE`.
+- **`bfea973`** — Strategy 0b also picks exact-name on multi-hit. Without this, "Black" → pdfAbbrev "B" still tied between OPCLBL (cleaned `BLACK`) and K2 BITUCOAT (cleaned `BITUCOAT`) and the first-encountered won. `hits[]` now holds family entries (with `.cleaned`) instead of bare zi objects so the exact-name comparison runs without recomputing cleanZohoName.
+- **`45d198a`** — Hard brand scope: items with empty `brand` AND no BIRLA/OPUS/ASIAN/BERGER/NIPPON/JSW keyword in their name are now dropped from scope when the PDF brand is asserted. The previous "truly unknown brand — keep" hedge let 197 legacy items (K2 BITUCOAT, AP APEX, GERMAN YELLOW OXIDE, etc.) bleed into Birla Opus matching. Behaviour change: when no genuine brand-scoped match exists (e.g. "Blue COLORANT" with no OPCL-blue in catalog), the row now lands in `unmatched` instead of confidently picking a wrong cross-brand item.
+
+Tests: 5 colorant matcher tests + 1 Black-vs-BITUCOAT + 1 Blue-no-match in `tests/unit/dpl-price-size.test.js`. Full suite: 97/97 passing.
+
+### admin-dpl: inline brand+category editor for Zoho-uncovered rows (2026-05-13)
+
+`ecd2323` + `9f09462`. The "Zoho uncovered" view (DPL paste step 2, View dropdown → "Zoho uncovered (N)") was read-only. Now each uncovered row has:
+
+- Checkbox + Brand `<select>` + Category `<select>` (inline edit, no modal).
+- Auto-suggestion when brand/category is empty — heuristics in `suggestUncovBrand` / `suggestUncovCat` mirror the matcher's brand-fallback (`BIRLA/OPUS → BIRLA OPUS`, `COLORANT/ENAMEL/EMULSION/PRIMER/PUTTY/STAINER/…` → matching category). Suggested values render with a yellow tint, edited values with an amber border.
+- "Push N selected to Zoho" button in the warning banner — pushes via existing `/api/zoho/items/bulk-edit`, which optimistically stamps `zoho_brand` + `zoho_category_name` on the local mirror so the next DPL paste's matcher correctly scopes these items. The Zoho-side update is queued in the bulk-job worker.
+- Dropdowns populated from the full distinct-brand and distinct-category list (`GET /api/zoho/stock/filter-options`) — not just the PDF's brand-scoped subset — so admin can assign any catalog brand/category to an uncovered row. Cached as `aiAllBrands` / `aiAllCategories`; merged into `aiZohoBrands` / `aiZohoCategories` on Step-2 entry.
+
+State persists on `aiData._uncovEdits` keyed by `zoho_item_id`. After a successful push the local mirror is patched in-place so the changed indicator clears without a full reload.
+
+### Phase 1-3 shipping roadmap (2026-05-13)
+
+User session goal: drive web + both Android flavors to "production-ready, Play-Store-published, no known P0/P1 issues" bar. See memory `project_phase1_shipping_2026_05` for the full roadmap state.
+
+**Phase 1 (ship-blockers) — Done except E2E:**
+- Staff v3.3.9 vc18 → Play Store internal track + Telegram chat 930726256 (APK).
+- Painter v3.3.0 vc32 → Play Store internal track + Telegram chat 930726256 (APK).
+- Web security hardening (OTP, SMS HTTPS, otpLimiter, token hashing, helmet, setImmediate forgot-password) — verified already shipped pre-2026-05.
+
+**Pending (user-side):** device E2E on real Android (both APKs in Telegram). After pass, promote internal → production: `node publish-to-play.js production` + `node publish-painter.js production`.
+
+**Phase 2 (web hygiene sprint):** Tailwind CDN → JIT migration on 104 pages, mobile/a11y, audit-log coverage extension, U10/U13/U2 queued audit items, 89 PENDING migrations.
+
+**Phase 3 (painter Android Epsilon B-L):** 11 remaining screen redesigns per `qcpaintshop-android/PAINTER-UX-AUDIT-2026-05-01.md`. Ship in 3 chunks via Telegram + version bumps.
+
+**Phase 4-6 (deferred):** customer portal invoices, anomaly notification badge, bug-reports AI fix loop, painter visualization auto-trigger, 2FA admin, DPL other-brand parsers, design-system token migration, print/PDF CDN migration.
+
+### Play Store publishing — gotchas hit 2026-05-13
+
+1. Version code must be unique across the package's history on Play Store; uncommitted uploads also burn the version code. Bumped staff vc17 → vc18 after a "Version code 17 has already been used" rejection. See memory `reference_play_store_publishing`.
+2. `changesNotSentForReview: true` is now rejected by the Play API. Removed from `google-services/publish-to-play.js`. (`publish-painter.js` never had it.)
+3. Release notes max 500 chars per language. Painter notes initially landed at 556 chars and got rejected; trimmed in `publish-painter.js`.
+
 ---
 
 *This document should be updated whenever new features are added or existing ones are enhanced.*
-*Last Updated: 2026-05-09 | Version: 3.3.9 (Staff/Customer), 3.1.7 (Painter vc19) | Maintained by: Development Team*
+*Last Updated: 2026-05-13 | Version: 3.3.9 vc18 (Staff internal), 3.3.0 vc32 (Painter internal) | Maintained by: Development Team*
