@@ -1427,6 +1427,12 @@
 
     // ============ AI: build options + cache unique brand/category lists ============
     var aiZohoBrands = [], aiZohoCategories = [];
+    // Cache of the FULL distinct-brand / distinct-category set across all Zoho
+    // items (not just the brand-scoped subset returned with the parse). Populated
+    // by aiFetchAllTaxonomy() at Step-2 entry. Empty when fetch hasn't run or
+    // failed — code falls back to the scoped list in that case.
+    var aiAllBrands = [], aiAllCategories = [];
+
     function aiBuildZohoOptionsHtml() {
         zpPopulateFilters();
         // Cache unique brands + categories for match cell dropdowns
@@ -1437,7 +1443,36 @@
             if(b&&!bSeen[b]){bSeen[b]=1;aiZohoBrands.push(b);}
             if(c&&!cSeen[c]){cSeen[c]=1;aiZohoCategories.push(c);}
         });
+        // Merge in the full-catalog distinct values so admins can assign any
+        // brand/category to an uncovered or matched row, not just ones that
+        // already appear inside the PDF's brand scope.
+        aiAllBrands.forEach(function(b)    { if (b && !bSeen[b]) { bSeen[b] = 1; aiZohoBrands.push(b); } });
+        aiAllCategories.forEach(function(c){ if (c && !cSeen[c]) { cSeen[c] = 1; aiZohoCategories.push(c); } });
         aiZohoBrands.sort(); aiZohoCategories.sort();
+    }
+
+    // Fetch the full distinct-brand and distinct-category list from the server
+    // once per Step-2 entry. The endpoint already exists for stock filters and
+    // returns everything in zoho_items_map, not just the brand-scoped subset.
+    async function aiFetchAllTaxonomy() {
+        try {
+            var resp = await fetch('/api/zoho/stock/filter-options', {
+                headers: { 'Authorization': 'Bearer ' + getToken() }
+            });
+            if (!resp.ok) return;
+            var data = await resp.json();
+            if (!data || !data.success) return;
+            aiAllBrands     = Array.isArray(data.brands)     ? data.brands.slice()     : [];
+            aiAllCategories = Array.isArray(data.categories) ? data.categories.slice() : [];
+            // Rebuild caches + re-render so dropdowns pick up the wider list.
+            if (aiData) {
+                aiBuildZohoOptionsHtml();
+                renderAiTable();
+            }
+        } catch (e) {
+            // Non-fatal — dropdowns will fall back to the brand-scoped list.
+            console.warn('Taxonomy fetch failed:', e.message);
+        }
     }
 
     // ============ AI: render the Excel table ============
@@ -1446,6 +1481,10 @@
         document.getElementById('step2Ai').classList.remove('hidden');
         document.getElementById('step2Quick').classList.add('hidden');
         document.getElementById('step2Label').textContent = 'AI Review';
+        // Fire off the full taxonomy fetch in the background — when it returns,
+        // it rebuilds the brand/category caches and triggers a re-render so the
+        // matched-row and Zoho-uncovered dropdowns show every distinct value.
+        aiFetchAllTaxonomy();
 
         var d = aiData;
         document.getElementById('aiStatPages').textContent       = d.pages || '-';
