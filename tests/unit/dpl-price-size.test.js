@@ -317,6 +317,33 @@ describe('matchWithZohoItems — Birla Opus colorant all-letter SKUs', () => {
         expect(matched[0].zoho_item_id).toBe('opclbl');
     });
 
+    test('"Blue" with no Birla Opus blue colorant in catalog leaves row unmatched (no K2 BITUCOAT bleed-through)', () => {
+        // No OPCLBU / OPCL-blue exists in Birla Opus catalog. Previous behaviour
+        // matched "Blue COLORANT" against K2 BITUCOAT (waterproofing, empty brand,
+        // no BIRLA/OPUS in name) because the brand-scope filter kept "truly unknown
+        // brand" items as a hedge. Tightening the filter so PDF brand asserts a
+        // hard scope keeps the row unmatched — admin then either picks manually
+        // or creates the missing item.
+        const parsed = [{
+            brand: 'Birla Opus',
+            product: 'Blue',
+            dpl: 510,
+            packSize: '1L',
+            category: 'COLORANT',
+        }];
+        const zoho = [
+            { zoho_item_id: 'k2', sku: 'K2BC01', name: 'K2 BITUCOAT 01 L', rate: 250,
+              brand: '', category: 'K2 WATERPROOFING CHEMICALS', cf_dpl: 0, description: '' },
+            { zoho_item_id: 'stainer', sku: '', name: 'BLUE STAINER 100ML', rate: 41,
+              brand: 'GENERIC', category: 'STAINER', cf_dpl: 0, description: '' },
+        ];
+
+        const { matched, unmatched } = matchWithZohoItems(parsed, zoho);
+        expect(matched).toHaveLength(0);
+        expect(unmatched).toHaveLength(1);
+        expect(unmatched[0].product).toBe('Blue');
+    });
+
     test('"Yellow Oxide" prefers OPCLYO over an unrelated GERMAN YELLOW OXIDE item', () => {
         const parsed = [{
             brand: 'Birla Opus',

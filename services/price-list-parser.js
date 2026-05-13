@@ -1337,7 +1337,13 @@ function matchWithZohoItems(parsedItems, zohoItems) {
                    : nm.includes('JSW')    ? 'JSW'
                    : '';
             }
-            if (!zb) return true; // truly unknown brand — keep to avoid losing candidates
+            // When a brand is asserted on the PDF side, dropping items with no brand
+            // column AND no brand keyword in their name. The previous "keep to avoid
+            // losing candidates" hedge let unrelated legacy items (K2 BITUCOAT, AP
+            // APEX without brand, GERMAN YELLOW OXIDE, …) leak into Birla Opus
+            // matching and win the keyword fallback when no real Birla candidate
+            // existed (e.g. "Blue COLORANT" with no OPCL-blue in catalog).
+            if (!zb) return false;
             // Match if any PDF brand's normalized form is contained or equals
             for (const pb of pdfBrandSet) {
                 if (zb === pb || zb.includes(pb) || pb.includes(zb)) return true;
