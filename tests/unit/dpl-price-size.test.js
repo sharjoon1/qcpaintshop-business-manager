@@ -200,3 +200,115 @@ describe('matchWithZohoItems — overflow handling (PDF prices > Zoho family)', 
         expect(byZohoId['5']).toBeUndefined();
     });
 });
+
+describe('matchWithZohoItems — Birla Opus colorant all-letter SKUs', () => {
+    // Birla Opus colorant catalog (OPCL-family) uses all-letter SKUs:
+    // OPCLWT, OPCLBL, OPCLOR, OPCLEXY, OPCLEXHDY, OPCLSWT, etc. The structural
+    // matcher's parseSkuStructure requires digits, so these items fall through
+    // to the keyword fallback. This describe block locks in the matcher's
+    // ability to disambiguate them using the exact-cleaned-name bonus.
+
+    function colorantZoho({ id, sku, name }) {
+        return {
+            zoho_item_id: id, sku, name, rate: 0,
+            brand: 'BIRLA OPUS', category: 'COLORANT',
+            cf_dpl: 0, description: '',
+        };
+    }
+
+    test('"Ext. Yellow" picks OPCLEXY over OPCLEXHDY (no "HD" in PDF)', () => {
+        const parsed = [{
+            brand: 'Birla Opus',
+            product: 'Ext. Yellow',
+            dpl: 1436,
+            packSize: '1L',
+            category: 'COLORANT',
+        }];
+        // OPCLEXHDY listed FIRST to prove order doesn't matter once the
+        // exact-cleaned-name bonus is applied.
+        const zoho = [
+            colorantZoho({ id: 'hd', sku: 'OPCLEXHDY', name: 'OPCLEXHDY EXT. HD YELLOW BIRLA OPUS 01 L' }),
+            colorantZoho({ id: 'std', sku: 'OPCLEXY',  name: 'OPCLEXY EXT. YELLOW BIRLA OPUS 01 L' }),
+        ];
+
+        const { matched } = matchWithZohoItems(parsed, zoho);
+        expect(matched).toHaveLength(1);
+        expect(matched[0].zoho_item_id).toBe('std');
+    });
+
+    test('"Ext. Red" picks OPCLEXR over OPCLEXHR', () => {
+        const parsed = [{
+            brand: 'Birla Opus',
+            product: 'Ext. Red',
+            dpl: 874,
+            packSize: '1L',
+            category: 'COLORANT',
+        }];
+        const zoho = [
+            colorantZoho({ id: 'hd', sku: 'OPCLEXHR', name: 'OPCLEXHR EXT. HD RED BIRLA OPUS 01 L' }),
+            colorantZoho({ id: 'std', sku: 'OPCLEXR', name: 'OPCLEXR EXT. RED BIRLA OPUS 01 L' }),
+        ];
+
+        const { matched } = matchWithZohoItems(parsed, zoho);
+        expect(matched).toHaveLength(1);
+        expect(matched[0].zoho_item_id).toBe('std');
+    });
+
+    test('"White" colorant prefers OPCLWT over unrelated AP APEX item', () => {
+        const parsed = [{
+            brand: 'Birla Opus',
+            product: 'White',
+            dpl: 552,
+            packSize: '1L',
+            category: 'COLORANT',
+        }];
+        const zoho = [
+            // Cross-brand item with empty brand + WHITE in name — used to win on first-encounter.
+            { zoho_item_id: 'ap', sku: '680912210', name: 'AP APEX ULTIMA BR WHITE 1 LT', rate: 575,
+              brand: '', category: '', cf_dpl: 0, description: '' },
+            colorantZoho({ id: 'opclwt', sku: 'OPCLWT', name: 'OPCLWT WHITE BIRLA OPUS 01 L' }),
+            colorantZoho({ id: 'opclswt', sku: 'OPCLSWT', name: 'OPCLSWT SPECIAL WHITE BIRLA OPUS 01 L' }),
+        ];
+
+        const { matched } = matchWithZohoItems(parsed, zoho);
+        expect(matched).toHaveLength(1);
+        expect(matched[0].zoho_item_id).toBe('opclwt');
+    });
+
+    test('"Special White" colorant picks OPCLSWT (does not collapse to OPCLWT)', () => {
+        const parsed = [{
+            brand: 'Birla Opus',
+            product: 'Special White',
+            dpl: 350,
+            packSize: '1L',
+            category: 'COLORANT',
+        }];
+        const zoho = [
+            colorantZoho({ id: 'opclwt',  sku: 'OPCLWT',  name: 'OPCLWT WHITE BIRLA OPUS 01 L' }),
+            colorantZoho({ id: 'opclswt', sku: 'OPCLSWT', name: 'OPCLSWT SPECIAL WHITE BIRLA OPUS 01 L' }),
+        ];
+
+        const { matched } = matchWithZohoItems(parsed, zoho);
+        expect(matched).toHaveLength(1);
+        expect(matched[0].zoho_item_id).toBe('opclswt');
+    });
+
+    test('"Yellow Oxide" prefers OPCLYO over an unrelated GERMAN YELLOW OXIDE item', () => {
+        const parsed = [{
+            brand: 'Birla Opus',
+            product: 'Yellow Oxide',
+            dpl: 481,
+            packSize: '1L',
+            category: 'COLORANT',
+        }];
+        const zoho = [
+            { zoho_item_id: 'german', sku: 'GERMAN-YO', name: 'GERMAN YELLOW OXIDE 1KG', rate: 80,
+              brand: '', category: '', cf_dpl: 0, description: '' },
+            colorantZoho({ id: 'opclyo', sku: 'OPCLYO', name: 'OPCLYO YELLOW OXIDE BIRLA OPUS 01 L' }),
+        ];
+
+        const { matched } = matchWithZohoItems(parsed, zoho);
+        expect(matched).toHaveLength(1);
+        expect(matched[0].zoho_item_id).toBe('opclyo');
+    });
+});

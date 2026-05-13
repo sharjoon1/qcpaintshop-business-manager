@@ -855,11 +855,13 @@ function parseSkuStructure(skuOrName) {
 // and unit tokens — leaving just the product name words for abbrev extraction.
 // "OP05 STYLE SUPER BRIGHT DISTEMPER BIRLA OPUS 05 L" → "STYLE SUPER BRIGHT DISTEMPER"
 // "OP01 ODE99 ONE DREAM EFFECT 01 L" → "ONE DREAM EFFECT"
-function cleanZohoName(name) {
+// "OPCLEXY EXT. YELLOW BIRLA OPUS 01 L" → "EXT. YELLOW" (when sku="OPCLEXY")
+function cleanZohoName(name, sku) {
     const noiseWords = new Set([
         'BIRLA', 'OPUS', 'ASIAN', 'PAINTS', 'PAINT', 'BERGER', 'NIPPON',
         'GEM', 'ASTRAL', 'JSW', 'LIMITED', 'LTD', 'PRIVATE', 'PVT', 'L', 'ML', 'KG', 'GM', 'NO'
     ]);
+    const skuUpper = String(sku || '').toUpperCase().trim();
     const tokens = String(name || '').toUpperCase().trim().split(/\s+/);
     const kept = [];
     for (let i = 0; i < tokens.length; i++) {
@@ -867,6 +869,11 @@ function cleanZohoName(name) {
         // Drop up to first 2 leading SKU-like tokens (e.g., "OP05" or "OP01 ODE99")
         if (kept.length === 0 && i < 2 && /^[A-Z]{1,4}\d{1,5}[A-Z]*$/.test(tok)) continue;
         if (kept.length === 0 && /^[A-Z]{2,6}WT$/.test(tok)) continue; // drop WT-base SKU prefix (e.g. "ECWT" after "ECWT01")
+        // Drop leading token when it equals the item's SKU verbatim. Catches all-letter
+        // SKUs the digit patterns above miss (Birla Opus colorants: OPCLWT, OPCLEXY,
+        // OPCLEXHDY, …) AND non-Birla compound SKUs like CSTDOR01 that are too long for
+        // the {1,4}-letter prefix rule.
+        if (kept.length === 0 && i < 2 && skuUpper && tok === skuUpper) continue;
         if (noiseWords.has(tok)) continue;
         if (/^\d+(?:\.\d+)?$/.test(tok)) continue;         // pure numeric (pack sizes)
         if (/^\d+ML$/.test(tok)) continue;                  // "200ML"
@@ -1346,7 +1353,8 @@ function matchWithZohoItems(parsedItems, zohoItems) {
     const zohoFamilyIndex = new Map();  // abbrev → Array<{ zi, packCode, rate, name, finish }>
     for (const zi of scopedZoho) {
         const nameText = (zi.name || zi.zoho_item_name || '').toUpperCase();
-        const cleaned = cleanZohoName(nameText);
+        const skuText = (zi.sku || zi.zoho_sku || '');
+        const cleaned = cleanZohoName(nameText, skuText);
         const abbr = extractProductAbbrev(cleaned);
         if (!abbr) continue;
         const packCode = extractZohoPackCode(zi);
@@ -1354,7 +1362,7 @@ function matchWithZohoItems(parsedItems, zohoItems) {
         const rate = parseFloat(zi.rate || 0);
         const finish = detectFinish(nameText);
         if (!zohoFamilyIndex.has(abbr)) zohoFamilyIndex.set(abbr, []);
-        zohoFamilyIndex.get(abbr).push({ zi, packCode, rate, name: nameText, finish });
+        zohoFamilyIndex.get(abbr).push({ zi, packCode, rate, name: nameText, finish, cleaned });
     }
 
     // For rows where we have multiple prices but unknown column alignment, use Zoho's
@@ -1407,7 +1415,7 @@ function matchWithZohoItems(parsedItems, zohoItems) {
                         // Base variant gate: emulsion White must not match non-White Zoho and vice versa
                         if (!baseVariantCompatible(p.product, zi.sku || zi.zoho_sku || '', isEmulFb)) continue;
                         const nameText = (zi.name || zi.zoho_item_name || '').toUpperCase();
-                        const cleaned = cleanZohoName(nameText);
+                        const cleaned = cleanZohoName(nameText, zi.sku || zi.zoho_sku || '');
                         let hits = 0;
                         for (const kw of pdfKeywords) {
                             if (cleaned.includes(kw)) hits++;
@@ -1515,7 +1523,11 @@ function matchWithZohoItems(parsedItems, zohoItems) {
         const finish = detectFinish(name);
         if (name) {
             zohoByName.set(name, zi);
-            zohoByWords.push({ words: name.split(/\s+/), item: zi, name, finish });
+            // `cleaned` strips the leading SKU token + brand/pack noise so an exact-equality
+            // tiebreaker in Strategy 2 can prefer "OPCLEXY EXT. YELLOW BIRLA OPUS" over
+            // "OPCLEXHDY EXT. HD YELLOW BIRLA OPUS" when PDF says just "Ext. Yellow".
+            const cleaned = cleanZohoName(name, sku);
+            zohoByWords.push({ words: name.split(/\s+/), item: zi, name, finish, cleaned });
         }
         // Prefer SKU-parse; fall back to parsing first token of name
         const struct = parseSkuStructure(sku) || parseSkuStructure(name);
@@ -1610,7 +1622,8 @@ function matchWithZohoItems(parsedItems, zohoItems) {
 
         // Strategy 2: fallback keyword match — finish + category enforced, minimum score raised
         if (!match) {
-            const keywords = extractKeywords(productName.split(/\s*-\s*/)[0]);
+            const pdfBaseForExact = productName.split(/\s*-\s*/)[0].trim();
+            const keywords = extractKeywords(pdfBaseForExact);
             const pdfCatStr2 = (parsed.category || '').toUpperCase();
             // Numeric size from PDF for approximate unit-mismatch matching (e.g. PDF "4L" ↔ Zoho "05 KG")
             const pPackNumM = (parsed.packSize || '').match(/^(\d+(?:\.\d+)?)/);
@@ -1640,12 +1653,21 @@ function matchWithZohoItems(parsedItems, zohoItems) {
                 for (const kw of keywords) if (entry.name.includes(kw)) score++;
                 // Raise the bar: need ≥3 matching keywords (or all if name short) to avoid cross-family leaks
                 const minRequired = keywords.length <= 2 ? keywords.length : 3;
-                if (score >= minRequired && score > bestScore) {
-                    bestScore = score;
+                if (score < minRequired) continue;
+                // Exact-name bonus: when the Zoho cleaned form (SKU + brand + pack stripped)
+                // exactly equals the PDF product base, this is a much stronger signal than
+                // raw keyword overlap. Without this bonus, "Ext. Yellow" (PDF) ties between
+                // "OPCLEXY EXT. YELLOW" and "OPCLEXHDY EXT. HD YELLOW" and the first one
+                // encountered wins — usually the wrong one for all-letter SKUs that don't
+                // get sorted by structural parsing.
+                const exactBonus = (entry.cleaned && entry.cleaned === pdfBaseForExact) ? 100 : 0;
+                const adjusted = score + exactBonus;
+                if (adjusted > bestScore) {
+                    bestScore = adjusted;
                     bestMatch = entry.item;
                 }
             }
-            if (bestMatch && bestScore >= (bestMatch && keywords.length <= 2 ? keywords.length : 3)) match = bestMatch;
+            if (bestMatch) match = bestMatch;
         }
 
         if (match) {
