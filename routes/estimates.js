@@ -4,6 +4,7 @@ const express = require('express');
 const router = express.Router();
 const { requirePermission, requireAuth } = require('../middleware/permissionMiddleware');
 const { idempotent, setPool: setIdempotencyPool } = require('../middleware/idempotency');
+const audit = require('../services/audit-log');
 
 let pool;
 
@@ -613,6 +614,18 @@ router.post('/:id/record-payment', requireAuth, idempotent('estimate.record-paym
         `, [invoiceId, amount, payment_method, payment_reference || null, req.user.id,
             `Payment for Estimate #${est.estimate_number}`]);
 
+        await audit.record(req, {
+            action: 'estimate.payment.record',
+            entity_type: 'estimate',
+            entity_id: req.params.id,
+            before: { payment_amount: prevPaid, payment_status: est.payment_status, balance: balance },
+            after: {
+                payment_amount: newTotalPaid, payment_status: paymentStatus, balance_due: balanceDue,
+                amount, payment_method, payment_reference: payment_reference || null,
+                invoice_id: invoiceId,
+            },
+        });
+
         // Send receipt via WhatsApp
         let whatsappSent = false;
         if (send_whatsapp && phone) {
@@ -878,6 +891,19 @@ router.post('/', requirePermission('estimates', 'add'), idempotent('estimate.cre
             await pool.query(ITEM_INSERT_SQL, [buildItemValues(estimateId, processedItems)]);
         }
 
+        await audit.record(req, {
+            action: 'estimate.create',
+            entity_type: 'estimate',
+            entity_id: estimateId,
+            before: null,
+            after: {
+                estimate_number: estimateNumber,
+                customer_name, customer_phone, branch_id: branch_id || null,
+                grand_total: totals.grand_total, status: status || 'draft',
+                item_count: processedItems.length,
+            },
+        });
+
         res.json({ success: true, id: estimateId, estimate_number: estimateNumber, message: 'Estimate created successfully' });
     } catch (err) {
         console.error('Create estimate error:', err);
@@ -896,6 +922,14 @@ router.put('/:id', requirePermission('estimates', 'edit'), async (req, res) => {
             show_gst_breakdown, column_visibility, show_description_only,
             notes, admin_notes, branch_id, items
         } = req.body;
+
+        // Capture before snapshot (header + items) for audit trail
+        const [beforeRows] = await pool.query('SELECT * FROM estimates WHERE id = ?', [estimateId]);
+        if (!beforeRows.length) return res.status(404).json({ error: 'Estimate not found' });
+        const [beforeItems] = await pool.query(
+            'SELECT * FROM estimate_items WHERE estimate_id = ? AND deleted_at IS NULL ORDER BY id',
+            [estimateId]
+        );
 
         // Calculate item pricing
         const processedItems = processItems(items);
@@ -928,6 +962,20 @@ router.put('/:id', requirePermission('estimates', 'edit'), async (req, res) => {
             await pool.query(ITEM_INSERT_SQL, [buildItemValues(estimateId, processedItems)]);
         }
 
+        await audit.record(req, {
+            action: 'estimate.update',
+            entity_type: 'estimate',
+            entity_id: estimateId,
+            before: { header: beforeRows[0], items: beforeItems },
+            after: {
+                header: {
+                    customer_name, customer_phone, branch_id: branch_id || null,
+                    grand_total: totals.grand_total,
+                },
+                items: processedItems,
+            },
+        });
+
         res.json({ success: true, message: 'Estimate updated successfully' });
     } catch (err) {
         console.error('Update estimate error:', err);
@@ -946,6 +994,15 @@ router.delete('/:id', requirePermission('estimates', 'delete'), async (req, res)
 
         await pool.query('DELETE FROM estimate_items WHERE estimate_id = ?', [estimateId]);
         await pool.query('DELETE FROM estimates WHERE id = ?', [estimateId]);
+
+        await audit.record(req, {
+            action: 'estimate.delete',
+            entity_type: 'estimate',
+            entity_id: estimateId,
+            before: estimate[0],
+            after: null,
+        });
+
         res.json({ success: true, message: 'Estimate deleted successfully' });
     } catch (err) {
         res.status(500).json({ error: err.message });
@@ -980,6 +1037,14 @@ router.patch('/:id/status', requirePermission('estimates', 'edit'), async (req, 
             'INSERT INTO estimate_status_history (estimate_id, old_status, new_status, changed_by_user_id, reason, notes) VALUES (?, ?, ?, ?, ?, ?)',
             [estimateId, oldStatus, status, req.user.id, reason, notes]
         );
+
+        await audit.record(req, {
+            action: 'estimate.status.change',
+            entity_type: 'estimate',
+            entity_id: estimateId,
+            before: { status: oldStatus },
+            after: { status, reason: reason || null, notes: notes || null },
+        });
 
         res.json({ success: true, message: 'Status updated successfully' });
     } catch (err) {

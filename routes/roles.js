@@ -239,13 +239,14 @@ router.put('/:id', requirePermission('roles', 'manage'), async (req, res) => {
         const { id } = req.params;
         const { display_name, description, status, price_markup_percent, default_discount_percent } = req.body;
 
-        const [roles] = await pool.query('SELECT is_system_role FROM roles WHERE id = ?', [id]);
+        const [roles] = await pool.query('SELECT * FROM roles WHERE id = ?', [id]);
         if (roles.length === 0) {
             return res.status(404).json({
                 success: false,
                 error: 'Role not found'
             });
         }
+        const before = roles[0];
 
         const updates = [];
         const params = [];
@@ -285,6 +286,15 @@ router.put('/:id', requirePermission('roles', 'manage'), async (req, res) => {
         params.push(id);
 
         await pool.query(`UPDATE roles SET ${updates.join(', ')} WHERE id = ?`, params);
+
+        const [afterRows] = await pool.query('SELECT * FROM roles WHERE id = ?', [id]);
+        await audit.record(req, {
+            action: 'role.update',
+            entity_type: 'role',
+            entity_id: id,
+            before,
+            after: afterRows[0],
+        });
 
         res.json({
             success: true,
@@ -410,6 +420,12 @@ router.put('/:id/permissions', requirePermission('roles', 'manage'), async (req,
             });
         }
 
+        const [beforePerms] = await pool.query(
+            'SELECT permission_id FROM role_permissions WHERE role_id = ?',
+            [id]
+        );
+        const beforeIds = beforePerms.map(r => r.permission_id);
+
         const connection = await pool.getConnection();
         await connection.beginTransaction();
 
@@ -426,6 +442,14 @@ router.put('/:id/permissions', requirePermission('roles', 'manage'), async (req,
 
             await connection.commit();
             connection.release();
+
+            await audit.record(req, {
+                action: 'role.permissions.replace',
+                entity_type: 'role',
+                entity_id: id,
+                before: { permission_ids: beforeIds },
+                after: { permission_ids },
+            });
 
             res.json({
                 success: true,
@@ -463,10 +487,20 @@ router.post('/:id/permissions', requirePermission('roles', 'manage'), async (req
             });
         }
 
-        await pool.query(
+        const [r] = await pool.query(
             'INSERT IGNORE INTO role_permissions (role_id, permission_id) VALUES (?, ?)',
             [id, permission_id]
         );
+
+        if (r.affectedRows > 0) {
+            await audit.record(req, {
+                action: 'role.permissions.grant',
+                entity_type: 'role',
+                entity_id: id,
+                before: null,
+                after: { permission_id },
+            });
+        }
 
         res.json({
             success: true,
@@ -490,10 +524,20 @@ router.delete('/:id/permissions/:permission_id', requirePermission('roles', 'man
     try {
         const { id, permission_id } = req.params;
 
-        await pool.query(
+        const [r] = await pool.query(
             'DELETE FROM role_permissions WHERE role_id = ? AND permission_id = ?',
             [id, permission_id]
         );
+
+        if (r.affectedRows > 0) {
+            await audit.record(req, {
+                action: 'role.permissions.revoke',
+                entity_type: 'role',
+                entity_id: id,
+                before: { permission_id },
+                after: null,
+            });
+        }
 
         res.json({
             success: true,

@@ -6131,6 +6131,12 @@ router.put('/:id', requirePermission('painters', 'manage'), async (req, res) => 
     try {
         const { full_name, email, phone, city, district, state, pincode, experience_years, specialization, notes, zoho_contact_id, assign_referral_code } = req.body;
 
+        const [beforeRows] = await pool.query(
+            'SELECT id, full_name, email, phone, city, district, state, pincode, experience_years, specialization, notes, zoho_contact_id, referred_by FROM painters WHERE id = ?',
+            [req.params.id]
+        );
+        if (!beforeRows.length) return res.status(404).json({ success: false, message: 'Painter not found' });
+
         // Handle referral code assignment
         if (assign_referral_code) {
             const code = assign_referral_code.trim().toUpperCase();
@@ -6159,6 +6165,19 @@ router.put('/:id', requirePermission('painters', 'manage'), async (req, res) => 
              card_generated_at = NULL, id_card_generated_at = NULL WHERE id = ?`,
             [full_name, email, phone, city, district, state, pincode, experience_years, specialization, notes, zoho_contact_id, req.params.id]
         );
+
+        const [afterRows] = await pool.query(
+            'SELECT id, full_name, email, phone, city, district, state, pincode, experience_years, specialization, notes, zoho_contact_id, referred_by FROM painters WHERE id = ?',
+            [req.params.id]
+        );
+        await audit.record(req, {
+            action: 'painter.update',
+            entity_type: 'painter',
+            entity_id: req.params.id,
+            before: beforeRows[0],
+            after: afterRows[0],
+        });
+
         res.json({ success: true, message: 'Painter updated' });
     } catch (error) {
         console.error('Update painter error:', error);

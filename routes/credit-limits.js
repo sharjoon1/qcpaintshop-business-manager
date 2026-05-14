@@ -436,6 +436,20 @@ router.post('/requests', requirePermission('credit_limits', 'request'), idempote
             [cust[0].branch_id || 0, req.user.id, zoho_customer_map_id, cust[0].zoho_contact_name, requested_amount, reason || null]
         );
 
+        await audit.record(req, {
+            action: 'credit_limit.request.create',
+            entity_type: 'credit_limit_request',
+            entity_id: result.insertId,
+            before: null,
+            after: {
+                zoho_customer_map_id,
+                customer_name: cust[0].zoho_contact_name,
+                requested_amount,
+                reason: reason || null,
+                requested_by: req.user.id,
+            },
+        });
+
         // Notify all admin/super_admin users
         try {
             const [admins] = await pool.query(
@@ -603,6 +617,14 @@ router.put('/requests/:id/reject', requirePermission('credit_limits', 'manage'),
             `UPDATE credit_limit_requests SET status = 'rejected', reviewed_by = ?, reviewed_at = NOW(), review_notes = ? WHERE id = ?`,
             [req.user.id, review_notes, req.params.id]
         );
+
+        await audit.record(req, {
+            action: 'credit_limit.request.reject',
+            entity_type: 'credit_limit_request',
+            entity_id: req.params.id,
+            before: r,
+            after: { ...r, status: 'rejected', reviewed_by: req.user.id, review_notes },
+        });
 
         // Notify requester
         try {

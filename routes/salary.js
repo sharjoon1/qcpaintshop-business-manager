@@ -18,6 +18,7 @@ try { sessionManager = require('../services/whatsapp-session-manager'); } catch 
 
 // Database connection (imported from main app)
 const { idempotent, setPool: setIdempotencyPool } = require('../middleware/idempotency');
+const audit = require('../services/audit-log');
 
 let pool;
 
@@ -720,6 +721,14 @@ router.post('/calculate', requireAuth, requirePermission('salary', 'manage'), as
 
         const result = await calculateSalaryForUser(user_id, month, req.user.id);
 
+        await audit.record(req, {
+            action: 'salary.calculate',
+            entity_type: 'monthly_salary',
+            entity_id: result && result.id != null ? result.id : `${user_id}:${month}`,
+            before: null,
+            after: { user_id, month, ...result },
+        });
+
         res.json({
             success: true,
             message: 'Salary calculated successfully',
@@ -790,6 +799,18 @@ router.post('/calculate-all', requireAuth, requirePermission('salary', 'manage')
                 });
             }
         }
+
+        const successCount = results.filter(r => r.success).length;
+        await audit.record(req, {
+            action: 'salary.calculate.bulk',
+            entity_type: 'monthly_salary',
+            entity_id: `bulk:${month}`,
+            before: null,
+            after: {
+                month, branch_id: branch_id || null,
+                total_users: results.length, succeeded: successCount, failed: results.length - successCount,
+            },
+        });
 
         res.json({
             success: true,
@@ -1138,8 +1159,11 @@ router.put('/monthly/:id/approve', requireAuth, requirePermission('salary', 'app
     try {
         const { notes } = req.body;
 
-        // Get salary record before update to know which user
-        const [salaryRec] = await pool.query('SELECT user_id FROM monthly_salaries WHERE id = ?', [req.params.id]);
+        // Get salary record before update (for audit + to know which user to notify)
+        const [salaryRec] = await pool.query(
+            'SELECT id, user_id, status, net_salary FROM monthly_salaries WHERE id = ?',
+            [req.params.id]
+        );
 
         await pool.query(`
             UPDATE monthly_salaries
@@ -1149,6 +1173,14 @@ router.put('/monthly/:id/approve', requireAuth, requirePermission('salary', 'app
                 notes = CONCAT(COALESCE(notes, ''), '\n\nApproval: ', ?)
             WHERE id = ?
         `, [req.user.id, notes || 'Approved', req.params.id]);
+
+        await audit.record(req, {
+            action: 'salary.approve',
+            entity_type: 'monthly_salary',
+            entity_id: req.params.id,
+            before: salaryRec[0] || null,
+            after: { ...(salaryRec[0] || {}), status: 'approved', approved_by: req.user.id, approval_notes: notes || 'Approved' },
+        });
 
         // Notify user salary approved
         if (salaryRec.length > 0) {
@@ -1277,7 +1309,7 @@ router.post('/payments', requireAuth, requirePermission('salary', 'manage'), ide
         }
         
         await pool.query(`
-            UPDATE monthly_salaries 
+            UPDATE monthly_salaries
             SET paid_amount = ?,
                 payment_status = ?,
                 payment_date = ?,
@@ -1286,7 +1318,19 @@ router.post('/payments', requireAuth, requirePermission('salary', 'manage'), ide
                 status = CASE WHEN status = 'calculated' THEN 'approved' ELSE status END
             WHERE id = ?
         `, [totalPaid, paymentStatus, payment_date, payment_method, payment_reference, monthly_salary_id]);
-        
+
+        await audit.record(req, {
+            action: 'salary.payment.create',
+            entity_type: 'salary_payment',
+            entity_id: result.insertId,
+            before: { paid_amount: parseFloat(currentSalary[0].paid_amount), net_salary: netSalary },
+            after: {
+                payment_id: result.insertId, monthly_salary_id, user_id, payment_date,
+                amount_paid, payment_method, payment_reference, transaction_id,
+                total_paid: totalPaid, payment_status: paymentStatus,
+            },
+        });
+
         // Notify user of payment
         try {
             await notificationService.send(user_id, {
