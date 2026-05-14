@@ -226,6 +226,24 @@
             flex-direction: column;
             gap: 6px;
         }
+        .product-card .thumb-wrap {
+            width: 100%;
+            aspect-ratio: 4 / 3;
+            background: linear-gradient(135deg, #f1f5f9, #e2e8f0);
+            border-radius: 8px;
+            overflow: hidden;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #cbd5e1;
+            font-size: 1.6rem;
+        }
+        .product-card .thumb-wrap img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            display: block;
+        }
         .product-card.added {
             background: #f0fdf4;
             border-color: #86efac;
@@ -578,6 +596,13 @@
                 <div style="font-size:0.65rem; color:#94a3b8; margin-top:4px;" id="reqSearchHint">
                     Tip: pick Brand or Category to browse without typing.
                 </div>
+            </div>
+
+            <!-- Stock availability chips -->
+            <div class="filter-tabs" id="reqStockChips" style="margin:6px 0 10px;">
+                <button type="button" class="filter-tab active" data-stock="all">All</button>
+                <button type="button" class="filter-tab" data-stock="in_stock">In Stock</button>
+                <button type="button" class="filter-tab" data-stock="zero">Zero Stock</button>
             </div>
 
             <!-- Catalog-style product grid -->
@@ -1705,8 +1730,22 @@ function clearReqFilters() {
     document.getElementById('reqBrand').value = '';
     document.getElementById('reqCategory').value = '';
     document.getElementById('reqSearch').value = '';
+    // Reset stock chip to "All"
+    document.querySelectorAll('#reqStockChips .filter-tab').forEach(btn => {
+        btn.classList.toggle('active', btn.getAttribute('data-stock') === 'all');
+    });
     loadFilterOptions().then(() => searchRequestProducts(true));
 }
+
+// Stock-availability chip clicks
+document.addEventListener('click', (e) => {
+    const chip = e.target.closest('#reqStockChips .filter-tab');
+    if (!chip) return;
+    const chips = chip.parentElement.querySelectorAll('.filter-tab');
+    chips.forEach(c => c.classList.remove('active'));
+    chip.classList.add('active');
+    searchRequestProducts(true);
+});
 
 function renderProductCard(item) {
     const id = escAttr(item.zoho_item_id);
@@ -1729,8 +1768,16 @@ function renderProductCard(item) {
         lastLine = '<span style="color:#dc2626;">Never checked</span>';
     }
 
+    // Thumbnail — image_url comes from zoho_items_map. Fall back to a placeholder
+    // icon when missing or when the URL 404s (handled by onerror).
+    const thumb = item.image_url
+        ? `<img src="${escAttr(item.image_url)}" alt="" loading="lazy"
+                onerror="this.parentElement.innerHTML='&#128230;'">`
+        : '&#128230;';
+
     return `
         <div class="product-card${already ? ' added' : ''}" data-card-id="${id}">
+            <div class="thumb-wrap">${thumb}</div>
             <div class="name" title="${escAttr(item.item_name)}">${escHtml(item.item_name)}</div>
             <div class="meta">
                 ${item.sku ? '<span>' + escHtml(item.sku) + '</span>' : ''}
@@ -1791,10 +1838,13 @@ function searchRequestProducts(force) {
     const delay = force ? 0 : 300;
     searchTimeout = setTimeout(async () => {
         const locationId = document.getElementById('reqLocation').value;
+        const stockChip = document.querySelector('#reqStockChips .filter-tab.active');
+        const stockStatus = stockChip ? stockChip.getAttribute('data-stock') : 'all';
         const params = [];
         if (q) params.push('search=' + encodeURIComponent(q));
         if (brand) params.push('brand=' + encodeURIComponent(brand));
         if (category) params.push('category=' + encodeURIComponent(category));
+        if (stockStatus && stockStatus !== 'all') params.push('stock_status=' + encodeURIComponent(stockStatus));
         if (locationId) params.push('zoho_location_id=' + encodeURIComponent(locationId));
         if (userBranchId) params.push('branch_id=' + userBranchId);
         params.push('limit=100');

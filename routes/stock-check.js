@@ -1273,11 +1273,12 @@ router.get('/products/suggest', requirePermission('zoho', 'stock_check'), async 
 // ========================================
 
 /** GET /api/stock-check/products/search — Search products with last-checked info
- *  Optional filters: search (>=2 chars), brand, category. At least one of those
- *  must be provided so we don't dump the entire catalogue. */
+ *  Optional filters: search (>=2 chars), brand, category, stock_status.
+ *  At least one of search/brand/category must be provided so we don't
+ *  dump the entire catalogue. */
 router.get('/products/search', requireAuth, async (req, res) => {
     try {
-        const { search, brand, category, zoho_location_id, branch_id, limit: lim = 50 } = req.query;
+        const { search, brand, category, stock_status, zoho_location_id, branch_id, limit: lim = 50 } = req.query;
 
         const hasSearch = typeof search === 'string' && search.trim().length >= 2;
         const hasBrand = typeof brand === 'string' && brand.trim() !== '';
@@ -1322,6 +1323,11 @@ router.get('/products/search', requireAuth, async (req, res) => {
             where.push('zim.zoho_category_name = ?');
             params.push(category.trim());
         }
+        if (stock_status === 'in_stock') {
+            where.push('ls.stock_on_hand > 0');
+        } else if (stock_status === 'zero') {
+            where.push('ls.stock_on_hand <= 0');
+        }
 
         const safeLimit = Math.min(parseInt(lim) || 50, 200);
         params.push(safeLimit);
@@ -1332,6 +1338,7 @@ router.get('/products/search', requireAuth, async (req, res) => {
         const [rows] = await pool.query(
             `SELECT ls.zoho_item_id, ls.item_name, ls.sku, ls.stock_on_hand,
                     zim.zoho_brand AS brand, zim.zoho_category_name AS category,
+                    zim.image_url AS image_url,
                     latest.last_checked, latest.last_checked_by
              FROM zoho_location_stock ls
              LEFT JOIN zoho_items_map zim ON ls.zoho_item_id = zim.zoho_item_id COLLATE utf8mb4_unicode_ci
