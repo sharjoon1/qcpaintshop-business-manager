@@ -304,7 +304,7 @@ async function loadData() {
         document.getElementById('summarySection').style.display = '';
         document.getElementById('actionSection').style.display = 'flex';
     } catch (err) {
-        document.getElementById('loadingState').innerHTML = '<div class="text-red-500">Error: ' + err.message + '</div>';
+        document.getElementById('loadingState').innerHTML = '<div class="text-red-500">Error: ' + esc(err.message) + '</div>';
         showToast('Failed to load data: ' + err.message, 'error');
     }
 }

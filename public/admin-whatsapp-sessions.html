@@ -448,7 +448,7 @@ function renderQR(branchId, qrData) {
 
         container.appendChild(canvas);
     } catch (err) {
-        container.innerHTML = `<div class="text-xs text-red-500">Failed to render QR: ${err.message}</div>`;
+        container.innerHTML = `<div class="text-xs text-red-500">Failed to render QR: ${escHtml(err.message)}</div>`;
     }
 }
 

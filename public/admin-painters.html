@@ -1579,7 +1579,7 @@
             const pb = document.getElementById('pendingBadge');
             if (pb) { if (pendingCount > 0) { pb.textContent = pendingCount; pb.style.display = 'inline'; } else pb.style.display = 'none'; }
         } catch (err) {
-            document.getElementById('paintersTableBody').innerHTML = `<tr><td colspan="10" class="text-center py-4 text-red-500">${err.message}</td></tr>`;
+            document.getElementById('paintersTableBody').innerHTML = `<tr><td colspan="10" class="text-center py-4 text-red-500">${esc(err.message)}</td></tr>`;
             const ml = document.getElementById('paintersMobileList');
             if (ml) ml.innerHTML = `<div class="painter-card" style="color:#ef4444;text-align:center;padding:1rem;">${esc(err.message)}</div>`;
         }
@@ -1940,7 +1940,7 @@
                     <td class="text-xs">${(t.source || '').replace(/_/g, ' ')}</td>
                     <td class="text-xs">${esc(t.description || '-')}</td>
                 </tr>`).join('')}</tbody></table>`;
-        } catch (err) { container.innerHTML = '<p class="text-red-500 text-sm">Error loading: ' + err.message + '</p>'; }
+        } catch (err) { container.innerHTML = '<p class="text-red-500 text-sm">Error loading: ' + esc(err.message) + '</p>'; }
     }
 
     async function updateCredit(painterId, enabled) {
@@ -2072,7 +2072,7 @@
             renderGroupedRatesTable(allGroupedProducts);
             renderUnmappedSection(allUnmappedItems);
         } catch (err) {
-            document.getElementById('ratesTableBody').innerHTML = `<tr><td colspan="9" class="text-center py-4 text-red-500">${err.message}</td></tr>`;
+            document.getElementById('ratesTableBody').innerHTML = `<tr><td colspan="9" class="text-center py-4 text-red-500">${esc(err.message)}</td></tr>`;
         }
     }
 
@@ -2154,7 +2154,7 @@
                 if (!data.success) throw new Error(data.message);
                 expandedProducts[productId] = data.variants;
             } catch (err) {
-                variantsDiv.innerHTML = `<p class="text-xs text-red-500 py-2">${err.message}</p>`;
+                variantsDiv.innerHTML = `<p class="text-xs text-red-500 py-2">${esc(err.message)}</p>`;
                 return;
             }
         }
@@ -2365,7 +2365,7 @@
                 </tr>
             `).join('');
         } catch (err) {
-            document.getElementById('slabsTableBody').innerHTML = `<tr><td colspan="7" class="text-center py-4 text-red-500">${err.message}</td></tr>`;
+            document.getElementById('slabsTableBody').innerHTML = `<tr><td colspan="7" class="text-center py-4 text-red-500">${esc(err.message)}</td></tr>`;
         }
     }
 

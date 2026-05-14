@@ -785,7 +785,7 @@
             // Also populate the branch filter
             populateBranchFilter([]);
         } catch (err) {
-            document.getElementById('branchesLoading').innerHTML = '<p class="text-red-500">Failed to load: ' + err.message + '</p>';
+            document.getElementById('branchesLoading').innerHTML = '<p class="text-red-500">Failed to load: ' + escHtml(err.message) + '</p>';
         }
     }
 
@@ -869,7 +869,7 @@
             document.getElementById('categoriesTable').classList.remove('hidden');
             renderCategoriesTable();
         } catch (err) {
-            document.getElementById('categoriesLoading').innerHTML = '<p class="text-red-500">Failed to load: ' + err.message + '</p>';
+            document.getElementById('categoriesLoading').innerHTML = '<p class="text-red-500">Failed to load: ' + escHtml(err.message) + '</p>';
         }
     }
 
