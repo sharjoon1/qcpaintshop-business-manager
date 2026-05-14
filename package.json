@@ -13,7 +13,13 @@
     "test:coverage": "jest --coverage",
     "build:css": "tailwindcss -i ./src/tailwind-input.css -o ./public/css/tailwind.css --minify",
     "watch:css": "tailwindcss -i ./src/tailwind-input.css -o ./public/css/tailwind.css --watch",
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix",
+    "prepare": "husky",
     "postinstall": "npm run build:css || echo '[postinstall] build:css failed (non-fatal)'"
+  },
+  "lint-staged": {
+    "*.{js,mjs}": "eslint --fix"
   },
   "keywords": [],
   "author": "",
@@ -45,7 +51,11 @@
     "zod": "^4.3.6"
   },
   "devDependencies": {
+    "eslint": "^9.39.4",
+    "globals": "^17.6.0",
+    "husky": "^9.1.7",
     "jest": "^30.2.0",
+    "lint-staged": "^17.0.4",
     "tailwindcss": "^3.4.19"
   }
 }
