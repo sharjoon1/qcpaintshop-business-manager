@@ -11,16 +11,19 @@ const nodemailer = require('nodemailer');
 
 function createTransporter() {
     if (!process.env.SMTP_HOST) return null;
-    return nodemailer.createTransport({
+    // Local loopback sendmail (SMTP_USER unset) won't accept AUTH. Drop the auth
+    // block entirely in that case — passing an empty user/pass makes nodemailer
+    // attempt CRAM-MD5 and fail with "Missing credentials".
+    const cfg = {
         host: process.env.SMTP_HOST,
         port: parseInt(process.env.SMTP_PORT || '587'),
         secure: parseInt(process.env.SMTP_PORT || '587') === 465 || process.env.SMTP_SECURE === 'true',
-        auth: {
-            user: process.env.SMTP_USER,
-            pass: process.env.SMTP_PASSWORD
-        },
-        tls: { rejectUnauthorized: false }
-    });
+        tls: { rejectUnauthorized: false },
+    };
+    if (process.env.SMTP_USER) {
+        cfg.auth = { user: process.env.SMTP_USER, pass: process.env.SMTP_PASSWORD };
+    }
+    return nodemailer.createTransport(cfg);
 }
 
 function getMailFrom() {

@@ -658,13 +658,14 @@ app.post('/api/auth/forgot-password', authLimiter, async (req, res) => {
             const baseUrl = process.env.APP_PUBLIC_URL || 'https://act.qcpaintshop.com';
             const resetLink = `${baseUrl}/reset-password.html?token=${rawToken}`;
 
-            const transporter = nodemailer.createTransport({
+            const _smtpCfg = {
                 host: process.env.SMTP_HOST,
                 port: parseInt(process.env.SMTP_PORT || '587'),
                 secure: parseInt(process.env.SMTP_PORT || '587') === 465 || process.env.SMTP_SECURE === 'true',
-                auth: { user: process.env.SMTP_USER, pass: process.env.SMTP_PASSWORD },
-                tls: { rejectUnauthorized: false }
-            });
+                tls: { rejectUnauthorized: false },
+            };
+            if (process.env.SMTP_USER) _smtpCfg.auth = { user: process.env.SMTP_USER, pass: process.env.SMTP_PASSWORD };
+            const transporter = nodemailer.createTransport(_smtpCfg);
 
             await transporter.sendMail({
                 from: `"${process.env.MAIL_FROM_NAME || 'Quality Colours'}" <${process.env.MAIL_FROM || process.env.SMTP_USER}>`,
@@ -872,12 +873,13 @@ app.post('/api/otp/send', otpLimiter, async (req, res) => {
         // For Staff Registration, also send OTP via email
         if (purpose === 'Staff Registration' && req.body.email && process.env.SMTP_HOST) {
             try {
-                const transporter = nodemailer.createTransport({
+                const _smtpCfg = {
                     host: process.env.SMTP_HOST,
                     port: parseInt(process.env.SMTP_PORT || '587'),
                     secure: parseInt(process.env.SMTP_PORT || '587') === 465 || process.env.SMTP_SECURE === 'true',
-                    auth: { user: process.env.SMTP_USER, pass: process.env.SMTP_PASSWORD }
-                });
+                };
+                if (process.env.SMTP_USER) _smtpCfg.auth = { user: process.env.SMTP_USER, pass: process.env.SMTP_PASSWORD };
+                const transporter = nodemailer.createTransport(_smtpCfg);
                 await transporter.sendMail({
                     from: `"${process.env.MAIL_FROM_NAME || 'Quality Colours'}" <${process.env.MAIL_FROM || process.env.SMTP_USER}>`,
                     to: req.body.email,
@@ -1036,12 +1038,13 @@ app.post('/api/otp/resend', otpLimiter, async (req, res) => {
         // For Staff Registration, also resend OTP via email
         if (purpose === 'Staff Registration' && req.body.email && process.env.SMTP_HOST) {
             try {
-                const transporter = nodemailer.createTransport({
+                const _smtpCfg = {
                     host: process.env.SMTP_HOST,
                     port: parseInt(process.env.SMTP_PORT || '587'),
                     secure: parseInt(process.env.SMTP_PORT || '587') === 465 || process.env.SMTP_SECURE === 'true',
-                    auth: { user: process.env.SMTP_USER, pass: process.env.SMTP_PASSWORD }
-                });
+                };
+                if (process.env.SMTP_USER) _smtpCfg.auth = { user: process.env.SMTP_USER, pass: process.env.SMTP_PASSWORD };
+                const transporter = nodemailer.createTransport(_smtpCfg);
                 await transporter.sendMail({
                     from: `"${process.env.MAIL_FROM_NAME || 'Quality Colours'}" <${process.env.MAIL_FROM || process.env.SMTP_USER}>`,
                     to: req.body.email,
