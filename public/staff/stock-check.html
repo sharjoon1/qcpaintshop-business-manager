@@ -474,12 +474,33 @@
                 </select>
             </div>
 
+            <!-- Brand + Category filter row -->
+            <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-bottom:10px;">
+                <div>
+                    <label style="font-size:0.75rem; font-weight:600; color:#475569; display:block; margin-bottom:4px;">Brand</label>
+                    <select id="reqBrand" onchange="searchRequestProducts(true)"
+                            style="width:100%; padding:9px 10px; border:2px solid #e2e8f0; border-radius:10px; font-size:0.8rem; outline:none; background:white;">
+                        <option value="">All brands</option>
+                    </select>
+                </div>
+                <div>
+                    <label style="font-size:0.75rem; font-weight:600; color:#475569; display:block; margin-bottom:4px;">Category</label>
+                    <select id="reqCategory" onchange="searchRequestProducts(true)"
+                            style="width:100%; padding:9px 10px; border:2px solid #e2e8f0; border-radius:10px; font-size:0.8rem; outline:none; background:white;">
+                        <option value="">All categories</option>
+                    </select>
+                </div>
+            </div>
+
             <!-- Product search -->
             <div style="margin-bottom:12px; position:relative;">
                 <label style="font-size:0.75rem; font-weight:600; color:#475569; display:block; margin-bottom:4px;">Search Products</label>
-                <input type="text" id="reqSearch" placeholder="Type product name or SKU..."
+                <input type="text" id="reqSearch" placeholder="Type product name or SKU (or pick a filter above)..."
                        style="width:100%; padding:10px 12px; border:2px solid #e2e8f0; border-radius:10px; font-size:0.85rem; outline:none;"
                        oninput="searchRequestProducts()" autocomplete="off">
+                <div style="font-size:0.65rem; color:#94a3b8; margin-top:4px;" id="reqSearchHint">
+                    Tip: pick Brand or Category to browse without typing.
+                </div>
                 <div id="reqSearchResults" class="search-results" style="display:none"></div>
             </div>
 
@@ -1519,45 +1540,111 @@ async function initSelfRequest() {
 
         if (locData.success && locData.data && locData.data.length > 1) {
             const locSel = document.getElementById('reqLocation');
-            locSel.innerHTML = locData.data.map(l => `<option value="${l.zoho_location_id}">${l.zoho_location_name}</option>`).join('');
+            locSel.innerHTML = locData.data.map(l => `<option value="${escAttr(l.zoho_location_id)}">${escHtml(l.zoho_location_name)}</option>`).join('');
             document.getElementById('locationSection').style.display = '';
+            locSel.addEventListener('change', loadFilterOptions);
         }
+
+        // Load brand/category dropdowns for this location
+        await loadFilterOptions();
     } catch (err) {
         console.error('Init self-request error:', err);
     }
 }
 
-function searchRequestProducts() {
+// Tiny escapers — keep inline so the page is self-contained
+function escHtml(s) {
+    return String(s == null ? '' : s).replace(/[&<>"']/g, c => ({
+        '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+    })[c]);
+}
+function escAttr(s) { return escHtml(s); }
+
+let reqCachedItems = {}; // { zoho_item_id: { item_name, sku, stock_on_hand, last_checked, brand, category } }
+
+async function loadFilterOptions() {
+    const brandSel = document.getElementById('reqBrand');
+    const catSel = document.getElementById('reqCategory');
+    if (!brandSel || !catSel) return;
+
+    const locationId = document.getElementById('reqLocation').value;
+    let url = API + '/products/filter-options';
+    const params = [];
+    if (locationId) params.push('zoho_location_id=' + encodeURIComponent(locationId));
+    if (userBranchId) params.push('branch_id=' + userBranchId);
+    if (params.length) url += '?' + params.join('&');
+
+    try {
+        const res = await fetch(url, { headers: headers() });
+        const data = await res.json();
+        if (!data.success) return;
+
+        const prevBrand = brandSel.value;
+        const prevCat = catSel.value;
+        brandSel.innerHTML = '<option value="">All brands</option>' +
+            (data.brands || []).map(b => `<option value="${escAttr(b)}">${escHtml(b)}</option>`).join('');
+        catSel.innerHTML = '<option value="">All categories</option>' +
+            (data.categories || []).map(c => `<option value="${escAttr(c)}">${escHtml(c)}</option>`).join('');
+
+        // Restore selection if still present
+        if (prevBrand && Array.from(brandSel.options).some(o => o.value === prevBrand)) brandSel.value = prevBrand;
+        if (prevCat && Array.from(catSel.options).some(o => o.value === prevCat)) catSel.value = prevCat;
+    } catch (e) {
+        console.error('Load filter options error:', e);
+    }
+}
+
+function searchRequestProducts(force) {
     clearTimeout(searchTimeout);
     const q = document.getElementById('reqSearch').value.trim();
+    const brand = document.getElementById('reqBrand').value;
+    const category = document.getElementById('reqCategory').value;
     const container = document.getElementById('reqSearchResults');
-    if (q.length < 2) { container.style.display = 'none'; return; }
 
+    // Need either >=2 chars OR a brand/category filter to fire a query
+    const canBrowse = !!(brand || category);
+    if (!canBrowse && q.length < 2) { container.style.display = 'none'; return; }
+
+    const delay = force ? 0 : 300;
     searchTimeout = setTimeout(async () => {
         const locationId = document.getElementById('reqLocation').value;
-        let url = API + '/products/search?search=' + encodeURIComponent(q);
-        if (locationId) url += '&zoho_location_id=' + encodeURIComponent(locationId);
-        if (userBranchId) url += '&branch_id=' + userBranchId;
+        const params = [];
+        if (q) params.push('search=' + encodeURIComponent(q));
+        if (brand) params.push('brand=' + encodeURIComponent(brand));
+        if (category) params.push('category=' + encodeURIComponent(category));
+        if (locationId) params.push('zoho_location_id=' + encodeURIComponent(locationId));
+        if (userBranchId) params.push('branch_id=' + userBranchId);
+        const url = API + '/products/search?' + params.join('&');
 
         try {
             const res = await fetch(url, { headers: headers() });
             const data = await res.json();
 
             if (data.success && data.data && data.data.length) {
-                container.innerHTML = data.data
-                    .filter(item => !reqSelectedItems.find(s => s.zoho_item_id === item.zoho_item_id))
-                    .map(item => `
-                        <div class="search-result-item" onclick="addRequestProduct('${item.zoho_item_id}', '${(item.item_name || '').replace(/'/g, "\\'")}', '${(item.sku || '').replace(/'/g, "\\'")}', ${item.stock_on_hand || 0}, ${item.last_checked ? "'" + item.last_checked + "'" : 'null'})">
-                            <div style="display:flex; justify-content:space-between; align-items:center;">
-                                <div>
-                                    <span style="font-weight:600;">${item.item_name}</span>
-                                    <span style="color:#94a3b8; font-size:0.7rem; margin-left:4px;">${item.sku || ''}</span>
+                const filtered = data.data.filter(item => !reqSelectedItems.find(s => s.zoho_item_id === item.zoho_item_id));
+
+                // Cache full item rows so click handler can find them by id
+                for (const it of filtered) reqCachedItems[it.zoho_item_id] = it;
+
+                if (!filtered.length) {
+                    container.innerHTML = '<div style="padding:12px; text-align:center; color:#94a3b8; font-size:0.8rem;">All matching items already added below</div>';
+                } else {
+                    container.innerHTML = filtered.map(item => {
+                        const meta = [item.brand, item.category].filter(Boolean).map(escHtml).join(' &middot; ');
+                        return `
+                            <div class="search-result-item" data-item-id="${escAttr(item.zoho_item_id)}">
+                                <div style="display:flex; justify-content:space-between; align-items:center;">
+                                    <div style="min-width:0; flex:1;">
+                                        <div style="font-weight:600; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${escHtml(item.item_name)}</div>
+                                        <div style="color:#94a3b8; font-size:0.65rem;">${escHtml(item.sku || '')}${meta ? ' &middot; ' + meta : ''}</div>
+                                    </div>
+                                    <span style="font-size:0.7rem; color:#64748b; margin-left:8px; flex-shrink:0;">Qty: ${item.stock_on_hand || 0}</span>
                                 </div>
-                                <span style="font-size:0.7rem; color:#64748b;">Qty: ${item.stock_on_hand || 0}</span>
+                                <div style="margin-top:2px;">${lastCheckedLabel(item.last_checked)}</div>
                             </div>
-                            <div style="margin-top:2px;">${lastCheckedLabel(item.last_checked)}</div>
-                        </div>
-                    `).join('');
+                        `;
+                    }).join('');
+                }
                 container.style.display = '';
             } else {
                 container.innerHTML = '<div style="padding:12px; text-align:center; color:#94a3b8; font-size:0.8rem;">No items found</div>';
@@ -1566,12 +1653,31 @@ function searchRequestProducts() {
         } catch (err) {
             container.style.display = 'none';
         }
-    }, 300);
+    }, delay);
 }
 
-function addRequestProduct(id, name, sku, qty, lastChecked) {
-    if (reqSelectedItems.find(s => s.zoho_item_id === id)) return;
-    reqSelectedItems.push({ zoho_item_id: id, item_name: name, sku: sku, stock_on_hand: qty, last_checked: lastChecked });
+// Event delegation for search-result clicks — safe against item-name special chars
+document.addEventListener('click', (e) => {
+    const row = e.target.closest('#reqSearchResults .search-result-item[data-item-id]');
+    if (!row) return;
+    const id = row.getAttribute('data-item-id');
+    const item = reqCachedItems[id];
+    if (!item) return;
+    addRequestProduct(item);
+});
+
+function addRequestProduct(item) {
+    if (!item || !item.zoho_item_id) return;
+    if (reqSelectedItems.find(s => s.zoho_item_id === item.zoho_item_id)) return;
+    reqSelectedItems.push({
+        zoho_item_id: item.zoho_item_id,
+        item_name: item.item_name,
+        sku: item.sku || '',
+        stock_on_hand: item.stock_on_hand || 0,
+        last_checked: item.last_checked || null,
+        brand: item.brand || '',
+        category: item.category || '',
+    });
     renderRequestProducts();
     document.getElementById('reqSearch').value = '';
     document.getElementById('reqSearchResults').style.display = 'none';
@@ -1593,42 +1699,65 @@ function renderRequestProducts() {
         return;
     }
 
-    el.innerHTML = reqSelectedItems.map(item => `
+    el.innerHTML = reqSelectedItems.map(item => {
+        const id = escAttr(item.zoho_item_id);
+        const meta = [item.brand, item.category].filter(Boolean).map(escHtml).join(' &middot; ');
+        return `
         <div class="item-card" style="padding:12px;">
             <div class="item-header">
-                <div>
-                    <div class="item-name">${item.item_name}</div>
-                    <div style="display:flex; gap:8px; align-items:center;">
-                        ${item.sku ? '<span class="item-sku">' + item.sku + '</span>' : ''}
+                <div style="min-width:0; flex:1;">
+                    <div class="item-name">${escHtml(item.item_name)}</div>
+                    <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
+                        ${item.sku ? '<span class="item-sku">' + escHtml(item.sku) + '</span>' : ''}
+                        ${meta ? '<span style="font-size:0.65rem; color:#94a3b8;">' + meta + '</span>' : ''}
                         ${lastCheckedLabel(item.last_checked)}
                     </div>
                 </div>
-                <div style="display:flex; align-items:center; gap:6px;">
-                    <span style="font-size:0.7rem; color:#6366f1;">Sys: ${item.stock_on_hand}</span>
-                    <button class="remove-btn" onclick="removeRequestProduct('${item.zoho_item_id}')">&times;</button>
+                <div style="display:flex; align-items:center; gap:6px; flex-shrink:0;">
+                    <span style="font-size:0.7rem; color:#6366f1;">Sys: ${escHtml(item.stock_on_hand)}</span>
+                    <button class="remove-btn" data-remove-id="${id}" type="button">&times;</button>
                 </div>
             </div>
 
             <div class="item-input-row">
                 <label>Count:</label>
-                <input type="number" step="0.01" min="0" class="qty-input" id="req-qty-${item.zoho_item_id}"
+                <input type="number" step="0.01" min="0" class="qty-input" id="req-qty-${id}"
                        placeholder="Actual count" oninput="onQtyInput(this); updateReqSubmitBtn();">
             </div>
 
             <div class="photo-row">
                 <input type="file" accept="image/*" capture="environment" class="hidden-input"
-                       id="req-file-${item.zoho_item_id}" onchange="onReqPhotoSelect(this, '${item.zoho_item_id}')">
-                <button class="photo-btn" id="req-photobtn-${item.zoho_item_id}"
-                        onclick="document.getElementById('req-file-${item.zoho_item_id}').click()">
+                       id="req-file-${id}" data-photo-id="${id}">
+                <button class="photo-btn" id="req-photobtn-${id}" data-photo-trigger="${id}" type="button">
                     <span>&#128247;</span> <span>Add Photo</span>
                 </button>
-                <img id="req-preview-${item.zoho_item_id}" class="photo-preview" style="display:none">
+                <img id="req-preview-${id}" class="photo-preview" style="display:none">
             </div>
 
-            <textarea class="notes-input" id="req-notes-${item.zoho_item_id}" rows="1" placeholder="Notes (optional)"></textarea>
+            <textarea class="notes-input" id="req-notes-${id}" rows="1" placeholder="Notes (optional)"></textarea>
         </div>
-    `).join('');
+        `;
+    }).join('');
 }
+
+// Event delegation for selected-product buttons (remove + photo trigger) — safe against IDs with special chars
+document.addEventListener('click', (e) => {
+    const removeBtn = e.target.closest('[data-remove-id]');
+    if (removeBtn) {
+        removeRequestProduct(removeBtn.getAttribute('data-remove-id'));
+        return;
+    }
+    const photoBtn = e.target.closest('[data-photo-trigger]');
+    if (photoBtn) {
+        const id = photoBtn.getAttribute('data-photo-trigger');
+        const fileInput = document.getElementById('req-file-' + id);
+        if (fileInput) fileInput.click();
+    }
+});
+document.addEventListener('change', (e) => {
+    const input = e.target.closest('input[data-photo-id]');
+    if (input) onReqPhotoSelect(input, input.getAttribute('data-photo-id'));
+});
 renderRequestProducts();
 
 function onReqPhotoSelect(input, itemId) {

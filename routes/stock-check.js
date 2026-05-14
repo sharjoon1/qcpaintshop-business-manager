@@ -1272,12 +1272,19 @@ router.get('/products/suggest', requirePermission('zoho', 'stock_check'), async 
 // PRODUCT SEARCH WITH LAST-CHECKED INFO
 // ========================================
 
-/** GET /api/stock-check/products/search — Search products with last-checked info */
+/** GET /api/stock-check/products/search — Search products with last-checked info
+ *  Optional filters: search (>=2 chars), brand, category. At least one of those
+ *  must be provided so we don't dump the entire catalogue. */
 router.get('/products/search', requireAuth, async (req, res) => {
     try {
-        const { search, zoho_location_id, branch_id, limit: lim = 20 } = req.query;
+        const { search, brand, category, zoho_location_id, branch_id, limit: lim = 50 } = req.query;
 
-        if (!search || search.length < 2) {
+        const hasSearch = typeof search === 'string' && search.trim().length >= 2;
+        const hasBrand = typeof brand === 'string' && brand.trim() !== '';
+        const hasCategory = typeof category === 'string' && category.trim() !== '';
+
+        // Require at least one filter so we don't return all rows
+        if (!hasSearch && !hasBrand && !hasCategory) {
             return res.json({ success: true, data: [] });
         }
 
@@ -1299,24 +1306,97 @@ router.get('/products/search', requireAuth, async (req, res) => {
             return res.status(400).json({ success: false, message: 'Could not determine Zoho location' });
         }
 
-        const searchTerm = '%' + search + '%';
+        const where = ['ls.zoho_location_id = ?'];
+        const params = [locationId];
+
+        if (hasSearch) {
+            const searchTerm = '%' + search.trim() + '%';
+            where.push('(ls.item_name LIKE ? OR ls.sku LIKE ?)');
+            params.push(searchTerm, searchTerm);
+        }
+        if (hasBrand) {
+            where.push('zim.zoho_brand = ?');
+            params.push(brand.trim());
+        }
+        if (hasCategory) {
+            where.push('zim.zoho_category_name = ?');
+            params.push(category.trim());
+        }
+
+        const safeLimit = Math.min(parseInt(lim) || 50, 200);
+        params.push(safeLimit);
+
         const [rows] = await pool.query(
             `SELECT ls.zoho_item_id, ls.item_name, ls.sku, ls.stock_on_hand,
+                    zim.zoho_brand AS brand, zim.zoho_category_name AS category,
                     MAX(sci.submitted_at) as last_checked
              FROM zoho_location_stock ls
+             LEFT JOIN zoho_items_map zim ON ls.zoho_item_id = zim.zoho_item_id COLLATE utf8mb4_unicode_ci
              LEFT JOIN stock_check_items sci ON ls.zoho_item_id = sci.zoho_item_id COLLATE utf8mb4_unicode_ci
                  AND sci.submitted_at IS NOT NULL
-             WHERE ls.zoho_location_id = ? AND (ls.item_name LIKE ? OR ls.sku LIKE ?)
-             GROUP BY ls.zoho_item_id, ls.item_name, ls.sku, ls.stock_on_hand
+             WHERE ${where.join(' AND ')}
+             GROUP BY ls.zoho_item_id, ls.item_name, ls.sku, ls.stock_on_hand, zim.zoho_brand, zim.zoho_category_name
              ORDER BY ls.item_name ASC
              LIMIT ?`,
-            [locationId, searchTerm, searchTerm, parseInt(lim)]
+            params
         );
 
         res.json({ success: true, data: rows });
     } catch (error) {
         console.error('Product search error:', error);
         res.status(500).json({ success: false, message: 'Failed to search products' });
+    }
+});
+
+/** GET /api/stock-check/products/filter-options — Brands & categories for staff's location.
+ *  Staff-scoped so it doesn't need the broader zoho.view permission. */
+router.get('/products/filter-options', requireAuth, async (req, res) => {
+    try {
+        const { zoho_location_id, branch_id } = req.query;
+
+        let locationId = zoho_location_id;
+        if (!locationId) {
+            const effectiveBranchId = branch_id || (await getBranchId(req.user.id));
+            if (effectiveBranchId) {
+                const [locRows] = await pool.query(
+                    'SELECT zoho_location_id FROM zoho_locations_map WHERE local_branch_id = ? AND is_active = 1 LIMIT 1',
+                    [effectiveBranchId]
+                );
+                locationId = locRows.length ? locRows[0].zoho_location_id : null;
+            }
+        }
+
+        if (!locationId) {
+            return res.json({ success: true, brands: [], categories: [] });
+        }
+
+        const [brandRows] = await pool.query(
+            `SELECT DISTINCT zim.zoho_brand AS v
+             FROM zoho_location_stock ls
+             JOIN zoho_items_map zim ON ls.zoho_item_id = zim.zoho_item_id COLLATE utf8mb4_unicode_ci
+             WHERE ls.zoho_location_id = ?
+               AND zim.zoho_brand IS NOT NULL AND zim.zoho_brand != ''
+             ORDER BY zim.zoho_brand ASC`,
+            [locationId]
+        );
+        const [catRows] = await pool.query(
+            `SELECT DISTINCT zim.zoho_category_name AS v
+             FROM zoho_location_stock ls
+             JOIN zoho_items_map zim ON ls.zoho_item_id = zim.zoho_item_id COLLATE utf8mb4_unicode_ci
+             WHERE ls.zoho_location_id = ?
+               AND zim.zoho_category_name IS NOT NULL AND zim.zoho_category_name != ''
+             ORDER BY zim.zoho_category_name ASC`,
+            [locationId]
+        );
+
+        res.json({
+            success: true,
+            brands: brandRows.map(r => r.v),
+            categories: catRows.map(r => r.v),
+        });
+    } catch (error) {
+        console.error('Filter options error:', error);
+        res.status(500).json({ success: false, message: 'Failed to load filter options' });
     }
 });
 
