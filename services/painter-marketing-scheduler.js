@@ -62,16 +62,28 @@ async function getConfig(pool, branchId, userId = null) {
 
 async function generateDailyLists(pool) {
     const [branches] = await pool.query(`SELECT id FROM branches WHERE status='active'`);
-    const stats = { branches: 0, staff: 0, assignments: 0 };
+    const stats = { branches: 0, staff: 0, skipped: 0, assignments: 0 };
     for (const br of branches) {
         stats.branches++;
+        // Exclude staff whose painter_marketing_config row has is_active=0.
+        // LEFT JOIN so users without a config row (the default case) still pass.
         const [staff] = await pool.query(
-            `SELECT id FROM users WHERE branch_id = ? AND role IN ('staff','manager') AND status = 'active'`,
+            `SELECT u.id
+             FROM users u
+             LEFT JOIN painter_marketing_config pmc
+                 ON pmc.scope = 'user' AND pmc.scope_id = u.id
+             WHERE u.branch_id = ?
+               AND u.role IN ('staff','manager')
+               AND u.status = 'active'
+               AND COALESCE(pmc.is_active, 1) = 1`,
             [br.id]
         );
         for (const s of staff) {
             stats.staff++;
             const cfg = await getConfig(pool, br.id, s.id);
+            // Defensive: getConfig merges branch + user; if user-scope row exists
+            // and is disabled, skip explicitly (in case the LEFT JOIN missed it).
+            if (cfg.is_active === 0) { stats.skipped++; continue; }
             const quota = Number(cfg.daily_quota || 10);
             const [eligible] = await pool.query(
                 `SELECT id FROM painter_leads
@@ -102,11 +114,23 @@ async function generateDailyLists(pool) {
 }
 
 async function assignNewLead(pool, painterLeadId, branchId) {
+    // Round-robin by current open-lead count, excluding staff with
+    // painter_marketing_config.is_active = 0.
     const [candidates] = await pool.query(
         `SELECT u.id, COUNT(pl.id) AS cnt
-         FROM users u LEFT JOIN painter_leads pl ON pl.assigned_to = u.id AND pl.status NOT IN ('converted','active_painter','wrong_number','duplicate')
-         WHERE u.branch_id = ? AND u.role IN ('staff','manager') AND u.status = 'active'
-         GROUP BY u.id ORDER BY cnt ASC LIMIT 1`,
+         FROM users u
+         LEFT JOIN painter_marketing_config pmc
+             ON pmc.scope = 'user' AND pmc.scope_id = u.id
+         LEFT JOIN painter_leads pl
+             ON pl.assigned_to = u.id
+             AND pl.status NOT IN ('converted','active_painter','wrong_number','duplicate')
+         WHERE u.branch_id = ?
+           AND u.role IN ('staff','manager')
+           AND u.status = 'active'
+           AND COALESCE(pmc.is_active, 1) = 1
+         GROUP BY u.id
+         ORDER BY cnt ASC
+         LIMIT 1`,
         [branchId]
     );
     if (!candidates.length) return null;
