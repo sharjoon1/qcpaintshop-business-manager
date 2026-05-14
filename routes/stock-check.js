@@ -1430,6 +1430,227 @@ router.get('/products/filter-options', requireAuth, async (req, res) => {
 });
 
 // ========================================
+// DAILY / WEEKLY / MONTHLY RECONCILIATION
+//   Driven by zoho_stock_history (every Zoho stock change is logged there)
+//   joined with stock_verifications (staff-side acknowledgement).
+// ========================================
+
+/** Helper: resolve the active Zoho location for the requesting staff */
+async function resolveStaffLocation(req) {
+    const branchId = await getBranchId(req.user.id);
+    if (!branchId) return { branchId: null, locationId: null };
+    const [locRows] = await pool.query(
+        'SELECT zoho_location_id FROM zoho_locations_map WHERE local_branch_id = ? AND is_active = 1 LIMIT 1',
+        [branchId]
+    );
+    return { branchId, locationId: locRows.length ? locRows[0].zoho_location_id : null };
+}
+
+/** Common SELECT shape used by all four list endpoints. The window functions
+ *  fold the latest stock-history row and the latest verification per item so
+ *  the card can render last-movement + last-verifier in one round-trip. */
+const RECON_SELECT = `
+    SELECT
+        ls.zoho_item_id, ls.item_name, ls.sku, ls.stock_on_hand,
+        zim.zoho_brand AS brand, zim.zoho_category_name AS category,
+        zim.image_url AS image_url,
+        hist.last_change_at, hist.last_change_amount, hist.last_change_source,
+        verify.verified_at AS last_verified_at,
+        verify.verified_by_name AS last_verified_by,
+        verify.match_status AS last_match_status,
+        DATE(verify.verified_at) AS last_verified_date
+    FROM zoho_location_stock ls
+    LEFT JOIN zoho_items_map zim ON ls.zoho_item_id = zim.zoho_item_id COLLATE utf8mb4_unicode_ci
+    LEFT JOIN (
+        SELECT zoho_item_id, zoho_location_id, recorded_at AS last_change_at,
+               change_amount AS last_change_amount, source AS last_change_source
+        FROM (
+            SELECT zoho_item_id, zoho_location_id, recorded_at, change_amount, source,
+                   ROW_NUMBER() OVER (PARTITION BY zoho_item_id, zoho_location_id ORDER BY recorded_at DESC) AS rn
+            FROM zoho_stock_history
+        ) r WHERE rn = 1
+    ) hist ON hist.zoho_item_id = ls.zoho_item_id COLLATE utf8mb4_unicode_ci AND hist.zoho_location_id = ls.zoho_location_id COLLATE utf8mb4_unicode_ci
+    LEFT JOIN (
+        SELECT zoho_item_id, zoho_location_id, verified_at, match_status, verified_by_name
+        FROM (
+            SELECT sv.zoho_item_id, sv.zoho_location_id, sv.verified_at, sv.match_status,
+                   COALESCE(u.full_name, 'Staff') AS verified_by_name,
+                   ROW_NUMBER() OVER (PARTITION BY sv.zoho_item_id, sv.zoho_location_id ORDER BY sv.verified_at DESC) AS rn
+            FROM stock_verifications sv
+            LEFT JOIN users u ON sv.verified_by = u.id
+        ) r WHERE rn = 1
+    ) verify ON verify.zoho_item_id = ls.zoho_item_id COLLATE utf8mb4_unicode_ci AND verify.zoho_location_id = ls.zoho_location_id COLLATE utf8mb4_unicode_ci
+`;
+
+/** GET /api/stock-check/reconciliation/today
+ *  Items whose stock moved today at the staff's branch. Already-verified-today
+ *  items still appear (with green tick) so staff can see what's done. */
+router.get('/reconciliation/today', requireAuth, async (req, res) => {
+    try {
+        const { locationId, branchId } = await resolveStaffLocation(req);
+        if (!locationId) return res.json({ success: true, data: [], counts: { todo: 0, done: 0 } });
+
+        const [rows] = await pool.query(
+            `${RECON_SELECT}
+             WHERE ls.zoho_location_id = ?
+               AND hist.last_change_at IS NOT NULL
+               AND hist.last_change_at >= CURDATE()
+             ORDER BY hist.last_change_at DESC
+             LIMIT 200`,
+            [locationId]
+        );
+
+        // Counts: items whose last verify is from today vs. not
+        let done = 0, todo = 0;
+        const today = new Date().toISOString().slice(0, 10);
+        for (const r of rows) {
+            const verified = r.last_verified_date && String(r.last_verified_date).startsWith(today);
+            if (verified) done++; else todo++;
+        }
+
+        res.json({ success: true, data: rows, branch_id: branchId, counts: { todo, done } });
+    } catch (error) {
+        console.error('Reconciliation/today error:', error);
+        res.status(500).json({ success: false, message: 'Failed to load today reconciliation' });
+    }
+});
+
+/** GET /api/stock-check/reconciliation/week
+ *  Items with movement in last 30 days that have NOT been verified in the
+ *  last 7 days. Catches things that quietly moved but weren't reviewed. */
+router.get('/reconciliation/week', requireAuth, async (req, res) => {
+    try {
+        const { locationId, branchId } = await resolveStaffLocation(req);
+        if (!locationId) return res.json({ success: true, data: [], counts: { todo: 0 } });
+
+        const [rows] = await pool.query(
+            `${RECON_SELECT}
+             WHERE ls.zoho_location_id = ?
+               AND hist.last_change_at IS NOT NULL
+               AND hist.last_change_at >= DATE_SUB(NOW(), INTERVAL 30 DAY)
+               AND (verify.verified_at IS NULL OR verify.verified_at < DATE_SUB(NOW(), INTERVAL 7 DAY))
+             ORDER BY hist.last_change_at DESC
+             LIMIT 200`,
+            [locationId]
+        );
+
+        res.json({ success: true, data: rows, branch_id: branchId, counts: { todo: rows.length } });
+    } catch (error) {
+        console.error('Reconciliation/week error:', error);
+        res.status(500).json({ success: false, message: 'Failed to load week reconciliation' });
+    }
+});
+
+/** GET /api/stock-check/reconciliation/month
+ *  Items with NO movement this calendar month BUT movement in the last 90
+ *  days, and not verified this month. Catches slow-movers that need a
+ *  monthly count. */
+router.get('/reconciliation/month', requireAuth, async (req, res) => {
+    try {
+        const { locationId, branchId } = await resolveStaffLocation(req);
+        if (!locationId) return res.json({ success: true, data: [], counts: { todo: 0 } });
+
+        const [rows] = await pool.query(
+            `${RECON_SELECT}
+             WHERE ls.zoho_location_id = ?
+               AND hist.last_change_at IS NOT NULL
+               AND hist.last_change_at < DATE_FORMAT(NOW(), '%Y-%m-01')
+               AND hist.last_change_at >= DATE_SUB(NOW(), INTERVAL 90 DAY)
+               AND (verify.verified_at IS NULL OR verify.verified_at < DATE_FORMAT(NOW(), '%Y-%m-01'))
+             ORDER BY hist.last_change_at DESC
+             LIMIT 200`,
+            [locationId]
+        );
+
+        res.json({ success: true, data: rows, branch_id: branchId, counts: { todo: rows.length } });
+    } catch (error) {
+        console.error('Reconciliation/month error:', error);
+        res.status(500).json({ success: false, message: 'Failed to load month reconciliation' });
+    }
+});
+
+/** GET /api/stock-check/reconciliation/stale
+ *  Items with NO movement for 3+ months at this location (dead stock). */
+router.get('/reconciliation/stale', requireAuth, async (req, res) => {
+    try {
+        const { locationId, branchId } = await resolveStaffLocation(req);
+        if (!locationId) return res.json({ success: true, data: [], counts: { todo: 0 } });
+
+        const [rows] = await pool.query(
+            `${RECON_SELECT}
+             WHERE ls.zoho_location_id = ?
+               AND ls.stock_on_hand > 0
+               AND (hist.last_change_at IS NULL OR hist.last_change_at < DATE_SUB(NOW(), INTERVAL 90 DAY))
+             ORDER BY ls.stock_on_hand DESC, ls.item_name ASC
+             LIMIT 200`,
+            [locationId]
+        );
+
+        res.json({ success: true, data: rows, branch_id: branchId, counts: { todo: rows.length } });
+    } catch (error) {
+        console.error('Reconciliation/stale error:', error);
+        res.status(500).json({ success: false, message: 'Failed to load stale items' });
+    }
+});
+
+/** POST /api/stock-check/reconciliation/verify
+ *  Body: { zoho_item_id, match_status: 'matches'|'discrepancy',
+ *          physical_stock? (required for discrepancy), notes? } */
+router.post('/reconciliation/verify', requireAuth, async (req, res) => {
+    try {
+        const { zoho_item_id, match_status, physical_stock, notes } = req.body || {};
+
+        if (!zoho_item_id || !match_status) {
+            return res.status(400).json({ success: false, message: 'zoho_item_id and match_status required' });
+        }
+        if (!['matches', 'discrepancy'].includes(match_status)) {
+            return res.status(400).json({ success: false, message: 'Invalid match_status' });
+        }
+        if (match_status === 'discrepancy' && (physical_stock === undefined || physical_stock === null || physical_stock === '')) {
+            return res.status(400).json({ success: false, message: 'physical_stock required for discrepancy' });
+        }
+
+        const { locationId, branchId } = await resolveStaffLocation(req);
+        if (!locationId) {
+            return res.status(400).json({ success: false, message: 'No Zoho location for your branch' });
+        }
+
+        // Snapshot the current system stock so the audit row stays
+        // meaningful even after future Zoho syncs change stock_on_hand.
+        const [stockRows] = await pool.query(
+            'SELECT stock_on_hand FROM zoho_location_stock WHERE zoho_item_id = ? AND zoho_location_id = ? LIMIT 1',
+            [zoho_item_id, locationId]
+        );
+        const systemStock = stockRows.length ? parseFloat(stockRows[0].stock_on_hand) : 0;
+        const physicalStock = match_status === 'discrepancy' ? parseFloat(physical_stock) : systemStock;
+        const discrepancy = physicalStock - systemStock;
+
+        const [result] = await pool.query(
+            `INSERT INTO stock_verifications
+                (zoho_item_id, zoho_location_id, branch_id, verified_by,
+                 system_stock, physical_stock, match_status, discrepancy, notes)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+            [zoho_item_id, locationId, branchId, req.user.id,
+             systemStock, physicalStock, match_status, discrepancy, notes || null]
+        );
+
+        res.json({
+            success: true,
+            data: {
+                id: result.insertId,
+                system_stock: systemStock,
+                physical_stock: physicalStock,
+                discrepancy,
+                match_status,
+            }
+        });
+    } catch (error) {
+        console.error('Reconciliation/verify error:', error);
+        res.status(500).json({ success: false, message: 'Failed to record verification' });
+    }
+});
+
+// ========================================
 // BRANCH INVENTORY (ALL ITEMS + PRICE + LAST CHECKED)
 // ========================================
 

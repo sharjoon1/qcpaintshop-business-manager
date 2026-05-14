@@ -311,6 +311,103 @@
             border-radius: 12px;
         }
 
+        /* Reconcile tab */
+        .recon-badge {
+            display: inline-block;
+            background: rgba(255,255,255,0.7);
+            color: #1e293b;
+            font-size: 0.6rem;
+            padding: 0 5px;
+            border-radius: 99px;
+            margin-left: 4px;
+            min-width: 14px;
+            font-weight: 700;
+        }
+        .filter-tab.active .recon-badge { background: rgba(255,255,255,0.25); color: white; }
+        .recon-intro {
+            font-size: 0.72rem;
+            color: #64748b;
+            background: #f8fafc;
+            border: 1px solid #e2e8f0;
+            border-radius: 8px;
+            padding: 8px 10px;
+            margin-bottom: 10px;
+        }
+        .recon-card .last-change-line {
+            font-size: 0.68rem;
+            color: #475569;
+            line-height: 1.3;
+        }
+        .recon-card .last-change-line .chg-pos { color: #059669; font-weight: 600; }
+        .recon-card .last-change-line .chg-neg { color: #dc2626; font-weight: 600; }
+        .recon-actions {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 6px;
+            margin-top: 4px;
+        }
+        .recon-btn {
+            padding: 7px 6px;
+            border: none;
+            border-radius: 8px;
+            font-size: 0.72rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: opacity 0.15s;
+        }
+        .recon-btn-match {
+            background: #059669;
+            color: white;
+        }
+        .recon-btn-diff {
+            background: #fef3c7;
+            color: #92400e;
+            border: 1px solid #fde68a;
+        }
+        .recon-btn:hover { opacity: 0.9; }
+        .recon-btn:disabled { opacity: 0.6; cursor: not-allowed; }
+        .product-card.verified-today {
+            background: #f0fdf4;
+            border-color: #86efac;
+        }
+        .product-card.verified-today .recon-actions { display: none; }
+        .verified-stamp {
+            font-size: 0.68rem;
+            color: #065f46;
+            background: #d1fae5;
+            border-radius: 6px;
+            padding: 5px 8px;
+            text-align: center;
+            font-weight: 600;
+        }
+        .verified-stamp.discrepancy { color: #92400e; background: #fef3c7; }
+        .diff-input-row {
+            display: flex;
+            gap: 6px;
+            margin-top: 4px;
+        }
+        .diff-input-row input {
+            flex: 1;
+            padding: 7px 8px;
+            border: 1.5px solid #fcd34d;
+            border-radius: 8px;
+            font-size: 0.8rem;
+            outline: none;
+            text-align: center;
+        }
+        .diff-input-row input:focus { border-color: #f59e0b; }
+        .diff-input-row button {
+            padding: 7px 12px;
+            border: none;
+            border-radius: 8px;
+            background: #92400e;
+            color: white;
+            font-size: 0.72rem;
+            font-weight: 600;
+            cursor: pointer;
+        }
+        .diff-input-row .cancel-btn { background: #94a3b8; }
+
         .last-checked-badge {
             display: inline-block;
             font-size: 0.65rem;
@@ -537,6 +634,7 @@
     <!-- Tabs -->
     <div class="tab-bar">
         <button class="tab-btn active" onclick="switchTab('assignments')">Assignments</button>
+        <button class="tab-btn" onclick="switchTab('reconcile')">Reconcile</button>
         <button class="tab-btn" onclick="switchTab('history')">History</button>
         <button class="tab-btn" onclick="switchTab('request')">New Request</button>
     </div>
@@ -545,6 +643,29 @@
     <div class="container" id="tab-assignments">
         <div class="card" style="text-align:center; padding: 40px;">
             <div style="color:#94a3b8">Loading assignments...</div>
+        </div>
+    </div>
+
+    <!-- Reconcile Tab -->
+    <div class="container" id="tab-reconcile" style="display:none">
+        <div class="card">
+            <h3 style="font-size:0.95rem; font-weight:700; color:#1e293b; margin-bottom:4px;">Daily Reconciliation</h3>
+            <p style="font-size:0.7rem; color:#94a3b8; margin-bottom:12px;">
+                Verify that what's on the shelf matches the system. Catches discrepancies before they pile up.
+            </p>
+
+            <!-- Sub-chips -->
+            <div class="filter-tabs" id="reconChips" style="margin-bottom:10px;">
+                <button type="button" class="filter-tab active" data-recon="today">Today <span class="recon-badge" id="badge-today">0</span></button>
+                <button type="button" class="filter-tab" data-recon="week">Week <span class="recon-badge" id="badge-week">0</span></button>
+                <button type="button" class="filter-tab" data-recon="month">Month <span class="recon-badge" id="badge-month">0</span></button>
+                <button type="button" class="filter-tab" data-recon="stale">3m+ Stale <span class="recon-badge" id="badge-stale">0</span></button>
+            </div>
+
+            <div id="reconIntro" class="recon-intro" style="display:none;"></div>
+            <div id="reconGrid" class="product-grid">
+                <div class="grid-loading">Loading...</div>
+            </div>
         </div>
     </div>
 
@@ -696,14 +817,17 @@ function showToast(msg, type = 'success') {
 // TAB SWITCHING
 // ========================================
 function switchTab(tab) {
-    ['assignments', 'history', 'request'].forEach(t => {
-        document.getElementById('tab-' + t).style.display = t === tab ? '' : 'none';
+    const tabs = ['assignments', 'reconcile', 'history', 'request'];
+    tabs.forEach(t => {
+        const el = document.getElementById('tab-' + t);
+        if (el) el.style.display = t === tab ? '' : 'none';
     });
     document.querySelectorAll('.tab-btn').forEach((el, i) => {
-        el.classList.toggle('active', ['assignments', 'history', 'request'][i] === tab);
+        el.classList.toggle('active', tabs[i] === tab);
     });
     if (tab === 'history') loadHistory();
     if (tab === 'request') initSelfRequest();
+    if (tab === 'reconcile') initReconcile();
 }
 
 // ========================================
@@ -2127,6 +2251,286 @@ function showNewAssignmentAlert(notification) {
 const style = document.createElement('style');
 style.textContent = '@keyframes slideDown { from { transform: translateY(-100%); } to { transform: translateY(0); } }';
 document.head.appendChild(style);
+
+// ========================================
+// RECONCILE TAB
+// ========================================
+let reconActiveSection = 'today';
+let reconInitialized = false;
+let reconCached = {}; // { item_id: row } — cached for re-render after verify
+
+const RECON_INTROS = {
+    today: 'Items that moved today at your branch. Verify before closing for the day.',
+    week: 'Last 30 days had movement but no verification in the last 7 days.',
+    month: 'Slow-movers: no transactions this month, but had some in the last 90 days.',
+    stale: '3+ months without movement. These are at highest risk of physical drift.',
+};
+
+async function initReconcile() {
+    if (!reconInitialized) {
+        reconInitialized = true;
+        // Refresh all badge counts on first open
+        refreshAllReconBadges();
+    }
+    loadReconSection(reconActiveSection);
+}
+
+async function refreshAllReconBadges() {
+    const sections = ['today', 'week', 'month', 'stale'];
+    await Promise.all(sections.map(async (s) => {
+        try {
+            const res = await fetch(API + '/reconciliation/' + s, { headers: headers() });
+            const data = await res.json();
+            const badge = document.getElementById('badge-' + s);
+            if (!badge) return;
+            const n = data.counts ? (data.counts.todo || 0) : (data.data ? data.data.length : 0);
+            badge.textContent = n;
+        } catch (e) { /* ignore */ }
+    }));
+}
+
+async function loadReconSection(section) {
+    reconActiveSection = section;
+
+    // Update chip active state
+    document.querySelectorAll('#reconChips .filter-tab').forEach(btn => {
+        btn.classList.toggle('active', btn.getAttribute('data-recon') === section);
+    });
+
+    const intro = document.getElementById('reconIntro');
+    if (intro) { intro.textContent = RECON_INTROS[section] || ''; intro.style.display = ''; }
+
+    const grid = document.getElementById('reconGrid');
+    if (grid) grid.innerHTML = '<div class="grid-loading">Loading...</div>';
+
+    try {
+        const res = await fetch(API + '/reconciliation/' + section, { headers: headers() });
+        const data = await res.json();
+        const items = (data.success && data.data) ? data.data : [];
+
+        // Update badge for current section
+        const badge = document.getElementById('badge-' + section);
+        if (badge) {
+            const n = data.counts ? (data.counts.todo || 0) : items.length;
+            badge.textContent = n;
+        }
+
+        // Cache rows by id
+        for (const it of items) reconCached[it.zoho_item_id] = it;
+
+        if (!items.length) {
+            grid.innerHTML = '<div class="grid-empty">' + emptyMsgFor(section) + '</div>';
+            return;
+        }
+
+        grid.innerHTML = items.map(renderReconCard).join('');
+    } catch (err) {
+        grid.innerHTML = '<div class="grid-empty" style="color:#ef4444;">Failed to load. Try again.</div>';
+    }
+}
+
+function emptyMsgFor(section) {
+    switch (section) {
+        case 'today': return '&#127881; Nothing to reconcile today. Either no stock moved, or you\'ve verified everything.';
+        case 'week': return '&#9989; All items moving in the last 30 days have been verified in the last week.';
+        case 'month': return '&#9989; No slow-moving stock needs attention this month.';
+        case 'stale': return '&#9989; No stock has been idle for 3+ months. Inventory is healthy.';
+        default: return 'Nothing to show.';
+    }
+}
+
+function renderReconCard(item) {
+    const id = escAttr(item.zoho_item_id);
+    const meta = [item.brand, item.category].filter(Boolean).map(escHtml).join(' &middot; ');
+    const stock = Number(item.stock_on_hand) || 0;
+    const stockClass = stock > 0 ? 'stock-pos' : 'stock-zero';
+
+    const thumb = item.image_url
+        ? `<img src="${escAttr(item.image_url)}" alt="" loading="lazy" onerror="this.parentElement.innerHTML='&#128230;'">`
+        : '&#128230;';
+
+    // "Last change" line — show source + signed amount + relative time
+    let lastChangeLine = '';
+    if (item.last_change_at) {
+        const amt = Number(item.last_change_amount) || 0;
+        const cls = amt > 0 ? 'chg-pos' : amt < 0 ? 'chg-neg' : '';
+        const sign = amt > 0 ? '+' : '';
+        const src = item.last_change_source ? escHtml(item.last_change_source) : 'change';
+        const when = relativeTime(item.last_change_at);
+        lastChangeLine = `Last move: <span class="${cls}">${sign}${amt}</span> via ${src} &middot; ${when}`;
+    } else {
+        lastChangeLine = '<span style="color:#94a3b8;">No movement on record</span>';
+    }
+
+    // Verification status for the card — for "today" section we only count "verified today" as done.
+    let verifiedToday = false;
+    if (reconActiveSection === 'today' && item.last_verified_date) {
+        const today = new Date().toISOString().slice(0, 10);
+        verifiedToday = String(item.last_verified_date).startsWith(today);
+    }
+
+    let verifyLine = '';
+    if (item.last_verified_at) {
+        const who = item.last_verified_by ? escHtml(item.last_verified_by) : 'Staff';
+        const when = relativeTime(item.last_verified_at);
+        const tone = item.last_match_status === 'discrepancy' ? 'discrepancy' : '';
+        const label = item.last_match_status === 'discrepancy' ? 'Discrepancy' : 'Verified';
+        verifyLine = `<div class="verified-stamp ${tone}">${label} by <strong>${who}</strong> &middot; ${when}</div>`;
+    }
+
+    const actionsBlock = verifiedToday
+        ? ''
+        : `<div class="recon-actions" id="recon-actions-${id}">
+                <button type="button" class="recon-btn recon-btn-match" data-recon-match="${id}">&#10003; Matches</button>
+                <button type="button" class="recon-btn recon-btn-diff" data-recon-diff="${id}">&#9888; Different</button>
+           </div>
+           <div id="recon-diff-${id}"></div>`;
+
+    return `
+        <div class="product-card recon-card${verifiedToday ? ' verified-today' : ''}" data-card-id="${id}">
+            <div class="thumb-wrap">${thumb}</div>
+            <div class="name" title="${escAttr(item.item_name)}">${escHtml(item.item_name)}</div>
+            <div class="meta">
+                ${item.sku ? '<span>' + escHtml(item.sku) + '</span>' : ''}
+                ${meta ? '<span>' + meta + '</span>' : ''}
+            </div>
+            <div class="stock-line">
+                <span class="stock-badge ${stockClass}">${stock} in stock</span>
+            </div>
+            <div class="last-change-line">${lastChangeLine}</div>
+            ${verifyLine}
+            ${actionsBlock}
+        </div>
+    `;
+}
+
+function relativeTime(dt) {
+    if (!dt) return '';
+    const d = new Date(dt);
+    if (isNaN(d.getTime())) return '';
+    const diff = Math.floor((Date.now() - d.getTime()) / 1000);
+    if (diff < 60) return 'just now';
+    if (diff < 3600) return Math.floor(diff / 60) + 'm ago';
+    if (diff < 86400) return Math.floor(diff / 3600) + 'h ago';
+    const days = Math.floor(diff / 86400);
+    if (days === 1) return 'yesterday';
+    if (days < 30) return days + 'd ago';
+    if (days < 365) return Math.floor(days / 30) + 'mo ago';
+    return Math.floor(days / 365) + 'y ago';
+}
+
+// Refresh one card in place after verify
+function refreshReconCard(id, newRow) {
+    if (newRow) reconCached[id] = { ...reconCached[id], ...newRow };
+    const card = document.querySelector(`#reconGrid .recon-card[data-card-id="${CSS.escape(id)}"]`);
+    if (!card) return;
+    const wrapper = document.createElement('div');
+    wrapper.innerHTML = renderReconCard(reconCached[id]);
+    const fresh = wrapper.firstElementChild;
+    if (fresh) card.replaceWith(fresh);
+}
+
+// Sub-chip clicks
+document.addEventListener('click', (e) => {
+    const chip = e.target.closest('#reconChips .filter-tab');
+    if (chip) {
+        loadReconSection(chip.getAttribute('data-recon'));
+    }
+
+    // "Matches" — one-tap verify
+    const matchBtn = e.target.closest('[data-recon-match]');
+    if (matchBtn) {
+        const id = matchBtn.getAttribute('data-recon-match');
+        verifyReconItem(id, 'matches');
+    }
+
+    // "Different" — show inline count input
+    const diffBtn = e.target.closest('[data-recon-diff]');
+    if (diffBtn) {
+        const id = diffBtn.getAttribute('data-recon-diff');
+        const item = reconCached[id];
+        const slot = document.getElementById('recon-diff-' + id);
+        const actions = document.getElementById('recon-actions-' + id);
+        if (!slot || !item) return;
+        slot.innerHTML = `
+            <div class="diff-input-row">
+                <input type="number" step="0.01" min="0" id="diff-qty-${escAttr(id)}"
+                       placeholder="Actual count" value="${escAttr(item.stock_on_hand)}">
+                <button type="button" data-recon-diff-save="${escAttr(id)}">Save</button>
+                <button type="button" class="cancel-btn" data-recon-diff-cancel="${escAttr(id)}">&times;</button>
+            </div>
+        `;
+        if (actions) actions.style.display = 'none';
+        const inp = document.getElementById('diff-qty-' + id);
+        if (inp) { inp.focus(); inp.select(); }
+    }
+
+    // Save discrepancy
+    const saveBtn = e.target.closest('[data-recon-diff-save]');
+    if (saveBtn) {
+        const id = saveBtn.getAttribute('data-recon-diff-save');
+        const inp = document.getElementById('diff-qty-' + id);
+        const v = inp ? inp.value : '';
+        if (v === '' || isNaN(parseFloat(v))) {
+            showToast('Enter the actual count', 'warning');
+            return;
+        }
+        verifyReconItem(id, 'discrepancy', parseFloat(v));
+    }
+
+    // Cancel discrepancy input
+    const cancelBtn = e.target.closest('[data-recon-diff-cancel]');
+    if (cancelBtn) {
+        const id = cancelBtn.getAttribute('data-recon-diff-cancel');
+        const slot = document.getElementById('recon-diff-' + id);
+        const actions = document.getElementById('recon-actions-' + id);
+        if (slot) slot.innerHTML = '';
+        if (actions) actions.style.display = '';
+    }
+});
+
+async function verifyReconItem(zohoItemId, matchStatus, physicalStock) {
+    const body = { zoho_item_id: zohoItemId, match_status: matchStatus };
+    if (matchStatus === 'discrepancy') body.physical_stock = physicalStock;
+
+    try {
+        const res = await fetch(API + '/reconciliation/verify', {
+            method: 'POST',
+            headers: { ...headers(), 'Content-Type': 'application/json' },
+            body: JSON.stringify(body),
+        });
+        const data = await res.json();
+        if (!data.success) {
+            showToast(data.message || 'Verify failed', 'error');
+            return;
+        }
+        showToast(matchStatus === 'matches' ? 'Verified — matches' : 'Discrepancy recorded');
+
+        // Optimistic in-place update
+        const userStr = localStorage.getItem('user');
+        const user = userStr ? JSON.parse(userStr) : {};
+        const whoName = user.full_name || user.name || 'You';
+        refreshReconCard(zohoItemId, {
+            last_verified_at: new Date().toISOString(),
+            last_verified_by: whoName,
+            last_match_status: matchStatus,
+            last_verified_date: new Date().toISOString().slice(0, 10),
+        });
+
+        // Refresh badge for active section after a moment
+        refreshAllReconBadges();
+    } catch (err) {
+        showToast('Network error', 'error');
+    }
+}
+
+// Real-time refresh: if another staff at the same branch verifies, re-pull when tab is active
+window.addEventListener('qc-notification', function(e) {
+    const n = e.detail;
+    if (n && n.type === 'stock_verified' && document.getElementById('tab-reconcile').style.display !== 'none') {
+        loadReconSection(reconActiveSection);
+    }
+});
 
 // ========================================
 // INIT
