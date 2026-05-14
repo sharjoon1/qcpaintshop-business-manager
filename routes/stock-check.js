@@ -1326,16 +1326,29 @@ router.get('/products/search', requireAuth, async (req, res) => {
         const safeLimit = Math.min(parseInt(lim) || 50, 200);
         params.push(safeLimit);
 
+        // latest per-item check (staff_name + when) via window-function subquery.
+        // MariaDB 10.11 supports ROW_NUMBER(). Joining the latest sci row also pulls
+        // the staff who did it, which the catalog card surfaces.
         const [rows] = await pool.query(
             `SELECT ls.zoho_item_id, ls.item_name, ls.sku, ls.stock_on_hand,
                     zim.zoho_brand AS brand, zim.zoho_category_name AS category,
-                    MAX(sci.submitted_at) as last_checked
+                    latest.last_checked, latest.last_checked_by
              FROM zoho_location_stock ls
              LEFT JOIN zoho_items_map zim ON ls.zoho_item_id = zim.zoho_item_id COLLATE utf8mb4_unicode_ci
-             LEFT JOIN stock_check_items sci ON ls.zoho_item_id = sci.zoho_item_id COLLATE utf8mb4_unicode_ci
-                 AND sci.submitted_at IS NOT NULL
+             LEFT JOIN (
+                 SELECT zoho_item_id, submitted_at AS last_checked, last_checked_by
+                 FROM (
+                     SELECT sci.zoho_item_id, sci.submitted_at,
+                            COALESCE(u.full_name, 'Staff') AS last_checked_by,
+                            ROW_NUMBER() OVER (PARTITION BY sci.zoho_item_id ORDER BY sci.submitted_at DESC) AS rn
+                     FROM stock_check_items sci
+                     INNER JOIN stock_check_assignments sca ON sci.assignment_id = sca.id
+                     LEFT JOIN users u ON sca.staff_id = u.id
+                     WHERE sci.submitted_at IS NOT NULL
+                 ) ranked
+                 WHERE rn = 1
+             ) latest ON latest.zoho_item_id = ls.zoho_item_id COLLATE utf8mb4_unicode_ci
              WHERE ${where.join(' AND ')}
-             GROUP BY ls.zoho_item_id, ls.item_name, ls.sku, ls.stock_on_hand, zim.zoho_brand, zim.zoho_category_name
              ORDER BY ls.item_name ASC
              LIMIT ?`,
             params
@@ -1349,10 +1362,11 @@ router.get('/products/search', requireAuth, async (req, res) => {
 });
 
 /** GET /api/stock-check/products/filter-options — Brands & categories for staff's location.
- *  Staff-scoped so it doesn't need the broader zoho.view permission. */
+ *  Staff-scoped so it doesn't need the broader zoho.view permission.
+ *  When ?brand=X is supplied, returned categories are scoped to that brand. */
 router.get('/products/filter-options', requireAuth, async (req, res) => {
     try {
-        const { zoho_location_id, branch_id } = req.query;
+        const { zoho_location_id, branch_id, brand } = req.query;
 
         let locationId = zoho_location_id;
         if (!locationId) {
@@ -1379,14 +1393,22 @@ router.get('/products/filter-options', requireAuth, async (req, res) => {
              ORDER BY zim.zoho_brand ASC`,
             [locationId]
         );
+
+        const catParams = [locationId];
+        let catBrandClause = '';
+        if (typeof brand === 'string' && brand.trim() !== '') {
+            catBrandClause = ' AND zim.zoho_brand = ?';
+            catParams.push(brand.trim());
+        }
         const [catRows] = await pool.query(
             `SELECT DISTINCT zim.zoho_category_name AS v
              FROM zoho_location_stock ls
              JOIN zoho_items_map zim ON ls.zoho_item_id = zim.zoho_item_id COLLATE utf8mb4_unicode_ci
              WHERE ls.zoho_location_id = ?
                AND zim.zoho_category_name IS NOT NULL AND zim.zoho_category_name != ''
+               ${catBrandClause}
              ORDER BY zim.zoho_category_name ASC`,
-            [locationId]
+            catParams
         );
 
         res.json({

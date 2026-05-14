@@ -198,23 +198,100 @@
         }
         .history-item:last-child { border-bottom: none; }
 
-        /* Self-request product search */
-        .search-results {
-            background: white;
+        /* Catalog-style product grid (self-request) */
+        .product-grid-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 0.75rem;
+            color: #64748b;
+            margin: 8px 0;
+        }
+        .product-grid-header .count { font-weight: 600; color: #1B5E3B; }
+        .product-grid {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 8px;
+            margin-bottom: 14px;
+        }
+        @media (min-width: 480px) {
+            .product-grid { grid-template-columns: 1fr 1fr; }
+        }
+        .product-card {
             border: 1px solid #e2e8f0;
-            border-radius: 0 0 12px 12px;
-            max-height: 240px;
-            overflow-y: auto;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+            border-radius: 12px;
+            padding: 10px 12px;
+            background: white;
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
         }
-        .search-result-item {
-            padding: 10px 14px;
+        .product-card.added {
+            background: #f0fdf4;
+            border-color: #86efac;
+        }
+        .product-card .name {
+            font-size: 0.82rem;
+            font-weight: 600;
+            color: #1e293b;
+            line-height: 1.25;
+            display: -webkit-box;
+            -webkit-line-clamp: 2;
+            -webkit-box-orient: vertical;
+            overflow: hidden;
+        }
+        .product-card .meta {
+            font-size: 0.65rem;
+            color: #94a3b8;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 4px 6px;
+        }
+        .product-card .stock-line {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 0.75rem;
+        }
+        .product-card .stock-badge {
+            font-weight: 700;
+            padding: 2px 8px;
+            border-radius: 6px;
+        }
+        .stock-pos { background: #eef2ff; color: #4338ca; }
+        .stock-zero { background: #fee2e2; color: #991b1b; }
+        .product-card .last-line {
+            font-size: 0.68rem;
+            color: #64748b;
+            line-height: 1.3;
+        }
+        .product-card .last-line strong { color: #1e293b; font-weight: 600; }
+        .product-card .req-btn {
+            margin-top: 4px;
+            padding: 7px 10px;
+            border: none;
+            border-radius: 8px;
+            background: linear-gradient(135deg, #1B5E3B, #154D31);
+            color: white;
+            font-size: 0.75rem;
+            font-weight: 600;
             cursor: pointer;
-            font-size: 0.8rem;
-            border-bottom: 1px solid #f1f5f9;
+            transition: opacity 0.15s;
         }
-        .search-result-item:hover { background: #f0f4ff; }
-        .search-result-item:active { background: #e0e7ff; }
+        .product-card .req-btn:hover { opacity: 0.9; }
+        .product-card.added .req-btn {
+            background: #d1fae5;
+            color: #065f46;
+            cursor: default;
+        }
+        .grid-empty, .grid-loading {
+            text-align: center;
+            padding: 24px 12px;
+            color: #94a3b8;
+            font-size: 0.8rem;
+            border: 1px dashed #e2e8f0;
+            border-radius: 12px;
+        }
 
         .last-checked-badge {
             display: inline-block;
@@ -478,7 +555,7 @@
             <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-bottom:10px;">
                 <div>
                     <label style="font-size:0.75rem; font-weight:600; color:#475569; display:block; margin-bottom:4px;">Brand</label>
-                    <select id="reqBrand" onchange="searchRequestProducts(true)"
+                    <select id="reqBrand" onchange="onBrandChange()"
                             style="width:100%; padding:9px 10px; border:2px solid #e2e8f0; border-radius:10px; font-size:0.8rem; outline:none; background:white;">
                         <option value="">All brands</option>
                     </select>
@@ -493,7 +570,7 @@
             </div>
 
             <!-- Product search -->
-            <div style="margin-bottom:12px; position:relative;">
+            <div style="margin-bottom:8px;">
                 <label style="font-size:0.75rem; font-weight:600; color:#475569; display:block; margin-bottom:4px;">Search Products</label>
                 <input type="text" id="reqSearch" placeholder="Type product name or SKU (or pick a filter above)..."
                        style="width:100%; padding:10px 12px; border:2px solid #e2e8f0; border-radius:10px; font-size:0.85rem; outline:none;"
@@ -501,7 +578,23 @@
                 <div style="font-size:0.65rem; color:#94a3b8; margin-top:4px;" id="reqSearchHint">
                     Tip: pick Brand or Category to browse without typing.
                 </div>
-                <div id="reqSearchResults" class="search-results" style="display:none"></div>
+            </div>
+
+            <!-- Catalog-style product grid -->
+            <div class="product-grid-header" id="reqGridHeader" style="display:none;">
+                <span><span class="count" id="reqGridCount">0</span> products</span>
+                <button type="button" id="reqGridClear"
+                        style="background:none; border:none; color:#64748b; font-size:0.7rem; cursor:pointer; font-weight:500;">
+                    Clear filters
+                </button>
+            </div>
+            <div id="reqProductGrid" class="product-grid">
+                <div class="grid-empty">Pick a brand or category above, or type 2+ characters to find products.</div>
+            </div>
+
+            <!-- Divider before selected section -->
+            <div id="reqSelectedHeader" style="display:none; font-size:0.8rem; font-weight:700; color:#1e293b; margin:10px 0 6px;">
+                Your Request <span id="reqSelectedCount" style="color:#1B5E3B;"></span>
             </div>
 
             <!-- Selected products -->
@@ -1560,9 +1653,9 @@ function escHtml(s) {
 }
 function escAttr(s) { return escHtml(s); }
 
-let reqCachedItems = {}; // { zoho_item_id: { item_name, sku, stock_on_hand, last_checked, brand, category } }
+let reqCachedItems = {}; // { zoho_item_id: { item_name, sku, stock_on_hand, last_checked, last_checked_by, brand, category } }
 
-async function loadFilterOptions() {
+async function loadFilterOptions(brandScope) {
     const brandSel = document.getElementById('reqBrand');
     const catSel = document.getElementById('reqCategory');
     if (!brandSel || !catSel) return;
@@ -1572,6 +1665,7 @@ async function loadFilterOptions() {
     const params = [];
     if (locationId) params.push('zoho_location_id=' + encodeURIComponent(locationId));
     if (userBranchId) params.push('branch_id=' + userBranchId);
+    if (brandScope) params.push('brand=' + encodeURIComponent(brandScope));
     if (params.length) url += '?' + params.join('&');
 
     try {
@@ -1581,29 +1675,118 @@ async function loadFilterOptions() {
 
         const prevBrand = brandSel.value;
         const prevCat = catSel.value;
-        brandSel.innerHTML = '<option value="">All brands</option>' +
-            (data.brands || []).map(b => `<option value="${escAttr(b)}">${escHtml(b)}</option>`).join('');
+
+        // Only repopulate brands on the initial (unscoped) load — repopulating
+        // when brand is selected would wipe the chosen brand from the <select>.
+        if (!brandScope) {
+            brandSel.innerHTML = '<option value="">All brands</option>' +
+                (data.brands || []).map(b => `<option value="${escAttr(b)}">${escHtml(b)}</option>`).join('');
+            if (prevBrand && Array.from(brandSel.options).some(o => o.value === prevBrand)) brandSel.value = prevBrand;
+        }
+
+        // Always refresh the category list (scoped if brandScope is set)
         catSel.innerHTML = '<option value="">All categories</option>' +
             (data.categories || []).map(c => `<option value="${escAttr(c)}">${escHtml(c)}</option>`).join('');
-
-        // Restore selection if still present
-        if (prevBrand && Array.from(brandSel.options).some(o => o.value === prevBrand)) brandSel.value = prevBrand;
         if (prevCat && Array.from(catSel.options).some(o => o.value === prevCat)) catSel.value = prevCat;
+        else catSel.value = ''; // brand changed and prev category no longer valid → reset
     } catch (e) {
         console.error('Load filter options error:', e);
     }
 }
+
+// Brand change: reload categories scoped to that brand, then re-search
+async function onBrandChange() {
+    const brand = document.getElementById('reqBrand').value;
+    await loadFilterOptions(brand || null);
+    searchRequestProducts(true);
+}
+
+function clearReqFilters() {
+    document.getElementById('reqBrand').value = '';
+    document.getElementById('reqCategory').value = '';
+    document.getElementById('reqSearch').value = '';
+    loadFilterOptions().then(() => searchRequestProducts(true));
+}
+
+function renderProductCard(item) {
+    const id = escAttr(item.zoho_item_id);
+    const meta = [item.brand, item.category].filter(Boolean).map(escHtml).join(' &middot; ');
+    const stock = Number(item.stock_on_hand) || 0;
+    const stockClass = stock > 0 ? 'stock-pos' : 'stock-zero';
+    const already = !!reqSelectedItems.find(s => s.zoho_item_id === item.zoho_item_id);
+
+    let lastLine;
+    if (item.last_checked) {
+        const days = daysAgo(item.last_checked);
+        let when;
+        if (days === 0) when = 'today';
+        else if (days === 1) when = 'yesterday';
+        else if (days != null) when = days + 'd ago';
+        else when = '';
+        const who = item.last_checked_by ? escHtml(item.last_checked_by) : 'Staff';
+        lastLine = `Checked by <strong>${who}</strong>${when ? ' &middot; ' + when : ''}`;
+    } else {
+        lastLine = '<span style="color:#dc2626;">Never checked</span>';
+    }
+
+    return `
+        <div class="product-card${already ? ' added' : ''}" data-card-id="${id}">
+            <div class="name" title="${escAttr(item.item_name)}">${escHtml(item.item_name)}</div>
+            <div class="meta">
+                ${item.sku ? '<span>' + escHtml(item.sku) + '</span>' : ''}
+                ${meta ? '<span>' + meta + '</span>' : ''}
+            </div>
+            <div class="stock-line">
+                <span class="stock-badge ${stockClass}">${stock} in stock</span>
+            </div>
+            <div class="last-line">${lastLine}</div>
+            <button type="button" class="req-btn" data-add-id="${id}" ${already ? 'disabled' : ''}>
+                ${already ? '&#10003; Added' : '+ Request Stock Check'}
+            </button>
+        </div>
+    `;
+}
+
+function renderProductGrid(items) {
+    const grid = document.getElementById('reqProductGrid');
+    const header = document.getElementById('reqGridHeader');
+    const countEl = document.getElementById('reqGridCount');
+    if (!grid) return;
+
+    if (!items || !items.length) {
+        grid.innerHTML = '<div class="grid-empty">No products match your filters. Try a different brand/category or clear filters.</div>';
+        if (header) header.style.display = 'none';
+        return;
+    }
+
+    grid.innerHTML = items.map(renderProductCard).join('');
+    if (header) {
+        header.style.display = '';
+        if (countEl) countEl.textContent = items.length;
+    }
+}
+
+let reqCurrentResults = []; // last server response, used to re-render after add/remove
 
 function searchRequestProducts(force) {
     clearTimeout(searchTimeout);
     const q = document.getElementById('reqSearch').value.trim();
     const brand = document.getElementById('reqBrand').value;
     const category = document.getElementById('reqCategory').value;
-    const container = document.getElementById('reqSearchResults');
+    const grid = document.getElementById('reqProductGrid');
+    const header = document.getElementById('reqGridHeader');
 
     // Need either >=2 chars OR a brand/category filter to fire a query
     const canBrowse = !!(brand || category);
-    if (!canBrowse && q.length < 2) { container.style.display = 'none'; return; }
+    if (!canBrowse && q.length < 2) {
+        reqCurrentResults = [];
+        if (grid) grid.innerHTML = '<div class="grid-empty">Pick a brand or category above, or type 2+ characters to find products.</div>';
+        if (header) header.style.display = 'none';
+        return;
+    }
+
+    if (grid) grid.innerHTML = '<div class="grid-loading">Loading products...</div>';
+    if (header) header.style.display = 'none';
 
     const delay = force ? 0 : 300;
     searchTimeout = setTimeout(async () => {
@@ -1614,53 +1797,43 @@ function searchRequestProducts(force) {
         if (category) params.push('category=' + encodeURIComponent(category));
         if (locationId) params.push('zoho_location_id=' + encodeURIComponent(locationId));
         if (userBranchId) params.push('branch_id=' + userBranchId);
+        params.push('limit=100');
         const url = API + '/products/search?' + params.join('&');
 
         try {
             const res = await fetch(url, { headers: headers() });
             const data = await res.json();
+            const items = (data.success && data.data) ? data.data : [];
 
-            if (data.success && data.data && data.data.length) {
-                const filtered = data.data.filter(item => !reqSelectedItems.find(s => s.zoho_item_id === item.zoho_item_id));
+            // Cache full rows by id (for the Add click handler)
+            for (const it of items) reqCachedItems[it.zoho_item_id] = it;
 
-                // Cache full item rows so click handler can find them by id
-                for (const it of filtered) reqCachedItems[it.zoho_item_id] = it;
-
-                if (!filtered.length) {
-                    container.innerHTML = '<div style="padding:12px; text-align:center; color:#94a3b8; font-size:0.8rem;">All matching items already added below</div>';
-                } else {
-                    container.innerHTML = filtered.map(item => {
-                        const meta = [item.brand, item.category].filter(Boolean).map(escHtml).join(' &middot; ');
-                        return `
-                            <div class="search-result-item" data-item-id="${escAttr(item.zoho_item_id)}">
-                                <div style="display:flex; justify-content:space-between; align-items:center;">
-                                    <div style="min-width:0; flex:1;">
-                                        <div style="font-weight:600; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${escHtml(item.item_name)}</div>
-                                        <div style="color:#94a3b8; font-size:0.65rem;">${escHtml(item.sku || '')}${meta ? ' &middot; ' + meta : ''}</div>
-                                    </div>
-                                    <span style="font-size:0.7rem; color:#64748b; margin-left:8px; flex-shrink:0;">Qty: ${item.stock_on_hand || 0}</span>
-                                </div>
-                                <div style="margin-top:2px;">${lastCheckedLabel(item.last_checked)}</div>
-                            </div>
-                        `;
-                    }).join('');
-                }
-                container.style.display = '';
-            } else {
-                container.innerHTML = '<div style="padding:12px; text-align:center; color:#94a3b8; font-size:0.8rem;">No items found</div>';
-                container.style.display = '';
-            }
+            reqCurrentResults = items;
+            renderProductGrid(items);
         } catch (err) {
-            container.style.display = 'none';
+            if (grid) grid.innerHTML = '<div class="grid-empty" style="color:#ef4444;">Failed to load products. Try again.</div>';
+            if (header) header.style.display = 'none';
         }
     }, delay);
 }
 
-// Event delegation for search-result clicks — safe against item-name special chars
+// Re-render only the card matching an id (after add/remove) without re-fetching
+function refreshProductCard(id) {
+    const card = document.querySelector(`#reqProductGrid .product-card[data-card-id="${CSS.escape(id)}"]`);
+    if (!card) return;
+    const item = reqCachedItems[id];
+    if (!item) return;
+    const wrapper = document.createElement('div');
+    wrapper.innerHTML = renderProductCard(item);
+    const fresh = wrapper.firstElementChild;
+    if (fresh) card.replaceWith(fresh);
+}
+
+// Event delegation for "+ Request" buttons on the grid
 document.addEventListener('click', (e) => {
-    const row = e.target.closest('#reqSearchResults .search-result-item[data-item-id]');
-    if (!row) return;
-    const id = row.getAttribute('data-item-id');
+    const addBtn = e.target.closest('#reqProductGrid [data-add-id]');
+    if (!addBtn) return;
+    const id = addBtn.getAttribute('data-add-id');
     const item = reqCachedItems[id];
     if (!item) return;
     addRequestProduct(item);
@@ -1675,12 +1848,12 @@ function addRequestProduct(item) {
         sku: item.sku || '',
         stock_on_hand: item.stock_on_hand || 0,
         last_checked: item.last_checked || null,
+        last_checked_by: item.last_checked_by || null,
         brand: item.brand || '',
         category: item.category || '',
     });
     renderRequestProducts();
-    document.getElementById('reqSearch').value = '';
-    document.getElementById('reqSearchResults').style.display = 'none';
+    refreshProductCard(item.zoho_item_id);
     updateReqSubmitBtn();
 }
 
@@ -1689,15 +1862,21 @@ function removeRequestProduct(id) {
     // Also remove photo
     delete reqPhotoFiles[id];
     renderRequestProducts();
+    refreshProductCard(id);
     updateReqSubmitBtn();
 }
 
 function renderRequestProducts() {
     const el = document.getElementById('reqSelectedProducts');
+    const header = document.getElementById('reqSelectedHeader');
+    const countEl = document.getElementById('reqSelectedCount');
     if (!reqSelectedItems.length) {
-        el.innerHTML = '<p style="font-size:0.75rem; color:#94a3b8; text-align:center; padding:8px;">No products selected. Search above to add items.</p>';
+        el.innerHTML = '';
+        if (header) header.style.display = 'none';
         return;
     }
+    if (header) header.style.display = '';
+    if (countEl) countEl.textContent = `(${reqSelectedItems.length})`;
 
     el.innerHTML = reqSelectedItems.map(item => {
         const id = escAttr(item.zoho_item_id);
@@ -1851,10 +2030,10 @@ async function submitSelfRequest() {
     }
 }
 
-// Close search on outside click
+// Wire "Clear filters" button
 document.addEventListener('click', (e) => {
-    if (!e.target.closest('#reqSearch') && !e.target.closest('#reqSearchResults')) {
-        document.getElementById('reqSearchResults').style.display = 'none';
+    if (e.target.closest('#reqGridClear')) {
+        clearReqFilters();
     }
 });
 
