@@ -3440,6 +3440,49 @@ app.get('/api/customer/me/estimates/:id', requireCustomerAuth, async (req, res) 
     }
 });
 
+// Customer portal — Zoho invoices for the authenticated customer.
+// Match path: req.customer.phone → zoho_customers_map.zoho_phone →
+// zoho_contact_id → zoho_invoices.zoho_customer_id. Matches against the
+// last 10 digits so +91-prefixed and bare phone numbers both line up
+// (the rest of the app already stores both forms inconsistently).
+app.get('/api/customer/me/invoices', requireCustomerAuth, async (req, res) => {
+    try {
+        const limit = Math.min(parseInt(req.query.limit) || 50, 100);
+        const [rows] = await pool.query(
+            `SELECT zi.id, zi.zoho_invoice_id, zi.invoice_number, zi.invoice_date,
+                    zi.due_date, zi.total, zi.balance, zi.status, zi.customer_name
+             FROM zoho_invoices zi
+             JOIN zoho_customers_map zcm ON zi.zoho_customer_id = zcm.zoho_contact_id
+             WHERE RIGHT(zcm.zoho_phone, 10) = RIGHT(?, 10)
+             ORDER BY zi.invoice_date DESC, zi.id DESC
+             LIMIT ?`,
+            [req.customer.phone, limit]
+        );
+        res.json({ success: true, data: rows });
+    } catch (error) {
+        console.error('Customer invoices list error:', error);
+        res.status(500).json({ success: false, message: error.message });
+    }
+});
+
+app.get('/api/customer/me/invoices/:id', requireCustomerAuth, async (req, res) => {
+    try {
+        const [rows] = await pool.query(
+            `SELECT zi.*
+             FROM zoho_invoices zi
+             JOIN zoho_customers_map zcm ON zi.zoho_customer_id = zcm.zoho_contact_id
+             WHERE zi.id = ? AND RIGHT(zcm.zoho_phone, 10) = RIGHT(?, 10)
+             LIMIT 1`,
+            [req.params.id, req.customer.phone]
+        );
+        if (!rows.length) return res.status(404).json({ success: false, message: 'Not found' });
+        res.json({ success: true, data: rows[0] });
+    } catch (error) {
+        console.error('Customer invoice detail error:', error);
+        res.status(500).json({ success: false, message: error.message });
+    }
+});
+
 // ========================================
 // CUSTOMERS
 // ========================================

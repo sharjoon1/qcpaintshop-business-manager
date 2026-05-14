@@ -221,6 +221,20 @@
             </div>
         </div>
 
+        <!-- Invoices -->
+        <div class="mt-6 bg-white rounded-lg shadow-md">
+            <div class="p-6 border-b flex items-center justify-between">
+                <h2 class="text-xl font-bold text-gray-800">🧾 Recent Invoices</h2>
+                <span class="text-xs text-gray-500" id="invoicesSubtitle">From Zoho Books</span>
+            </div>
+            <div id="recentInvoicesContainer" class="p-6">
+                <div class="text-center py-8 text-gray-400">
+                    <div class="text-4xl mb-2">⏳</div>
+                    <p>Loading invoices...</p>
+                </div>
+            </div>
+        </div>
+
         <!-- Help Section -->
         <div class="mt-6 bg-gradient-to-r from-purple-600 to-purple-700 rounded-lg shadow-lg p-8 text-white">
             <div class="text-center">
@@ -265,6 +279,7 @@
             loadCustomerInfo();
             loadStats();
             loadRecentRequests();
+            loadRecentInvoices();
 
             // Profile dropdown
             document.getElementById('profileBtn').addEventListener('click', function() {
@@ -275,6 +290,7 @@
             setInterval(() => {
                 loadStats();
                 loadRecentRequests();
+                loadRecentInvoices();
             }, 120000);
         });
 
@@ -384,6 +400,79 @@
 
         function viewRequest(requestNumber) {
             window.location = `customer-requests.html?request=${requestNumber}`;
+        }
+
+        function esc(s) {
+            return String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+        }
+
+        function fmtINR(n) {
+            const x = Number(n || 0);
+            return '₹' + x.toLocaleString('en-IN', { maximumFractionDigits: 0 });
+        }
+
+        function fmtInvoiceDate(d) {
+            if (!d) return '';
+            try {
+                return new Date(d).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
+            } catch (_) { return d; }
+        }
+
+        function invoiceStatusBadge(status) {
+            const map = {
+                paid: ['bg-green-100', 'text-green-700', 'Paid'],
+                sent: ['bg-blue-100', 'text-blue-700', 'Sent'],
+                overdue: ['bg-red-100', 'text-red-700', 'Overdue'],
+                partially_paid: ['bg-yellow-100', 'text-yellow-700', 'Partial'],
+                draft: ['bg-gray-100', 'text-gray-700', 'Draft'],
+                void: ['bg-gray-100', 'text-gray-500', 'Void'],
+            };
+            const [bg, fg, label] = map[status] || ['bg-gray-100', 'text-gray-700', status || '—'];
+            return `<span class="${bg} ${fg} px-2.5 py-1 rounded-full text-xs font-semibold">${esc(label)}</span>`;
+        }
+
+        async function loadRecentInvoices() {
+            const container = document.getElementById('recentInvoicesContainer');
+            try {
+                if (!customerPhone) {
+                    container.innerHTML = `<div class="text-center py-6 text-gray-400">Login to view invoices</div>`;
+                    return;
+                }
+                const response = await fetch(`${API_BASE}/customer/me/invoices?limit=10`, { headers: customerHeaders() });
+                if (handleAuthFailure(response)) return;
+                const result = await response.json();
+                const list = result.data || [];
+
+                if (!result.success || list.length === 0) {
+                    container.innerHTML = `
+                        <div class="text-center py-8 text-gray-400">
+                            <div class="text-4xl mb-2">🧾</div>
+                            <p>No invoices yet</p>
+                            <p class="text-xs mt-1">Your past Zoho invoices will appear here once posted.</p>
+                        </div>
+                    `;
+                    return;
+                }
+
+                container.innerHTML = list.map(inv => `
+                    <div class="border-b last:border-b-0 py-3 flex items-center justify-between gap-3">
+                        <div class="min-w-0 flex-1">
+                            <div class="font-semibold text-gray-800 truncate">${esc(inv.invoice_number || '—')}</div>
+                            <div class="text-xs text-gray-500">${fmtInvoiceDate(inv.invoice_date)}</div>
+                        </div>
+                        <div class="text-right">
+                            <div class="font-semibold text-gray-800">${fmtINR(inv.total)}</div>
+                            <div class="text-xs ${Number(inv.balance) > 0 ? 'text-red-600' : 'text-gray-500'}">
+                                ${Number(inv.balance) > 0 ? 'Balance ' + fmtINR(inv.balance) : 'Settled'}
+                            </div>
+                        </div>
+                        <div>${invoiceStatusBadge(inv.status)}</div>
+                    </div>
+                `).join('');
+            } catch (error) {
+                console.error('Load invoices error:', error);
+                container.innerHTML = `<div class="text-center py-6 text-red-600 text-sm">Failed to load invoices</div>`;
+            }
         }
 
         function formatStatus(status) {
