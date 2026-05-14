@@ -282,7 +282,7 @@
         <!-- Step 2: OTP Verification -->
         <div class="form-section" id="section2">
             <div class="section-title">Enter Verification Code</div>
-            <div class="section-desc" id="otpSentMsg">OTP sent to your phone and email</div>
+            <div class="section-desc" id="otpSentMsg">OTP sent to your phone via SMS</div>
 
             <div class="otp-inputs">
                 <input type="text" class="otp-input" maxlength="1" inputmode="numeric" data-otp="1">
@@ -529,7 +529,7 @@
                 if (data.success) {
                     otpId = data.data.otp_id;
                     document.getElementById('otpSentMsg').innerHTML =
-                        `Verification code sent to <strong>${email}</strong>. Check your inbox (and spam folder).`;
+                        `Verification code sent to <strong>${phone}</strong> via SMS. Check your messages.`;
                     goToStep(2);
                     startResendTimer();
                 } else {
