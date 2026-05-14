@@ -696,6 +696,63 @@ app.post('/api/auth/forgot-password', authLimiter, async (req, res) => {
     });
 });
 
+// Mobile-OTP-driven password reset. Pairs with /api/otp/send (purpose=Password
+// Reset) + /api/otp/verify on the frontend: user enters their phone, gets an
+// SMS, enters OTP + new password. We re-verify the otp_id here, set the new
+// hash, blow away any active sessions, and return a generic response so an
+// attacker can't enumerate registered phones by response shape.
+app.post('/api/auth/forgot-password-mobile', authLimiter, async (req, res) => {
+    try {
+        const { mobile, otp_id, password } = req.body || {};
+        if (!mobile || !otp_id || !password) {
+            return res.status(400).json({ success: false, message: 'Mobile, otp_id and password are required.' });
+        }
+        if (typeof password !== 'string' || password.length < 8 || !/[A-Z]/.test(password) || !/[0-9]/.test(password)) {
+            return res.status(400).json({
+                success: false,
+                message: 'Password must be at least 8 characters with one uppercase letter and one number.'
+            });
+        }
+        if (!/^[6-9]\d{9}$/.test(mobile)) {
+            return res.status(400).json({ success: false, message: 'Invalid mobile number.' });
+        }
+
+        const [otps] = await pool.query(
+            `SELECT id FROM otp_verifications
+             WHERE id = ? AND phone = ? AND purpose = 'Password Reset' AND verified = 1
+               AND created_at > DATE_SUB(NOW(), INTERVAL 15 MINUTE)`,
+            [otp_id, mobile]
+        );
+        if (otps.length === 0) {
+            return res.status(400).json({ success: false, message: 'OTP verification expired. Request a new code.' });
+        }
+
+        const [users] = await pool.query(
+            'SELECT id FROM users WHERE phone IN (?, ?, ?) AND status = ? LIMIT 1',
+            [mobile, '+91' + mobile, '91' + mobile, 'active']
+        );
+
+        // Always consume the OTP so the same code can't be replayed.
+        await pool.query('DELETE FROM otp_verifications WHERE id = ?', [otp_id]);
+
+        if (users.length === 0) {
+            return res.json({ success: true, message: 'Password reset successful.' });
+        }
+
+        const hashed = await bcrypt.hash(password, 10);
+        await pool.query('UPDATE users SET password_hash = ? WHERE id = ?', [hashed, users[0].id]);
+
+        // Sign every existing session out — the assumption is whoever just
+        // requested a reset wants stale sessions invalidated.
+        await pool.query('DELETE FROM user_sessions WHERE user_id = ?', [users[0].id]);
+
+        res.json({ success: true, message: 'Password reset successful. Please login with your new password.' });
+    } catch (error) {
+        console.error('Forgot-password-mobile error:', error);
+        res.status(500).json({ success: false, message: 'Reset failed. Please try again.' });
+    }
+});
+
 // Validate a reset token without consuming it (used by the reset page on load)
 app.get('/api/auth/validate-reset-token', async (req, res) => {
     try {
@@ -820,6 +877,23 @@ app.post('/api/otp/send', otpLimiter, async (req, res) => {
                         code: 'MOBILE_ALREADY_REGISTERED'
                     });
                 }
+            }
+        }
+
+        // For password reset, only send SMS if the mobile is actually registered.
+        // Return success regardless so an attacker can't enumerate which numbers
+        // belong to staff. The reset endpoint applies the same generic response.
+        if (purpose === 'Password Reset') {
+            const [users] = await pool.query(
+                'SELECT id FROM users WHERE phone IN (?, ?, ?) AND status = ? LIMIT 1',
+                [mobile, '+91' + mobile, '91' + mobile, 'active']
+            );
+            if (users.length === 0) {
+                return res.json({
+                    success: true,
+                    data: { mobile, otp_id: null, expires_in_seconds: 300, purpose },
+                    message: 'If an account exists with this mobile number, an OTP has been sent.'
+                });
             }
         }
 
