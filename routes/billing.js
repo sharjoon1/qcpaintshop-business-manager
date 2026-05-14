@@ -952,7 +952,6 @@ router.post('/invoices/:id/payment',
             res.json({
                 success: true,
                 message: 'Payment recorded',
-                payment_number: paymentNumber,
                 amount_paid: totalPaid,
                 balance_due: balanceDue,
                 payment_status: paymentStatus
@@ -981,9 +980,9 @@ router.get('/payments',
 
             if (branchId) { where += ' AND bi.branch_id = ?'; params.push(branchId); }
             if (search) {
-                where += ' AND (bi.customer_name LIKE ? OR bi.invoice_number LIKE ? OR bp.payment_number LIKE ?)';
+                where += ' AND (bi.customer_name LIKE ? OR bi.invoice_number LIKE ?)';
                 const term = `%${search}%`;
-                params.push(term, term, term);
+                params.push(term, term);
             }
 
             const countParams = [...params];
