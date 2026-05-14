@@ -1651,6 +1651,140 @@ router.post('/reconciliation/verify', requireAuth, async (req, res) => {
 });
 
 // ========================================
+// ADMIN VIEW: RECONCILIATION OVERSIGHT
+//   Branch compliance grid + filtered discrepancies list. Drives the
+//   admin Reconcile tab so admins can see which branches are doing
+//   EOD verification and chase down stock drift.
+// ========================================
+
+/** GET /api/stock-check/admin/reconciliation/summary
+ *  Per-branch stats: today's transacted items, verified-today count,
+ *  pending count, discrepancies (today + 7d), last activity. */
+router.get('/admin/reconciliation/summary', requirePermission('zoho', 'stock_check'), async (req, res) => {
+    try {
+        const [rows] = await pool.query(`
+            SELECT
+                b.id AS branch_id,
+                b.name AS branch_name,
+                zlm.zoho_location_id,
+                COALESCE(today_moves.moved_today, 0) AS moved_today,
+                COALESCE(verified_today.verified_today, 0) AS verified_today,
+                COALESCE(verified_today.discrepancies_today, 0) AS discrepancies_today,
+                COALESCE(disc_7d.discrepancies_7d, 0) AS discrepancies_7d,
+                verified_today.last_verified_at
+            FROM branches b
+            LEFT JOIN zoho_locations_map zlm
+                ON zlm.local_branch_id = b.id AND zlm.is_active = 1
+            LEFT JOIN (
+                SELECT zoho_location_id, COUNT(DISTINCT zoho_item_id) AS moved_today
+                FROM zoho_stock_history
+                WHERE recorded_at >= CURDATE()
+                GROUP BY zoho_location_id
+            ) today_moves ON today_moves.zoho_location_id COLLATE utf8mb4_unicode_ci = zlm.zoho_location_id COLLATE utf8mb4_unicode_ci
+            LEFT JOIN (
+                SELECT
+                    zoho_location_id,
+                    COUNT(DISTINCT zoho_item_id) AS verified_today,
+                    SUM(CASE WHEN match_status = 'discrepancy' THEN 1 ELSE 0 END) AS discrepancies_today,
+                    MAX(verified_at) AS last_verified_at
+                FROM stock_verifications
+                WHERE verified_at >= CURDATE()
+                GROUP BY zoho_location_id
+            ) verified_today ON verified_today.zoho_location_id COLLATE utf8mb4_unicode_ci = zlm.zoho_location_id COLLATE utf8mb4_unicode_ci
+            LEFT JOIN (
+                SELECT zoho_location_id, COUNT(*) AS discrepancies_7d
+                FROM stock_verifications
+                WHERE match_status = 'discrepancy'
+                  AND verified_at >= DATE_SUB(NOW(), INTERVAL 7 DAY)
+                GROUP BY zoho_location_id
+            ) disc_7d ON disc_7d.zoho_location_id COLLATE utf8mb4_unicode_ci = zlm.zoho_location_id COLLATE utf8mb4_unicode_ci
+            WHERE b.is_active = 1
+            ORDER BY b.name ASC
+        `);
+
+        // Compliance %: verified_today / moved_today (NULL-safe; 0/0 -> 100%)
+        const data = rows.map(r => {
+            const moved = Number(r.moved_today) || 0;
+            const verified = Number(r.verified_today) || 0;
+            const compliance_pct = moved === 0 ? 100 : Math.min(100, Math.round((verified / moved) * 100));
+            return { ...r, pending_today: Math.max(0, moved - verified), compliance_pct };
+        });
+
+        res.json({ success: true, data });
+    } catch (error) {
+        console.error('Admin reconciliation/summary error:', error);
+        res.status(500).json({ success: false, message: 'Failed to load summary' });
+    }
+});
+
+/** GET /api/stock-check/admin/reconciliation/discrepancies
+ *  Filters: branch_id, days (default 30), match_status (default 'discrepancy'),
+ *  page, limit. */
+router.get('/admin/reconciliation/discrepancies', requirePermission('zoho', 'stock_check'), async (req, res) => {
+    try {
+        const branchId = req.query.branch_id ? parseInt(req.query.branch_id) : null;
+        const days = Math.min(parseInt(req.query.days) || 30, 365);
+        const matchStatus = req.query.match_status || 'discrepancy';
+        const page = Math.max(parseInt(req.query.page) || 1, 1);
+        const limit = Math.min(parseInt(req.query.limit) || 50, 200);
+        const offset = (page - 1) * limit;
+
+        const where = ['sv.verified_at >= DATE_SUB(NOW(), INTERVAL ? DAY)'];
+        const params = [days];
+
+        if (matchStatus && matchStatus !== 'all') {
+            where.push('sv.match_status = ?');
+            params.push(matchStatus);
+        }
+        if (branchId) {
+            where.push('sv.branch_id = ?');
+            params.push(branchId);
+        }
+
+        const whereSql = 'WHERE ' + where.join(' AND ');
+
+        const [countRows] = await pool.query(
+            `SELECT COUNT(*) AS total FROM stock_verifications sv ${whereSql}`,
+            params
+        );
+        const total = countRows[0].total;
+
+        const [rows] = await pool.query(
+            `SELECT
+                sv.id, sv.zoho_item_id, sv.zoho_location_id, sv.branch_id,
+                sv.verified_at, sv.system_stock, sv.physical_stock,
+                sv.discrepancy, sv.match_status, sv.notes,
+                COALESCE(u.full_name, 'Staff') AS verified_by_name,
+                b.name AS branch_name,
+                ls.item_name, ls.sku,
+                zim.zoho_brand AS brand, zim.zoho_category_name AS category,
+                zim.image_url AS image_url
+             FROM stock_verifications sv
+             LEFT JOIN users u ON sv.verified_by = u.id
+             LEFT JOIN branches b ON sv.branch_id = b.id
+             LEFT JOIN zoho_location_stock ls
+                ON ls.zoho_item_id COLLATE utf8mb4_unicode_ci = sv.zoho_item_id COLLATE utf8mb4_unicode_ci
+                AND ls.zoho_location_id COLLATE utf8mb4_unicode_ci = sv.zoho_location_id COLLATE utf8mb4_unicode_ci
+             LEFT JOIN zoho_items_map zim
+                ON zim.zoho_item_id COLLATE utf8mb4_unicode_ci = sv.zoho_item_id COLLATE utf8mb4_unicode_ci
+             ${whereSql}
+             ORDER BY sv.verified_at DESC
+             LIMIT ? OFFSET ?`,
+            [...params, limit, offset]
+        );
+
+        res.json({
+            success: true,
+            data: rows,
+            pagination: { page, limit, total, pages: Math.ceil(total / limit) }
+        });
+    } catch (error) {
+        console.error('Admin reconciliation/discrepancies error:', error);
+        res.status(500).json({ success: false, message: 'Failed to load discrepancies' });
+    }
+});
+
+// ========================================
 // BRANCH INVENTORY (ALL ITEMS + PRICE + LAST CHECKED)
 // ========================================
 
