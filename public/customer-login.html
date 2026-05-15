@@ -67,12 +67,12 @@
                 <p class="text-sm text-gray-600 mb-6">We sent a 6-digit code to <strong id="otpPhoneDisplay"></strong></p>
 
                 <div class="flex justify-center gap-3 mb-6">
-                    <input type="text" class="otp-input" maxlength="1" data-otp="0" autofocus>
-                    <input type="text" class="otp-input" maxlength="1" data-otp="1">
-                    <input type="text" class="otp-input" maxlength="1" data-otp="2">
-                    <input type="text" class="otp-input" maxlength="1" data-otp="3">
-                    <input type="text" class="otp-input" maxlength="1" data-otp="4">
-                    <input type="text" class="otp-input" maxlength="1" data-otp="5">
+                    <input type="text" class="otp-input" maxlength="1" inputmode="numeric" pattern="[0-9]*" autocomplete="one-time-code" data-otp="0" autofocus aria-label="OTP digit 1">
+                    <input type="text" class="otp-input" maxlength="1" inputmode="numeric" pattern="[0-9]*" data-otp="1" aria-label="OTP digit 2">
+                    <input type="text" class="otp-input" maxlength="1" inputmode="numeric" pattern="[0-9]*" data-otp="2" aria-label="OTP digit 3">
+                    <input type="text" class="otp-input" maxlength="1" inputmode="numeric" pattern="[0-9]*" data-otp="3" aria-label="OTP digit 4">
+                    <input type="text" class="otp-input" maxlength="1" inputmode="numeric" pattern="[0-9]*" data-otp="4" aria-label="OTP digit 5">
+                    <input type="text" class="otp-input" maxlength="1" inputmode="numeric" pattern="[0-9]*" data-otp="5" aria-label="OTP digit 6">
                 </div>
 
                 <button onclick="verifyOTP()" id="verifyBtn"

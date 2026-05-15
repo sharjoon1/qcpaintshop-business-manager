@@ -870,7 +870,20 @@ async function generateFixForBug(bugId) {
     try {
         const res = await fetch(`${API}/bugs/${bugId}/fix-suggestions`, { method: 'POST', headers });
         const json = await res.json();
-        if (!json.success) throw new Error(json.message);
+        if (!json.success) {
+            // Graceful fallback when clawdbot / AI provider is unavailable
+            const msg = String(json.message || '').toLowerCase();
+            if (msg.includes('clawdbot') || msg.includes('not configured') || msg.includes('disabled') || msg.includes('unavailable')) {
+                alert(
+                    'AI fix-suggester is currently unavailable.\n\n' +
+                    'You can still triage this bug manually: open the bug detail panel, ' +
+                    'add notes, and update its status. The AI suggestion feature will ' +
+                    'come back online once the provider is reconfigured by an admin.'
+                );
+                return;
+            }
+            throw new Error(json.message || 'Request failed');
+        }
 
         showToast(`${json.data.length} fix suggestions generated`);
         // Refresh detail if panel is open
@@ -879,7 +892,8 @@ async function generateFixForBug(bugId) {
         }
         loadBugs(currentPage);
     } catch (e) {
-        alert('Error: ' + e.message);
+        // Network or 5xx — still graceful
+        alert('Could not generate AI fix: ' + e.message + '\nYou can continue triaging this bug manually from the detail panel.');
     }
 }
 

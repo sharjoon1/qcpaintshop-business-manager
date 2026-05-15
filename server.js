@@ -123,6 +123,10 @@ console.error = function(...args) {
 // CDNs in active use across the public/ pages. Stricter CSP (drop
 // 'unsafe-inline' / 'unsafe-eval', narrow connect-src) is a follow-up that
 // requires migrating remaining inline-script handlers first.
+// NOTE: CSP is allowlist-based, so any host NOT in script-src/style-src is
+// blocked by default — this includes cdn.tailwindcss.com (we use the local
+// JIT pipeline; postinstall builds public/css/tailwind.css). If a page
+// regresses to the CDN, the browser will block-and-report, not silently load.
 app.use(require('helmet')({
     contentSecurityPolicy: {
         useDefaults: true,

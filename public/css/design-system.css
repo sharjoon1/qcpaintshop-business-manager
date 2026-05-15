@@ -221,7 +221,61 @@
   --breakpoint-lg: 1024px;
   --breakpoint-xl: 1280px;
   --breakpoint-2xl: 1536px;
+
+  /* ==================
+     STAFF + PAINTER BRAND PALETTE
+     Use these instead of inline linear-gradient(...) so palette swaps
+     are one-line changes. See .bg-staff-gradient / .bg-painter-gradient
+     utility classes below.
+     ================== */
+  --color-staff-primary: #1B5E3B;
+  --color-staff-dark: #154D31;
+  --color-staff-darkest: #0D3D23;
+  --color-staff-bg: #f0fdf4;
+  --color-painter-gold: #D4A24E;
+  --color-painter-gold-dark: #B8862D;
+  --gradient-staff: linear-gradient(135deg, #1B5E3B 0%, #154D31 100%);
+  --gradient-staff-gold: linear-gradient(135deg, #1B5E3B 0%, #D4A24E 100%);
+  --gradient-painter: linear-gradient(135deg, #D4A24E 0%, #B8862D 100%);
 }
+
+/* ========================================
+   STAFF + PAINTER GRADIENT UTILITY CLASSES
+   ======================================== */
+.bg-staff-gradient {
+  background: var(--gradient-staff);
+  color: white;
+}
+.bg-staff-gold-gradient {
+  background: var(--gradient-staff-gold);
+  color: white;
+}
+.bg-painter-gradient {
+  background: var(--gradient-painter);
+  color: white;
+}
+.btn-staff {
+  background: var(--gradient-staff);
+  color: white;
+  border: none;
+  border-radius: 10px;
+  padding: 10px 20px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: opacity 0.15s;
+}
+.btn-staff:hover { opacity: 0.92; }
+.btn-painter {
+  background: var(--gradient-painter);
+  color: white;
+  border: none;
+  border-radius: 10px;
+  padding: 10px 20px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: opacity 0.15s;
+}
+.btn-painter:hover { opacity: 0.92; }
 
 /* ========================================
    GLOBAL RESETS & BASE STYLES
