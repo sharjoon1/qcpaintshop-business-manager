@@ -37,17 +37,15 @@ This is the live punch-list of what still needs hands-on work before the launch 
 - **Strategy**: Convert page-by-page when next touched. Mass regex unsafe — each instance is in a different context (button, body, div, JS-assigned `.style.background`)
 - **Owner**: incidental during normal feature work
 
-### G4 — Loading skeletons on list pages
-- Pages without `qcSkeleton*` calls today:
-  - `staff-leads.html`, `staff-vendors.html`, `staff-daily-work.html`
-  - `admin-leads.html`, `admin-painters.html`, `painter-dashboard.html`
-- Each uses a different fetch-then-replace-innerHTML pattern, so the swap requires per-page edits + smoke test
-- **Owner**: dedicated UX polish PR (~2 hours)
+### G4 — Loading skeletons on list pages ✅ DONE
+- All 5 audited pages verified: `staff-leads`, `staff-vendors`, `staff-daily-work`, `admin-painters` already have custom `.skeleton` classes with `@keyframes shimmer` (each implements its own visual but the UX intent is met)
+- `admin-leads.html` had no skeleton; now uses the shared `qcSkeletonRows()` helper from `public/js/ui-skeletons.js`
+- `painter-dashboard.html` has its own `.skel` shimmer painted in `paintInitialSkeletons()` before first fetch
+- **Follow-up (low priority)**: standardise all five pages onto the shared `qcSkeleton*` helper for consistent visual language. Mostly cosmetic.
 
-### G6 — Customer dashboard mobile card layout
-- Tables on `customer-dashboard.html` need an explicit card-layout below `md:` breakpoint
-- Page is currently already responsive at the grid level; only the data tables (estimates / invoices) need card-style stacking on mobile
-- **Owner**: ~30 min focused work
+### G6 — Customer dashboard mobile card layout ✅ DONE
+- Customer dashboard was already card-based (no tables) — verified via grep
+- Invoice rows now flex-wrap so the status badge stacks below on narrow mobile (`<sm` breakpoint), eliminating 3-column cramping on 320-375px screens
 
 ---
 

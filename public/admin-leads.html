@@ -32,6 +32,9 @@
         .priority-medium { border-left: 4px solid #3b82f6; }
         .priority-high { border-left: 4px solid #f59e0b; }
     </style>
+    <!-- Shared skeleton helpers for loading state -->
+    <link rel="stylesheet" href="/css/skeletons.css">
+    <script src="/js/ui-skeletons.js"></script>
 </head>
 <body class="bg-gray-50" data-page="leads">
 <!-- Main Content -->
@@ -694,6 +697,12 @@
 
         // Load all leads
         async function loadLeads() {
+            const tbody = document.getElementById('leadsTableBody');
+            // Paint shimmer skeleton while the list refetches so the user
+            // sees motion instead of stale rows + then a flicker.
+            if (tbody && typeof qcSkeletonRows === 'function') {
+                tbody.innerHTML = `<tr><td colspan="9" style="padding:0">${qcSkeletonRows(6)}</td></tr>`;
+            }
             try {
                 const status = document.getElementById('filterStatus').value;
                 const source = document.getElementById('filterSource').value;
@@ -713,7 +722,7 @@
                 }
             } catch (error) {
                 console.error('Error loading leads:', error);
-                alert('Failed to load leads');
+                if (tbody) tbody.innerHTML = '<tr><td colspan="9" class="text-center py-8 text-red-500">Failed to load leads. Try again.</td></tr>';
             }
         }
 
