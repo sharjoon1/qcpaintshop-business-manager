@@ -17,9 +17,12 @@
         .stat-card:hover { transform: translateY(-2px); box-shadow: 0 4px 12px rgba(0,0,0,0.08); }
         .stat-value { font-size: 1.75rem; font-weight: 700; }
         .stat-label { font-size: 0.8125rem; color: #64748b; margin-top: 2px; }
-        .action-btn { background: #fff; border: 1px solid #e2e8f0; border-radius: 12px; padding: 1rem; text-align: center; cursor: pointer; transition: all 0.2s; text-decoration: none; color: inherit; display: block; }
-        .action-btn:hover { border-color: #1B5E3B; box-shadow: 0 2px 8px rgba(27,94,59,0.15); }
-        .action-btn svg { width: 28px; height: 28px; stroke: #1B5E3B; fill: none; stroke-width: 1.75; margin: 0 auto 0.5rem; }
+        /* min-height 64px ~= 56dp at typical 1.14 device pixel ratio — meets
+           painter-with-paint-stained-hands minimum touch target. */
+        .action-btn { background: #fff; border: 1px solid #e2e8f0; border-radius: 12px; padding: 14px 12px; text-align: center; cursor: pointer; transition: all 0.2s; text-decoration: none; color: inherit; display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 64px; }
+        .action-btn:hover, .action-btn:active { border-color: #1B5E3B; box-shadow: 0 2px 8px rgba(27,94,59,0.15); }
+        .action-btn svg { width: 30px; height: 30px; stroke: #1B5E3B; fill: none; stroke-width: 1.75; margin: 0 auto 6px; }
+        .action-btn .text-xs { font-size: 0.8125rem; line-height: 1.1; }
         .txn-row { display: flex; justify-content: space-between; align-items: center; padding: 0.75rem 0; border-bottom: 1px solid #f1f5f9; }
         .txn-row:last-child { border-bottom: none; }
         .badge { display: inline-flex; padding: 2px 8px; border-radius: 9999px; font-size: 0.75rem; font-weight: 600; }
@@ -172,6 +175,39 @@
 
         @keyframes countUp { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
         .count-up { animation: countUp 0.5s ease forwards; }
+
+        /* Shimmer skeleton — used while the dashboard payload is in flight.
+           Pages still render the .loading-text fallback for older sessions. */
+        @keyframes shimmer { 0% { background-position: -400px 0; } 100% { background-position: 400px 0; } }
+        .skel { display: block; background: linear-gradient(90deg, #f1f5f9 0%, #e2e8f0 50%, #f1f5f9 100%); background-size: 800px 100%; animation: shimmer 1.4s infinite linear; border-radius: 8px; }
+        .skel-row { height: 14px; margin: 8px 0; }
+        .skel-row.short { width: 40%; }
+        .skel-row.medium { width: 70%; }
+        .skel-card { height: 56px; margin: 8px 0; border-radius: 12px; }
+
+        /* Pull-to-refresh indicator */
+        .ptr-indicator { position: fixed; top: 0; left: 0; right: 0; height: 50px; display: flex; align-items: center; justify-content: center; background: linear-gradient(to bottom, rgba(27,94,59,0.95), rgba(27,94,59,0.85)); color: white; font-size: 0.85rem; font-weight: 600; transform: translateY(-100%); transition: transform 0.2s; z-index: 999; backdrop-filter: blur(4px); }
+        .ptr-indicator.visible { transform: translateY(0); }
+        .ptr-indicator.refreshing { background: linear-gradient(to bottom, #1B5E3B, #154D31); }
+        .ptr-spinner { display: inline-block; width: 16px; height: 16px; border: 2px solid rgba(255,255,255,0.4); border-top-color: white; border-radius: 50%; animation: spin 0.7s linear infinite; margin-right: 8px; vertical-align: middle; }
+        @keyframes spin { to { transform: rotate(360deg); } }
+
+        /* Basic dark-mode support — painter pages live mostly on Android with
+           system dark-mode honoured by the painter WebView. Keep palette muted
+           so the staff/painter green still reads brand-correct. */
+        @media (prefers-color-scheme: dark) {
+            body { background: #0d1614; color: #e2e8f0; }
+            .stat-card, .section-card, .action-btn { background: #16241e; border-color: #1f3329; color: #e2e8f0; }
+            .stat-label { color: #94a3b8; }
+            .section-header { border-bottom-color: #1f3329; color: #e2e8f0; }
+            .section-body { color: #cbd5e1; }
+            .referral-code { background: linear-gradient(135deg, #0f2419, #1a1a0a); border-color: #4a7d5d; }
+            .referral-code code { color: #6ee7b7; }
+            .txn-row { border-bottom-color: #1f3329; }
+            .skel { background: linear-gradient(90deg, #1a2924 0%, #213a30 50%, #1a2924 100%); }
+            .action-btn svg { stroke: #6ee7b7; }
+            .action-btn:hover, .action-btn:active { border-color: #6ee7b7; }
+        }
     </style>
 </head>
 <body>
@@ -2074,10 +2110,14 @@
     }
 
     function getGreeting() {
+        // Tamil-first audience — bilingual time-aware greeting.
+        // NOTE: deliberately avoid "வணக்கம்" per project preference; use
+        // "வரவேற்கிறோம்" / "மாலை நேரம்" style phrasing.
         const h = new Date().getHours();
-        if (h < 12) return 'Good Morning,';
-        if (h < 17) return 'Good Afternoon,';
-        return 'Good Evening,';
+        if (h < 12) return 'காலை வரவேற்கிறோம் · Good Morning,';
+        if (h < 17) return 'மதிய வரவேற்கிறோம் · Good Afternoon,';
+        if (h < 20) return 'மாலை வரவேற்கிறோம் · Good Evening,';
+        return 'இரவு வரவேற்கிறோம் · Good Evening,';
     }
 
     function animateCounter(el, target) {
@@ -2216,6 +2256,19 @@
     function formatStatus(s) { return (s || '').replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase()); }
 
     // ============ Init ============
+    // Paint shimmer placeholders into the slow-loading lists BEFORE the
+    // first network call so painters never see a bare "Loading..." string
+    // on slow 4G. Each loadX() replaces its container.innerHTML on success.
+    function paintInitialSkeletons() {
+        const recent = document.getElementById('recentTransactions');
+        if (recent) recent.innerHTML = '<div class="skel skel-row medium"></div><div class="skel skel-row short"></div><div class="skel skel-row medium"></div>';
+        const ests = document.getElementById('estimatesList');
+        if (ests) ests.innerHTML = '<div class="skel skel-card"></div><div class="skel skel-card"></div>';
+        const viz = document.getElementById('vizGallery');
+        if (viz) viz.innerHTML = '<div class="skel skel-card"></div>';
+    }
+    paintInitialSkeletons();
+
     loadDashboard();
     loadEstimates();
     loadOfferProducts();
@@ -2230,6 +2283,64 @@
         initSocket();
         registerFCMToken();
     });
+
+    // ============ Pull-to-refresh ============
+    // Touch-only, fires when user pulls down ~70px from top of page.
+    (function setupPullToRefresh() {
+        if (!('ontouchstart' in window)) return; // skip on desktop
+        let startY = 0, currentY = 0, pulling = false, refreshing = false;
+        const indicator = document.createElement('div');
+        indicator.className = 'ptr-indicator';
+        indicator.innerHTML = '<span data-i18n="common.pull_refresh">⬇ Pull to refresh</span>';
+        document.body.appendChild(indicator);
+
+        document.addEventListener('touchstart', (e) => {
+            if (refreshing || window.scrollY > 5) return;
+            startY = e.touches[0].clientY;
+            pulling = true;
+        }, { passive: true });
+
+        document.addEventListener('touchmove', (e) => {
+            if (!pulling || refreshing) return;
+            currentY = e.touches[0].clientY;
+            const delta = currentY - startY;
+            if (delta > 20) {
+                indicator.classList.add('visible');
+                if (delta > 80) indicator.querySelector('span').textContent = '⬇ Release to refresh';
+                else indicator.querySelector('span').textContent = '⬇ Pull to refresh';
+            }
+        }, { passive: true });
+
+        document.addEventListener('touchend', async () => {
+            if (!pulling || refreshing) { pulling = false; return; }
+            const delta = currentY - startY;
+            pulling = false;
+            if (delta > 80) {
+                refreshing = true;
+                indicator.classList.add('refreshing');
+                indicator.innerHTML = '<span class="ptr-spinner"></span><span>Refreshing…</span>';
+                try {
+                    paintInitialSkeletons();
+                    await Promise.all([
+                        loadDashboard(),
+                        loadEstimates(),
+                        loadOfferProducts(),
+                        loadNotifications(),
+                        loadVisualizations(),
+                        loadAttendanceHero(),
+                    ]);
+                } finally {
+                    setTimeout(() => {
+                        indicator.classList.remove('visible', 'refreshing');
+                        indicator.innerHTML = '<span>⬇ Pull to refresh</span>';
+                        refreshing = false;
+                    }, 400);
+                }
+            } else {
+                indicator.classList.remove('visible');
+            }
+        });
+    })();
 
     // ═══════════════════════════════════════
     // ATTENDANCE HERO (AP)

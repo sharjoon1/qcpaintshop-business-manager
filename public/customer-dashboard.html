@@ -455,7 +455,7 @@
                 }
 
                 container.innerHTML = list.map(inv => `
-                    <div class="border-b last:border-b-0 py-3 flex items-center justify-between gap-3">
+                    <div class="border-b last:border-b-0 py-3 flex flex-wrap items-center justify-between gap-x-3 gap-y-2">
                         <div class="min-w-0 flex-1">
                             <div class="font-semibold text-gray-800 truncate">${esc(inv.invoice_number || '—')}</div>
                             <div class="text-xs text-gray-500">${fmtInvoiceDate(inv.invoice_date)}</div>
@@ -466,7 +466,7 @@
                                 ${Number(inv.balance) > 0 ? 'Balance ' + fmtINR(inv.balance) : 'Settled'}
                             </div>
                         </div>
-                        <div>${invoiceStatusBadge(inv.status)}</div>
+                        <div class="basis-full sm:basis-auto text-right sm:text-left">${invoiceStatusBadge(inv.status)}</div>
                     </div>
                 `).join('');
             } catch (error) {
