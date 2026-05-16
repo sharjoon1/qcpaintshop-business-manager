@@ -399,7 +399,7 @@
                     <div class="flex flex-wrap gap-1 mt-0.5">${p.pack_sizes.map(ps => stockBadge(ps.stock)).filter((v,i,a) => a.indexOf(v) === i).join('')}</div>
                 </div>
                 ${p.image_url
-                    ? '<img src="' + p.image_url + '" class="product-img" onerror="this.style.display=\'none\'">'
+                    ? '<img src="' + p.image_url + '" class="product-img" onerror="this.onerror=null; this.src=\'/images/product-placeholder.png\';">'
                     : ''
                 }
             </div>`;
@@ -486,8 +486,11 @@
             document.getElementById('cartTotals').innerHTML =
                 '<div class="flex justify-between text-sm text-gray-600 mb-1"><span>Items (' + items.length + ')</span><span>' + fmtPrice(total) + '</span></div>' +
                 '<div class="text-[0.65rem] text-gray-400 mb-1">* Prices include GST</div>' +
-                '<div class="flex justify-between font-semibold text-gray-800 pt-1 border-t border-gray-200"><span>Total</span><span>' + fmtPrice(total) + '</span></div>';
+                '<div class="flex justify-between font-semibold text-gray-800 pt-1 border-t border-gray-200"><span>Total</span><span>' + fmtPrice(total) + '</span></div>' +
+                '<div id="estimatedPoints" style="font-size:0.8125rem;color:#1B5E3B;margin-top:4px;"></div>';
             document.getElementById('floatingCartTotal').textContent = fmtPrice(total);
+            const epEl = document.getElementById('estimatedPoints');
+            if (epEl) epEl.textContent = total > 0 ? '≈ ' + Math.floor(total * (window.painterPointsRate || 1)) + ' points / புள்ளிகள்' : '';
         } else {
             document.getElementById('cartTotals').innerHTML = '<div class="text-sm text-gray-500 text-center">Prices will be set by admin after review</div>';
             document.getElementById('floatingCartTotal').textContent = '';
@@ -531,11 +534,25 @@
             window.location.href = '/painter-dashboard.html';
         } catch (err) {
             alert('Error: ' + err.message);
+        } finally {
             btn.disabled = false;
             btn.textContent = 'Submit Estimate';
             isSubmitting = false;
         }
     }
+
+    // Fetch painter points rate on page load
+    (async function fetchPointsRate() {
+        try {
+            const res = await fetch(`${API}/me`, { headers: painterHeaders() });
+            if (res.ok) {
+                const data = await res.json();
+                if (data.success && data.painter) {
+                    window.painterPointsRate = data.painter.points_rate || 1;
+                }
+            }
+        } catch (e) { /* silent, default of 1 will be used */ }
+    })();
 
     // Initialize stepper for step 1
     buildStepper();

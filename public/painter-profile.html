@@ -288,6 +288,7 @@
     const API = '/api/painters';
     let originalData = {};
     let uploading = false;
+    let isDirty = false;
 
     function painterHeaders() {
         return {
@@ -438,6 +439,11 @@
             el.addEventListener('input', checkDirty);
             el.addEventListener('change', checkDirty);
         });
+        // Unsaved-changes guard
+        document.querySelectorAll('input,select,textarea').forEach(function(el) {
+            el.addEventListener('change', function() { isDirty = true; });
+        });
+        window.onbeforeunload = function() { return isDirty ? 'Unsaved changes. Leave?' : null; };
     }
 
     // ============ Save Profile ============
@@ -463,6 +469,7 @@
             const current = getCurrentData();
             Object.assign(originalData, current);
 
+            isDirty = false;
             showToast('Profile updated successfully!');
             btn.disabled = true;
         } catch (err) {
@@ -477,23 +484,25 @@
     }
 
     // ============ Photo Upload ============
-    document.getElementById('photoInput').addEventListener('change', async function(e) {
-        const file = e.target.files[0];
-        if (!file) return;
+    function compressAndUpload(file) {
+        const img = new Image();
+        img.onload = function() {
+            const c = document.createElement('canvas'), max = 800;
+            let w = img.width, h = img.height;
+            if (w > max) { h = h * max / w; w = max; }
+            if (h > max) { w = w * max / h; h = max; }
+            c.width = w; c.height = h;
+            c.getContext('2d').drawImage(img, 0, 0, w, h);
+            c.toBlob(function(b) {
+                const fd = new FormData();
+                fd.append('photo', b, 'photo.jpg');
+                uploadPhoto(fd);
+            }, 'image/jpeg', 0.82);
+        };
+        img.src = URL.createObjectURL(file);
+    }
 
-        // Validate file type
-        if (!file.type.startsWith('image/')) {
-            showToast('Please select an image file', 'error');
-            return;
-        }
-
-        // Validate file size (5MB max)
-        if (file.size > 5 * 1024 * 1024) {
-            showToast('Image must be under 5MB', 'error');
-            return;
-        }
-
-        // Show loading overlay
+    async function uploadPhoto(formData) {
         const wrapper = document.getElementById('avatarWrapper');
         const loadingEl = document.createElement('div');
         loadingEl.className = 'avatar-loading';
@@ -501,9 +510,6 @@
         wrapper.appendChild(loadingEl);
 
         try {
-            const formData = new FormData();
-            formData.append('photo', file);
-
             const res = await fetch(`${API}/me/profile-photo`, {
                 method: 'PUT',
                 headers: { 'X-Painter-Token': localStorage.getItem('painter_token') || '' },
@@ -520,9 +526,29 @@
             showToast('Failed to upload photo', 'error');
         } finally {
             loadingEl.remove();
-            // Reset file input for re-selection
-            e.target.value = '';
         }
+    }
+
+    document.getElementById('photoInput').addEventListener('change', function(e) {
+        const file = e.target.files[0];
+        if (!file) return;
+
+        // Validate file type
+        if (!file.type.startsWith('image/')) {
+            showToast('Please select an image file', 'error');
+            return;
+        }
+
+        // Validate file size (5MB max)
+        if (file.size > 5 * 1024 * 1024) {
+            showToast('Image must be under 5MB', 'error');
+            return;
+        }
+
+        // Reset file input for re-selection
+        e.target.value = '';
+
+        compressAndUpload(file);
     });
 
     // ============ Init ============

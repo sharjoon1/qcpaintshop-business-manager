@@ -370,6 +370,7 @@
                             ${priceHtml}
                             ${getStockBadge(p.total_stock !== undefined ? p.total_stock : p.stock)}
                         </div>
+                        <a href="/painter-estimate-create.html?product_id=${p.product_id}" class="text-xs text-green-700 font-medium mt-1 block" onclick="event.stopPropagation()">+ Add to Estimate</a>
                     </div>
                 </div>
             `;
@@ -459,7 +460,9 @@
                 }
 
                 hideSkeleton();
+                const _searchVal = document.getElementById('searchInput').value;
                 renderProducts(append);
+                document.getElementById('searchInput').value = _searchVal;
 
             } catch (err) {
                 hideSkeleton();

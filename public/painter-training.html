@@ -7,6 +7,7 @@
     <link rel="icon" type="image/png" sizes="192x192" href="/icons/icon-192x192.png">
     <title>Training Hub - Quality Colours</title>
     <link rel="stylesheet" href="/css/tailwind.css">
+    <link rel="preconnect" href="https://www.youtube.com">
     <script src="/js/painter-i18n.js"></script>
     <style>
         body { background: #f9fafb; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; }
@@ -106,6 +107,11 @@
             <div class="text-5xl mb-4">📚</div>
             <p class="text-gray-500 font-medium" data-i18n="training.no_content">No content available</p>
             <p class="text-gray-400 text-sm mt-1">Check back soon for new training materials</p>
+        </div>
+
+        <!-- No Search Results -->
+        <div id="noResults" style="display:none" class="text-center py-12 text-gray-400">
+            <p>No content found / பயிற்சி உள்ளடக்கம் இல்லை</p>
         </div>
 
         <!-- Featured Videos Section -->
@@ -363,15 +369,24 @@
         const featuredSection = document.getElementById('featuredSection');
         const guidesSection = document.getElementById('guidesSection');
         const emptyState = document.getElementById('emptyState');
+        const noRes = document.getElementById('noResults');
 
         if (filtered.length === 0) {
             featuredSection.style.display = 'none';
             guidesSection.style.display = 'none';
-            emptyState.style.display = 'block';
+            // Show noResults for search/filter, emptyState for initial empty data
+            if (searchQuery || currentCategory !== 'all') {
+                emptyState.style.display = 'none';
+                if (noRes) noRes.style.display = 'block';
+            } else {
+                if (noRes) noRes.style.display = 'none';
+                emptyState.style.display = 'block';
+            }
             return;
         }
 
         emptyState.style.display = 'none';
+        if (noRes) noRes.style.display = 'none';
 
         // Featured section
         if (featured.length > 0) {
@@ -536,7 +551,7 @@
         if (youtubeId) {
             videoEmbed = `
                 <div class="video-wrapper mb-4">
-                    <iframe src="https://www.youtube.com/embed/${youtubeId}?rel=0" allowfullscreen allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"></iframe>
+                    <iframe src="https://www.youtube.com/embed/${youtubeId}?rel=0" allowfullscreen loading="lazy" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"></iframe>
                 </div>`;
         } else {
             videoEmbed = `
