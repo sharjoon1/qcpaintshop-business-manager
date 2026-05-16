@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="theme-color" content="#1B5E3B">
     <link rel="icon" type="image/png" sizes="192x192" href="/icons/icon-192x192.png">
-    <title>Shop Attendance - Quality Colours</title>
+    <title>My Attendance / என் வருகை - Quality Colours</title>
     <link rel="stylesheet" href="/css/tailwind.css">
     <script src="/js/painter-i18n.js"></script>
     <style>
@@ -153,7 +153,7 @@
                     <a href="/painter-dashboard.html" class="p-1 rounded-lg hover:bg-white/10">
                         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M15 18l-6-6 6-6"/></svg>
                     </a>
-                    <h1 class="text-lg font-bold" data-i18n="attendance.title">Shop Attendance</h1>
+                    <h1 class="text-lg font-bold" data-i18n="attendance.title">My Attendance / என் வருகை</h1>
                 </div>
                 <div class="flex items-center gap-2">
                     <a href="/painter-dashboard.html" class="p-2 rounded-lg hover:bg-white/10 relative" id="notifBtn">
@@ -222,6 +222,9 @@
                     <span class="btn-text" data-i18n="attendance.check_in_now">Check In Now</span>
                     <div class="spinner"></div>
                 </button>
+                <p id="checkedInMsg" style="display:none; color:#16a34a; text-align:center; font-size:0.875rem; margin-top:8px;">
+                    ✓ Already checked in today / இன்று சரிபார்க்கப்பட்டது
+                </p>
             </div>
         </div>
 
@@ -443,9 +446,11 @@
             statusPoints.style.display = 'block';
             document.getElementById('pointsValue').textContent = att.points_awarded || 5;
 
-            // Hide check-in button
+            // Hide check-in button; show already-checked-in message
             btn.style.display = 'none';
             photoSection.style.display = 'none';
+            const checkedInMsg = document.getElementById('checkedInMsg');
+            if (checkedInMsg) checkedInMsg.style.display = 'block';
         } else {
             // Not checked in
             statusBadge.className = 'flex items-center gap-3 p-3 rounded-xl bg-gray-50';
@@ -457,11 +462,13 @@
 
             statusPoints.style.display = 'none';
 
-            // Show check-in button and photo
+            // Show check-in button and photo; hide already-checked-in message
             btn.style.display = 'flex';
             btn.disabled = false;
             btn.classList.remove('loading');
             photoSection.style.display = 'block';
+            const checkedInMsgEl = document.getElementById('checkedInMsg');
+            if (checkedInMsgEl) checkedInMsgEl.style.display = 'none';
         }
     }
 
