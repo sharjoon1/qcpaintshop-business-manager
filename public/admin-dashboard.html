@@ -124,7 +124,11 @@
 <div class="container mx-auto p-4 md:p-6">
         <!-- Page Header -->
         <div class="mb-6">
-            <h1 class="text-2xl md:text-3xl font-bold text-gray-800">Admin Dashboard</h1>
+            <div class="flex items-center gap-2">
+                <h1 class="text-2xl md:text-3xl font-bold text-gray-800">Admin Dashboard</h1>
+                <!-- FIX-6: Real-time connection indicator -->
+                <span id="socketDot" title="Real-time connection" style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#ef4444;margin-left:8px;vertical-align:middle;" aria-label="Connection status"></span>
+            </div>
             <p class="text-gray-500 text-sm mt-1" id="greeting">Welcome back!</p>
         </div>
 
@@ -584,6 +588,35 @@
 
     // Auto-refresh every 60s
     setInterval(() => { loadStaffActivity(); loadNotices(); }, 60000);
+
+    // FIX-6: Socket.io real-time connection indicator
+    (function initSocketIndicator() {
+        const dotEl = document.getElementById('socketDot');
+        if (!dotEl) return;
+        // Load socket.io client if not already loaded
+        function connectSocket() {
+            if (typeof io === 'undefined') {
+                const s = document.createElement('script');
+                s.src = '/socket.io/socket.io.js';
+                s.onload = function() { attachSocket(); };
+                s.onerror = function() { /* Socket.io not available */ };
+                document.head.appendChild(s);
+            } else {
+                attachSocket();
+            }
+        }
+        function attachSocket() {
+            try {
+                const socket = io({ transports: ['websocket', 'polling'] });
+                socket.on('connect', () => { dotEl.style.background = '#22c55e'; });
+                socket.on('disconnect', () => { dotEl.style.background = '#ef4444'; });
+                if (socket.connected) dotEl.style.background = '#22c55e';
+            } catch (e) {
+                console.warn('Socket.io connect failed:', e);
+            }
+        }
+        connectSocket();
+    })();
 </script>
 </body>
 </html>

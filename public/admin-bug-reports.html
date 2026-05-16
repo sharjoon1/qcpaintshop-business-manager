@@ -518,6 +518,8 @@ function renderBugDetail(bug) {
                     Generate AI Fix
                 </button>
             </div>
+            <!-- FIX-7: Inline error display for AI fix generation failures -->
+            <p id="fixGenerateError" style="display:none;font-size:0.75rem;color:#ef4444;margin-bottom:6px;padding:6px 10px;background:#fef2f2;border-radius:6px;"></p>
             ${(bug.fix_suggestions || []).length === 0
                 ? '<p class="text-xs text-gray-400">No fix suggestions yet. Click "Generate AI Fix" to get suggestions.</p>'
                 : (bug.fix_suggestions || []).map(fs => renderFixCard(fs)).join('')
@@ -866,23 +868,41 @@ async function deleteBug(id) {
 }
 
 async function generateFixForBug(bugId) {
+    // FIX-7: Inline error display helper
+    function showFixError(msg) {
+        const resultEl = document.getElementById('fixGenerateError');
+        if (resultEl) {
+            resultEl.textContent = msg;
+            resultEl.style.color = '#ef4444';
+            resultEl.style.display = 'block';
+        } else {
+            showToast(msg, 'error');
+        }
+    }
+    function hideFixError() {
+        const resultEl = document.getElementById('fixGenerateError');
+        if (resultEl) resultEl.style.display = 'none';
+    }
+
+    hideFixError();
     showToast('Generating AI fix suggestions...');
     try {
         const res = await fetch(`${API}/bugs/${bugId}/fix-suggestions`, { method: 'POST', headers });
+        // FIX-7: Handle 404 and other failure statuses with inline message
+        if (res.status === 404) {
+            showFixError('AI fix generation unavailable. Check server logs or try again later.');
+            return;
+        }
         const json = await res.json();
         if (!json.success) {
             // Graceful fallback when clawdbot / AI provider is unavailable
             const msg = String(json.message || '').toLowerCase();
             if (msg.includes('clawdbot') || msg.includes('not configured') || msg.includes('disabled') || msg.includes('unavailable')) {
-                alert(
-                    'AI fix-suggester is currently unavailable.\n\n' +
-                    'You can still triage this bug manually: open the bug detail panel, ' +
-                    'add notes, and update its status. The AI suggestion feature will ' +
-                    'come back online once the provider is reconfigured by an admin.'
-                );
+                showFixError('AI fix generation unavailable. Check server logs or try again later.');
                 return;
             }
-            throw new Error(json.message || 'Request failed');
+            showFixError('AI fix generation unavailable. Check server logs or try again later.');
+            return;
         }
 
         showToast(`${json.data.length} fix suggestions generated`);
@@ -892,8 +912,8 @@ async function generateFixForBug(bugId) {
         }
         loadBugs(currentPage);
     } catch (e) {
-        // Network or 5xx — still graceful
-        alert('Could not generate AI fix: ' + e.message + '\nYou can continue triaging this bug manually from the detail panel.');
+        // Network or 5xx — inline error
+        showFixError('AI fix generation unavailable. Check server logs or try again later.');
     }
 }
 

@@ -11,10 +11,8 @@
     <link rel="apple-touch-icon" href="/icons/icon-192x192.png">
     <title>My Dashboard - Quality Colours</title>
     <script>
-    // Customer auth check — must have a server-issued token, not just the legacy boolean
-    if (!localStorage.getItem('customer_token') || localStorage.getItem('customer_logged_in') !== 'true') {
-        window.location.href = '/customer-login.html';
-    }
+    // FIX-8: Simplified auth check — token presence is the single source of truth
+    if (!localStorage.getItem('customer_token')) { window.location.href = '/customer-login.html'; return; }
     </script>
     <link rel="stylesheet" href="/css/tailwind.css">
     <style>
@@ -183,7 +181,8 @@
                         <a href="customer-requests.html" class="text-sm text-purple-600 hover:text-purple-700 font-medium">View All →</a>
                     </div>
                 </div>
-                <div id="recentRequestsContainer" class="p-6">
+                <!-- FIX-9: Responsive estimate card list (replaces table) -->
+                <div id="estimateList" class="space-y-3 px-4 py-4">
                     <div class="text-center py-8 text-gray-400">
                         <div class="text-4xl mb-2">⏳</div>
                         <p>Loading requests...</p>
@@ -338,8 +337,9 @@
         }
 
         async function loadRecentRequests() {
-            const container = document.getElementById('recentRequestsContainer');
-            
+            // FIX-9: Use estimateList div for responsive card rendering
+            const container = document.getElementById('estimateList');
+
             try {
                 if (!customerPhone) {
                     container.innerHTML = `
@@ -370,20 +370,16 @@
                     return;
                 }
 
+                // FIX-9: Responsive card layout — no table, works on mobile
                 container.innerHTML = result.data.map(request => `
-                    <div class="border-b last:border-b-0 py-4 hover:bg-gray-50 transition cursor-pointer" onclick="viewRequest('${request.request_number}')">
-                        <div class="flex items-start justify-between mb-2">
-                            <div class="flex-1">
-                                <div class="font-semibold text-gray-800">${request.request_number}</div>
-                                <div class="text-sm text-gray-600">${formatProjectType(request.project_type)}</div>
-                            </div>
-                            <span class="status-badge status-${request.status} px-3 py-1 rounded-full text-xs font-semibold">
-                                ${formatStatus(request.status)}
-                            </span>
+                    <div class="bg-white rounded-xl p-4 border border-gray-100 flex justify-between items-center cursor-pointer hover:shadow-sm transition" onclick="viewRequest('${esc(request.request_number)}')">
+                        <div>
+                            <p class="font-semibold text-gray-800">#${esc(request.request_number)}</p>
+                            <p class="text-sm text-gray-500">${esc(formatTimeAgo(request.created_at))} · ${esc(formatProjectType(request.project_type))}</p>
                         </div>
-                        <div class="flex items-center justify-between text-sm">
-                            <span class="text-gray-600">${request.area_sqft} sq.ft</span>
-                            <span class="text-gray-500">${formatTimeAgo(request.created_at)}</span>
+                        <div class="text-right">
+                            <span class="status-badge status-${esc(request.status)} px-2 py-0.5 rounded-full text-xs font-semibold">${esc(formatStatus(request.status))}</span>
+                            <p class="text-sm text-gray-500 mt-1">${request.area_sqft ? esc(String(request.area_sqft)) + ' sq.ft' : ''}</p>
                         </div>
                     </div>
                 `).join('');

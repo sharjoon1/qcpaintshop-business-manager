@@ -11,7 +11,7 @@
     <link rel="apple-touch-icon" href="/icons/icon-192x192.png">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="mobile-web-app-capable" content="yes">
-    <title>My Attendance - Quality Colours</title>
+    <title>Staff Dashboard - Quality Colours</title>
     <script src="/js/auth-helper.js"></script>
     <script>checkAuthOrRedirect();</script>
     <link rel="stylesheet" href="/css/tailwind.css">
@@ -650,12 +650,14 @@
                 </div>
             </div>
         </div>
-        <button class="action-btn clock-in-btn" onclick="goToClockIn()" style="padding: 14px; font-size: 16px;">
+        <button class="action-btn clock-in-btn" onclick="checkLocationThenClockIn()" style="padding: 14px; font-size: 16px;">
             <svg style="width: 22px; height: 22px;" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
             </svg>
             Clock In Now
         </button>
+        <!-- FIX-3: Location error message -->
+        <p id="locationError" style="display:none;color:#dc2626;font-size:13px;margin-top:8px;padding:8px 12px;background:#fee2e2;border-radius:8px;"></p>
     </div>
 
     <!-- Clocked In State -->
@@ -1547,6 +1549,18 @@
         function showClockedInState(data) {
             document.getElementById('clockedInState').style.display = 'block';
 
+            // FIX-2: Switch clock-in button to Clock Out (red gradient) when clocked in
+            const clockInBtn = document.querySelector('#notClockedInState .action-btn');
+            if (clockInBtn) {
+                clockInBtn.textContent = '🔴 Clock Out';
+                clockInBtn.style.background = 'linear-gradient(135deg, #ef4444, #dc2626)';
+            }
+            // Show clock-out section immediately (no need to click the toggle link)
+            const clockOutSection = document.getElementById('clockOutSection');
+            const showClockOutBtn = document.getElementById('showClockOutBtn');
+            if (clockOutSection) clockOutSection.style.display = 'block';
+            if (showClockOutBtn) showClockOutBtn.style.display = 'none';
+
             // Clock in time
             const clockInTime = new Date(data.clock_in_time);
             document.getElementById('clockInTime').textContent = clockInTime.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
@@ -2035,6 +2049,30 @@
         // Navigation
         function goToClockIn() {
             window.location.href = 'clock-in.html';
+        }
+
+        // FIX-3: Check location permission before proceeding to clock-in
+        function checkLocationThenClockIn() {
+            const errEl = document.getElementById('locationError');
+            if (errEl) errEl.style.display = 'none';
+            if (!navigator.geolocation) {
+                goToClockIn(); // No geolocation API — let clock-in.html handle it
+                return;
+            }
+            navigator.geolocation.getCurrentPosition(
+                () => { goToClockIn(); },
+                (err) => {
+                    if (err.code === err.PERMISSION_DENIED) {
+                        if (errEl) {
+                            errEl.textContent = 'Location access denied. Enable in browser settings and try again.';
+                            errEl.style.display = 'block';
+                        }
+                    } else {
+                        goToClockIn(); // Other errors — let clock-in.html handle details
+                    }
+                },
+                { timeout: 5000 }
+            );
         }
 
         // ═══════════════════════════════════
