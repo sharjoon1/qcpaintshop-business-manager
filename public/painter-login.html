@@ -56,7 +56,7 @@
             <button onclick="verifyLoginOtp()" class="btn-primary" id="verifyBtn">Verify & Login</button>
             <div id="otpError" class="error-msg" style="display:none" role="alert" aria-live="polite"></div>
             <div class="flex justify-between mt-3 text-sm">
-                <a href="#" onclick="document.getElementById('otpSection').style.display='none';document.getElementById('phoneSection').style.display='block'" class="text-emerald-700">Change number</a>
+                <a href="#" onclick="resetResendCooldown();document.getElementById('otpSection').style.display='none';document.getElementById('phoneSection').style.display='block'" class="text-emerald-700">Change number</a>
                 <a href="#" id="resendOtpLink" onclick="resendOtpWithCooldown(event)" class="text-emerald-700">Resend OTP</a>
             </div>
         </div>
@@ -74,6 +74,9 @@
     <script>
     const API = '/api/painters';
 
+    // Module-level interval handle so "Change number" can cancel it
+    let resendCooldownInterval = null;
+
     // OTP input auto-focus
     document.querySelectorAll('.otp-input').forEach((input, idx, inputs) => {
         input.addEventListener('input', (e) => {
@@ -85,31 +88,48 @@
         });
     });
 
-    function resendOtpWithCooldown(event) {
+    async function resendOtpWithCooldown(event) {
         event.preventDefault();
         const resendEl = document.getElementById('resendOtpLink');
-        sendLoginOtp();
+        const ok = await sendLoginOtp(true); // isResend=true → errors shown in #otpError
+        if (!ok) return; // don't start countdown if OTP wasn't sent
         let t = 30;
         resendEl.style.pointerEvents = 'none';
         resendEl.textContent = `Resend in ${t}s`;
-        const iv = setInterval(() => {
+        resendCooldownInterval = setInterval(() => {
             t--;
             resendEl.textContent = `Resend in ${t}s`;
             if (t <= 0) {
-                clearInterval(iv);
+                clearInterval(resendCooldownInterval);
+                resendCooldownInterval = null;
                 resendEl.style.pointerEvents = '';
                 resendEl.textContent = 'Resend OTP';
             }
         }, 1000);
     }
 
-    async function sendLoginOtp() {
+    function resetResendCooldown() {
+        if (resendCooldownInterval) {
+            clearInterval(resendCooldownInterval);
+            resendCooldownInterval = null;
+        }
+        const resendEl = document.getElementById('resendOtpLink');
+        if (resendEl) {
+            resendEl.style.pointerEvents = '';
+            resendEl.textContent = 'Resend OTP';
+        }
+    }
+
+    async function sendLoginOtp(isResend) {
         const phone = document.getElementById('loginPhone').value.trim();
-        if (!phone) { showError('phoneError', 'Phone number required'); return; }
+        const errTarget = isResend ? 'otpError' : 'phoneError';
+        if (!phone) { showError(errTarget, 'Phone number required'); return false; }
 
         const btn = document.getElementById('sendOtpBtn');
-        btn.disabled = true;
-        btn.textContent = 'Sending...';
+        if (!isResend) {
+            btn.disabled = true;
+            btn.textContent = 'Sending...';
+        }
 
         try {
             const res = await fetch(`${API}/send-otp`, {
@@ -124,14 +144,19 @@
                 document.getElementById('phoneSection').style.display = 'none';
                 document.getElementById('otpSection').style.display = 'block';
                 document.querySelector('[data-otp="1"]').focus();
+                return true;
             } else {
-                showError('phoneError', data.message || 'Failed to send OTP');
+                showError(errTarget, data.message || 'Failed to send OTP');
+                return false;
             }
         } catch (err) {
-            showError('phoneError', 'Network error. Try again.');
+            showError(errTarget, 'Network error. Try again.');
+            return false;
         } finally {
-            btn.disabled = false;
-            btn.textContent = 'Send OTP';
+            if (!isResend) {
+                btn.disabled = false;
+                btn.textContent = 'Send OTP';
+            }
         }
     }
 
