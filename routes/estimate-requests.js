@@ -300,8 +300,13 @@ router.post('/', async (req, res) => {
         
         // Insert products if method is 'product'
         if (requestMethod === 'product' && products) {
-            const productList = typeof products === 'string' ? JSON.parse(products) : products;
-            
+            let productList;
+            try {
+                productList = typeof products === 'string' ? JSON.parse(products) : (products || []);
+            } catch (e) {
+                return res.status(400).json({ success: false, error: 'Invalid products data' });
+            }
+
             for (const product of productList) {
                 await pool.query(`
                     INSERT INTO estimate_request_products (

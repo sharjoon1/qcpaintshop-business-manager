@@ -203,7 +203,7 @@ router.post('/register', async (req, res) => {
         for (let attempt = 0; attempt < 5; attempt++) {
             const [codeCheck] = await pool.query('SELECT id FROM painters WHERE referral_code = ?', [myReferralCode]);
             if (codeCheck.length === 0) break;
-            myReferralCode = pointsEngine.generateReferralCode(full_name) + Math.floor(Math.random() * 100);
+            myReferralCode = pointsEngine.generateReferralCode(full_name) + require('crypto').randomInt(10, 99);
         }
 
         let referredBy = null;

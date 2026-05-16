@@ -15,6 +15,11 @@ const { requireAuth, requirePermission } = require('../middleware/permissionMidd
 let pool;
 function setPool(p) { pool = p; }
 
+function safeParse(val, fallback = []) {
+    if (typeof val !== 'string') return val || fallback;
+    try { return JSON.parse(val) || fallback; } catch { return fallback; }
+}
+
 // Photo upload config
 const storage = multer.diskStorage({
     destination: (req, file, cb) => {
@@ -59,10 +64,8 @@ router.get('/today', requireAuth, async (req, res) => {
 
         // Filter by role
         const filtered = templates.filter(t => {
-            try {
-                const roles = typeof t.roles === 'string' ? JSON.parse(t.roles) : t.roles;
-                return !roles || roles.length === 0 || roles.includes(userRole);
-            } catch { return true; }
+            const roles = safeParse(t.roles, []);
+            return !roles || roles.length === 0 || roles.includes(userRole);
         });
 
         // Get today's responses
@@ -90,14 +93,14 @@ router.get('/today', requireAuth, async (req, res) => {
         // Parse JSON fields
         const parsedTemplates = filtered.map(t => ({
             ...t,
-            detail_fields: typeof t.detail_fields === 'string' ? JSON.parse(t.detail_fields || '[]') : (t.detail_fields || []),
-            roles: typeof t.roles === 'string' ? JSON.parse(t.roles || '[]') : (t.roles || [])
+            detail_fields: safeParse(t.detail_fields, []),
+            roles: safeParse(t.roles, [])
         }));
 
         const parsedResponses = responses.map(r => ({
             ...r,
-            details: typeof r.details === 'string' ? JSON.parse(r.details || '{}') : (r.details || {}),
-            photos: typeof r.photos === 'string' ? JSON.parse(r.photos || '[]') : (r.photos || [])
+            details: safeParse(r.details, {}),
+            photos: safeParse(r.photos, [])
         }));
 
         res.json({
@@ -183,10 +186,7 @@ router.post('/upload-photo', requireAuth, upload.single('photo'), async (req, re
         );
 
         if (existing.length > 0) {
-            let photos = [];
-            try {
-                photos = typeof existing[0].photos === 'string' ? JSON.parse(existing[0].photos || '[]') : (existing[0].photos || []);
-            } catch { photos = []; }
+            let photos = safeParse(existing[0].photos, []);
             photos.push(photoUrl);
             await pool.query('UPDATE daily_task_responses SET photos = ? WHERE id = ?', [JSON.stringify(photos), existing[0].id]);
         } else {
@@ -305,10 +305,8 @@ router.post('/submit-day', requireAuth, async (req, res) => {
 
         const [templates] = await pool.query('SELECT * FROM daily_task_templates WHERE is_active = TRUE');
         const filtered = templates.filter(t => {
-            try {
-                const roles = typeof t.roles === 'string' ? JSON.parse(t.roles) : t.roles;
-                return !roles || roles.length === 0 || roles.includes(userRole);
-            } catch { return true; }
+            const roles = safeParse(t.roles, []);
+            return !roles || roles.length === 0 || roles.includes(userRole);
         });
 
         // Count responses
@@ -367,10 +365,8 @@ router.get('/status', requireAuth, async (req, res) => {
         // Count applicable templates
         const [templates] = await pool.query('SELECT * FROM daily_task_templates WHERE is_active = TRUE');
         const filtered = templates.filter(t => {
-            try {
-                const roles = typeof t.roles === 'string' ? JSON.parse(t.roles) : t.roles;
-                return !roles || roles.length === 0 || roles.includes(userRole);
-            } catch { return true; }
+            const roles = safeParse(t.roles, []);
+            return !roles || roles.length === 0 || roles.includes(userRole);
         });
 
         // Count responses
@@ -409,8 +405,8 @@ router.get('/templates', requirePermission('tasks', 'view'), async (req, res) =>
         const [templates] = await pool.query('SELECT * FROM daily_task_templates ORDER BY sort_order');
         const parsed = templates.map(t => ({
             ...t,
-            detail_fields: typeof t.detail_fields === 'string' ? JSON.parse(t.detail_fields || '[]') : (t.detail_fields || []),
-            roles: typeof t.roles === 'string' ? JSON.parse(t.roles || '[]') : (t.roles || [])
+            detail_fields: safeParse(t.detail_fields, []),
+            roles: safeParse(t.roles, [])
         }));
         res.json({ success: true, data: parsed });
     } catch (error) {
@@ -530,8 +526,8 @@ router.get('/admin/responses', requirePermission('tasks', 'view'), async (req, r
         // Parse JSON fields
         const parsed = responses.map(r => ({
             ...r,
-            details: typeof r.details === 'string' ? JSON.parse(r.details || '{}') : (r.details || {}),
-            photos: typeof r.photos === 'string' ? JSON.parse(r.photos || '[]') : (r.photos || []),
+            details: safeParse(r.details, {}),
+            photos: safeParse(r.photos, []),
             materials: materials.filter(m => m.response_id === r.id)
         }));
 

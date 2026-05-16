@@ -133,9 +133,9 @@ router.post('/stop-with-photo', requireAuth, (req, res, next) => {
         let metadata = {};
         if (req.body.metadata) {
             try {
-                metadata = typeof req.body.metadata === 'string' ? JSON.parse(req.body.metadata) : req.body.metadata;
+                metadata = typeof req.body.metadata === 'string' ? JSON.parse(req.body.metadata) : (req.body.metadata || {});
             } catch (e) {
-                // ignore parse errors
+                return res.status(400).json({ success: false, error: 'Invalid metadata format' });
             }
         }
 
