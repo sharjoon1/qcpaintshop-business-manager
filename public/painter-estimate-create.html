@@ -244,7 +244,7 @@
             dot.className = 'stepper-dot' + (s === step ? ' active' : s < step ? ' done' : '');
         });
 
-        if (step === 3) loadProducts();
+        if (step === 3) { maybePreloadProduct(); loadProducts(); }
         window.scrollTo(0, 0);
     }
 
@@ -486,11 +486,9 @@
             document.getElementById('cartTotals').innerHTML =
                 '<div class="flex justify-between text-sm text-gray-600 mb-1"><span>Items (' + items.length + ')</span><span>' + fmtPrice(total) + '</span></div>' +
                 '<div class="text-[0.65rem] text-gray-400 mb-1">* Prices include GST</div>' +
-                '<div class="flex justify-between font-semibold text-gray-800 pt-1 border-t border-gray-200"><span>Total</span><span>' + fmtPrice(total) + '</span></div>' +
-                '<div id="estimatedPoints" style="font-size:0.8125rem;color:#1B5E3B;margin-top:4px;"></div>';
+                '<div class="flex justify-between font-semibold text-gray-800 pt-1 border-t border-gray-200"><span>Total</span><span>' + fmtPrice(total) + '</span></div>';
+                // TODO: add estimated points once /api/painters/config returns points_rate
             document.getElementById('floatingCartTotal').textContent = fmtPrice(total);
-            const epEl = document.getElementById('estimatedPoints');
-            if (epEl) epEl.textContent = total > 0 ? '≈ ' + Math.floor(total * (window.painterPointsRate || 1)) + ' points / புள்ளிகள்' : '';
         } else {
             document.getElementById('cartTotals').innerHTML = '<div class="text-sm text-gray-500 text-center">Prices will be set by admin after review</div>';
             document.getElementById('floatingCartTotal').textContent = '';
@@ -541,18 +539,41 @@
         }
     }
 
-    // Fetch painter points rate on page load
-    (async function fetchPointsRate() {
-        try {
-            const res = await fetch(`${API}/me`, { headers: painterHeaders() });
-            if (res.ok) {
-                const data = await res.json();
-                if (data.success && data.painter) {
-                    window.painterPointsRate = data.painter.points_rate || 1;
-                }
+    // Pre-fill product from catalog link (?product_id=X)
+    async function maybePreloadProduct() {
+        const urlParams = new URLSearchParams(window.location.search);
+        const preloadProductId = parseInt(urlParams.get('product_id'), 10);
+        if (!preloadProductId) return;
+
+        // Wait until products are loaded (loadProducts is called when entering step 3)
+        const originalRender = renderProducts;
+        renderProducts = function(products) {
+            originalRender(products);
+            renderProducts = originalRender; // restore after first call
+
+            const product = allProducts.find(p => p.id === preloadProductId);
+            if (!product) return;
+
+            // Add first in-stock pack size, or the first pack size if none in stock
+            const ps = product.pack_sizes.find(s => s.stock > 0) || product.pack_sizes[0];
+            if (!ps) return;
+
+            const key = product.id + '_' + ps.pack_size_id;
+            if (!cart[key]) {
+                addToCart(key, product.id, ps.pack_size_id);
+                showToast('Product added from catalog');
             }
-        } catch (e) { /* silent, default of 1 will be used */ }
-    })();
+        };
+    }
+
+    function showToast(msg) {
+        const el = document.createElement('div');
+        el.style.cssText = 'position:fixed;top:1rem;left:50%;transform:translateX(-50%);background:#1B5E3B;color:#fff;padding:0.5rem 1.25rem;border-radius:0.625rem;font-size:0.875rem;font-weight:500;z-index:200;box-shadow:0 2px 8px rgba(0,0,0,0.15);pointer-events:none;';
+        el.textContent = msg;
+        document.body.appendChild(el);
+        setTimeout(() => { el.style.opacity = '0'; el.style.transition = 'opacity 0.3s'; }, 2200);
+        setTimeout(() => el.remove(), 2600);
+    }
 
     // Initialize stepper for step 1
     buildStepper();

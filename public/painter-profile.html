@@ -493,6 +493,7 @@
             if (h > max) { w = w * max / h; h = max; }
             c.width = w; c.height = h;
             c.getContext('2d').drawImage(img, 0, 0, w, h);
+            URL.revokeObjectURL(img.src);
             c.toBlob(function(b) {
                 const fd = new FormData();
                 fd.append('photo', b, 'photo.jpg');
