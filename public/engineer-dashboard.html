@@ -199,13 +199,13 @@
         // Status banner
         var bar = document.getElementById('epStatusBanner');
         if (status === 'pending') {
+          bar.className = 'banner-pending';
+          bar.innerHTML = '⏳ Your account is pending approval. Our team will review within 24 hours.';
           bar.style.display = '';
-          bar.className = 'ep-notice warn';
-          bar.innerHTML = '<strong>Notice:</strong> Account verification is in progress. Quotation requests can be submitted; credit and loyalty facilities will be released upon administrator approval.';
         } else if (status === 'rejected') {
-          bar.style.display = '';
-          bar.className = 'ep-notice err';
+          bar.className = 'banner-rejected';
           bar.innerHTML = '<strong>Account application declined.</strong> ' + (reason ? 'Reason on record: ' + EP.escapeHTML(reason) + '. ' : '') + 'Please contact the relationship manager.';
+          bar.style.display = '';
         } else if (status === 'suspended') {
           bar.style.display = '';
           bar.className = 'ep-notice err';

@@ -9,6 +9,7 @@
 const express = require('express');
 const router = express.Router();
 const crypto = require('crypto');
+const { randomInt } = require('crypto');
 const { requirePermission, requireAuth } = require('../middleware/permissionMiddleware');
 const pointsEngine = require('../services/painter-points-engine');
 const zohoAPI = require('../services/zoho-api');
@@ -203,7 +204,7 @@ router.post('/register', async (req, res) => {
         for (let attempt = 0; attempt < 5; attempt++) {
             const [codeCheck] = await pool.query('SELECT id FROM painters WHERE referral_code = ?', [myReferralCode]);
             if (codeCheck.length === 0) break;
-            myReferralCode = pointsEngine.generateReferralCode(full_name) + require('crypto').randomInt(10, 99);
+            myReferralCode = pointsEngine.generateReferralCode(full_name) + randomInt(10, 100);
         }
 
         let referredBy = null;
