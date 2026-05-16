@@ -379,7 +379,7 @@
                         </div>
                         <div class="text-right">
                             <span class="status-badge status-${esc(request.status)} px-2 py-0.5 rounded-full text-xs font-semibold">${esc(formatStatus(request.status))}</span>
-                            <p class="text-sm text-gray-500 mt-1">${request.area_sqft ? esc(String(request.area_sqft)) + ' sq.ft' : ''}</p>
+                            <p class="font-bold text-gray-800 mt-1">${fmtINR(request.estimate_amount || request.total_amount || request.amount || 0)}</p>
                         </div>
                     </div>
                 `).join('');
