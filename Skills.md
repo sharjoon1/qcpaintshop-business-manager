@@ -1,8 +1,8 @@
 # QC Paint Shop Business Manager - System Skills & Capabilities
 
 > **Platform**: act.qcpaintshop.com
-> **Version**: Web on master HEAD · Staff Android 3.3.9 vc18 (internal) · Painter Android 3.3.0 vc32 (internal)
-> **Last Updated**: 2026-05-13
+> **Version**: Web on master HEAD · Staff Android 3.3.9 vc18 (internal) · Painter Android v3.5.0 vc38 (branch design/painter-app-ux-2026-05, APK delivered 2026-05-17, Play Store upload pending)
+> **Last Updated**: 2026-05-17
 > **Total Codebase**: ~205,000 LOC (web) | 106 frontend pages | Android app (3 flavors: staff / customer / painter)
 
 ---
