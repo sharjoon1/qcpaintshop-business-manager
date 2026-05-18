@@ -13,7 +13,7 @@
 
 const express = require('express');
 const router = express.Router();
-const { requirePermission, isFullAdmin } = require('../middleware/permissionMiddleware');
+const { requirePermission, requireAuth, isFullAdmin } = require('../middleware/permissionMiddleware');
 
 let pool;
 let sessionManager;
@@ -24,12 +24,13 @@ function setSessionManager(sm) { sessionManager = sm; }
 const perm = requirePermission('zoho', 'whatsapp_sessions');
 
 // Allows admin OR any authenticated staff with a branch_id (for their own branch)
-const permStaff = (req, res, next) => {
-    // req.user is set globally by auth middleware before routes
-    if (!req.user) return res.status(401).json({ success: false, message: 'Unauthorised' });
-    if (isFullAdmin(req.user.role) || req.user.branch_id) return next();
-    return res.status(403).json({ success: false, message: 'Not authorised — no branch assigned' });
-};
+const permStaff = [
+    requireAuth,
+    (req, res, next) => {
+        if (isFullAdmin(req.user.role) || req.user.branch_id) return next();
+        return res.status(403).json({ success: false, message: 'Not authorised — no branch assigned' });
+    }
+];
 
 // ========================================
 // LIST ALL SESSIONS
