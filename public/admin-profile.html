@@ -308,6 +308,35 @@
                     Update Password
                 </button>
             </form>
+
+            <!-- 2FA Section -->
+            <div class="mt-6 pt-6 border-t border-gray-100" id="twoFASection" style="display:none">
+                <div class="section-title mb-4">
+                    <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/></svg>
+                    Two-Factor Authentication (2FA)
+                </div>
+                <p class="text-sm text-gray-500 mb-4">Required for Admin and Manager accounts. Use Google Authenticator, Authy, or any TOTP app.</p>
+                <div id="twoFAStatus" class="mb-4"></div>
+                <div id="twoFAActions"></div>
+            </div>
+
+            <!-- 2FA QR Modal -->
+            <div id="qrModal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 px-4">
+                <div class="bg-white rounded-2xl shadow-xl p-6 w-full max-w-sm">
+                    <h3 class="text-lg font-bold text-gray-800 mb-1">Scan QR Code</h3>
+                    <p class="text-sm text-gray-500 mb-4">Scan with Google Authenticator, Authy, or any TOTP app.</p>
+                    <img id="qrImage" src="" alt="QR Code" class="mx-auto mb-3 rounded-lg border border-gray-200" style="width:200px;height:200px">
+                    <p class="text-xs text-gray-500 text-center mb-1">Or enter manually:</p>
+                    <p id="manualKey" class="text-xs font-mono bg-gray-100 rounded px-3 py-2 text-center text-gray-700 mb-4 break-all"></p>
+                    <label class="text-sm font-medium text-gray-700 mb-1 block">Enter the 6-digit code to verify:</label>
+                    <input type="text" id="verifyTotpInput" inputmode="numeric" maxlength="6" autocomplete="one-time-code"
+                        class="w-full text-center text-xl tracking-widest font-mono border-2 border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:border-indigo-500 mb-2"
+                        placeholder="000000">
+                    <div id="qrError" class="hidden text-red-600 text-sm text-center mb-2"></div>
+                    <button onclick="confirmTOTPSetup()" class="w-full py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold rounded-lg transition mb-2">Verify & Enable 2FA</button>
+                    <button onclick="document.getElementById('qrModal').classList.add('hidden')" class="w-full py-2 text-gray-500 text-sm hover:text-gray-700">Cancel</button>
+                </div>
+            </div>
         </div>
     </div>
 
@@ -712,8 +741,71 @@
             setTimeout(() => { toast.classList.remove('show'); }, 3000);
         }
 
+        // ── 2FA Functions ──
+        async function load2FAStatus() {
+            try {
+                const user = JSON.parse(localStorage.getItem('user') || '{}');
+                if (!['admin', 'manager'].includes(user.role)) return;
+                document.getElementById('twoFASection').style.display = 'block';
+                const data = await fetch('/api/2fa/status', { headers: getAuthHeaders() }).then(r => r.json());
+                const statusEl = document.getElementById('twoFAStatus');
+                const actionsEl = document.getElementById('twoFAActions');
+                if (data.totp_enabled) {
+                    statusEl.innerHTML = '<span class="inline-flex items-center gap-1.5 px-3 py-1 bg-green-100 text-green-800 rounded-full text-sm font-medium">✓ 2FA is enabled</span>';
+                    actionsEl.innerHTML = `<button onclick="disable2FA()" class="px-4 py-2 bg-red-50 hover:bg-red-100 text-red-700 border border-red-200 rounded-lg text-sm font-medium transition">Disable 2FA</button>`;
+                } else {
+                    statusEl.innerHTML = '<span class="inline-flex items-center gap-1.5 px-3 py-1 bg-amber-100 text-amber-800 rounded-full text-sm font-medium">⚠ 2FA not enabled</span>';
+                    actionsEl.innerHTML = `<button onclick="setup2FA()" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-sm font-semibold transition">Enable 2FA</button>`;
+                }
+            } catch (e) { /* non-critical, skip */ }
+        }
+
+        async function setup2FA() {
+            const data = await fetch('/api/2fa/setup', { headers: getAuthHeaders() }).then(r => r.json());
+            if (!data.success) { showToast(data.error || 'Failed to start setup', 'error'); return; }
+            if (data.already_enabled) { showToast('2FA is already enabled'); return; }
+            document.getElementById('qrImage').src = data.qr;
+            document.getElementById('manualKey').textContent = data.manual_key;
+            document.getElementById('verifyTotpInput').value = '';
+            document.getElementById('qrError').classList.add('hidden');
+            document.getElementById('qrModal').classList.remove('hidden');
+            setTimeout(() => document.getElementById('verifyTotpInput').focus(), 200);
+        }
+
+        async function confirmTOTPSetup() {
+            const token = document.getElementById('verifyTotpInput').value.trim();
+            const errEl = document.getElementById('qrError');
+            if (!token || token.length !== 6) { errEl.textContent = 'Enter a 6-digit code.'; errEl.classList.remove('hidden'); return; }
+            const data = await fetch('/api/2fa/verify-setup', {
+                method: 'POST',
+                headers: Object.assign({ 'Content-Type': 'application/json' }, getAuthHeaders()),
+                body: JSON.stringify({ token })
+            }).then(r => r.json());
+            if (data.success) {
+                document.getElementById('qrModal').classList.add('hidden');
+                showToast('2FA enabled successfully!');
+                load2FAStatus();
+            } else {
+                errEl.textContent = data.error || 'Invalid token. Try again.';
+                errEl.classList.remove('hidden');
+                document.getElementById('verifyTotpInput').value = '';
+            }
+        }
+
+        async function disable2FA() {
+            if (!confirm('Disable 2FA for your account?')) return;
+            const data = await fetch('/api/2fa/disable', {
+                method: 'POST',
+                headers: Object.assign({ 'Content-Type': 'application/json' }, getAuthHeaders()),
+                body: '{}'
+            }).then(r => r.json());
+            if (data.success) { showToast('2FA disabled'); load2FAStatus(); }
+            else showToast(data.error || 'Failed to disable', 'error');
+        }
+
         // Init
         loadProfile();
+        load2FAStatus();
     </script>
     <script src="/components/logo-loader.js"></script>
 </body>

@@ -115,6 +115,25 @@
 
         </div>
 
+        <!-- 2FA Modal -->
+        <div id="twoFAModal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 px-4">
+            <div class="bg-white rounded-2xl shadow-xl p-8 w-full max-w-sm">
+                <div class="text-center mb-6">
+                    <div class="w-14 h-14 bg-indigo-100 rounded-full flex items-center justify-center mx-auto mb-3">
+                        <svg class="w-7 h-7 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"></path></svg>
+                    </div>
+                    <h3 class="text-lg font-bold text-gray-800">Two-Factor Authentication</h3>
+                    <p class="text-sm text-gray-500 mt-1">Enter the 6-digit code from your authenticator app</p>
+                </div>
+                <input type="text" id="totpInput" inputmode="numeric" maxlength="6" autocomplete="one-time-code"
+                    class="w-full text-center text-2xl tracking-widest font-mono border-2 border-gray-300 rounded-lg px-4 py-3 focus:outline-none focus:border-indigo-500 mb-3"
+                    placeholder="000000">
+                <div id="twoFAError" class="hidden text-red-600 text-sm text-center mb-3"></div>
+                <button onclick="submitTwoFA()" id="twoFABtn" class="w-full py-3 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold rounded-lg transition">Verify</button>
+                <p class="text-xs text-gray-400 text-center mt-3">Wrong account? <a href="#" onclick="cancelTwoFA()" class="text-indigo-500 underline">Go back</a></p>
+            </div>
+        </div>
+
         <!-- Footer -->
         <p class="text-center text-green-200 text-sm mt-6">
             © 2025 Quality Colours Paint Shop
@@ -127,6 +146,9 @@
         const loginBtn = document.getElementById('loginBtn');
         const btnText = document.getElementById('btnText');
         const btnLoader = document.getElementById('btnLoader');
+        let pending2FAUserId = null;
+        let pending2FARemember = false;
+        let twoFAAttempts = 0;
         const errorMessage = document.getElementById('errorMessage');
         const errorText = document.getElementById('errorText');
 
@@ -155,6 +177,16 @@
                 const data = await response.json();
 
                 if (response.ok && data.success) {
+                    if (data.requires_2fa) {
+                        pending2FAUserId = data.user_id;
+                        pending2FARemember = remember;
+                        twoFAAttempts = 0;
+                        document.getElementById('twoFAModal').classList.remove('hidden');
+                        document.getElementById('totpInput').value = '';
+                        document.getElementById('twoFAError').classList.add('hidden');
+                        setTimeout(() => document.getElementById('totpInput').focus(), 100);
+                        return;
+                    }
                     // Store session token
                     localStorage.setItem('auth_token', data.token);
                     localStorage.setItem('user', JSON.stringify(data.user));
@@ -208,6 +240,62 @@
                 window.location.href = '/dashboard.html';
             }
         }
+
+        async function submitTwoFA() {
+            const token = document.getElementById('totpInput').value.trim();
+            const errEl = document.getElementById('twoFAError');
+            const btn = document.getElementById('twoFABtn');
+            if (!token || token.length !== 6) {
+                errEl.textContent = 'Enter a 6-digit code.';
+                errEl.classList.remove('hidden');
+                return;
+            }
+            if (twoFAAttempts >= 5) {
+                errEl.textContent = 'Too many attempts. Please wait 30 seconds.';
+                errEl.classList.remove('hidden');
+                return;
+            }
+            btn.disabled = true;
+            btn.textContent = 'Verifying...';
+            try {
+                const res = await fetch('/api/auth/login-2fa', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ user_id: pending2FAUserId, token, remember: pending2FARemember })
+                });
+                const data = await res.json();
+                if (res.ok && data.success) {
+                    localStorage.setItem('auth_token', data.token);
+                    localStorage.setItem('user', JSON.stringify(data.user));
+                    window.location.href = '/dashboard.html';
+                } else {
+                    twoFAAttempts++;
+                    errEl.textContent = data.message || 'Invalid code. Try again.';
+                    errEl.classList.remove('hidden');
+                    document.getElementById('totpInput').value = '';
+                    document.getElementById('totpInput').focus();
+                    if (twoFAAttempts >= 5) {
+                        btn.disabled = true;
+                        setTimeout(() => { twoFAAttempts = 0; btn.disabled = false; btn.textContent = 'Verify'; }, 30000);
+                    }
+                }
+            } catch (e) {
+                errEl.textContent = 'Network error. Please try again.';
+                errEl.classList.remove('hidden');
+            } finally {
+                if (btn.disabled === false || twoFAAttempts < 5) { btn.disabled = false; btn.textContent = 'Verify'; }
+            }
+        }
+
+        function cancelTwoFA() {
+            document.getElementById('twoFAModal').classList.add('hidden');
+            pending2FAUserId = null;
+        }
+
+        // Allow Enter key in TOTP input
+        document.getElementById('totpInput').addEventListener('keydown', function(e) {
+            if (e.key === 'Enter') submitTwoFA();
+        });
     </script>
 <!-- Expired-session toast: shown when auth-helper redirects here with ?reason=expired -->
 <div id="qcExpiredToast" style="position:fixed;top:20px;left:50%;transform:translateX(-50%);background:#fef3c7;color:#92400e;border:1px solid #fde68a;padding:10px 16px;border-radius:8px;box-shadow:0 4px 12px rgba(0,0,0,0.12);font-size:13px;z-index:9999;display:none;max-width:90vw;text-align:center;">

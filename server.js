@@ -98,6 +98,7 @@ const fcmAdmin = require('./services/fcm-admin');
 const monitoringRoutes = require('./routes/monitoring');
 const photosRoutes = require('./routes/photos');
 const agreementsRoutes = require('./routes/agreements');
+const twoFARoutes = require('./routes/auth-2fa');
 
 const app = express();
 app.set('trust proxy', 1); // Trust first proxy (nginx/aaPanel)
@@ -328,6 +329,7 @@ monitoringRoutes.setPool(pool);
 photosRoutes.setPool(pool);
 if (itemMasterRoutes.setPool) itemMasterRoutes.setPool(pool);
 agreementsRoutes.setPool(pool);
+twoFARoutes.setPool(pool);
 const invoiceLineSync = require('./services/zoho-invoice-line-sync');
 invoiceLineSync.setPool(pool);
 const reorderCompute = require('./services/reorder-compute-service');
@@ -398,6 +400,7 @@ app.use('/api/monitoring', monitoringRoutes.router);
 app.use('/api/photos', photosRoutes.router);
 app.use('/api/item-master', itemMasterRoutes.router);
 app.use('/api/agreements', agreementsRoutes.router);
+app.use('/api/2fa', twoFARoutes);
 
 // Share page routes (serve HTML for public share links)
 app.get('/share/estimate/:token', (req, res) => {
@@ -449,6 +452,11 @@ app.post('/api/auth/login', authLimiter, async (req, res) => {
             return res.status(401).json({ success: false, message: 'Invalid credentials' });
         }
 
+        // 2FA challenge for admin/manager roles that have TOTP enabled
+        if (['admin', 'manager'].includes(user.role) && user.totp_enabled) {
+            return res.json({ success: true, requires_2fa: true, user_id: user.id });
+        }
+
         const sessionToken = crypto.randomBytes(32).toString('hex');
         const sessionTokenHash = crypto.createHash('sha256').update(sessionToken).digest('hex');
         const expiresAt = new Date();
@@ -480,6 +488,60 @@ app.post('/api/auth/login', authLimiter, async (req, res) => {
 
     } catch (error) {
         console.error('Login error:', error);
+        res.status(500).json({ success: false, message: 'Server error' });
+    }
+});
+
+// Complete login after successful 2FA TOTP validation
+app.post('/api/auth/login-2fa', authLimiter, async (req, res) => {
+    try {
+        const { user_id, token, remember } = req.body;
+        if (!user_id || !token) {
+            return res.status(400).json({ success: false, message: 'user_id and token required' });
+        }
+
+        const totpSvc = require('./services/totp-service');
+        const [users] = await pool.query(
+            `SELECT u.*, b.name as branch_name FROM users u
+             LEFT JOIN branches b ON u.branch_id = b.id
+             WHERE u.id = ? AND u.status = 'active' AND u.role IN ('admin','manager')`,
+            [user_id]
+        );
+        const user = users[0];
+        if (!user) return res.status(404).json({ success: false, message: 'User not found' });
+        if (!user.totp_enabled) return res.status(400).json({ success: false, message: '2FA not enabled for this user' });
+
+        const valid = totpSvc.verifyToken(user.totp_secret, token);
+        if (!valid) return res.status(401).json({ success: false, message: 'Invalid 2FA token' });
+
+        const sessionToken = crypto.randomBytes(32).toString('hex');
+        const sessionTokenHash = crypto.createHash('sha256').update(sessionToken).digest('hex');
+        const expiresAt = new Date();
+        expiresAt.setHours(expiresAt.getHours() + (remember ? 720 : 24));
+
+        await pool.query(
+            'INSERT INTO user_sessions (user_id, session_token, token_hash, ip_address, user_agent, expires_at) VALUES (?, ?, ?, ?, ?, ?)',
+            [user.id, sessionToken, sessionTokenHash, req.ip, req.get('User-Agent'), expiresAt]
+        );
+        await pool.query('UPDATE users SET last_login = NOW() WHERE id = ?', [user.id]);
+
+        res.json({
+            success: true,
+            token: sessionToken,
+            user: {
+                id: user.id,
+                username: user.username,
+                full_name: user.full_name,
+                email: user.email,
+                role: user.role,
+                branch_id: user.branch_id,
+                branch_name: user.branch_name || null,
+                phone: user.phone,
+                profile_image_url: user.profile_image_url
+            }
+        });
+    } catch (error) {
+        console.error('2FA login error:', error);
         res.status(500).json({ success: false, message: 'Server error' });
     }
 });
