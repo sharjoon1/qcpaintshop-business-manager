@@ -5885,8 +5885,21 @@ router.post('/sync/expenses', requirePermission('zoho', 'sync'), async (req, res
 
 router.get('/creditnotes', requirePermission('zoho', 'view'), async (req, res) => {
     try {
-        const [rows] = await pool.query('SELECT * FROM zoho_credit_notes ORDER BY date DESC LIMIT 200');
-        res.json({ success: true, creditnotes: rows });
+        const { page = 1, limit = 50, status, from_date, to_date } = req.query;
+        const conditions = ['1=1'];
+        const params = [];
+        if (status && status !== 'all') { conditions.push('status = ?'); params.push(status); }
+        if (from_date) { conditions.push('date >= ?'); params.push(from_date); }
+        if (to_date) { conditions.push('date <= ?'); params.push(to_date); }
+        const where = conditions.join(' AND ');
+
+        const [[{ total }]] = await pool.query(`SELECT COUNT(*) as total FROM zoho_credit_notes WHERE ${where}`, params);
+        const rows = await pool.query(
+            `SELECT * FROM zoho_credit_notes WHERE ${where} ORDER BY date DESC LIMIT ? OFFSET ?`,
+            [...params, Number(limit), (Number(page) - 1) * Number(limit)]
+        ).then(([r]) => r);
+
+        res.json({ success: true, creditnotes: rows, total, page: Number(page), limit: Number(limit) });
     } catch (e) { res.status(500).json({ success: false, error: e.message }); }
 });
 

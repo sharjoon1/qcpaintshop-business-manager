@@ -2404,25 +2404,25 @@ async function syncExpenses(params = {}) {
     const fromDate = params.from_date || new Date(Date.now() - 90*24*60*60*1000).toISOString().split('T')[0];
     const data = await apiGet('/expenses', { organization_id: orgId, date_after: fromDate, per_page: 200 });
     const expenses = data.expenses || [];
-    let upserted = 0;
-    for (const exp of expenses) {
-        await pool.query(`
-            INSERT INTO zoho_expenses
-                (expense_id, account_name, paid_through_account_name, vendor_name,
-                 date, total, tax_amount, description, status, currency_code, reference_number, synced_at)
-            VALUES (?,?,?,?,?,?,?,?,?,?,?,NOW())
-            ON DUPLICATE KEY UPDATE
-                account_name=VALUES(account_name), total=VALUES(total),
-                status=VALUES(status), synced_at=NOW()
-        `, [
-            exp.expense_id, exp.account_name, exp.paid_through_account_name,
-            exp.vendor_name, exp.date, exp.total, exp.tax_amount || 0,
-            exp.description, exp.status, exp.currency_code || 'INR',
-            exp.reference_number || null
-        ]);
-        upserted++;
-    }
-    return { success: true, upserted };
+    if (expenses.length === 0) return { success: true, upserted: 0 };
+
+    const values = expenses.map(exp => [
+        exp.expense_id, exp.account_name || null, exp.paid_through_account_name || null,
+        exp.vendor_name || null, exp.date || null, exp.total || 0, exp.tax_amount || 0,
+        exp.description || null, exp.status || null, exp.currency_code || 'INR',
+        exp.reference_number || null
+    ]);
+    const placeholders = values.map(() => '(?,?,?,?,?,?,?,?,?,?,?,NOW())').join(',');
+    await pool.query(`
+        INSERT INTO zoho_expenses
+            (expense_id,account_name,paid_through_account_name,vendor_name,
+             date,total,tax_amount,description,status,currency_code,reference_number,synced_at)
+        VALUES ${placeholders}
+        ON DUPLICATE KEY UPDATE
+            account_name=VALUES(account_name), total=VALUES(total),
+            status=VALUES(status), synced_at=NOW()
+    `, values.flat());
+    return { success: true, upserted: expenses.length };
 }
 
 // ========================================
@@ -2434,28 +2434,28 @@ async function getCreditNotes(params = {}) {
     return await apiGet('/creditnotes', { organization_id: orgId, ...params });
 }
 
-async function syncCreditNotes(params = {}) {
+async function syncCreditNotes() {
     if (!pool) throw new Error('Database pool not initialized');
     const orgId = process.env.ZOHO_ORGANIZATION_ID;
     const data = await apiGet('/creditnotes', { organization_id: orgId, per_page: 200 });
     const notes = data.creditnotes || [];
-    let upserted = 0;
-    for (const cn of notes) {
-        await pool.query(`
-            INSERT INTO zoho_credit_notes
-                (creditnote_id, creditnote_number, customer_name, customer_id,
-                 date, total, balance, status, currency_code, synced_at)
-            VALUES (?,?,?,?,?,?,?,?,?,NOW())
-            ON DUPLICATE KEY UPDATE
-                balance=VALUES(balance), status=VALUES(status), synced_at=NOW()
-        `, [
-            cn.creditnote_id, cn.creditnote_number, cn.customer_name,
-            cn.customer_id, cn.date, cn.total, cn.balance,
-            cn.status, cn.currency_code || 'INR'
-        ]);
-        upserted++;
-    }
-    return { success: true, upserted };
+    if (notes.length === 0) return { success: true, upserted: 0 };
+
+    const values = notes.map(cn => [
+        cn.creditnote_id, cn.creditnote_number || null, cn.customer_name || null,
+        cn.customer_id || null, cn.date || null, cn.total || 0, cn.balance || 0,
+        cn.status || null, cn.currency_code || 'INR'
+    ]);
+    const placeholders = values.map(() => '(?,?,?,?,?,?,?,?,?,NOW())').join(',');
+    await pool.query(`
+        INSERT INTO zoho_credit_notes
+            (creditnote_id,creditnote_number,customer_name,customer_id,
+             date,total,balance,status,currency_code,synced_at)
+        VALUES ${placeholders}
+        ON DUPLICATE KEY UPDATE
+            balance=VALUES(balance), status=VALUES(status), synced_at=NOW()
+    `, values.flat());
+    return { success: true, upserted: notes.length };
 }
 
 async function getRawSalesOrder(soId) {

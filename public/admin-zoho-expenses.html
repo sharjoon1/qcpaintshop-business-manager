@@ -125,6 +125,11 @@
                         </tbody>
                     </table>
                 </div>
+                <div class="flex items-center justify-between px-4 py-3 border-t border-gray-100 text-sm text-gray-500" id="cnPaginationBar">
+                    <button onclick="loadCreditNotes(cnCurrentPage - 1)" id="cnPrevBtn" class="px-3 py-1 rounded border border-gray-300 bg-white hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed">← Prev</button>
+                    <span id="cnPageInfo">—</span>
+                    <button onclick="loadCreditNotes(cnCurrentPage + 1)" id="cnNextBtn" class="px-3 py-1 rounded border border-gray-300 bg-white hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed">Next →</button>
+                </div>
             </div>
         </div>
 
@@ -132,6 +137,7 @@
 
     <script>
     let currentPage = 1;
+    let cnCurrentPage = 1;
     let currentTab = 'expenses';
 
     function formatCurrency(amount) {
@@ -204,13 +210,20 @@
         }
     }
 
-    async function loadCreditNotes() {
+    async function loadCreditNotes(page = 1) {
+        if (page < 1) return;
+        cnCurrentPage = page;
+        const limit = 50;
         try {
-            const data = await fetch('/api/zoho/creditnotes', { headers: getAuthHeaders() }).then(r => r.json());
+            const params = new URLSearchParams({ page, limit });
+            const data = await fetch(`/api/zoho/creditnotes?${params}`, { headers: getAuthHeaders() }).then(r => r.json());
             const tbody = document.getElementById('creditNotesBody');
             if (!data.creditnotes || data.creditnotes.length === 0) {
                 tbody.innerHTML = '<tr><td colspan="6" class="text-center py-8 text-gray-400">No credit notes found. Click Sync Credit Notes to load data.</td></tr>';
                 document.getElementById('statCreditBalance').textContent = '₹0';
+                document.getElementById('cnPageInfo').textContent = '0 records';
+                document.getElementById('cnPrevBtn').disabled = true;
+                document.getElementById('cnNextBtn').disabled = true;
                 return;
             }
             tbody.innerHTML = data.creditnotes.map(cn => `
@@ -225,6 +238,13 @@
             `).join('');
             const totalBalance = data.creditnotes.reduce((s, cn) => s + parseFloat(cn.balance || 0), 0);
             document.getElementById('statCreditBalance').textContent = formatCurrency(totalBalance);
+
+            const totalPages = Math.max(1, Math.ceil((data.total || data.creditnotes.length) / limit));
+            document.getElementById('cnPageInfo').textContent = data.total
+                ? `Page ${page} of ${totalPages} — ${data.total} total`
+                : `${data.creditnotes.length} credit notes`;
+            document.getElementById('cnPrevBtn').disabled = page <= 1;
+            document.getElementById('cnNextBtn').disabled = page >= totalPages;
         } catch (err) {
             document.getElementById('creditNotesBody').innerHTML = '<tr><td colspan="6" class="text-center py-6 text-red-500">Failed to load credit notes</td></tr>';
         }
