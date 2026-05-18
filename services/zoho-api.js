@@ -1455,6 +1455,15 @@ async function syncLocationStock(triggeredBy = null) {
             const batch = items.slice(i, i + batchSize);
             const itemIds = batch.map(it => it.zoho_item_id);
 
+            // Delete all existing location-stock rows for this batch before inserting fresh data.
+            // Zoho occasionally reassigns location IDs, which would leave orphaned rows that inflate SUM totals.
+            if (itemIds.length > 0) {
+                await pool.query(
+                    `DELETE FROM zoho_location_stock WHERE zoho_item_id IN (${itemIds.map(() => '?').join(',')})`,
+                    itemIds
+                );
+            }
+
             const itemDetails = await getItemDetails(itemIds);
 
             for (const item of itemDetails) {
