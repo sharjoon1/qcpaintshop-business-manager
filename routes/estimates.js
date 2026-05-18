@@ -395,10 +395,10 @@ router.post('/:id/send-whatsapp', requireAuth, async (req, res) => {
         if (!pdfResp.ok) throw new Error('Failed to generate PDF');
         const pdfBuffer = Buffer.from(await pdfResp.arrayBuffer());
 
-        // Save to temp file
+        // Save to temp file (unique suffix prevents race conditions on concurrent requests)
         const tmpDir = path.join(os.tmpdir(), 'qc-estimates');
         fs.mkdirSync(tmpDir, { recursive: true });
-        const pdfPath = path.join(tmpDir, `EST-${est.estimate_number}.pdf`);
+        const pdfPath = path.join(tmpDir, `EST-${est.estimate_number}_${Date.now()}_${Math.random().toString(36).slice(2)}.pdf`);
         fs.writeFileSync(pdfPath, pdfBuffer);
 
         // Send PDF via WhatsApp
@@ -489,7 +489,7 @@ router.post('/:id/send-receipt', requireAuth, async (req, res) => {
         const pdfBuffer = Buffer.from(await pdfResp.arrayBuffer());
         const tmpDir = path.join(os.tmpdir(), 'qc-receipts');
         fs.mkdirSync(tmpDir, { recursive: true });
-        const receiptPath = path.join(tmpDir, `Receipt-${est.estimate_number}.pdf`);
+        const receiptPath = path.join(tmpDir, `Receipt-${est.estimate_number}_${Date.now()}_${Math.random().toString(36).slice(2)}.pdf`);
         fs.writeFileSync(receiptPath, pdfBuffer);
 
         const sessionManager = require('../services/whatsapp-session-manager');
@@ -544,7 +544,7 @@ router.post('/:id/update-payment-ref', requireAuth, async (req, res) => {
 // ========================================
 // RECORD PAYMENT ON ESTIMATE
 // ========================================
-router.post('/:id/record-payment', requireAuth, idempotent('estimate.record-payment'), async (req, res) => {
+router.post('/:id/record-payment', requirePermission('billing', 'payment'), idempotent('estimate.record-payment'), async (req, res) => {
     try {
         const { amount, payment_method, payment_reference, send_whatsapp, phone } = req.body;
         if (!amount || amount <= 0) return res.status(400).json({ success: false, message: 'Valid amount required' });
@@ -650,7 +650,7 @@ router.post('/:id/record-payment', requireAuth, idempotent('estimate.record-paym
                     const pdfBuffer = Buffer.from(await pdfResp.arrayBuffer());
                     const tmpDir = path.join(os.tmpdir(), 'qc-receipts');
                     fs.mkdirSync(tmpDir, { recursive: true });
-                    const receiptPath = path.join(tmpDir, `Receipt-${est.estimate_number}.pdf`);
+                    const receiptPath = path.join(tmpDir, `Receipt-${est.estimate_number}_${Date.now()}_${Math.random().toString(36).slice(2)}.pdf`);
                     fs.writeFileSync(receiptPath, pdfBuffer);
 
                     const sessionManager = require('../services/whatsapp-session-manager');
@@ -681,7 +681,7 @@ router.post('/:id/record-payment', requireAuth, idempotent('estimate.record-paym
 // ========================================
 // CREATE PURCHASE ORDER FROM ESTIMATE
 // ========================================
-router.post('/:id/create-po', requireAuth, async (req, res) => {
+router.post('/:id/create-po', requirePermission('billing', 'edit'), async (req, res) => {
     try {
         const { vendor_id, send_whatsapp, vendor_phone, notes, show_prices } = req.body;
         if (!vendor_id) return res.status(400).json({ success: false, message: 'Vendor is required' });
@@ -741,7 +741,7 @@ router.post('/:id/create-po', requireAuth, async (req, res) => {
                     const pdfBuffer = Buffer.from(await pdfResp.arrayBuffer());
                     const tmpDir = path.join(os.tmpdir(), 'qc-po');
                     fs.mkdirSync(tmpDir, { recursive: true });
-                    const poPath = path.join(tmpDir, `PO-${poNumber}.pdf`);
+                    const poPath = path.join(tmpDir, `PO-${poNumber}_${Date.now()}_${Math.random().toString(36).slice(2)}.pdf`);
                     fs.writeFileSync(poPath, pdfBuffer);
 
                     try {
