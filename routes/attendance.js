@@ -888,7 +888,8 @@ router.get('/today', requireAuth, async (req, res) => {
 router.get('/my-history', requireAuth, async (req, res) => {
     try {
         const userId = req.user.id;
-        const { month, year, limit = 30 } = req.query;
+        const { month, year } = req.query;
+        const limit = Math.min(parseInt(req.query.limit) || 30, 200);
         
         let query = `
             SELECT a.*, 
@@ -1266,18 +1267,35 @@ router.post('/permission/request', requireAuth, async (req, res) => {
         
         // Validation
         if (!request_type || !request_date || !reason) {
-            return res.status(400).json({ 
-                success: false, 
-                message: 'Request type, date, and reason are required' 
+            return res.status(400).json({
+                success: false,
+                message: 'Request type, date, and reason are required'
             });
         }
-        
+
         const validTypes = ['late_arrival', 'early_checkout', 'early_leave', 'extended_break', 'leave', 'half_day', 're_clockin', 'outside_work'];
         if (!validTypes.includes(request_type)) {
             return res.status(400).json({
                 success: false,
                 message: 'Invalid request type'
             });
+        }
+
+        // Time-based request types require request_time and duration_minutes
+        const timeBasedTypes = ['late_arrival', 'early_checkout', 'early_leave', 'extended_break'];
+        if (timeBasedTypes.includes(request_type)) {
+            if (!request_time) {
+                return res.status(400).json({
+                    success: false,
+                    message: 'request_time is required for ' + request_type
+                });
+            }
+            if (!duration_minutes || isNaN(parseInt(duration_minutes)) || parseInt(duration_minutes) <= 0) {
+                return res.status(400).json({
+                    success: false,
+                    message: 'duration_minutes must be a positive number for ' + request_type
+                });
+            }
         }
         
         // Get attendance record for the date (if exists)
@@ -1400,10 +1418,11 @@ router.post('/permission/request-reclockin', requireAuth, async (req, res) => {
 router.get('/permission/my-requests', requireAuth, async (req, res) => {
     try {
         const userId = req.user.id;
-        const { status, limit = 50 } = req.query;
-        
+        const { status } = req.query;
+        const limit = Math.min(parseInt(req.query.limit) || 50, 200);
+
         let query = `
-            SELECT ap.*, 
+            SELECT ap.*,
                    reviewer.full_name as reviewed_by_name
             FROM attendance_permissions ap
             LEFT JOIN users reviewer ON ap.reviewed_by = reviewer.id
@@ -1443,7 +1462,8 @@ router.get('/permission/my-requests', requireAuth, async (req, res) => {
  */
 router.get('/permission/all', requirePermission('attendance', 'approve'), async (req, res) => {
     try {
-        const { status, branch_id, limit = 100 } = req.query;
+        const { status, branch_id } = req.query;
+        const limit = Math.min(parseInt(req.query.limit) || 100, 200);
 
         let query = `
             SELECT ap.*,
@@ -2017,11 +2037,11 @@ router.post('/admin/force-clockout', requirePermission('attendance', 'manage'), 
         const workingMinutes = Math.round(((now - new Date(record.clock_in_time)) / 1000 / 60) - breakMinutes);
         const adminNote = `\n[Forced clock-out by admin ID:${adminId}]${notes ? ' ' + notes : ''}`;
 
-        // End active break if any
+        // End active break if any (COALESCE guards against NULL break_start_time)
         await pool.query(
             `UPDATE staff_attendance
              SET break_end_time = ?,
-                 break_duration_minutes = TIMESTAMPDIFF(MINUTE, break_start_time, ?)
+                 break_duration_minutes = COALESCE(TIMESTAMPDIFF(MINUTE, break_start_time, ?), 0)
              WHERE id = ? AND break_start_time IS NOT NULL AND break_end_time IS NULL`,
             [now, now, attendance_id]
         );
@@ -2792,7 +2812,8 @@ router.post('/geofence-violation', requireAuth, async (req, res) => {
  */
 router.get('/geofence-violations', requirePermission('attendance', 'view'), async (req, res) => {
     try {
-        const { user_id, branch_id, from_date, to_date, limit = 100 } = req.query;
+        const { user_id, branch_id, from_date, to_date } = req.query;
+        const limit = Math.min(parseInt(req.query.limit) || 100, 200);
 
         let query = `
             SELECT gv.*,
