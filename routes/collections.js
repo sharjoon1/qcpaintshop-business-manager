@@ -29,6 +29,104 @@ function setPool(p) { pool = p; }
 
 const perm = requirePermission('zoho', 'collections');
 
+/**
+ * Build and queue WhatsApp reminders for a payment promise.
+ * Sends via General WhatsApp (branch_id = 0).
+ * Queues: 1 staff message + 1 customer message (if phone known).
+ */
+async function queuePromiseReminder(pool, promise, staffUser, actionType) {
+    try {
+        // Resolve customer phone if not on promise record
+        let customerPhone = promise.customer_phone;
+        if (!customerPhone && promise.zoho_customer_id) {
+            const [custRows] = await pool.query(
+                `SELECT phone FROM zoho_customers_map WHERE zoho_contact_id = ? LIMIT 1`,
+                [promise.zoho_customer_id]
+            );
+            customerPhone = custRows[0]?.phone || null;
+        }
+
+        // Resolve staff phone
+        let staffPhone = staffUser?.phone || null;
+        if (!staffPhone && staffUser?.id) {
+            const [staffRows] = await pool.query(
+                `SELECT phone FROM users WHERE id = ? LIMIT 1`,
+                [staffUser.id]
+            );
+            staffPhone = staffRows[0]?.phone || null;
+        }
+
+        const promDateFmt = promise.promise_date
+            ? new Date(promise.promise_date).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })
+            : 'N/A';
+        const followUpFmt = promise.follow_up_date
+            ? new Date(promise.follow_up_date).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })
+            : null;
+        const amtFmt = parseFloat(promise.promise_amount || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 });
+        const todayFmt = new Date().toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
+
+        const staffMsg = `📋 *Payment Promise ${actionType === 'updated' ? 'Updated' : actionType === 'resent' ? 'Reminder' : 'Recorded'}*\n\n` +
+            `Customer: *${promise.customer_name || 'Unknown'}*\n` +
+            `Outstanding Balance: *₹${amtFmt}*\n` +
+            `Promise Date: *${promDateFmt}*\n` +
+            `Follow-up Date: *${followUpFmt || promDateFmt}*\n` +
+            `Follow-up done on: *${todayFmt}*\n\n` +
+            `Please follow up on ${followUpFmt || promDateFmt}.\n\n` +
+            `— Quality Colours Collections`;
+
+        const customerMsg = `Dear *${promise.customer_name || 'Valued Customer'}*,\n\n` +
+            `This is a reminder regarding your outstanding balance of *₹${amtFmt}* with Quality Colours.\n\n` +
+            `You have promised to pay by: *${promDateFmt}*\n` +
+            `Our team followed up on: *${todayFmt}*\n\n` +
+            `Kindly arrange payment by the promised date.\n\n` +
+            `Thank you,\n*Quality Colours*`;
+
+        const GENERAL_WA = 0;
+        const entries = [];
+
+        if (staffPhone) {
+            entries.push([
+                promise.zoho_customer_id, promise.zoho_invoice_id || null,
+                promise.customer_name, staffPhone,
+                'promise_staff_reminder', staffMsg,
+                promise.promise_amount, staffUser?.id || null, GENERAL_WA
+            ]);
+        }
+
+        if (customerPhone) {
+            entries.push([
+                promise.zoho_customer_id, promise.zoho_invoice_id || null,
+                promise.customer_name, customerPhone,
+                'promise_customer_reminder', customerMsg,
+                promise.promise_amount, staffUser?.id || null, GENERAL_WA
+            ]);
+        }
+
+        if (entries.length === 0) {
+            console.log(`[Collections] No phones found for promise ${promise.id} — skipping WA reminder`);
+            return;
+        }
+
+        for (const entry of entries) {
+            await pool.query(`
+                INSERT INTO whatsapp_followups (
+                    zoho_customer_id, zoho_invoice_id, customer_name, phone,
+                    message_type, message_body, amount, scheduled_at, created_by, branch_id
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, NOW(), ?, ?)
+            `, entry);
+        }
+
+        await pool.query(
+            `UPDATE payment_promises SET wa_reminder_sent_at = NOW(), customer_phone = COALESCE(customer_phone, ?) WHERE id = ?`,
+            [customerPhone, promise.id]
+        );
+
+        console.log(`[Collections] WA reminder queued for promise ${promise.id} — ${entries.length} messages`);
+    } catch (err) {
+        console.error(`[Collections] WA reminder queue failed for promise ${promise.id}:`, err.message);
+    }
+}
+
 // Helper: resolve branch_id from user role
 // Returns { branchId, includeUnassigned } for proper filtering
 function getBranchFilter(req) {
@@ -588,6 +686,15 @@ router.post('/promises', perm, async (req, res) => {
             data: { id: result.insertId }
         });
 
+        // Queue WA reminder (non-blocking)
+        queuePromiseReminder(pool, {
+            id: result.insertId, zoho_customer_id, zoho_invoice_id: zoho_invoice_id || null,
+            customer_name: customer_name || '', customer_phone: req.body.customer_phone || null,
+            promise_amount, promise_date,
+            follow_up_date: follow_up_date || promise_date,
+            branch_id: branchId || null
+        }, req.user, 'created').catch(() => {});
+
         // Log to activity feed
         const fmtAmt = parseFloat(promise_amount).toLocaleString('en-IN');
         activityFeed.logActivity(req.user.id, req.user.branch_id, 'lead_followup',
@@ -627,10 +734,37 @@ router.put('/promises/:id', perm, async (req, res) => {
             return res.status(404).json({ success: false, message: 'Promise not found' });
         }
 
+        // Re-queue WA reminder if promise_date or follow_up_date changed and still pending
+        if (status === 'pending' && (req.body.promise_date || req.body.follow_up_date)) {
+            const [promRows] = await pool.query(
+                `SELECT * FROM payment_promises WHERE id = ?`, [req.params.id]
+            );
+            if (promRows[0]) {
+                const p = promRows[0];
+                if (req.body.promise_date) p.promise_date = req.body.promise_date;
+                if (req.body.follow_up_date) p.follow_up_date = req.body.follow_up_date;
+                queuePromiseReminder(pool, p, req.user, 'updated').catch(() => {});
+            }
+        }
+
         res.json({ success: true, message: 'Promise updated' });
     } catch (error) {
         console.error('[Collections] Update promise error:', error.message);
         res.status(500).json({ success: false, message: error.message });
+    }
+});
+
+router.post('/promises/:id/remind', perm, async (req, res) => {
+    try {
+        const [rows] = await pool.query(
+            `SELECT * FROM payment_promises WHERE id = ?`, [req.params.id]
+        );
+        if (!rows[0]) return res.status(404).json({ success: false, message: 'Promise not found' });
+        await queuePromiseReminder(pool, rows[0], req.user, 'resent');
+        res.json({ success: true, message: 'WhatsApp reminder queued' });
+    } catch(e) {
+        console.error('[Collections] Resend reminder error:', e.message);
+        res.status(500).json({ success: false, message: e.message });
     }
 });
 

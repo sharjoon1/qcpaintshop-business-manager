@@ -84,6 +84,8 @@ const messageTemplates = {
         `Please arrange restocking at the earliest.\n\n` +
         `Quality Colours - Inventory Alert`,
 
+    promise_staff_reminder: (data) => data.message_body || `Payment promise reminder for ${data.customer_name || 'customer'}`,
+    promise_customer_reminder: (data) => data.message_body || `Payment reminder from Quality Colours for ${data.customer_name || 'customer'}`,
     custom: (data) => data.message_body || ''
 };
 
