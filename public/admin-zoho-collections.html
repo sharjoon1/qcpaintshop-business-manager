@@ -1467,11 +1467,29 @@
         const user = JSON.parse(localStorage.getItem('user') || '{}');
         const _isAdmin = ['admin','administrator','super_admin'].includes((user.role || '').toLowerCase());
         waWidgetBranchId = _isAdmin ? 0 : (user.branch_id || null);
-        if (waWidgetBranchId === null) return; // no branch, hide widget
+        if (waWidgetBranchId === null) return;
         document.getElementById('waSessionWidget').style.display = '';
         const label = _isAdmin ? 'General WhatsApp' : (user.branch_name || 'Your Branch');
         document.getElementById('waBranchLabel').textContent = label;
         document.getElementById('waQrBranchName').textContent = label;
+
+        // Head Office admin (or any admin): show General/Branch toggle
+        const isHeadOffice = _isAdmin || user.branch_id === 1;
+        if (isHeadOffice && user.branch_id) {
+            const widget = document.getElementById('waSessionWidget');
+            const toggleHtml = `<div style="display:flex;gap:6px;margin-bottom:10px;" id="waSessionToggle">
+                <button onclick="switchWaWidgetSession(0)" id="waToggleGeneral"
+                    style="flex:1;padding:5px;font-size:11px;border-radius:6px;border:1.5px solid #25D366;background:#25D366;color:#fff;font-weight:600;cursor:pointer;">
+                    🌐 General WA
+                </button>
+                <button onclick="switchWaWidgetSession(${user.branch_id})" id="waToggleBranch"
+                    style="flex:1;padding:5px;font-size:11px;border-radius:6px;border:1.5px solid #e2e8f0;background:#f8fafc;color:#374151;font-weight:600;cursor:pointer;">
+                    🏢 Branch WA
+                </button>
+            </div>`;
+            widget.insertAdjacentHTML('afterbegin', toggleHtml);
+        }
+
         await refreshWaStatus();
         setInterval(refreshWaStatus, 30000);
     }
@@ -1538,6 +1556,23 @@
     function closeWaQrModal() {
         document.getElementById('waQrModal').style.display = 'none';
         clearInterval(waQrPollInterval);
+        refreshWaStatus();
+    }
+
+    function switchWaWidgetSession(branchId) {
+        waWidgetBranchId = branchId;
+        const genBtn = document.getElementById('waToggleGeneral');
+        const branchBtn = document.getElementById('waToggleBranch');
+        if (genBtn) {
+            genBtn.style.background = branchId === 0 ? '#25D366' : '#f8fafc';
+            genBtn.style.color = branchId === 0 ? '#fff' : '#374151';
+            genBtn.style.borderColor = branchId === 0 ? '#25D366' : '#e2e8f0';
+        }
+        if (branchBtn) {
+            branchBtn.style.background = branchId !== 0 ? '#25D366' : '#f8fafc';
+            branchBtn.style.color = branchId !== 0 ? '#fff' : '#374151';
+            branchBtn.style.borderColor = branchId !== 0 ? '#25D366' : '#e2e8f0';
+        }
         refreshWaStatus();
     }
 

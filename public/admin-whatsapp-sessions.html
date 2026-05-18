@@ -300,6 +300,11 @@ function renderGeneralCard() {
     }
 }
 
+function isHeadOfficeBranch(branch) {
+    return (branch.branch_name && branch.branch_name.toLowerCase().includes('head')) ||
+           branch.branch_id === 1;
+}
+
 function renderCards() {
     const grid = document.getElementById('sessionsGrid');
     document.getElementById('branchesLabel').style.display = sessionsData.length > 0 ? '' : 'none';
@@ -354,6 +359,13 @@ function renderCards() {
                     </div>
                 </div>
                 ${buttons}
+                ${isHeadOfficeBranch(s) ? `
+                <div style="margin-top:10px; padding:8px 10px; background:#f0fdf4; border-radius:8px; font-size:11px; color:#166534; border:1px solid #bbf7d0;">
+                    <strong>Head Office:</strong> You can also connect the
+                    <a href="#" onclick="document.getElementById('generalSection').scrollIntoView({behavior:'smooth'});return false;"
+                       style="color:#16a34a; text-decoration:underline;">General WhatsApp</a>
+                    for company-wide message routing.
+                </div>` : ''}
             </div>
         `;
     }).join('');
