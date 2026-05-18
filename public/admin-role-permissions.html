@@ -20,7 +20,7 @@
     <!-- Header -->
     <div class="bg-gradient-to-r from-purple-600 to-indigo-600 shadow-lg">
         <div class="max-w-7xl mx-auto px-4 py-4">
-            <div class="flex items-center justify-between">
+            <div class="flex items-center justify-between flex-wrap gap-2">
                 <div class="flex items-center gap-4">
                     <a href="/admin-roles.html" class="text-white hover:text-purple-200 transition">
                         <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -32,7 +32,7 @@
                         <p class="text-purple-100 text-sm" id="roleName">Select a role below</p>
                     </div>
                 </div>
-                <button id="saveBtn" onclick="savePermissions()" class="hidden bg-white text-purple-600 px-6 py-2 rounded-lg hover:bg-purple-50 transition shadow-lg font-semibold">
+                <button id="saveBtn" onclick="savePermissions()" class="hidden bg-white text-purple-600 px-3 py-2 sm:px-6 rounded-lg hover:bg-purple-50 transition shadow-lg font-semibold text-sm">
                     Save Permissions
                 </button>
             </div>
@@ -65,7 +65,7 @@
 
         <!-- Search and Filters -->
         <div id="searchCard" class="hidden bg-white rounded-lg shadow-md p-4 mb-6">
-            <div class="flex gap-4 items-center">
+            <div class="flex flex-wrap gap-4 items-center">
                 <input type="text" id="searchPermissions" placeholder="Search permissions..." class="flex-1 px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-600">
                 <button onclick="selectAll()" class="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition">
                     Select All

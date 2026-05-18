@@ -1365,3 +1365,19 @@ body {
     min-height: 36px;
   }
 }
+
+/* Mobile table utilities */
+@media (max-width: 639px) {
+    .mobile-card-table { display: none; }
+    .mobile-card-list { display: block; }
+}
+@media (min-width: 640px) {
+    .mobile-card-table { display: block; }
+    .mobile-card-list { display: none; }
+}
+.table-action-btn {
+    padding: 0.25rem 0.5rem;
+    font-size: 0.75rem;
+    border-radius: 0.375rem;
+    line-height: 1.25rem;
+}
