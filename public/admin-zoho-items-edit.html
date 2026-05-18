@@ -580,8 +580,8 @@
     // Column definitions
     var allColumns = [
         { key: 'name', label: 'Item Name', type: 'text', zohoField: 'name', sticky: true, visible: true },
-        { key: 'brand', label: 'Brand', type: 'text', zohoField: 'brand', visible: true, width: 110 },
-        { key: 'category_name', label: 'Category', type: 'text', zohoField: 'category_name', visible: false, width: 120 },
+        { key: 'brand', label: 'Brand', type: 'select', zohoField: 'brand', options: [], visible: true, width: 130 },
+        { key: 'category_name', label: 'Category', type: 'select', zohoField: 'category_name', options: [], visible: true, width: 140 },
         { key: 'sku', label: 'SKU', type: 'text', zohoField: 'sku', visible: false, width: 110 },
         { key: 'cf_dpl', label: 'DPL', type: 'number', zohoField: 'cf_dpl', step: '0.01', visible: true, width: 90, pctAdjust: true },
         // MRP — Zoho's label_rate field, visible in painter catalog as MRP cap.
@@ -2401,14 +2401,23 @@
             if (!data.success) return;
             var bsel = document.getElementById('brandFilter');
             var csel = document.getElementById('categoryFilter');
+            var brandNames = (data.brands || []).map(function(b){ return b.name; }).filter(Boolean).sort();
+            var catNames   = (data.categories || []).map(function(c){ return c.name; }).filter(Boolean).sort();
+
             if (bsel) bsel.innerHTML = '<option value="">All Brands</option>' +
-                (data.brands || []).map(function(b){
-                    return '<option value="'+escapeHtml(b.name)+'">'+escapeHtml(b.name)+' ('+b.count+')</option>';
+                brandNames.map(function(n){
+                    return '<option value="'+escapeHtml(n)+'">'+escapeHtml(n)+'</option>';
                 }).join('');
             if (csel) csel.innerHTML = '<option value="">All Categories</option>' +
-                (data.categories || []).map(function(c){
-                    return '<option value="'+escapeHtml(c.name)+'">'+escapeHtml(c.name)+' ('+c.count+')</option>';
+                catNames.map(function(n){
+                    return '<option value="'+escapeHtml(n)+'">'+escapeHtml(n)+'</option>';
                 }).join('');
+
+            // Update inline-edit dropdown options for Brand and Category columns
+            var brandCol = allColumns.find(function(c){ return c.key === 'brand'; });
+            if (brandCol) brandCol.options = [''].concat(brandNames);
+            var catCol = allColumns.find(function(c){ return c.key === 'category_name'; });
+            if (catCol) catCol.options = [''].concat(catNames);
         } catch (_) { /* non-blocking */ }
     }
 
