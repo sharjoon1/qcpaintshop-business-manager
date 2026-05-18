@@ -692,7 +692,11 @@
             // Update profile avatar (top-right button)
             const avatarBtn = document.getElementById('headerAvatarBtn');
             if (data.dashboard.profilePhoto) {
-                avatarBtn.innerHTML = `<img src="${data.dashboard.profilePhoto}" style="width:100%;height:100%;object-fit:cover;border-radius:50%">`;
+                const img = document.createElement('img');
+                img.src = data.dashboard.profilePhoto;
+                img.style.cssText = 'width:100%;height:100%;object-fit:cover;border-radius:50%';
+                avatarBtn.innerHTML = '';
+                avatarBtn.appendChild(img);
             } else if (data.dashboard.painterName) {
                 document.getElementById('headerInitial').textContent = data.dashboard.painterName.charAt(0).toUpperCase();
             }
@@ -1784,7 +1788,12 @@
             const data = await res.json();
             if (data.success && data.url) {
                 visitingCardUrl = data.url;
-                document.getElementById('visitingCardPreview').innerHTML = `<img src="${data.url}" alt="Visiting Card">`;
+                const vcImg = document.createElement('img');
+                vcImg.src = data.url;
+                vcImg.alt = 'Visiting Card';
+                const vcEl = document.getElementById('visitingCardPreview');
+                vcEl.innerHTML = '';
+                vcEl.appendChild(vcImg);
             }
         } catch (err) {
             console.error('Load visiting card error:', err);
@@ -1798,7 +1807,12 @@
             const data = await res.json();
             if (data.success && data.url) {
                 idCardUrl = data.url;
-                document.getElementById('idCardPreview').innerHTML = `<img src="${data.url}" alt="ID Card">`;
+                const icImg = document.createElement('img');
+                icImg.src = data.url;
+                icImg.alt = 'ID Card';
+                const icEl = document.getElementById('idCardPreview');
+                icEl.innerHTML = '';
+                icEl.appendChild(icImg);
             }
         } catch (err) {
             console.error('Load ID card error:', err);
@@ -1966,7 +1980,7 @@
         const modal = document.createElement('div');
         modal.className = 'fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4';
         modal.onclick = function(e) { if (e.target === modal) modal.remove(); };
-        modal.innerHTML = `<div class="max-w-lg w-full"><img src="${url}" style="width:100%;border-radius:12px" alt="Visualization"><div class="flex gap-2 mt-3 justify-center"><button onclick="this.closest('.fixed').remove()" class="px-4 py-2 bg-white rounded-lg text-sm font-medium">Close</button></div></div>`;
+        modal.innerHTML = `<div class="max-w-lg w-full"><img src="${esc(url)}" style="width:100%;border-radius:12px" alt="Visualization"><div class="flex gap-2 mt-3 justify-center"><button onclick="this.closest('.fixed').remove()" class="px-4 py-2 bg-white rounded-lg text-sm font-medium">Close</button></div></div>`;
         document.body.appendChild(modal);
     }
 

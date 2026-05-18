@@ -858,11 +858,11 @@
                         <div class="flex items-start justify-between">
                             <div class="flex-1 min-w-0">
                                 <div class="flex items-center gap-2 mb-1">
-                                    <span class="font-bold text-gray-900 text-sm">${l.name}</span>
-                                    <span class="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-amber-100 text-amber-700">${l.lead_type || 'customer'}</span>
-                                    ${l.re_engage_count > 0 ? `<span class="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-teal-100 text-teal-700">Re-engaged x${l.re_engage_count}</span>` : ''}
+                                    <span class="font-bold text-gray-900 text-sm">${escapeHtml(l.name)}</span>
+                                    <span class="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-amber-100 text-amber-700">${escapeHtml(l.lead_type || 'customer')}</span>
+                                    ${l.re_engage_count > 0 ? `<span class="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-teal-100 text-teal-700">Re-engaged x${escapeHtml(String(l.re_engage_count))}</span>` : ''}
                                 </div>
-                                ${l.phone ? `<p class="text-xs text-gray-500">${l.phone}</p>` : ''}
+                                ${l.phone ? `<p class="text-xs text-gray-500">${escapeHtml(l.phone)}</p>` : ''}
                                 <p class="text-xs text-gray-400 mt-1">Last activity: ${lastDate} (${daysAgo}d ago)</p>
                             </div>
                             <button onclick="reEngageLead(${l.id})" class="ml-3 px-3 py-1.5 bg-gradient-to-r from-green-500 to-teal-600 text-white text-xs font-semibold rounded-lg flex-shrink-0">
