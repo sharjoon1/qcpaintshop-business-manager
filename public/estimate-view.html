@@ -629,7 +629,7 @@
 
         function autoSuggestVendor() {
             if (!estimateData || !estimateData.items || !vendors.length) return null;
-            const brands = [...new Set(estimateData.items.map(function(it) { return (it.brand || '').toLowerCase(); }).filter(Boolean))];
+            const brands = [...new Set((estimateData.items || []).map(function(it) { return (it.brand || '').toLowerCase(); }).filter(Boolean))];
             for (const v of vendors) {
                 const vName = (v.vendor_name || '').toLowerCase();
                 for (const brand of brands) {

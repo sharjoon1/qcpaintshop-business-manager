@@ -521,12 +521,13 @@
             };
             
             try {
+                const token = getAuthToken();
                 const response = await fetch('/api/settings', {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
+                    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
                     body: JSON.stringify(taxData)
                 });
-                
+
                 if (response.ok) {
                     alert('✅ Tax settings saved successfully!');
                 } else {
@@ -549,12 +550,13 @@
             };
             
             try {
+                const token = getAuthToken();
                 const response = await fetch('/api/settings', {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
+                    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
                     body: JSON.stringify(estimateData)
                 });
-                
+
                 if (response.ok) {
                     alert('✅ Estimate settings saved successfully!');
                 } else {
