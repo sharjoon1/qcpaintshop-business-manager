@@ -574,7 +574,7 @@ router.put('/me/profile', requirePainterAuth, uploadProfile.single('photo'), asy
             const fs = require('fs');
             if (fs.existsSync(outputPath)) fs.unlinkSync(outputPath);
             fs.renameSync(outputPath + '.tmp', outputPath);
-            if (req.file.path !== outputPath) { try { fs.unlinkSync(req.file.path); } catch (e) {} }
+            if (req.file.path !== outputPath) { try { fs.unlinkSync(req.file.path); } catch (e) { console.warn('[Painters] temp file cleanup failed:', e.message); } }
             photoUrl = `/uploads/profiles/${filename}?v=${Date.now()}`;
         }
 
@@ -612,7 +612,7 @@ router.put('/me/profile-photo', requirePainterAuth, uploadProfile.single('photo'
         fs.renameSync(outputPath + '.tmp', outputPath);
         // Remove multer's original upload
         if (req.file.path !== outputPath) {
-            try { fs.unlinkSync(req.file.path); } catch(e) {}
+            try { fs.unlinkSync(req.file.path); } catch(e) { console.warn('[Painters] temp file cleanup failed:', e.message); }
         }
 
         const photoUrl = `/uploads/profiles/${filename}?v=${Date.now()}`;
@@ -843,7 +843,7 @@ router.get('/me/dashboard', requirePainterAuth, async (req, res) => {
             const awDay = parseInt(cfgMap.painter_annual_withdrawal_day) || 1;
             const monthNames = ['', 'January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
             annualWithdrawalInfo = { month: awMonth, day: awDay, label: `Withdrawal opens on ${monthNames[awMonth]} ${awDay}` };
-        } catch (e) {}
+        } catch (e) { /* optional config fetch; skip if table absent */ }
 
         res.json({
             success: true,
@@ -2764,7 +2764,7 @@ router.post('/me/attendance/claim', requirePainterAuth, async (req, res) => {
                 body_ta: `${result.claimed_ap} AP உங்கள் Regular புள்ளிகளில் சேர்க்கப்பட்டது.`,
                 data: { screen: 'points' }
             });
-        } catch (e) {}
+        } catch (e) { /* push notification failure; non-fatal */ }
 
         res.json(result);
     } catch (err) {
@@ -3957,7 +3957,7 @@ router.post('/attendance/:checkinId/reject', requirePermission('painters', 'mana
                 body_ta: `${result.clawback} AP நீக்கப்பட்டது. காரணம்: ${reason}`,
                 data: { screen: 'attendance' }
             });
-        } catch (e) {}
+        } catch (e) { /* push notification failure; non-fatal */ }
 
         res.json(result);
     } catch (err) {
@@ -5117,7 +5117,7 @@ router.get('/me/quotations/:id', requirePainterAuth, async (req, res) => {
         const [items] = await pool.query('SELECT * FROM painter_quotation_items WHERE quotation_id = ? ORDER BY id', [req.params.id]);
         const quotation = quotations[0];
         if (quotation.rooms_data && typeof quotation.rooms_data === 'string') {
-            try { quotation.rooms_data = JSON.parse(quotation.rooms_data); } catch (e) {}
+            try { quotation.rooms_data = JSON.parse(quotation.rooms_data); } catch (e) { /* malformed JSON stored; skip */ }
         }
 
         res.json({ success: true, quotation, items });
@@ -5644,7 +5644,7 @@ router.get('/me/calculations', requirePainterAuth, async (req, res) => {
         // Parse calculation_data JSON
         for (const calc of calculations) {
             if (calc.calculation_data && typeof calc.calculation_data === 'string') {
-                try { calc.calculation_data = JSON.parse(calc.calculation_data); } catch (e) {}
+                try { calc.calculation_data = JSON.parse(calc.calculation_data); } catch (e) { /* malformed JSON stored; skip */ }
             }
         }
 
@@ -6265,6 +6265,9 @@ router.post('/:id/points/adjust', requirePermission('painters', 'points'), async
         if (!pointPool || !amount) return res.status(400).json({ success: false, message: 'Pool and amount required' });
 
         const amt = parseFloat(amount);
+        if (isNaN(amt) || Math.abs(amt) > 100000) {
+            return res.status(400).json({ success: false, message: 'Amount out of allowed range' });
+        }
         const beforeBalance = await pointsEngine.getBalance(parseInt(req.params.id));
         if (amt > 0) {
             await pointsEngine.addPoints(parseInt(req.params.id), pointPool, amt, 'admin_adjustment', null, null, description || 'Admin adjustment', req.user.id);
