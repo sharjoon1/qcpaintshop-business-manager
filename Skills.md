@@ -1,7 +1,7 @@
 # QC Paint Shop Business Manager - System Skills & Capabilities
 
 > **Platform**: act.qcpaintshop.com
-> **Version**: Web on master HEAD · Staff Android 3.3.9 vc18 (internal) · Painter Android v4.0.0 vc39 (branch design/painter-app-ux-2026-05, APK delivered 2026-05-18, Play Store upload pending)
+> **Version**: Web on master HEAD · Staff Android 3.4.0 vc19 (internal) · Painter Android v4.0.1 vc40 (branch design/painter-app-ux-2026-05, APK delivered 2026-05-18 msg_id 299, Play Store upload pending)
 > **Last Updated**: 2026-05-18
 > **Total Codebase**: ~205,000 LOC (web) | 106 frontend pages | Android app (3 flavors: staff / customer / painter)
 
@@ -3625,7 +3625,7 @@ Recommended next batch:
 - **U13** Structured logging via pino + request IDs — would massively speed up Hetzner debugging.
 - **U2** ESLint + Prettier + EditorConfig + husky pre-commit hook — DX foundation, catches bugs before commit.
 
-Other open U-items: U1 (extract 91 inline routes from server.js), U3 (consolidate session resolver), U4/U5 (slow-query log + SELECT * cleanup), U8 (catalog/brand result cache), U9 (Zod coverage), U11 (remove inline event handlers), U14 (circuit breaker), U15/U16 (DB pool backoff polish), U19 (admin TOTP 2FA), U20 (CSV/Excel export shared service), U21–U24 (UX polish + TS migration).
+Other open U-items: U1 (extract 91 inline routes from server.js), U3 (consolidate session resolver), U4/U5 (slow-query log + SELECT * cleanup), U8 (catalog/brand result cache), U9 (Zod coverage), U11 (remove inline event handlers), U14 (circuit breaker), U15/U16 (DB pool backoff polish), U20 (CSV/Excel export shared service), U21–U24 (UX polish + TS migration). **U19 Admin 2FA — DONE (2026-05-18)**.
 
 Open D-items: D1 admin dashboard refresh, D2 mobile clock-in flow, D3 painter polish, D4 estimate-create wizard, D7 onboarding, D8 card preview, D9 sidebar, D10 dark mode, D11 saved views, D12 mobile bottom nav.
 
@@ -3721,7 +3721,13 @@ User session goal: drive web + both Android flavors to "production-ready, Play-S
 
 **Phase 3 (painter Android v4.0.0) — COMPLETE (2026-05-18):** Full light-mode redesign (Goals A–H). Root cause fixed: `isSystemInDarkTheme()` + `QCDarkScheme` removed; `QCLightScheme` forced always. All ModalBottomSheet + AlertDialog get `containerColor`. ProductDetailSheet gets gradient header + selected variant row + sticky CTA. 8 goals, ~15 commits, v4.0.0 vc39 APK (10.32 MB) delivered to Telegram chat 930726256. Play Store upload pending.
 
-**Phase 4-6 (deferred):** customer portal invoices, anomaly notification badge, bug-reports AI fix loop, painter visualization auto-trigger, 2FA admin, DPL other-brand parsers, design-system token migration, print/PDF CDN migration.
+**V4 Goals (2026-05-18) — COMPLETE:**
+- **Painter v4.0.1 vc40**: AlgorithmicDarkening fix (`WebSettingsCompat.setAlgorithmicDarkeningAllowed(false)`) + staff defaultConfig bump vc18→vc19. APK (10.32 MB) to Telegram msg_id 299.
+- **Zoho sync bulk INSERT**: `syncExpenses` + `syncCreditNotes` converted from 200 sequential single-row inserts to one multi-value `INSERT ... ON DUPLICATE KEY UPDATE`. `GET /creditnotes` now paginated (page/limit/status/date filters).
+- **Admin 2FA TOTP**: `services/totp-service.js` (speakeasy), `routes/auth-2fa.js` (setup/verify/validate/status/disable), `POST /api/auth/login-2fa`, login.html 2FA modal, admin-profile.html QR setup UI. `users.totp_enabled` flag gates the challenge. Non-admin roles unaffected.
+- **Razorpay Pay Now**: `services/razorpay-service.js`, `payment_links` table, 4 routes on `/api/zoho/collections/pay-link|pay-verify|pay-history|pay-order/:id`, `💳 Pay` button per invoice row in `admin-zoho-collections.html`, standalone `public/payment.html`. Requires `RAZORPAY_KEY_ID` + `RAZORPAY_KEY_SECRET` in `.env`.
+
+**Phase 4-6 (deferred):** customer portal invoices, anomaly notification badge, bug-reports AI fix loop, painter visualization auto-trigger, DPL other-brand parsers, design-system token migration, print/PDF CDN migration.
 
 ### Play Store publishing — gotchas hit 2026-05-13
 
@@ -3732,4 +3738,4 @@ User session goal: drive web + both Android flavors to "production-ready, Play-S
 ---
 
 *This document should be updated whenever new features are added or existing ones are enhanced.*
-*Last Updated: 2026-05-18 | Version: 3.3.9 vc18 (Staff internal), v4.0.0 vc39 (Painter — APK delivered, Play Store pending) | Maintained by: Development Team*
+*Last Updated: 2026-05-18 | Version: 3.4.0 vc19 (Staff internal), v4.0.1 vc40 (Painter — APK delivered msg_id 299, Play Store pending) | Maintained by: Development Team*
