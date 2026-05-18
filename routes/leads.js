@@ -40,12 +40,17 @@ async function generateLeadNumber() {
 
     const prefix = `LEAD-${dateStr}-`;
 
-    const [rows] = await pool.query(
-        `SELECT lead_number FROM leads
-         WHERE lead_number LIKE ?
-         ORDER BY lead_number DESC LIMIT 1`,
-        [`${prefix}%`]
-    );
+    let rows;
+    try {
+        [rows] = await pool.query(
+            `SELECT lead_number FROM leads
+             WHERE lead_number LIKE ?
+             ORDER BY lead_number DESC LIMIT 1`,
+            [`${prefix}%`]
+        );
+    } catch (err) {
+        throw new Error(`generateLeadNumber DB error: ${err.message}`);
+    }
 
     let nextSeq = 1;
     if (rows.length > 0) {
@@ -64,6 +69,7 @@ async function generateLeadNumber() {
  * Staff: only own leads | Manager: branch leads | Admin: all leads
  */
 function buildRoleFilter(user) {
+    if (!user) return { clause: '', params: [] };
     const role = (user.role || '').toLowerCase();
     if (['admin', 'administrator', 'super_admin'].includes(role)) {
         return { clause: '', params: [] };
@@ -1055,24 +1061,28 @@ router.post('/my/:id/re-engage', requirePermission('leads', 'own.edit'), async (
  * Creates Zoho Books contact + local customers record
  */
 router.post('/my/:id/convert', requirePermission('leads', 'own.edit'), async (req, res) => {
-    const connection = await pool.getConnection();
-
+    let connection;
     try {
+        connection = await pool.getConnection();
+
         const leadId = req.params.id;
         const { lead_type } = req.body;
 
         if (!['customer', 'painter', 'engineer'].includes(lead_type)) {
             connection.release();
+            connection = null;
             return res.status(400).json({ success: false, message: 'Invalid lead_type. Must be customer, painter, or engineer' });
         }
 
         const ownership = await checkLeadOwnership(leadId, req.user.id);
         if (!ownership.exists) {
             connection.release();
+            connection = null;
             return res.status(404).json({ success: false, message: 'Lead not found' });
         }
         if (!ownership.isOwner) {
             connection.release();
+            connection = null;
             return res.status(403).json({ success: false, message: 'You can only convert leads assigned to you' });
         }
 
@@ -1084,11 +1094,13 @@ router.post('/my/:id/convert', requirePermission('leads', 'own.edit'), async (re
         if (lead.customer_id) {
             await connection.rollback();
             connection.release();
+            connection = null;
             return res.status(400).json({ success: false, message: 'Lead has already been converted' });
         }
         if (lead.status === 'inactive') {
             await connection.rollback();
             connection.release();
+            connection = null;
             return res.status(400).json({ success: false, message: 'Cannot convert an inactive lead' });
         }
 
@@ -1122,6 +1134,7 @@ router.post('/my/:id/convert', requirePermission('leads', 'own.edit'), async (re
 
         await connection.commit();
         connection.release();
+        connection = null;
 
         // NOTE: Zoho contact is NOT created here. It will be created later
         // when estimate is confirmed and payment is received.
@@ -1140,8 +1153,10 @@ router.post('/my/:id/convert', requirePermission('leads', 'own.edit'), async (re
         });
 
     } catch (error) {
-        await connection.rollback();
-        connection.release();
+        if (connection) {
+            try { await connection.rollback(); } catch (rbErr) { /* ignore */ }
+            connection.release();
+        }
         console.error('Staff convert lead error:', error);
         res.status(500).json({ success: false, message: 'Failed to convert lead' });
     }
@@ -1256,9 +1271,15 @@ router.get('/performance/:userId', requirePermission('leads', 'view'), async (re
             return res.status(404).json({ success: false, message: 'User not found' });
         }
 
-        // Manager can only view staff in own branch
-        if (req.user.role === 'manager' && users[0].branch_id !== req.user.branch_id) {
-            return res.status(403).json({ success: false, message: 'Cannot view staff from another branch' });
+        // Manager can only view staff in own branch.
+        // Explicit null-safe check: if either side is null, treat as different branches
+        // to prevent a branch-less manager from accessing branch-less users.
+        if (req.user.role === 'manager') {
+            const targetBranch = users[0].branch_id;
+            const managerBranch = req.user.branch_id;
+            if (targetBranch === null || managerBranch === null || targetBranch !== managerBranch) {
+                return res.status(403).json({ success: false, message: 'Cannot view staff from another branch' });
+            }
         }
 
         // Status breakdown
@@ -2382,14 +2403,16 @@ router.post('/:id/predict', requirePermission('leads', 'edit'), async (req, res)
  * Convert a lead to a customer
  */
 router.post('/:id/convert', requirePermission('leads', 'convert'), async (req, res) => {
-    const connection = await pool.getConnection();
-
+    let connection;
     try {
+        connection = await pool.getConnection();
+
         const leadId = req.params.id;
         const lead_type = req.body.lead_type || 'customer';
 
         if (!['customer', 'painter', 'engineer'].includes(lead_type)) {
             connection.release();
+            connection = null;
             return res.status(400).json({ success: false, message: 'Invalid lead_type' });
         }
 
@@ -2400,6 +2423,7 @@ router.post('/:id/convert', requirePermission('leads', 'convert'), async (req, r
         if (leads.length === 0) {
             await connection.rollback();
             connection.release();
+            connection = null;
             return res.status(404).json({ success: false, message: 'Lead not found' });
         }
 
@@ -2408,12 +2432,14 @@ router.post('/:id/convert', requirePermission('leads', 'convert'), async (req, r
         if (lead.customer_id) {
             await connection.rollback();
             connection.release();
+            connection = null;
             return res.status(400).json({ success: false, message: 'Lead has already been converted', data: { customer_id: lead.customer_id } });
         }
 
         if (lead.status === 'inactive') {
             await connection.rollback();
             connection.release();
+            connection = null;
             return res.status(400).json({ success: false, message: 'Cannot convert an inactive lead' });
         }
 
@@ -2448,6 +2474,7 @@ router.post('/:id/convert', requirePermission('leads', 'convert'), async (req, r
 
         await connection.commit();
         connection.release();
+        connection = null;
 
         // NOTE: Zoho contact is NOT created here. It will be created later
         // when estimate is confirmed and payment is received.
@@ -2469,8 +2496,10 @@ router.post('/:id/convert', requirePermission('leads', 'convert'), async (req, r
         });
 
     } catch (error) {
-        await connection.rollback();
-        connection.release();
+        if (connection) {
+            try { await connection.rollback(); } catch (rbErr) { /* ignore */ }
+            connection.release();
+        }
         console.error('Convert lead error:', error);
         res.status(500).json({ success: false, message: 'Failed to convert lead' });
     }
