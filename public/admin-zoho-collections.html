@@ -17,6 +17,7 @@
     <script src="/universal-nav-loader.js"></script>
     <script src="/js/auth-helper.js"></script>
     <script src="/js/wa-quick-send.js"></script>
+    <script src="https://checkout.razorpay.com/v1/checkout.js"></script>
     <script>requireAdminOrRedirect();</script>
     <style>
         body { background: #f9fafb; }
@@ -715,6 +716,7 @@
                         ${inv.phone ? `<a href="tel:${esc(inv.phone)}" class="px-2 py-1 text-xs bg-emerald-50 text-emerald-700 rounded hover:bg-emerald-100 inline-flex items-center gap-1" title="Call">📞</a>` : ''}
                         ${inv.phone ? `<button onclick="openReminderModal(${idx})" class="px-2 py-1 text-xs bg-green-50 text-green-700 rounded hover:bg-green-100">Remind</button>` : '<span class="text-xs text-gray-400">No phone</span>'}
                         <button onclick="openPromiseForInvoice(${idx})" class="px-2 py-1 text-xs bg-yellow-50 text-yellow-700 rounded hover:bg-yellow-100">Promise</button>
+                        <button onclick="openPayNow('${esc(inv.invoice_id)}','${esc(inv.customer_name||'')}',${parseFloat(inv.balance)||0},'${esc(inv.invoice_number||'')}')" class="px-2 py-1 text-xs bg-indigo-50 text-indigo-700 rounded hover:bg-indigo-100 font-medium">💳 Pay</button>
                     </td>
                 </tr>
             `).join('');
@@ -1443,6 +1445,55 @@
             context: 'collections',
             recipientType: null
         });
+    }
+
+    async function openPayNow(invoiceId, customerName, amount, invoiceNumber) {
+        if (!amount || amount <= 0) { showToast('No outstanding balance for this invoice', 'error'); return; }
+        try {
+            const r = await fetch('/api/zoho/collections/pay-link', {
+                method: 'POST',
+                headers: Object.assign({ 'Content-Type': 'application/json' }, getAuthHeaders()),
+                body: JSON.stringify({ invoice_id: invoiceId, amount, customer_name: customerName, zoho_invoice_number: invoiceNumber })
+            }).then(res => res.json());
+
+            if (!r.success) {
+                showToast(r.error || 'Failed to create payment link', 'error');
+                return;
+            }
+
+            const options = {
+                key: r.key_id,
+                amount: Math.round(r.amount * 100),
+                currency: 'INR',
+                name: 'Quality Colours',
+                description: `Invoice ${invoiceNumber}`,
+                order_id: r.order_id,
+                handler: async function(response) {
+                    const verify = await fetch('/api/zoho/collections/pay-verify', {
+                        method: 'POST',
+                        headers: Object.assign({ 'Content-Type': 'application/json' }, getAuthHeaders()),
+                        body: JSON.stringify({
+                            razorpay_order_id: response.razorpay_order_id,
+                            razorpay_payment_id: response.razorpay_payment_id,
+                            razorpay_signature: response.razorpay_signature,
+                            invoice_id: invoiceId
+                        })
+                    }).then(res => res.json());
+                    if (verify.success) {
+                        showToast('✅ Payment recorded! ID: ' + response.razorpay_payment_id);
+                        loadInvoices();
+                    } else {
+                        showToast('Payment received but verification failed. Contact admin.', 'error');
+                    }
+                },
+                prefill: { name: customerName },
+                theme: { color: '#1B5E3B' }
+            };
+            const rzp = new Razorpay(options);
+            rzp.open();
+        } catch (e) {
+            showToast('Error: ' + e.message, 'error');
+        }
     }
 </script>
 </body>

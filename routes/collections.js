@@ -22,6 +22,7 @@ const express = require('express');
 const router = express.Router();
 const { requirePermission, isFullAdmin } = require('../middleware/permissionMiddleware');
 const activityFeed = require('../services/activity-feed');
+const razorpayService = require('../services/razorpay-service');
 
 let pool;
 function setPool(p) { pool = p; }
@@ -783,5 +784,84 @@ function getInvoiceSortColumn(sort) {
     };
     return allowed[sort] || 'zi.balance';
 }
+
+// ==========================================
+// RAZORPAY PAYMENT LINKS
+// ==========================================
+
+// POST /pay-link — create Razorpay order for an invoice
+router.post('/pay-link', requirePermission('collections', 'view'), async (req, res) => {
+    try {
+        const { invoice_id, amount, customer_name, customer_phone, zoho_invoice_number } = req.body;
+        if (!invoice_id || !amount) {
+            return res.status(400).json({ success: false, error: 'invoice_id and amount required' });
+        }
+        if (!process.env.RAZORPAY_KEY_ID) {
+            return res.status(503).json({ success: false, error: 'Razorpay not configured on this server' });
+        }
+
+        const order = await razorpayService.createOrder({
+            amount,
+            receipt: `inv_${invoice_id}`.substring(0, 40),
+            notes: { invoice_id, customer_name: customer_name || '', zoho_invoice_number: zoho_invoice_number || '' }
+        });
+
+        const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000);
+        await pool.query(`
+            INSERT INTO payment_links
+                (invoice_id, zoho_invoice_number, customer_name, customer_phone, amount, razorpay_order_id, expires_at)
+            VALUES (?,?,?,?,?,?,?)
+        `, [invoice_id, zoho_invoice_number || null, customer_name || null, customer_phone || null, amount, order.id, expiresAt]);
+
+        res.json({ success: true, order_id: order.id, amount, currency: 'INR', key_id: process.env.RAZORPAY_KEY_ID });
+    } catch (e) { res.status(500).json({ success: false, error: e.message }); }
+});
+
+// POST /pay-verify — verify payment signature after Razorpay callback
+router.post('/pay-verify', requirePermission('collections', 'view'), async (req, res) => {
+    try {
+        const { razorpay_order_id, razorpay_payment_id, razorpay_signature, invoice_id } = req.body;
+        if (!razorpay_order_id || !razorpay_payment_id || !razorpay_signature) {
+            return res.status(400).json({ success: false, error: 'order_id, payment_id and signature required' });
+        }
+        const valid = razorpayService.verifyPaymentSignature({
+            order_id: razorpay_order_id,
+            payment_id: razorpay_payment_id,
+            signature: razorpay_signature
+        });
+        if (!valid) return res.status(400).json({ success: false, error: 'Invalid payment signature' });
+
+        await pool.query(
+            `UPDATE payment_links SET status='paid', razorpay_payment_id=?, paid_at=NOW() WHERE razorpay_order_id=?`,
+            [razorpay_payment_id, razorpay_order_id]
+        );
+        res.json({ success: true, payment_id: razorpay_payment_id });
+    } catch (e) { res.status(500).json({ success: false, error: e.message }); }
+});
+
+// GET /pay-history — list payment links with status
+router.get('/pay-history', requirePermission('collections', 'view'), async (req, res) => {
+    try {
+        const [rows] = await pool.query('SELECT * FROM payment_links ORDER BY created_at DESC LIMIT 100');
+        res.json({ success: true, payments: rows });
+    } catch (e) { res.status(500).json({ success: false, error: e.message }); }
+});
+
+// GET /pay-order/:order_id — public endpoint for payment.html (no auth needed)
+router.get('/pay-order/:order_id', async (req, res) => {
+    try {
+        const [rows] = await pool.query(
+            'SELECT invoice_id, zoho_invoice_number, customer_name, amount, status, expires_at FROM payment_links WHERE razorpay_order_id = ?',
+            [req.params.order_id]
+        );
+        if (!rows.length) return res.status(404).json({ success: false, error: 'Order not found' });
+        const link = rows[0];
+        if (link.status === 'paid') return res.json({ success: false, error: 'This invoice has already been paid.' });
+        if (link.expires_at && new Date(link.expires_at) < new Date()) {
+            return res.json({ success: false, error: 'This payment link has expired.' });
+        }
+        res.json({ success: true, order: link, key_id: process.env.RAZORPAY_KEY_ID || '' });
+    } catch (e) { res.status(500).json({ success: false, error: e.message }); }
+});
 
 module.exports = { router, setPool };
