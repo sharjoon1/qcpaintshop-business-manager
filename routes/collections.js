@@ -769,6 +769,37 @@ router.post('/promises/:id/remind', perm, async (req, res) => {
 });
 
 // ========================================
+// DELETE PROMISE
+// ========================================
+
+router.delete('/promises/:id', perm, async (req, res) => {
+    try {
+        const [rows] = await pool.query(
+            `SELECT id, branch_id, created_by FROM payment_promises WHERE id = ?`, [req.params.id]
+        );
+        if (!rows[0]) return res.status(404).json({ success: false, message: 'Promise not found' });
+
+        const promise = rows[0];
+        const user = req.user;
+
+        // Non-admin: can only delete promises on their own branch
+        if (!isFullAdmin(user.role)) {
+            const userBranch = user.branch_id ? parseInt(user.branch_id) : null;
+            const promBranch = promise.branch_id ? parseInt(promise.branch_id) : null;
+            if (userBranch !== promBranch) {
+                return res.status(403).json({ success: false, message: 'Not authorised to delete this promise' });
+            }
+        }
+
+        await pool.query(`DELETE FROM payment_promises WHERE id = ?`, [req.params.id]);
+        res.json({ success: true, message: 'Promise deleted' });
+    } catch(e) {
+        console.error('[Collections] Delete promise error:', e.message);
+        res.status(500).json({ success: false, message: e.message });
+    }
+});
+
+// ========================================
 // EXPORT CSV
 // ========================================
 
