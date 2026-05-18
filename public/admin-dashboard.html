@@ -462,11 +462,11 @@
 
                 return `<div class="${cls}">
                     <div style="display:flex;justify-content:space-between;align-items:center;">
-                        <div class="act-name">${s.full_name || 'Staff #' + s.user_id}</div>
+                        <div class="act-name">${escHtml(s.full_name || 'Staff #' + s.user_id)}</div>
                         ${badge}
                     </div>
                     <div class="act-type">${typeStr}</div>
-                    ${elapsed ? `<div class="act-time">Started ${elapsed} ago · ${s.branch_name || ''}</div>` : `<div class="act-time">${s.branch_name || ''}</div>`}
+                    ${elapsed ? `<div class="act-time">Started ${elapsed} ago · ${escHtml(s.branch_name || '')}</div>` : `<div class="act-time">${escHtml(s.branch_name || '')}</div>`}
                 </div>`;
             }).join('');
         } catch (err) {

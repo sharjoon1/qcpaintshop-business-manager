@@ -596,6 +596,10 @@ async function checkAuth() {
     }
 }
 
+function escHtml(s) {
+    return String(s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
 async function loadBranches() {
     try {
         const token = localStorage.getItem('auth_token');
@@ -605,7 +609,7 @@ async function loadBranches() {
         ['filterBranch', 'calculateBranch'].forEach(id => {
             const sel = document.getElementById(id);
             sel.innerHTML = '<option value="">All Branches</option>';
-            branches.forEach(b => sel.innerHTML += `<option value="${b.id}">${b.name}</option>`);
+            branches.forEach(b => sel.innerHTML += `<option value="${b.id}">${escHtml(b.name)}</option>`);
         });
     } catch(e) { console.error(e); }
 }
@@ -683,9 +687,9 @@ function renderSalaries(salaries) {
         const sunDays = (parseFloat(s.total_sunday_hours || 0) / 5).toFixed(1);
         const otDays  = (parseFloat(s.total_overtime_hours || 0) / 10).toFixed(1);
         return `<tr>
-            <td><input type="checkbox" class="salary-check" value="${s.id}" data-name="${s.staff_name}" onchange="updateBulkBtn()"></td>
-            <td>${s.staff_name}</td>
-            <td>${s.branch_name}</td>
+            <td><input type="checkbox" class="salary-check" value="${s.id}" data-name="${escHtml(s.staff_name)}" onchange="updateBulkBtn()"></td>
+            <td>${escHtml(s.staff_name)}</td>
+            <td>${escHtml(s.branch_name)}</td>
             <td>${s.total_present_days || 0}</td>
             <td>${stdDays}</td>
             <td>${sunDays}</td>
@@ -704,8 +708,8 @@ function renderSalaries(salaries) {
         <div class="salary-card">
             <div class="sc-header">
                 <div>
-                    <div class="sc-name">${s.staff_name}</div>
-                    <div class="sc-branch">${s.branch_name}</div>
+                    <div class="sc-name">${escHtml(s.staff_name)}</div>
+                    <div class="sc-branch">${escHtml(s.branch_name)}</div>
                 </div>
                 <div style="text-align:right;">
                     <div class="net-salary-val">₹${fmtINR(s.net_salary)}</div>
@@ -824,7 +828,7 @@ function renderSalaryDetails(data) {
                 <span>Pending:</span><strong>₹${fmtINR(pending)}</strong>
             </div>
         </div>
-        ${s.notes?`<div style="margin-top:12px;padding:10px;background:#f8f9fa;border-radius:5px;font-size:13px;"><strong>Notes:</strong> ${s.notes}</div>`:''}
+        ${s.notes?`<div style="margin-top:12px;padding:10px;background:#f8f9fa;border-radius:5px;font-size:13px;"><strong>Notes:</strong> ${escHtml(s.notes)}</div>`:''}
     `;
 
     // Pre-fill edit form
