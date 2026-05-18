@@ -17,7 +17,7 @@
     <script src="/universal-nav-loader.js"></script>
     <script src="/js/auth-helper.js"></script>
     <script src="/js/wa-quick-send.js"></script>
-    <script src="https://checkout.razorpay.com/v1/checkout.js"></script>
+
     <script>requireAdminOrRedirect();</script>
     <style>
         body { background: #f9fafb; }
@@ -716,7 +716,7 @@
                         ${inv.phone ? `<a href="tel:${esc(inv.phone)}" class="px-2 py-1 text-xs bg-emerald-50 text-emerald-700 rounded hover:bg-emerald-100 inline-flex items-center gap-1" title="Call">📞</a>` : ''}
                         ${inv.phone ? `<button onclick="openReminderModal(${idx})" class="px-2 py-1 text-xs bg-green-50 text-green-700 rounded hover:bg-green-100">Remind</button>` : '<span class="text-xs text-gray-400">No phone</span>'}
                         <button onclick="openPromiseForInvoice(${idx})" class="px-2 py-1 text-xs bg-yellow-50 text-yellow-700 rounded hover:bg-yellow-100">Promise</button>
-                        <button onclick="openPayNow('${esc(inv.invoice_id)}','${esc(inv.customer_name||'')}',${parseFloat(inv.balance)||0},'${esc(inv.invoice_number||'')}')" class="px-2 py-1 text-xs bg-indigo-50 text-indigo-700 rounded hover:bg-indigo-100 font-medium">💳 Pay</button>
+                        <button onclick="openPayNow('${esc(inv.invoice_id)}','${esc(inv.customer_name||'')}',${parseFloat(inv.balance)||0},'${esc(inv.invoice_number||'')}',this)" class="px-2 py-1 text-xs bg-indigo-50 text-indigo-700 rounded hover:bg-indigo-100 font-medium">💳 Pay</button>
                     </td>
                 </tr>
             `).join('');
@@ -1447,8 +1447,9 @@
         });
     }
 
-    async function openPayNow(invoiceId, customerName, amount, invoiceNumber) {
+    async function openPayNow(invoiceId, customerName, amount, invoiceNumber, btn) {
         if (!amount || amount <= 0) { showToast('No outstanding balance for this invoice', 'error'); return; }
+        if (btn) { btn.disabled = true; btn.textContent = '⏳'; }
         try {
             const r = await fetch('/api/zoho/collections/pay-link', {
                 method: 'POST',
@@ -1456,45 +1457,79 @@
                 body: JSON.stringify({ invoice_id: invoiceId, amount, customer_name: customerName, zoho_invoice_number: invoiceNumber })
             }).then(res => res.json());
 
-            if (!r.success) {
-                showToast(r.error || 'Failed to create payment link', 'error');
-                return;
-            }
-
-            const options = {
-                key: r.key_id,
-                amount: Math.round(r.amount * 100),
-                currency: 'INR',
-                name: 'Quality Colours',
-                description: `Invoice ${invoiceNumber}`,
-                order_id: r.order_id,
-                handler: async function(response) {
-                    const verify = await fetch('/api/zoho/collections/pay-verify', {
-                        method: 'POST',
-                        headers: Object.assign({ 'Content-Type': 'application/json' }, getAuthHeaders()),
-                        body: JSON.stringify({
-                            razorpay_order_id: response.razorpay_order_id,
-                            razorpay_payment_id: response.razorpay_payment_id,
-                            razorpay_signature: response.razorpay_signature,
-                            invoice_id: invoiceId
-                        })
-                    }).then(res => res.json());
-                    if (verify.success) {
-                        showToast('✅ Payment recorded! ID: ' + response.razorpay_payment_id);
-                        loadInvoices();
-                    } else {
-                        showToast('Payment received but verification failed. Contact admin.', 'error');
-                    }
-                },
-                prefill: { name: customerName },
-                theme: { color: '#1B5E3B' }
-            };
-            const rzp = new Razorpay(options);
-            rzp.open();
+            if (!r.success) { showToast(r.error || 'Failed to create payment link', 'error'); return; }
+            showPayLinkSheet(r.link_url, r.link_id, customerName, invoiceNumber, amount);
         } catch (e) {
             showToast('Error: ' + e.message, 'error');
+        } finally {
+            if (btn) { btn.disabled = false; btn.textContent = '💳 Pay'; }
+        }
+    }
+
+    function showPayLinkSheet(linkUrl, linkId, customerName, invoiceNumber, amount) {
+        const amtFmt = '₹' + parseFloat(amount).toLocaleString('en-IN', { minimumFractionDigits: 2 });
+        document.getElementById('plSheetInvoice').textContent = invoiceNumber || '—';
+        document.getElementById('plSheetCustomer').textContent = customerName || '—';
+        document.getElementById('plSheetAmount').textContent = amtFmt;
+        document.getElementById('plSheetLink').value = linkUrl;
+        document.getElementById('plSheetLinkId').value = linkId;
+        document.getElementById('plSheetCopyBtn').onclick = () => {
+            navigator.clipboard.writeText(linkUrl).then(() => showToast('Link copied!')).catch(() => {});
+        };
+        document.getElementById('plSheetOpenBtn').onclick = () => window.open(linkUrl, '_blank');
+        const waMsg = encodeURIComponent(`Dear ${customerName || 'Customer'}, please pay ${amtFmt} for Invoice ${invoiceNumber} using this link: ${linkUrl}`);
+        document.getElementById('plSheetWABtn').href = `https://wa.me/?text=${waMsg}`;
+        document.getElementById('plSheetCheckBtn').onclick = () => checkPayStatus(linkId);
+        document.getElementById('plSheet').style.display = 'flex';
+    }
+
+    async function checkPayStatus(linkId) {
+        const btn = document.getElementById('plSheetCheckBtn');
+        btn.disabled = true; btn.textContent = 'Checking...';
+        try {
+            const r = await fetch('/api/zoho/collections/pay-verify', {
+                method: 'POST',
+                headers: Object.assign({ 'Content-Type': 'application/json' }, getAuthHeaders()),
+                body: JSON.stringify({ link_id: linkId })
+            }).then(res => res.json());
+            if (r.paid) {
+                showToast('✅ Payment confirmed! ID: ' + (r.payment_id || linkId));
+                document.getElementById('plSheet').style.display = 'none';
+                loadInvoices();
+            } else {
+                showToast('Payment not yet received (status: ' + (r.status || 'pending') + ')', 'error');
+            }
+        } catch (e) {
+            showToast('Error: ' + e.message, 'error');
+        } finally {
+            btn.disabled = false; btn.textContent = '🔄 Check Status';
         }
     }
 </script>
+
+<!-- Zoho Payment Link Sheet -->
+<div id="plSheet" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:9999;align-items:center;justify-content:center;padding:1rem">
+  <div style="background:white;border-radius:1rem;padding:1.5rem;max-width:420px;width:100%;box-shadow:0 8px 32px rgba(0,0,0,0.18)">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem">
+      <h3 style="font-size:1rem;font-weight:700;color:#1a202c">💳 Payment Link Created</h3>
+      <button onclick="document.getElementById('plSheet').style.display='none'" style="background:none;border:none;font-size:1.25rem;cursor:pointer;color:#6b7280">✕</button>
+    </div>
+    <div style="background:#f9fafb;border-radius:0.5rem;padding:0.75rem;font-size:0.8125rem;margin-bottom:1rem">
+      <div style="display:flex;justify-content:space-between;margin-bottom:0.25rem"><span style="color:#6b7280">Invoice</span><span id="plSheetInvoice" style="font-weight:600">—</span></div>
+      <div style="display:flex;justify-content:space-between;margin-bottom:0.25rem"><span style="color:#6b7280">Customer</span><span id="plSheetCustomer" style="font-weight:600">—</span></div>
+      <div style="display:flex;justify-content:space-between"><span style="color:#6b7280">Amount</span><span id="plSheetAmount" style="font-weight:700;color:#1B5E3B">—</span></div>
+    </div>
+    <input id="plSheetLink" type="text" readonly style="width:100%;border:1px solid #e5e7eb;border-radius:0.5rem;padding:0.5rem 0.75rem;font-size:0.8125rem;color:#374151;background:#f9fafb;margin-bottom:0.75rem;outline:none" onclick="this.select()">
+    <input id="plSheetLinkId" type="hidden">
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.5rem;margin-bottom:0.5rem">
+      <button id="plSheetCopyBtn" style="padding:0.625rem;background:#1B5E3B;color:white;border:none;border-radius:0.5rem;font-size:0.8125rem;font-weight:600;cursor:pointer">📋 Copy Link</button>
+      <button id="plSheetOpenBtn" style="padding:0.625rem;background:#f0fdf4;color:#1B5E3B;border:1px solid #bbf7d0;border-radius:0.5rem;font-size:0.8125rem;font-weight:600;cursor:pointer">↗ Open</button>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.5rem">
+      <a id="plSheetWABtn" href="#" target="_blank" style="padding:0.625rem;background:#dcfce7;color:#15803d;border:1px solid #bbf7d0;border-radius:0.5rem;font-size:0.8125rem;font-weight:600;cursor:pointer;text-align:center;text-decoration:none">💬 WhatsApp</a>
+      <button id="plSheetCheckBtn" onclick="checkPayStatus(document.getElementById('plSheetLinkId').value)" style="padding:0.625rem;background:#eff6ff;color:#1d4ed8;border:1px solid #bfdbfe;border-radius:0.5rem;font-size:0.8125rem;font-weight:600;cursor:pointer">🔄 Check Status</button>
+    </div>
+  </div>
+</div>
 </body>
 </html>
