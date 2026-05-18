@@ -228,6 +228,15 @@ async function executeStockSync() {
             } catch (e) {
                 console.error('[Scheduler] Reorder check failed:', e.message);
             }
+            // Sync expenses and credit notes (90-day window, lightweight)
+            try {
+                const ninetyDaysAgo = new Date(Date.now() - 90*24*60*60*1000).toISOString().split('T')[0];
+                await zohoAPI.syncExpenses({ from_date: ninetyDaysAgo });
+                await zohoAPI.syncCreditNotes();
+                console.log('[Scheduler] Expenses and credit notes synced');
+            } catch (e) {
+                console.error('[Scheduler] Expenses/credit notes sync failed:', e.message);
+            }
             if (registry) registry.markCompleted('zoho-stock-sync', { details: 'Stock sync done' });
         } finally {
             rateLimiter.releaseSyncLock('stockSync');

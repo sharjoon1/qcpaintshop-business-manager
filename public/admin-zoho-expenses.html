@@ -1,0 +1,288 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="theme-color" content="#667eea">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <link rel="manifest" href="/manifest.json">
+    <link rel="icon" type="image/png" sizes="192x192" href="/icons/icon-192x192.png">
+    <link rel="apple-touch-icon" href="/icons/icon-192x192.png">
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <title>Expenses & Credit Notes - Quality Colours Manager</title>
+    <link rel="stylesheet" href="/css/tailwind.css">
+    <link rel="stylesheet" href="/css/design-system.css">
+    <link rel="stylesheet" href="/css/zoho-common.css">
+    <script src="/universal-nav-loader.js"></script>
+    <script src="/js/auth-helper.js"></script>
+    <script>requireAdminOrRedirect();</script>
+</head>
+<body class="bg-gray-50" data-page="zoho-expenses">
+    <div class="container mx-auto p-4 md:p-6">
+
+        <!-- Header -->
+        <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
+            <div>
+                <h2 class="text-xl sm:text-2xl md:text-3xl font-bold text-gray-800">Expenses & Credit Notes</h2>
+                <p class="text-gray-600 mt-1 text-sm">Synced from Zoho Books</p>
+            </div>
+            <div class="flex gap-2 flex-wrap">
+                <button onclick="syncExpenses()" id="syncExpBtn" class="btn btn-primary flex items-center gap-2 text-sm whitespace-nowrap">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg>
+                    Sync Expenses
+                </button>
+                <button onclick="syncCreditNotes()" id="syncCNBtn" class="btn btn-secondary flex items-center gap-2 text-sm whitespace-nowrap">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg>
+                    Sync Credit Notes
+                </button>
+            </div>
+        </div>
+
+        <!-- Tab Buttons -->
+        <div class="flex gap-2 mb-4">
+            <button onclick="switchTab('expenses')" id="tabExpenses" class="px-4 py-2 text-sm font-medium rounded-lg bg-indigo-600 text-white">Expenses</button>
+            <button onclick="switchTab('creditnotes')" id="tabCreditNotes" class="px-4 py-2 text-sm font-medium rounded-lg bg-white border border-gray-300 text-gray-700 hover:bg-gray-50">Credit Notes</button>
+        </div>
+
+        <!-- Summary Cards -->
+        <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-6" id="summaryCards">
+            <div class="bg-white rounded-lg shadow p-4">
+                <div class="text-gray-500 text-xs font-semibold uppercase">This Month</div>
+                <div class="text-xl font-bold text-gray-800 mt-1" id="statMonth">--</div>
+            </div>
+            <div class="bg-white rounded-lg shadow p-4">
+                <div class="text-gray-500 text-xs font-semibold uppercase">Paid</div>
+                <div class="text-xl font-bold text-green-600 mt-1" id="statPaid">--</div>
+            </div>
+            <div class="bg-white rounded-lg shadow p-4">
+                <div class="text-gray-500 text-xs font-semibold uppercase">Pending</div>
+                <div class="text-xl font-bold text-amber-600 mt-1" id="statPending">--</div>
+            </div>
+            <div class="bg-white rounded-lg shadow p-4">
+                <div class="text-gray-500 text-xs font-semibold uppercase">Credit Balance</div>
+                <div class="text-xl font-bold text-blue-600 mt-1" id="statCreditBalance">--</div>
+            </div>
+        </div>
+
+        <!-- Expenses Section -->
+        <div id="expensesSection">
+            <!-- Filter Bar -->
+            <div class="flex flex-col sm:flex-row gap-2 mb-4 flex-wrap">
+                <input type="date" id="fromDate" class="border rounded-lg px-3 py-2 text-sm w-full sm:w-auto">
+                <input type="date" id="toDate" class="border rounded-lg px-3 py-2 text-sm w-full sm:w-auto">
+                <select id="statusFilter" class="border rounded-lg px-3 py-2 text-sm w-full sm:w-auto">
+                    <option value="">All Status</option>
+                    <option value="paid">Paid</option>
+                    <option value="unbilled">Unbilled</option>
+                    <option value="invoiced">Invoiced</option>
+                    <option value="non-billable">Non-Billable</option>
+                </select>
+                <button onclick="applyFilters()" class="px-4 py-2 bg-indigo-600 text-white text-sm rounded-lg hover:bg-indigo-700 w-full sm:w-auto">Apply</button>
+            </div>
+
+            <!-- Expenses Table (desktop) -->
+            <div class="bg-white rounded-lg shadow overflow-hidden">
+                <div class="overflow-x-auto -mx-0">
+                    <table class="min-w-full divide-y divide-gray-200 text-xs sm:text-sm" id="expensesTable">
+                        <thead class="bg-gray-50">
+                            <tr>
+                                <th class="px-3 py-3 text-left font-semibold text-gray-600 whitespace-nowrap">Date</th>
+                                <th class="px-3 py-3 text-left font-semibold text-gray-600 whitespace-nowrap">Vendor</th>
+                                <th class="px-3 py-3 text-left font-semibold text-gray-600 whitespace-nowrap hidden sm:table-cell">Account</th>
+                                <th class="px-3 py-3 text-left font-semibold text-gray-600 whitespace-nowrap hidden sm:table-cell">Ref #</th>
+                                <th class="px-3 py-3 text-right font-semibold text-gray-600 whitespace-nowrap">Amount</th>
+                                <th class="px-3 py-3 text-right font-semibold text-gray-600 whitespace-nowrap hidden sm:table-cell">Tax</th>
+                                <th class="px-3 py-3 text-center font-semibold text-gray-600 whitespace-nowrap">Status</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-gray-100" id="expensesBody">
+                            <tr><td colspan="7" class="text-center py-8 text-gray-400">Loading expenses...</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+                <div class="px-4 py-3 border-t text-sm text-gray-500" id="expensesPagination"></div>
+            </div>
+        </div>
+
+        <!-- Credit Notes Section (hidden by default) -->
+        <div id="creditNotesSection" class="hidden">
+            <div class="bg-white rounded-lg shadow overflow-hidden">
+                <div class="overflow-x-auto">
+                    <table class="min-w-full divide-y divide-gray-200 text-xs sm:text-sm">
+                        <thead class="bg-gray-50">
+                            <tr>
+                                <th class="px-3 py-3 text-left font-semibold text-gray-600 whitespace-nowrap">Date</th>
+                                <th class="px-3 py-3 text-left font-semibold text-gray-600 whitespace-nowrap">Credit Note #</th>
+                                <th class="px-3 py-3 text-left font-semibold text-gray-600 whitespace-nowrap hidden sm:table-cell">Customer</th>
+                                <th class="px-3 py-3 text-right font-semibold text-gray-600 whitespace-nowrap">Total</th>
+                                <th class="px-3 py-3 text-right font-semibold text-gray-600 whitespace-nowrap">Balance</th>
+                                <th class="px-3 py-3 text-center font-semibold text-gray-600 whitespace-nowrap">Status</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-gray-100" id="creditNotesBody">
+                            <tr><td colspan="6" class="text-center py-8 text-gray-400">Loading credit notes...</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <script>
+    let currentPage = 1;
+    let currentTab = 'expenses';
+
+    function formatCurrency(amount) {
+        const n = parseFloat(amount) || 0;
+        return '₹' + n.toLocaleString('en-IN', { minimumFractionDigits: 0, maximumFractionDigits: 2 });
+    }
+
+    function statusBadge(status) {
+        const map = {
+            paid: 'bg-green-100 text-green-800',
+            invoiced: 'bg-green-100 text-green-700',
+            unbilled: 'bg-amber-100 text-amber-800',
+            'non-billable': 'bg-gray-100 text-gray-600',
+            open: 'bg-blue-100 text-blue-800',
+            void: 'bg-red-100 text-red-800',
+            closed: 'bg-gray-100 text-gray-600'
+        };
+        const cls = map[(status||'').toLowerCase()] || 'bg-gray-100 text-gray-600';
+        return `<span class="px-2 py-0.5 rounded-full text-xs font-medium ${cls}">${status || '-'}</span>`;
+    }
+
+    function switchTab(tab) {
+        currentTab = tab;
+        document.getElementById('expensesSection').classList.toggle('hidden', tab !== 'expenses');
+        document.getElementById('creditNotesSection').classList.toggle('hidden', tab !== 'creditnotes');
+        document.getElementById('tabExpenses').className = tab === 'expenses'
+            ? 'px-4 py-2 text-sm font-medium rounded-lg bg-indigo-600 text-white'
+            : 'px-4 py-2 text-sm font-medium rounded-lg bg-white border border-gray-300 text-gray-700 hover:bg-gray-50';
+        document.getElementById('tabCreditNotes').className = tab === 'creditnotes'
+            ? 'px-4 py-2 text-sm font-medium rounded-lg bg-indigo-600 text-white'
+            : 'px-4 py-2 text-sm font-medium rounded-lg bg-white border border-gray-300 text-gray-700 hover:bg-gray-50';
+        if (tab === 'creditnotes') loadCreditNotes();
+    }
+
+    async function loadExpenses(page = 1) {
+        currentPage = page;
+        const from = document.getElementById('fromDate').value;
+        const to = document.getElementById('toDate').value;
+        const status = document.getElementById('statusFilter').value;
+        let url = `/api/zoho/expenses?page=${page}&limit=50`;
+        if (from) url += `&from_date=${from}`;
+        if (to) url += `&to_date=${to}`;
+        if (status) url += `&status=${status}`;
+        try {
+            const data = await fetch(url, { headers: getAuthHeaders() }).then(r => r.json());
+            const tbody = document.getElementById('expensesBody');
+            if (!data.expenses || data.expenses.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="7" class="text-center py-8 text-gray-400">No expenses found. Click Sync Expenses to load data.</td></tr>';
+                updateSummaryCards([], null);
+                return;
+            }
+            tbody.innerHTML = data.expenses.map(e => `
+                <tr class="hover:bg-gray-50">
+                    <td class="px-3 py-2 whitespace-nowrap text-gray-700">${e.date || '-'}</td>
+                    <td class="px-3 py-2 text-gray-800 max-w-[120px] truncate">${e.vendor_name || '-'}</td>
+                    <td class="px-3 py-2 text-gray-600 hidden sm:table-cell max-w-[120px] truncate">${e.account_name || '-'}</td>
+                    <td class="px-3 py-2 text-gray-500 hidden sm:table-cell">${e.reference_number || '-'}</td>
+                    <td class="px-3 py-2 text-right font-medium text-gray-800">${formatCurrency(e.total)}</td>
+                    <td class="px-3 py-2 text-right text-gray-500 hidden sm:table-cell">${formatCurrency(e.tax_amount)}</td>
+                    <td class="px-3 py-2 text-center">${statusBadge(e.status)}</td>
+                </tr>
+            `).join('');
+            updateSummaryCards(data.expenses, null);
+            const totalPages = Math.ceil((data.total || data.expenses.length) / 50);
+            document.getElementById('expensesPagination').textContent = totalPages > 1
+                ? `Page ${page} of ${totalPages} — ${data.total} total`
+                : `${data.expenses.length} expenses`;
+        } catch (err) {
+            document.getElementById('expensesBody').innerHTML = '<tr><td colspan="7" class="text-center py-6 text-red-500">Failed to load expenses</td></tr>';
+        }
+    }
+
+    async function loadCreditNotes() {
+        try {
+            const data = await fetch('/api/zoho/creditnotes', { headers: getAuthHeaders() }).then(r => r.json());
+            const tbody = document.getElementById('creditNotesBody');
+            if (!data.creditnotes || data.creditnotes.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="6" class="text-center py-8 text-gray-400">No credit notes found. Click Sync Credit Notes to load data.</td></tr>';
+                document.getElementById('statCreditBalance').textContent = '₹0';
+                return;
+            }
+            tbody.innerHTML = data.creditnotes.map(cn => `
+                <tr class="hover:bg-gray-50">
+                    <td class="px-3 py-2 whitespace-nowrap text-gray-700">${cn.date || '-'}</td>
+                    <td class="px-3 py-2 font-medium text-indigo-700">${cn.creditnote_number || '-'}</td>
+                    <td class="px-3 py-2 text-gray-700 hidden sm:table-cell">${cn.customer_name || '-'}</td>
+                    <td class="px-3 py-2 text-right font-medium">${formatCurrency(cn.total)}</td>
+                    <td class="px-3 py-2 text-right text-blue-700 font-medium">${formatCurrency(cn.balance)}</td>
+                    <td class="px-3 py-2 text-center">${statusBadge(cn.status)}</td>
+                </tr>
+            `).join('');
+            const totalBalance = data.creditnotes.reduce((s, cn) => s + parseFloat(cn.balance || 0), 0);
+            document.getElementById('statCreditBalance').textContent = formatCurrency(totalBalance);
+        } catch (err) {
+            document.getElementById('creditNotesBody').innerHTML = '<tr><td colspan="6" class="text-center py-6 text-red-500">Failed to load credit notes</td></tr>';
+        }
+    }
+
+    function updateSummaryCards(expenses, creditBalance) {
+        const now = new Date();
+        const monthStr = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}`;
+        const monthTotal = expenses.filter(e => (e.date||'').startsWith(monthStr)).reduce((s,e) => s + parseFloat(e.total||0), 0);
+        const paidTotal = expenses.filter(e => (e.status||'').toLowerCase() === 'paid').reduce((s,e) => s + parseFloat(e.total||0), 0);
+        const pendingTotal = expenses.filter(e => ['unbilled','non-billable'].includes((e.status||'').toLowerCase())).reduce((s,e) => s + parseFloat(e.total||0), 0);
+        document.getElementById('statMonth').textContent = formatCurrency(monthTotal);
+        document.getElementById('statPaid').textContent = formatCurrency(paidTotal);
+        document.getElementById('statPending').textContent = formatCurrency(pendingTotal);
+    }
+
+    function applyFilters() {
+        loadExpenses(1);
+    }
+
+    async function syncExpenses() {
+        const btn = document.getElementById('syncExpBtn');
+        btn.disabled = true;
+        btn.textContent = 'Syncing...';
+        try {
+            const data = await fetch('/api/zoho/sync/expenses', { method: 'POST', headers: Object.assign({ 'Content-Type': 'application/json' }, getAuthHeaders()), body: '{}' }).then(r => r.json());
+            if (data.success) {
+                btn.textContent = `✓ ${data.upserted} synced`;
+                loadExpenses(1);
+            } else {
+                btn.textContent = 'Sync failed';
+            }
+        } catch (e) {
+            btn.textContent = 'Error';
+        }
+        setTimeout(() => { btn.disabled = false; btn.innerHTML = '<svg class="w-4 h-4 inline mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg>Sync Expenses'; }, 3000);
+    }
+
+    async function syncCreditNotes() {
+        const btn = document.getElementById('syncCNBtn');
+        btn.disabled = true;
+        btn.textContent = 'Syncing...';
+        try {
+            const data = await fetch('/api/zoho/sync/creditnotes', { method: 'POST', headers: getAuthHeaders() }).then(r => r.json());
+            if (data.success) {
+                btn.textContent = `✓ ${data.upserted} synced`;
+                if (currentTab === 'creditnotes') loadCreditNotes();
+            } else {
+                btn.textContent = 'Sync failed';
+            }
+        } catch (e) {
+            btn.textContent = 'Error';
+        }
+        setTimeout(() => { btn.disabled = false; btn.textContent = 'Sync Credit Notes'; }, 3000);
+    }
+
+    // Init
+    loadExpenses(1);
+    </script>
+</body>
+</html>

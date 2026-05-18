@@ -2384,6 +2384,80 @@ async function createPurchaseOrder(poData) {
     return await apiPost(`/purchaseorders?organization_id=${orgId}`, poData);
 }
 
+// ========================================
+// EXPENSES
+// ========================================
+
+async function getExpenses(params = {}) {
+    const orgId = process.env.ZOHO_ORGANIZATION_ID;
+    return await apiGet('/expenses', { organization_id: orgId, ...params });
+}
+
+async function getExpense(expenseId) {
+    const orgId = process.env.ZOHO_ORGANIZATION_ID;
+    return await apiGet(`/expenses/${expenseId}`, { organization_id: orgId });
+}
+
+async function syncExpenses(params = {}) {
+    if (!pool) throw new Error('Database pool not initialized');
+    const orgId = process.env.ZOHO_ORGANIZATION_ID;
+    const fromDate = params.from_date || new Date(Date.now() - 90*24*60*60*1000).toISOString().split('T')[0];
+    const data = await apiGet('/expenses', { organization_id: orgId, date_after: fromDate, per_page: 200 });
+    const expenses = data.expenses || [];
+    let upserted = 0;
+    for (const exp of expenses) {
+        await pool.query(`
+            INSERT INTO zoho_expenses
+                (expense_id, account_name, paid_through_account_name, vendor_name,
+                 date, total, tax_amount, description, status, currency_code, reference_number, synced_at)
+            VALUES (?,?,?,?,?,?,?,?,?,?,?,NOW())
+            ON DUPLICATE KEY UPDATE
+                account_name=VALUES(account_name), total=VALUES(total),
+                status=VALUES(status), synced_at=NOW()
+        `, [
+            exp.expense_id, exp.account_name, exp.paid_through_account_name,
+            exp.vendor_name, exp.date, exp.total, exp.tax_amount || 0,
+            exp.description, exp.status, exp.currency_code || 'INR',
+            exp.reference_number || null
+        ]);
+        upserted++;
+    }
+    return { success: true, upserted };
+}
+
+// ========================================
+// CREDIT NOTES
+// ========================================
+
+async function getCreditNotes(params = {}) {
+    const orgId = process.env.ZOHO_ORGANIZATION_ID;
+    return await apiGet('/creditnotes', { organization_id: orgId, ...params });
+}
+
+async function syncCreditNotes(params = {}) {
+    if (!pool) throw new Error('Database pool not initialized');
+    const orgId = process.env.ZOHO_ORGANIZATION_ID;
+    const data = await apiGet('/creditnotes', { organization_id: orgId, per_page: 200 });
+    const notes = data.creditnotes || [];
+    let upserted = 0;
+    for (const cn of notes) {
+        await pool.query(`
+            INSERT INTO zoho_credit_notes
+                (creditnote_id, creditnote_number, customer_name, customer_id,
+                 date, total, balance, status, currency_code, synced_at)
+            VALUES (?,?,?,?,?,?,?,?,?,NOW())
+            ON DUPLICATE KEY UPDATE
+                balance=VALUES(balance), status=VALUES(status), synced_at=NOW()
+        `, [
+            cn.creditnote_id, cn.creditnote_number, cn.customer_name,
+            cn.customer_id, cn.date, cn.total, cn.balance,
+            cn.status, cn.currency_code || 'INR'
+        ]);
+        upserted++;
+    }
+    return { success: true, upserted };
+}
+
 module.exports = {
     setPool,
     // Invoices
@@ -2458,5 +2532,12 @@ module.exports = {
     getBill,
     createBill,
     getPurchaseOrders,
-    createPurchaseOrder
+    createPurchaseOrder,
+    // Expenses
+    getExpenses,
+    getExpense,
+    syncExpenses,
+    // Credit Notes
+    getCreditNotes,
+    syncCreditNotes
 };

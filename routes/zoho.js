@@ -5852,6 +5852,51 @@ router.get('/items/propose-naming', requirePermission('zoho', 'manage'), async (
     }
 });
 
+// ==========================================
+// EXPENSES
+// ==========================================
+
+router.get('/expenses', requirePermission('zoho', 'view'), async (req, res) => {
+    try {
+        const { page=1, limit=50, from_date, to_date, status } = req.query;
+        let sql = 'SELECT * FROM zoho_expenses WHERE 1=1';
+        const params = [];
+        if (from_date) { sql += ' AND date >= ?'; params.push(from_date); }
+        if (to_date) { sql += ' AND date <= ?'; params.push(to_date); }
+        if (status) { sql += ' AND status = ?'; params.push(status); }
+        sql += ' ORDER BY date DESC LIMIT ? OFFSET ?';
+        params.push(Number(limit), (Number(page)-1)*Number(limit));
+        const [rows] = await pool.query(sql, params);
+        const [[{ total }]] = await pool.query('SELECT COUNT(*) as total FROM zoho_expenses');
+        res.json({ success: true, expenses: rows, total });
+    } catch (e) { res.status(500).json({ success: false, error: e.message }); }
+});
+
+router.post('/sync/expenses', requirePermission('zoho', 'sync'), async (req, res) => {
+    try {
+        const result = await zohoAPI.syncExpenses(req.body || {});
+        res.json(result);
+    } catch (e) { res.status(500).json({ success: false, error: e.message }); }
+});
+
+// ==========================================
+// CREDIT NOTES
+// ==========================================
+
+router.get('/creditnotes', requirePermission('zoho', 'view'), async (req, res) => {
+    try {
+        const [rows] = await pool.query('SELECT * FROM zoho_credit_notes ORDER BY date DESC LIMIT 200');
+        res.json({ success: true, creditnotes: rows });
+    } catch (e) { res.status(500).json({ success: false, error: e.message }); }
+});
+
+router.post('/sync/creditnotes', requirePermission('zoho', 'sync'), async (req, res) => {
+    try {
+        const result = await zohoAPI.syncCreditNotes();
+        res.json(result);
+    } catch (e) { res.status(500).json({ success: false, error: e.message }); }
+});
+
 module.exports = {
     router,
     setPool
