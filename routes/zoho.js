@@ -1837,7 +1837,7 @@ router.get('/items', requirePermission('zoho', 'view'), async (req, res) => {
                 zim.zoho_brand as brand,
                 zim.zoho_manufacturer as manufacturer,
                 zim.zoho_reorder_level as reorder_level,
-                zim.zoho_stock_on_hand as stock_on_hand,
+                COALESCE(ls_agg.total_stock, zim.zoho_stock_on_hand, 0) as stock_on_hand,
                 zim.zoho_category_name as category_name,
                 zim.zoho_upc as upc,
                 zim.zoho_ean as ean,
@@ -1849,6 +1849,11 @@ router.get('/items', requirePermission('zoho', 'view'), async (req, res) => {
                 zim.zoho_status as status,
                 zim.last_synced_at as last_synced
             FROM zoho_items_map zim
+            LEFT JOIN (
+                SELECT zoho_item_id, SUM(stock_on_hand) as total_stock
+                FROM zoho_location_stock
+                GROUP BY zoho_item_id
+            ) ls_agg ON ls_agg.zoho_item_id = zim.zoho_item_id
             ${where}
             ORDER BY ${(() => {
                 const SORT_WHITELIST = ['zoho_item_name','zoho_sku','zoho_brand','zoho_category_name','zoho_rate','zoho_stock_on_hand'];
