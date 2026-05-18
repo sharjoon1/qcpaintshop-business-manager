@@ -17,6 +17,7 @@
     <script src="/universal-nav-loader.js"></script>
     <script src="/js/auth-helper.js"></script>
     <script>requireAdminOrRedirect();</script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
     <style>
         .report-table th { position: sticky; top: 0; background: #f9fafb; z-index: 1; }
         .report-table tr:hover td { background: #f3f4f6; }
@@ -24,9 +25,11 @@
         .pill-btn:focus { outline: 2px solid #9333ea; outline-offset: 2px; }
         .spinner { border: 3px solid #e5e7eb; border-top-color: #7c3aed; border-radius: 50%; width: 2rem; height: 2rem; animation: spin 0.7s linear infinite; }
         @keyframes spin { to { transform: rotate(360deg); } }
+        .pills-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; scrollbar-width: none; }
+        .pills-scroll::-webkit-scrollbar { display: none; }
         @media (max-width: 640px) {
-            .pills-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; scrollbar-width: none; }
-            .pills-scroll::-webkit-scrollbar { display: none; }
+            .report-table { font-size: 0.7rem; }
+            .report-table th, .report-table td { padding: 0.375rem 0.5rem; }
         }
     </style>
 </head>
@@ -47,27 +50,27 @@
                 <div class="pills-scroll">
                     <div class="flex flex-nowrap gap-2" id="reportTabs">
                         <button onclick="selectReport('profit_loss')" data-report="profit_loss"
-                            class="pill-btn px-4 py-2 rounded-full text-sm font-medium whitespace-nowrap bg-purple-600 text-white">
+                            class="pill-btn flex-shrink-0 px-4 py-2 rounded-full text-sm font-medium whitespace-nowrap bg-purple-600 text-white">
                             Profit &amp; Loss
                         </button>
                         <button onclick="selectReport('balance_sheet')" data-report="balance_sheet"
-                            class="pill-btn px-4 py-2 rounded-full text-sm font-medium whitespace-nowrap bg-white text-gray-700 border hover:bg-gray-50">
+                            class="pill-btn flex-shrink-0 px-4 py-2 rounded-full text-sm font-medium whitespace-nowrap bg-white text-gray-700 border hover:bg-gray-50">
                             Balance Sheet
                         </button>
                         <button onclick="selectReport('sales_by_customer')" data-report="sales_by_customer"
-                            class="pill-btn px-4 py-2 rounded-full text-sm font-medium whitespace-nowrap bg-white text-gray-700 border hover:bg-gray-50">
+                            class="pill-btn flex-shrink-0 px-4 py-2 rounded-full text-sm font-medium whitespace-nowrap bg-white text-gray-700 border hover:bg-gray-50">
                             Sales by Customer
                         </button>
                         <button onclick="selectReport('sales_by_item')" data-report="sales_by_item"
-                            class="pill-btn px-4 py-2 rounded-full text-sm font-medium whitespace-nowrap bg-white text-gray-700 border hover:bg-gray-50">
+                            class="pill-btn flex-shrink-0 px-4 py-2 rounded-full text-sm font-medium whitespace-nowrap bg-white text-gray-700 border hover:bg-gray-50">
                             Sales by Item
                         </button>
                         <button onclick="selectReport('receivables')" data-report="receivables"
-                            class="pill-btn px-4 py-2 rounded-full text-sm font-medium whitespace-nowrap bg-white text-gray-700 border hover:bg-gray-50">
+                            class="pill-btn flex-shrink-0 px-4 py-2 rounded-full text-sm font-medium whitespace-nowrap bg-white text-gray-700 border hover:bg-gray-50">
                             Receivables Summary
                         </button>
                         <button onclick="selectReport('aging')" data-report="aging"
-                            class="pill-btn px-4 py-2 rounded-full text-sm font-medium whitespace-nowrap bg-white text-gray-700 border hover:bg-gray-50">
+                            class="pill-btn flex-shrink-0 px-4 py-2 rounded-full text-sm font-medium whitespace-nowrap bg-white text-gray-700 border hover:bg-gray-50">
                             Aging Report
                         </button>
                     </div>
@@ -158,6 +161,22 @@
             <div id="reportArea" class="hidden">
                 <!-- Summary Cards -->
                 <div id="summaryCards" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mb-6"></div>
+
+                <!-- P&L Chart (shown for profit_loss report) -->
+                <div id="plChartContainer" class="hidden bg-white rounded-lg shadow p-4 mb-4">
+                    <h3 class="text-sm font-semibold text-gray-600 mb-3">Income vs Expense vs Profit</h3>
+                    <div style="max-height: 220px; position: relative;">
+                        <canvas id="plChart"></canvas>
+                    </div>
+                </div>
+
+                <!-- Report Toolbar (shown after report loads) -->
+                <div class="flex justify-end mb-3">
+                    <button id="exportCsvBtn" onclick="exportReportCSV()" class="flex items-center gap-2 px-4 py-2 bg-green-600 hover:bg-green-700 text-white text-sm font-medium rounded-lg transition">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg>
+                        Export CSV
+                    </button>
+                </div>
 
                 <!-- Report Table -->
                 <div class="bg-white rounded-lg shadow overflow-hidden">
@@ -381,6 +400,10 @@
             thead.innerHTML = '';
             tbody.innerHTML = '';
 
+            // Hide P&L chart for non-P&L reports
+            const plContainer = document.getElementById('plChartContainer');
+            if (plContainer) plContainer.classList.add('hidden');
+
             const reportData = data.report_data || data.data || data;
 
             switch (type) {
@@ -462,6 +485,11 @@
                     <p class="text-sm text-gray-500 font-medium">Net Profit / Loss</p>
                     <p class="text-2xl font-bold mt-1 ${profitTextColor}">${formatCurrency(netProfit)}</p>
                 </div>`;
+
+            // Show P&L summary chart
+            if (totalIncome > 0 || totalExpense > 0) {
+                showPLChart(totalIncome, totalExpense, netProfit);
+            }
 
             // Render detail rows if available
             thead.innerHTML = buildTableHead(['Account', 'Amount']);
@@ -660,6 +688,68 @@
                 const colSpan = bucketHeaders.length + 2;
                 tbody.innerHTML = `<tr><td colspan="${colSpan}" class="px-4 py-8 text-center text-gray-400">No aging data available.</td></tr>`;
             }
+        }
+
+        // ===== P&L Bar Chart =====
+        function showPLChart(income, expense, profit) {
+            const container = document.getElementById('plChartContainer');
+            if (!container) return;
+            container.classList.remove('hidden');
+            const ctx = document.getElementById('plChart').getContext('2d');
+            if (window._plChart) window._plChart.destroy();
+            window._plChart = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: ['Income', 'Expense', 'Net Profit'],
+                    datasets: [{
+                        data: [income, expense, profit],
+                        backgroundColor: [
+                            'rgba(99,102,241,0.75)',
+                            'rgba(249,115,22,0.75)',
+                            profit >= 0 ? 'rgba(16,185,129,0.75)' : 'rgba(239,68,68,0.75)'
+                        ],
+                        borderRadius: 6,
+                        borderSkipped: false
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { display: false },
+                        tooltip: {
+                            callbacks: {
+                                label: function(ctx) {
+                                    return ' ₹' + Math.abs(ctx.raw).toLocaleString('en-IN', { minimumFractionDigits: 0 });
+                                }
+                            }
+                        }
+                    },
+                    scales: {
+                        y: { ticks: { callback: v => '₹' + (v/1000).toFixed(0) + 'k' } }
+                    }
+                }
+            });
+        }
+
+        // ===== Export CSV =====
+        function exportReportCSV() {
+            const table = document.getElementById('reportTable');
+            if (!table) return;
+            const rows = Array.from(table.querySelectorAll('tr'));
+            if (!rows.length) return;
+            const csv = rows.map(row =>
+                Array.from(row.querySelectorAll('th,td'))
+                    .map(cell => '"' + cell.textContent.trim().replace(/"/g, '""') + '"')
+                    .join(',')
+            ).join('\n');
+            const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'zoho-report-' + currentReport + '-' + new Date().toISOString().split('T')[0] + '.csv';
+            a.click();
+            URL.revokeObjectURL(url);
         }
 
         // ===== Init =====
