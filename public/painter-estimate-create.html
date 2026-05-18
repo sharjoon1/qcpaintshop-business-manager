@@ -46,6 +46,12 @@
         @keyframes spin { to { transform: rotate(360deg); } }
         .field-error { border-color: #ef4444 !important; }
         .error-text { color: #ef4444; font-size: 0.75rem; margin-top: 2px; display: none; }
+        .draft-banner { position:fixed; top:0; left:0; right:0; z-index:100; background:#1B5E3B; color:#fff; padding:10px 16px; display:flex; align-items:center; justify-content:space-between; font-size:0.875rem; transform:translateY(-100%); transition:transform 0.3s; }
+        .draft-banner.visible { transform:translateY(0); }
+        .draft-banner-btns { display:flex; gap:8px; }
+        .draft-btn { padding:4px 12px; border-radius:6px; font-size:0.8rem; font-weight:600; border:none; cursor:pointer; }
+        .draft-btn-restore { background:#D4A24E; color:#fff; }
+        .draft-btn-discard { background:rgba(255,255,255,0.2); color:#fff; }
     </style>
     <link rel="stylesheet" href="/css/painter-dark.css">
 </head>
@@ -530,6 +536,7 @@
             if (!data.success) throw new Error(data.message);
 
             alert('Estimate ' + data.estimateNumber + ' submitted successfully! Our team will review it shortly.');
+            localStorage.removeItem(DRAFT_KEY);
             window.location.href = '/painter-dashboard.html';
         } catch (err) {
             alert('Error: ' + err.message);
@@ -576,9 +583,103 @@
         setTimeout(() => el.remove(), 2600);
     }
 
+    // ============ Draft Autosave ============
+    const DRAFT_KEY = 'painter_estimate_draft_v1';
+    let _autosaveTimer = null;
+
+    function saveDraft() {
+        if (!billingType) return;
+        const draft = {
+            billingType,
+            cart,
+            customerName: document.getElementById('customerName')?.value || '',
+            customerPhone: document.getElementById('customerPhone')?.value || '',
+            customerAddress: document.getElementById('customerAddress')?.value || '',
+            notes: document.getElementById('estimateNotes')?.value || '',
+            savedAt: Date.now()
+        };
+        localStorage.setItem(DRAFT_KEY, JSON.stringify(draft));
+    }
+
+    function checkForDraft() {
+        try {
+            const raw = localStorage.getItem(DRAFT_KEY);
+            if (!raw) return;
+            const draft = JSON.parse(raw);
+            if (!draft.billingType || !draft.savedAt) return;
+            // Only show if draft is < 24 hours old and has something useful
+            const age = Date.now() - draft.savedAt;
+            if (age > 86400000) { localStorage.removeItem(DRAFT_KEY); return; }
+            if (!draft.billingType || Object.keys(draft.cart || {}).length === 0) return;
+            const banner = document.getElementById('draftBanner');
+            if (banner) banner.classList.add('visible');
+        } catch (e) { /* ignore */ }
+    }
+
+    function restoreDraft() {
+        try {
+            const raw = localStorage.getItem(DRAFT_KEY);
+            if (!raw) return;
+            const draft = JSON.parse(raw);
+
+            billingType = draft.billingType || '';
+            cart = draft.cart || {};
+
+            if (billingType === 'customer') {
+                // Highlight the customer type card
+                document.querySelectorAll('.type-card').forEach(c => c.classList.remove('selected'));
+                const cards = document.querySelectorAll('.type-card');
+                if (cards[1]) cards[1].classList.add('selected');
+                // Pre-fill form
+                if (document.getElementById('customerName')) document.getElementById('customerName').value = draft.customerName || '';
+                if (document.getElementById('customerPhone')) document.getElementById('customerPhone').value = draft.customerPhone || '';
+                if (document.getElementById('customerAddress')) document.getElementById('customerAddress').value = draft.customerAddress || '';
+                goToStep(3);
+            } else {
+                document.querySelectorAll('.type-card').forEach(c => c.classList.remove('selected'));
+                const cards = document.querySelectorAll('.type-card');
+                if (cards[0]) cards[0].classList.add('selected');
+                goToStep(3);
+            }
+
+            if (document.getElementById('estimateNotes')) document.getElementById('estimateNotes').value = draft.notes || '';
+
+            buildStepper();
+            updateCartUI();
+            const banner = document.getElementById('draftBanner');
+            if (banner) banner.classList.remove('visible');
+            showToast('Draft restored');
+        } catch (e) {
+            showToast('Could not restore draft');
+        }
+    }
+
+    function discardDraft() {
+        localStorage.removeItem(DRAFT_KEY);
+        const banner = document.getElementById('draftBanner');
+        if (banner) banner.classList.remove('visible');
+    }
+
+    function startAutosave() {
+        if (_autosaveTimer) clearInterval(_autosaveTimer);
+        _autosaveTimer = setInterval(saveDraft, 30000);
+    }
+
+    // Start autosave and check for existing draft
+    startAutosave();
+    checkForDraft();
+
     // Initialize stepper for step 1
     buildStepper();
     document.querySelector('.stepper-dot[data-step="1"]').classList.add('active');
     </script>
+    <!-- Draft restore banner -->
+    <div class="draft-banner" id="draftBanner">
+        <span>You have an unsaved draft</span>
+        <div class="draft-banner-btns">
+            <button class="draft-btn draft-btn-restore" onclick="restoreDraft()">Restore</button>
+            <button class="draft-btn draft-btn-discard" onclick="discardDraft()">Discard</button>
+        </div>
+    </div>
 </body>
 </html>
