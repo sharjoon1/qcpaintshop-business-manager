@@ -1,8 +1,8 @@
 # QC Paint Shop Business Manager - System Skills & Capabilities
 
 > **Platform**: act.qcpaintshop.com
-> **Version**: Web on master HEAD · Staff Android 3.3.9 vc18 (internal) · Painter Android v3.5.0 vc38 (branch design/painter-app-ux-2026-05, APK delivered 2026-05-17, Play Store upload pending)
-> **Last Updated**: 2026-05-17
+> **Version**: Web on master HEAD · Staff Android 3.3.9 vc18 (internal) · Painter Android v4.0.0 vc39 (branch design/painter-app-ux-2026-05, APK delivered 2026-05-18, Play Store upload pending)
+> **Last Updated**: 2026-05-18
 > **Total Codebase**: ~205,000 LOC (web) | 106 frontend pages | Android app (3 flavors: staff / customer / painter)
 
 ---
@@ -171,6 +171,25 @@ Quality Colours Business Manager is a **multi-branch paint shop management platf
 - Transaction comparison reports
 - Financial reports (sales, top items, customer analysis)
 - Pages: `admin-zoho-invoices.html`, `admin-zoho-transactions.html`, `admin-zoho-reports.html`
+
+**Expenses & Credit Notes** (added 2026-05-18)
+- `zoho_expenses` table (13 cols + 2 indexes): `expense_id` UNIQUE, account_name, vendor_name, date, total, tax_amount, description, status, etc.
+- `zoho_credit_notes` table (11 cols + 2 indexes): `creditnote_id` UNIQUE, creditnote_number, customer_name, customer_id, date, total, balance, status, etc.
+- `services/zoho-api.js`: `getExpenses()`, `getExpense(id)`, `syncExpenses(params)`, `getCreditNotes()`, `syncCreditNotes()`
+- Routes: `GET /api/zoho/expenses`, `POST /api/zoho/sync/expenses`, `GET /api/zoho/creditnotes`, `POST /api/zoho/sync/creditnotes`
+- Nightly sync in `services/sync-scheduler.js` `executeStockSync()` — try/catch so failures don't break stock sync
+- Page: `admin-zoho-expenses.html` — tabbed (Expenses/Credit Notes), filter bar, 4 summary cards, sync buttons
+
+**Sales Orders** (added 2026-05-18)
+- `services/zoho-api.js`: `getRawSalesOrder(soId)` — public wrapper around private `apiGet`
+- Routes: `GET /api/zoho/salesorders` (queries `zoho_daily_transactions WHERE type='sales_order'`), `GET /api/zoho/salesorders/:id` (live from Zoho API)
+- Page: `admin-zoho-salesorders.html` — filter bar, summary cards, table, row-click modal, CSV export
+
+**Zoho Reports** (enhanced 2026-05-18)
+- P&L bar chart: Chart.js 4.4.7 CDN, `#plChartContainer` renders Income/Expense/Profit bars via `showPLChart()`
+- CSV export: `exportReportCSV()` extracts rendered `#reportTable` to CSV download
+- Tab overflow: `.pills-scroll` overflow-x:auto in global CSS; `flex-shrink-0` on all tab buttons
+- Mobile table: `@media (max-width: 640px)` font-size 0.7rem + compact padding
 
 **WhatsApp Integration**
 - Queue-based message system
@@ -3700,7 +3719,7 @@ User session goal: drive web + both Android flavors to "production-ready, Play-S
 
 **Phase 2 (web hygiene sprint):** Tailwind CDN → JIT migration on 104 pages, mobile/a11y, audit-log coverage extension, U10/U13/U2 queued audit items, 89 PENDING migrations.
 
-**Phase 3 (painter Android Epsilon B-L):** 11 remaining screen redesigns per `qcpaintshop-android/PAINTER-UX-AUDIT-2026-05-01.md`. Ship in 3 chunks via Telegram + version bumps.
+**Phase 3 (painter Android v4.0.0) — COMPLETE (2026-05-18):** Full light-mode redesign (Goals A–H). Root cause fixed: `isSystemInDarkTheme()` + `QCDarkScheme` removed; `QCLightScheme` forced always. All ModalBottomSheet + AlertDialog get `containerColor`. ProductDetailSheet gets gradient header + selected variant row + sticky CTA. 8 goals, ~15 commits, v4.0.0 vc39 APK (10.32 MB) delivered to Telegram chat 930726256. Play Store upload pending.
 
 **Phase 4-6 (deferred):** customer portal invoices, anomaly notification badge, bug-reports AI fix loop, painter visualization auto-trigger, 2FA admin, DPL other-brand parsers, design-system token migration, print/PDF CDN migration.
 
@@ -3713,4 +3732,4 @@ User session goal: drive web + both Android flavors to "production-ready, Play-S
 ---
 
 *This document should be updated whenever new features are added or existing ones are enhanced.*
-*Last Updated: 2026-05-13 | Version: 3.3.9 vc18 (Staff internal), 3.3.0 vc32 (Painter internal) | Maintained by: Development Team*
+*Last Updated: 2026-05-18 | Version: 3.3.9 vc18 (Staff internal), v4.0.0 vc39 (Painter — APK delivered, Play Store pending) | Maintained by: Development Team*
