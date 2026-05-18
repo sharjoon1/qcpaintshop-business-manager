@@ -11,6 +11,7 @@ const path = require('path');
 const fs = require('fs');
 const PDFDocument = require('pdfkit');
 const { requirePermission, requireAuth } = require('../middleware/permissionMiddleware');
+const { authLimiter } = require('../middleware/rateLimiter');
 const emailService = require('../services/email-service');
 const notificationService = require('../services/notification-service');
 
@@ -47,7 +48,7 @@ const sendEmail = emailService.send;
 // ========================================
 // PUBLIC: Check phone/email availability
 // ========================================
-router.post('/check-availability', async (req, res) => {
+router.post('/check-availability', authLimiter, async (req, res) => {
     try {
         const { phone, email } = req.body;
         const result = {};
@@ -81,7 +82,7 @@ router.post('/check-availability', async (req, res) => {
 // ========================================
 // PUBLIC: Submit staff registration
 // ========================================
-router.post('/register', uploadAadhar.single('aadhar_proof'), async (req, res) => {
+router.post('/register', authLimiter, uploadAadhar.single('aadhar_proof'), async (req, res) => {
     try {
         const {
             full_name, email, phone, password, password_confirm, otp_id,
