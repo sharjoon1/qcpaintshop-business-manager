@@ -13,7 +13,7 @@
 
 const express = require('express');
 const router = express.Router();
-const { requirePermission } = require('../middleware/permissionMiddleware');
+const { requirePermission, isFullAdmin } = require('../middleware/permissionMiddleware');
 
 let pool;
 let sessionManager;
@@ -22,6 +22,14 @@ function setPool(p) { pool = p; }
 function setSessionManager(sm) { sessionManager = sm; }
 
 const perm = requirePermission('zoho', 'whatsapp_sessions');
+
+// Allows admin OR any authenticated staff with a branch_id (for their own branch)
+const permStaff = (req, res, next) => {
+    // req.user is set globally by auth middleware before routes
+    if (!req.user) return res.status(401).json({ success: false, message: 'Unauthorised' });
+    if (isFullAdmin(req.user.role) || req.user.branch_id) return next();
+    return res.status(403).json({ success: false, message: 'Not authorised — no branch assigned' });
+};
 
 // ========================================
 // LIST ALL SESSIONS
@@ -221,12 +229,15 @@ router.post('/admin/test', perm, async (req, res) => {
 // CONNECT
 // ========================================
 
-router.post('/:branchId/connect', perm, async (req, res) => {
+router.post('/:branchId/connect', permStaff, async (req, res) => {
     try {
         if (!sessionManager) {
             return res.status(503).json({ success: false, message: 'WhatsApp session manager not available' });
         }
-
+        // Non-admin can only connect their own branch
+        if (!isFullAdmin(req.user.role) && parseInt(req.params.branchId) !== parseInt(req.user.branch_id) && parseInt(req.params.branchId) !== 0) {
+            return res.status(403).json({ success: false, message: 'Can only connect your own branch' });
+        }
         const result = await sessionManager.connectBranch(req.params.branchId, req.user.id);
         res.json(result);
     } catch (error) {
@@ -239,12 +250,15 @@ router.post('/:branchId/connect', perm, async (req, res) => {
 // DISCONNECT
 // ========================================
 
-router.post('/:branchId/disconnect', perm, async (req, res) => {
+router.post('/:branchId/disconnect', permStaff, async (req, res) => {
     try {
         if (!sessionManager) {
             return res.status(503).json({ success: false, message: 'WhatsApp session manager not available' });
         }
-
+        // Non-admin can only disconnect their own branch
+        if (!isFullAdmin(req.user.role) && parseInt(req.params.branchId) !== parseInt(req.user.branch_id) && parseInt(req.params.branchId) !== 0) {
+            return res.status(403).json({ success: false, message: 'Can only disconnect your own branch' });
+        }
         const result = await sessionManager.disconnectBranch(req.params.branchId);
         res.json(result);
     } catch (error) {
@@ -257,7 +271,7 @@ router.post('/:branchId/disconnect', perm, async (req, res) => {
 // GET QR CODE
 // ========================================
 
-router.get('/:branchId/qr', perm, async (req, res) => {
+router.get('/:branchId/qr', permStaff, async (req, res) => {
     try {
         if (!sessionManager) {
             return res.json({ success: true, data: { qr: null } });
@@ -275,7 +289,7 @@ router.get('/:branchId/qr', perm, async (req, res) => {
 // GET STATUS
 // ========================================
 
-router.get('/:branchId/status', perm, async (req, res) => {
+router.get('/:branchId/status', permStaff, async (req, res) => {
     try {
         if (!sessionManager) {
             return res.json({ success: true, data: { status: 'disconnected', phone_number: null, has_qr: false } });

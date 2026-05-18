@@ -101,6 +101,24 @@
             </div>
         </div>
 
+        <!-- WA Session Widget (shown for branch staff + admin) -->
+        <div id="waSessionWidget" style="display:none; background:#fff; border:1px solid #e2e8f0; border-radius:10px; padding:12px 16px; margin-bottom:12px;">
+            <div style="display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap;">
+                <div style="display:flex; align-items:center; gap:10px;">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="#25D366"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.654-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413z"/></svg>
+                    <div>
+                        <div style="font-size:12px; font-weight:600; color:#374151;">WhatsApp — <span id="waBranchLabel">Branch</span></div>
+                        <div style="font-size:11px; color:#6b7280;" id="waSessionStatus">Checking...</div>
+                    </div>
+                </div>
+                <div style="display:flex; gap:8px; align-items:center;">
+                    <div id="waStatusDot" style="width:10px;height:10px;border-radius:50%;background:#94a3b8;"></div>
+                    <button id="waConnectBtn" onclick="openWaConnectModal()" style="padding:6px 14px; background:#25D366; color:#fff; border:none; border-radius:7px; font-size:12px; font-weight:600; cursor:pointer; display:none;">Connect WhatsApp</button>
+                    <button id="waDisconnectBtn" onclick="disconnectBranchWa()" style="padding:6px 14px; background:#fee2e2; color:#dc2626; border:none; border-radius:7px; font-size:12px; font-weight:600; cursor:pointer; display:none;">Disconnect</button>
+                </div>
+            </div>
+        </div>
+
         <!-- Tabs -->
         <div class="flex gap-1 border-b border-gray-200 mb-4 overflow-x-auto">
             <button class="cc-tab active" data-tab="summary" onclick="switchTab('summary')">Summary</button>
@@ -1428,6 +1446,7 @@
                 currentTab = saved;
             }
         }
+        initWaSessionWidget().catch(() => {});
         loadSummary();
         if (currentTab !== 'summary') {
             if (currentTab === 'customers') loadCustomers();
@@ -1436,6 +1455,91 @@
             else if (currentTab === 'promises') loadPromises();
         }
     })();
+
+    // ========================================
+    // WA SESSION WIDGET
+    // ========================================
+    let waWidgetBranchId = null;
+    let waQrPollInterval = null;
+    const WA_SESSION_API = '/api/zoho/whatsapp-sessions';
+
+    async function initWaSessionWidget() {
+        const user = JSON.parse(localStorage.getItem('user') || '{}');
+        const _isAdmin = ['admin','administrator','super_admin'].includes((user.role || '').toLowerCase());
+        waWidgetBranchId = _isAdmin ? 0 : (user.branch_id || null);
+        if (waWidgetBranchId === null) return; // no branch, hide widget
+        document.getElementById('waSessionWidget').style.display = '';
+        const label = _isAdmin ? 'General WhatsApp' : (user.branch_name || 'Your Branch');
+        document.getElementById('waBranchLabel').textContent = label;
+        document.getElementById('waQrBranchName').textContent = label;
+        await refreshWaStatus();
+        setInterval(refreshWaStatus, 30000);
+    }
+
+    async function refreshWaStatus() {
+        if (waWidgetBranchId === null && waWidgetBranchId !== 0) return;
+        try {
+            const data = await apiJson(`${WA_SESSION_API}/${waWidgetBranchId}/status`);
+            const status = data.data?.status || data.status || 'disconnected';
+            const colors = { connected:'#22c55e', qr_pending:'#f59e0b', connecting:'#3b82f6', disconnected:'#94a3b8', failed:'#ef4444' };
+            document.getElementById('waStatusDot').style.background = colors[status] || '#94a3b8';
+            const phone = data.data?.phone_number || '';
+            const labels = { connected:'✓ Connected' + (phone ? ' — ' + phone : ''), qr_pending:'⏳ Scan QR to connect', connecting:'⏳ Connecting...', disconnected:'● Disconnected', failed:'✗ Connection failed' };
+            document.getElementById('waSessionStatus').textContent = labels[status] || status;
+            document.getElementById('waConnectBtn').style.display = ['disconnected','failed'].includes(status) ? '' : 'none';
+            document.getElementById('waDisconnectBtn').style.display = status === 'connected' ? '' : 'none';
+            if (status === 'qr_pending' && document.getElementById('waQrModal').style.display === 'flex') loadWaQr();
+        } catch(e) {
+            document.getElementById('waSessionStatus').textContent = 'Status unavailable';
+        }
+    }
+
+    async function openWaConnectModal() {
+        const modal = document.getElementById('waQrModal');
+        modal.style.display = 'flex';
+        document.getElementById('waQrContainer').innerHTML = '<div style="color:#6b7280;font-size:13px;">Initiating connection...</div>';
+        try {
+            await apiJson(`${WA_SESSION_API}/${waWidgetBranchId}/connect`, { method: 'POST', body: {} });
+            await loadWaQr();
+            waQrPollInterval = setInterval(async () => {
+                await refreshWaStatus();
+                const txt = document.getElementById('waSessionStatus').textContent;
+                if (txt.includes('Connected')) { clearInterval(waQrPollInterval); closeWaQrModal(); showToast('WhatsApp connected ✓', 'success'); }
+                else await loadWaQr();
+            }, 5000);
+        } catch(e) {
+            document.getElementById('waQrContainer').innerHTML = `<div style="color:#dc2626;font-size:13px;">Error: ${e.message}</div>`;
+        }
+    }
+
+    async function loadWaQr() {
+        try {
+            const data = await apiJson(`${WA_SESSION_API}/${waWidgetBranchId}/qr`);
+            const qr = data.data?.qr || data.qr;
+            if (qr) {
+                document.getElementById('waQrContainer').innerHTML = qr.startsWith('data:image')
+                    ? `<img src="${qr}" style="max-width:220px;border-radius:8px;">`
+                    : `<img src="https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=${encodeURIComponent(qr)}" style="max-width:220px;border-radius:8px;">`;
+            } else {
+                document.getElementById('waQrContainer').innerHTML = '<div style="color:#6b7280;font-size:13px;">Waiting for QR...</div>';
+            }
+        } catch(e) { /* ignore poll errors */ }
+    }
+
+    async function disconnectBranchWa() {
+        if (!confirm('Disconnect WhatsApp? Messages will stop sending.')) return;
+        try {
+            await apiJson(`${WA_SESSION_API}/${waWidgetBranchId}/disconnect`, { method: 'POST', body: {} });
+            await refreshWaStatus();
+            showToast('WhatsApp disconnected', 'info');
+        } catch(e) { showToast('Error: ' + e.message, 'error'); }
+    }
+
+    function closeWaQrModal() {
+        document.getElementById('waQrModal').style.display = 'none';
+        clearInterval(waQrPollInterval);
+        refreshWaStatus();
+    }
 
     // WhatsApp Quick Send helpers
     function waQuickCust(customerName, phone, outstanding, overdueCount) {
@@ -1556,5 +1660,18 @@
     </div>
   </div>
 </div>
+
+    <!-- WA QR Modal (Collections page) -->
+    <div id="waQrModal" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.5); z-index:1000; align-items:center; justify-content:center;">
+        <div style="background:#fff; border-radius:14px; padding:24px; max-width:360px; width:90%; text-align:center;">
+            <h3 style="font-size:16px; font-weight:700; margin-bottom:4px;">Connect WhatsApp</h3>
+            <p id="waQrBranchName" style="font-size:12px; color:#6b7280; margin-bottom:16px;"></p>
+            <div id="waQrContainer" style="min-height:200px; display:flex; align-items:center; justify-content:center;">
+                <div style="color:#6b7280; font-size:13px;">Loading QR code...</div>
+            </div>
+            <p style="font-size:11px; color:#9ca3af; margin-top:12px;">Open WhatsApp → Linked Devices → Link a Device → Scan</p>
+            <button onclick="closeWaQrModal()" style="margin-top:16px; padding:8px 24px; background:#f3f4f6; border:none; border-radius:8px; font-size:13px; cursor:pointer;">Close</button>
+        </div>
+    </div>
 </body>
 </html>
