@@ -624,76 +624,56 @@ async function calculateSalaryForUser(userId, month, calculatedBy) {
     );
     const incentiveAmount = parseFloat(incentiveRows[0].total_incentive) || 0;
 
-    // Check if salary record exists
-    const [existing] = await pool.query(
-        'SELECT id FROM monthly_salaries WHERE user_id = ? AND salary_month = ?',
-        [userId, month]
+    // Upsert salary record atomically — prevents race condition on concurrent calculation requests.
+    // Relies on UNIQUE KEY unique_user_month (user_id, salary_month).
+    const [upsertResult] = await pool.query(
+        `INSERT INTO monthly_salaries (
+            user_id, branch_id, salary_month, from_date, to_date, base_salary,
+            total_working_days, total_present_days, total_absent_days,
+            total_half_days, total_sundays_worked, total_leaves,
+            paid_sunday_leaves, paid_weekday_leaves, excess_leaves,
+            total_standard_hours, total_sunday_hours, total_overtime_hours, total_worked_hours,
+            standard_hours_pay, sunday_hours_pay, overtime_pay,
+            transport_allowance, food_allowance, other_allowance, total_allowances,
+            incentive_amount,
+            late_deduction, absence_deduction, leave_deduction, total_deductions,
+            status, calculation_date, calculated_by
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'calculated', NOW(), ?)
+        ON DUPLICATE KEY UPDATE
+            branch_id = VALUES(branch_id), from_date = VALUES(from_date), to_date = VALUES(to_date),
+            base_salary = VALUES(base_salary),
+            total_working_days = VALUES(total_working_days), total_present_days = VALUES(total_present_days),
+            total_absent_days = VALUES(total_absent_days), total_half_days = VALUES(total_half_days),
+            total_sundays_worked = VALUES(total_sundays_worked), total_leaves = VALUES(total_leaves),
+            paid_sunday_leaves = VALUES(paid_sunday_leaves), paid_weekday_leaves = VALUES(paid_weekday_leaves),
+            excess_leaves = VALUES(excess_leaves),
+            total_standard_hours = VALUES(total_standard_hours), total_sunday_hours = VALUES(total_sunday_hours),
+            total_overtime_hours = VALUES(total_overtime_hours), total_worked_hours = VALUES(total_worked_hours),
+            standard_hours_pay = VALUES(standard_hours_pay), sunday_hours_pay = VALUES(sunday_hours_pay),
+            overtime_pay = VALUES(overtime_pay),
+            transport_allowance = VALUES(transport_allowance), food_allowance = VALUES(food_allowance),
+            other_allowance = VALUES(other_allowance), total_allowances = VALUES(total_allowances),
+            incentive_amount = VALUES(incentive_amount),
+            late_deduction = VALUES(late_deduction), absence_deduction = VALUES(absence_deduction),
+            leave_deduction = VALUES(leave_deduction), total_deductions = VALUES(total_deductions),
+            status = 'calculated', calculation_date = NOW(), calculated_by = VALUES(calculated_by)`,
+        [
+            userId, config.branch_id, month, fromDate, toDate, config.monthly_salary,
+            parseInt(att.total_days), parseInt(att.present_days), parseInt(att.absent_days),
+            parseInt(att.half_days), parseInt(att.sundays_worked), parseInt(att.leaves),
+            paidSundayLeaves, paidWeekdayLeaves, excessLeaves,
+            parseFloat(att.standard_hours), parseFloat(att.sunday_hours),
+            parseFloat(att.overtime_hours) + parseFloat(att.sunday_overtime_hours),
+            parseFloat(att.standard_hours) + parseFloat(att.sunday_hours) + parseFloat(att.overtime_hours) + parseFloat(att.sunday_overtime_hours),
+            standardHoursPay, sundayHoursPay, overtimePay,
+            transportAllowance, foodAllowance, otherAllowance, totalAllowances,
+            incentiveAmount,
+            lateDeduction, absenceDeduction, leaveDeduction, totalDeductions,
+            calculatedBy
+        ]
     );
-
-    let salaryId;
-    if (existing.length > 0) {
-        salaryId = existing[0].id;
-        await pool.query(
-            `UPDATE monthly_salaries SET
-                branch_id = ?, from_date = ?, to_date = ?, base_salary = ?,
-                total_working_days = ?, total_present_days = ?, total_absent_days = ?,
-                total_half_days = ?, total_sundays_worked = ?, total_leaves = ?,
-                paid_sunday_leaves = ?, paid_weekday_leaves = ?, excess_leaves = ?,
-                total_standard_hours = ?, total_sunday_hours = ?, total_overtime_hours = ?,
-                total_worked_hours = ?,
-                standard_hours_pay = ?, sunday_hours_pay = ?, overtime_pay = ?,
-                transport_allowance = ?, food_allowance = ?, other_allowance = ?,
-                total_allowances = ?, incentive_amount = ?,
-                late_deduction = ?, absence_deduction = ?, leave_deduction = ?,
-                total_deductions = ?,
-                status = 'calculated', calculation_date = NOW(), calculated_by = ?
-             WHERE id = ?`,
-            [
-                config.branch_id, fromDate, toDate, config.monthly_salary,
-                parseInt(att.total_days), parseInt(att.present_days), parseInt(att.absent_days),
-                parseInt(att.half_days), parseInt(att.sundays_worked), parseInt(att.leaves),
-                paidSundayLeaves, paidWeekdayLeaves, excessLeaves,
-                parseFloat(att.standard_hours), parseFloat(att.sunday_hours),
-                parseFloat(att.overtime_hours) + parseFloat(att.sunday_overtime_hours),
-                parseFloat(att.standard_hours) + parseFloat(att.sunday_hours) + parseFloat(att.overtime_hours) + parseFloat(att.sunday_overtime_hours),
-                standardHoursPay, sundayHoursPay, overtimePay,
-                transportAllowance, foodAllowance, otherAllowance, totalAllowances, incentiveAmount,
-                lateDeduction, absenceDeduction, leaveDeduction,
-                totalDeductions,
-                calculatedBy, salaryId
-            ]
-        );
-    } else {
-        const [result] = await pool.query(
-            `INSERT INTO monthly_salaries (
-                user_id, branch_id, salary_month, from_date, to_date, base_salary,
-                total_working_days, total_present_days, total_absent_days,
-                total_half_days, total_sundays_worked, total_leaves,
-                paid_sunday_leaves, paid_weekday_leaves, excess_leaves,
-                total_standard_hours, total_sunday_hours, total_overtime_hours, total_worked_hours,
-                standard_hours_pay, sunday_hours_pay, overtime_pay,
-                transport_allowance, food_allowance, other_allowance, total_allowances,
-                incentive_amount,
-                late_deduction, absence_deduction, leave_deduction, total_deductions,
-                status, calculation_date, calculated_by
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'calculated', NOW(), ?)`,
-            [
-                userId, config.branch_id, month, fromDate, toDate, config.monthly_salary,
-                parseInt(att.total_days), parseInt(att.present_days), parseInt(att.absent_days),
-                parseInt(att.half_days), parseInt(att.sundays_worked), parseInt(att.leaves),
-                paidSundayLeaves, paidWeekdayLeaves, excessLeaves,
-                parseFloat(att.standard_hours), parseFloat(att.sunday_hours),
-                parseFloat(att.overtime_hours) + parseFloat(att.sunday_overtime_hours),
-                parseFloat(att.standard_hours) + parseFloat(att.sunday_hours) + parseFloat(att.overtime_hours) + parseFloat(att.sunday_overtime_hours),
-                standardHoursPay, sundayHoursPay, overtimePay,
-                transportAllowance, foodAllowance, otherAllowance, totalAllowances,
-                incentiveAmount,
-                lateDeduction, absenceDeduction, leaveDeduction, totalDeductions,
-                calculatedBy
-            ]
-        );
-        salaryId = result.insertId;
-    }
+    // insertId is the existing row's id on UPDATE (MariaDB/MySQL returns last_insert_id = existing id on duplicate)
+    const salaryId = upsertResult.insertId;
 
     return { salary_id: salaryId, message: 'Salary calculated successfully' };
 }
@@ -1300,7 +1280,7 @@ router.post('/payments', requireAuth, requirePermission('salary', 'manage'), ide
             [monthly_salary_id]
         );
         
-        const totalPaid = parseFloat(currentSalary[0].paid_amount) + parseFloat(amount_paid);
+        const totalPaid = parseFloat(currentSalary[0].paid_amount || 0) + parseFloat(amount_paid);
         const netSalary = parseFloat(currentSalary[0].net_salary);
         
         let paymentStatus = 'partial';
@@ -1323,7 +1303,7 @@ router.post('/payments', requireAuth, requirePermission('salary', 'manage'), ide
             action: 'salary.payment.create',
             entity_type: 'salary_payment',
             entity_id: result.insertId,
-            before: { paid_amount: parseFloat(currentSalary[0].paid_amount), net_salary: netSalary },
+            before: { paid_amount: parseFloat(currentSalary[0].paid_amount || 0), net_salary: netSalary },
             after: {
                 payment_id: result.insertId, monthly_salary_id, user_id, payment_date,
                 amount_paid, payment_method, payment_reference, transaction_id,
