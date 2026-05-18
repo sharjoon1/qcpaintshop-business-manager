@@ -108,6 +108,7 @@
             border-radius: 10px;
             margin-bottom: 20px;
             box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+            overflow-x: auto;
         }
 
         .report-section h2 {
@@ -224,6 +225,21 @@
             margin-bottom: 20px;
         }
 
+        @media (max-width: 768px) {
+            body { padding: 12px; }
+            .header { flex-direction: column; align-items: flex-start; gap: 10px; padding: 14px; }
+            .header h1 { font-size: 18px; }
+            .filter-row { grid-template-columns: 1fr; }
+            .summary-grid { grid-template-columns: 1fr 1fr; gap: 10px; }
+            .summary-card { padding: 14px; }
+            .summary-card .value { font-size: 22px; }
+            .report-section { padding: 14px; }
+            .report-section h2 { font-size: 16px; }
+            .export-buttons { flex-wrap: wrap; }
+        }
+        @media (max-width: 480px) {
+            .summary-grid { grid-template-columns: 1fr; }
+        }
         @media print {
             body {
                 background: white;

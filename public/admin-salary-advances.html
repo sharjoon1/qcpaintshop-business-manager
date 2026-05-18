@@ -336,6 +336,12 @@
             .header { flex-direction: column; gap: 10px; text-align: center; }
             .summary-cards { grid-template-columns: repeat(2, 1fr); }
             .filter-row { grid-template-columns: 1fr; }
+            .btn-sm { padding: 5px 8px; font-size: 11px; }
+            /* Hide less-important table columns on mobile */
+            table th:nth-child(4), table td:nth-child(4) { display: none; }
+        }
+        @media (max-width: 480px) {
+            .summary-cards { grid-template-columns: 1fr; }
         }
     </style>
     <script src="/universal-nav-loader.js"></script>

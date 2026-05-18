@@ -258,6 +258,19 @@
         .tab-content.active {
             display: block;
         }
+
+        @media (max-width: 768px) {
+            body { padding: 8px; }
+            .header { flex-wrap: wrap; padding: 12px; }
+            .header h1 { font-size: 18px; }
+            .filter-row { grid-template-columns: 1fr; }
+            .summary-cards { grid-template-columns: 1fr 1fr; }
+            .tabs { flex-wrap: wrap; gap: 6px; }
+            .tab { padding: 10px 14px; font-size: 13px; border-radius: 8px; }
+        }
+        @media (max-width: 480px) {
+            .summary-cards { grid-template-columns: 1fr; }
+        }
     </style>
     <script src="/universal-nav-loader.js"></script>
 </head>
