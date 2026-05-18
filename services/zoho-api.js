@@ -2458,6 +2458,11 @@ async function syncCreditNotes(params = {}) {
     return { success: true, upserted };
 }
 
+async function getRawSalesOrder(soId) {
+    const orgId = process.env.ZOHO_ORGANIZATION_ID;
+    return await apiGet(`/salesorders/${soId}`, { organization_id: orgId });
+}
+
 module.exports = {
     setPool,
     // Invoices
@@ -2539,5 +2544,7 @@ module.exports = {
     syncExpenses,
     // Credit Notes
     getCreditNotes,
-    syncCreditNotes
+    syncCreditNotes,
+    // Sales Orders (raw Zoho API fetch)
+    getRawSalesOrder
 };

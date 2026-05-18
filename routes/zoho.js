@@ -5897,6 +5897,35 @@ router.post('/sync/creditnotes', requirePermission('zoho', 'sync'), async (req, 
     } catch (e) { res.status(500).json({ success: false, error: e.message }); }
 });
 
+// ==========================================
+// SALES ORDERS
+// ==========================================
+
+router.get('/salesorders', requirePermission('zoho', 'view'), async (req, res) => {
+    try {
+        const { page=1, limit=50, from_date, to_date, status, search } = req.query;
+        let sql = `SELECT transaction_id, reference_number as so_number, date,
+                          customer_name, total, status, location_id, currency_code
+                   FROM zoho_daily_transactions WHERE type = 'sales_order'`;
+        const params = [];
+        if (from_date) { sql += ' AND date >= ?'; params.push(from_date); }
+        if (to_date) { sql += ' AND date <= ?'; params.push(to_date); }
+        if (status) { sql += ' AND status = ?'; params.push(status); }
+        if (search) { sql += ' AND customer_name LIKE ?'; params.push(`%${search}%`); }
+        sql += ' ORDER BY date DESC LIMIT ? OFFSET ?';
+        params.push(Number(limit), (Number(page)-1)*Number(limit));
+        const [rows] = await pool.query(sql, params);
+        res.json({ success: true, salesorders: rows });
+    } catch (e) { res.status(500).json({ success: false, error: e.message }); }
+});
+
+router.get('/salesorders/:id', requirePermission('zoho', 'view'), async (req, res) => {
+    try {
+        const result = await zohoAPI.getRawSalesOrder(req.params.id);
+        res.json({ success: true, salesorder: result.salesorder });
+    } catch (e) { res.status(500).json({ success: false, error: e.message }); }
+});
+
 module.exports = {
     router,
     setPool

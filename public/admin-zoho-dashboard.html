@@ -45,8 +45,12 @@
             font-weight: 500;
             transition: all 0.2s;
         }
+        .quick-link { font-size: 0.875rem; }
         .quick-link:hover { transform: translateX(4px); box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
         .quick-link-icon { font-size: 1.25rem; }
+        @media (max-width: 640px) {
+            .quick-link { padding: 0.6rem 0.75rem; font-size: 0.8rem; }
+        }
 
         /* Status badge styles */
         .badge {
@@ -306,6 +310,10 @@
             display: none;
         }
         .trend-chart-container.show { display: block; }
+        @media (max-width: 640px) {
+            .trend-chart-container { padding: 0.75rem; }
+            #trendChart { max-height: 200px !important; }
+        }
         .trend-chart-header {
             display: flex;
             align-items: center;
@@ -350,6 +358,8 @@
             transform: translateX(100%);
             transition: transform 0.3s ease;
             overflow: hidden;
+            padding-bottom: max(1rem, env(safe-area-inset-bottom));
+            max-height: calc(100dvh - 4rem);
         }
         .drilldown-overlay.open .drilldown-panel { transform: translateX(0); }
 
@@ -776,7 +786,7 @@
     <div id="activePeriodLabel" class="period-label" style="display: none;"></div>
 
     <!-- KPI Stats Grid - Row 1 -->
-    <div class="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4 mb-4">
+    <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 md:gap-4 mb-4">
         <!-- Total Revenue -->
         <div class="stat-card" style="border-left-color: #7c3aed;" onclick="openDrilldown('revenue')" title="Click to see invoices">
             <div class="flex justify-between items-start">
@@ -851,7 +861,7 @@
     </div>
 
     <!-- KPI Stats Grid - Row 2 -->
-    <div class="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4 mb-6">
+    <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 md:gap-4 mb-6">
         <!-- Total Invoices -->
         <div class="card stat-card" style="border-left-color: #6366f1;" onclick="openDrilldown('total_invoices')" title="Click to see all invoices">
             <div class="flex justify-between items-start">
@@ -934,7 +944,7 @@
                 <option value="month">Monthly</option>
             </select>
         </div>
-        <canvas id="trendChart" height="100"></canvas>
+        <canvas id="trendChart" height="100" style="max-height: 300px"></canvas>
     </div>
 
     <!-- Main Content Grid: Recent Invoices + Sidebar -->
@@ -1045,6 +1055,14 @@
                             </svg>
                         </span>
                         <span>Zoho Settings</span>
+                    </a>
+                    <a href="/admin-zoho-salesorders.html" class="quick-link">
+                        <span class="quick-link-icon">📋</span>
+                        <span>Sales Orders</span>
+                    </a>
+                    <a href="/admin-zoho-expenses.html" class="quick-link">
+                        <span class="quick-link-icon">💳</span>
+                        <span>Expenses &amp; Credit Notes</span>
                     </a>
                     <button onclick="syncCustomers()" class="quick-link text-left w-full" id="syncCustomersBtn">
                         <span class="quick-link-icon">
