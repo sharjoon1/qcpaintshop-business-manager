@@ -1649,6 +1649,29 @@ async function getLocationStockDashboard(filters = {}) {
 // ========================================
 
 /**
+ * Create a new item in Zoho Books
+ *
+ * Handles cf_* custom field keys same as updateItem — wraps them into
+ * custom_fields: [{ api_name, value }] before sending.
+ */
+async function createItem(data) {
+    const orgId = process.env.ZOHO_ORGANIZATION_ID;
+    const payload = { ...data };
+    // Handle cf_* custom fields same as updateItem
+    const cfKeys = Object.keys(payload).filter(k => k.startsWith('cf_'));
+    if (cfKeys.length > 0) {
+        const existing = Array.isArray(payload.custom_fields) ? [...payload.custom_fields] : [];
+        const byApi = new Map(existing.map(f => [f.api_name, f]));
+        for (const k of cfKeys) {
+            byApi.set(k, { api_name: k, value: payload[k] });
+            delete payload[k];
+        }
+        payload.custom_fields = Array.from(byApi.values());
+    }
+    return await apiPost(`/items?organization_id=${orgId}`, payload);
+}
+
+/**
  * Update a single item in Zoho
  *
  * Zoho ignores top-level custom field keys (e.g. cf_dpl) — they must be
@@ -2486,6 +2509,7 @@ module.exports = {
     // Items
     getItems,
     getItem,
+    createItem,
     updateItem,
     // Reports
     getProfitAndLoss,

@@ -1870,6 +1870,80 @@ router.get('/items', requirePermission('zoho', 'view'), async (req, res) => {
 });
 
 /**
+ * POST /api/zoho/items - Create a new item in Zoho Books + local DB
+ */
+router.post('/items', requirePermission('zoho', 'manage'), async (req, res) => {
+    try {
+        const { name, rate, sku, brand, category_name, unit, purchase_rate,
+                cf_dpl, label_rate, description, hsn_or_sac, tax_percentage,
+                manufacturer, reorder_level, status } = req.body;
+        if (!name || !name.trim()) {
+            return res.status(400).json({ success: false, message: 'Item name is required' });
+        }
+        if (rate === undefined || rate === null || rate === '') {
+            return res.status(400).json({ success: false, message: 'Rate is required' });
+        }
+
+        const zohoPayload = {};
+        if (name)              zohoPayload.name           = name.trim();
+        if (rate !== undefined) zohoPayload.rate          = parseFloat(rate) || 0;
+        if (sku)               zohoPayload.sku            = sku.trim();
+        if (unit)              zohoPayload.unit           = unit;
+        if (purchase_rate)     zohoPayload.purchase_rate  = parseFloat(purchase_rate) || 0;
+        if (label_rate)        zohoPayload.label_rate     = parseFloat(label_rate) || 0;
+        if (description)       zohoPayload.description    = description;
+        if (hsn_or_sac)        zohoPayload.hsn_or_sac     = hsn_or_sac;
+        if (tax_percentage)    zohoPayload.tax_percentage = parseFloat(tax_percentage) || 0;
+        if (manufacturer)      zohoPayload.manufacturer   = manufacturer;
+        if (reorder_level)     zohoPayload.reorder_level  = parseInt(reorder_level) || 0;
+        if (status)            zohoPayload.status         = status;
+        // Zoho Books uses category_name directly
+        if (category_name)     zohoPayload.category_name  = category_name;
+        // Custom fields
+        if (cf_dpl)            zohoPayload.cf_dpl         = parseFloat(cf_dpl) || 0;
+
+        // Create in Zoho
+        const zohoResp = await zohoAPI.createItem(zohoPayload);
+        const createdItem = zohoResp.item;
+        if (!createdItem || !createdItem.item_id) {
+            return res.status(500).json({ success: false, message: 'Zoho did not return item_id' });
+        }
+
+        // Insert into local DB
+        await pool.query(`
+            INSERT INTO zoho_items_map
+                (zoho_item_id, zoho_item_name, zoho_sku, zoho_rate, zoho_purchase_rate,
+                 zoho_label_rate, zoho_unit, zoho_description, zoho_hsn_or_sac,
+                 zoho_tax_percentage, zoho_brand, zoho_category_name, zoho_manufacturer,
+                 zoho_reorder_level, zoho_stock_on_hand, zoho_cf_dpl, zoho_status, last_synced_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?, NOW())
+        `, [
+            createdItem.item_id,
+            name.trim(),
+            sku || createdItem.sku || null,
+            parseFloat(rate) || 0,
+            parseFloat(purchase_rate) || 0,
+            parseFloat(label_rate) || 0,
+            unit || null,
+            description || null,
+            hsn_or_sac || null,
+            parseFloat(tax_percentage) || 0,
+            brand || null,
+            category_name || null,
+            manufacturer || null,
+            parseInt(reorder_level) || 0,
+            parseFloat(cf_dpl) || 0,
+            status || 'active'
+        ]);
+
+        res.json({ success: true, message: 'Item created successfully', data: { zoho_item_id: createdItem.item_id, name: name.trim() } });
+    } catch (error) {
+        console.error('[Zoho Items] Create error:', error.message);
+        res.status(500).json({ success: false, message: error.message });
+    }
+});
+
+/**
  * POST /api/zoho/sync/items - Sync items from Zoho (debounced 30s)
  */
 router.post('/sync/items', requirePermission('zoho', 'sync'), async (req, res) => {
