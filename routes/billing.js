@@ -855,7 +855,7 @@ router.put('/invoices/:id',
 
             // Preserve any existing payments when recalculating balance_due
             const [paySum] = await pool.query(
-                'SELECT COALESCE(SUM(amount_paid), 0) AS total_paid FROM billing_payments WHERE invoice_id = ? AND deleted_at IS NULL',
+                'SELECT COALESCE(SUM(amount), 0) AS total_paid FROM billing_payments WHERE invoice_id = ?',
                 [id]
             );
             const totalPaid = Number(paySum[0].total_paid);
