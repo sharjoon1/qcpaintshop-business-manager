@@ -27,6 +27,7 @@ function setPointsEngine(pe) { billingZohoService.setPointsEngine(pe); }
  * Admin/manager/super_admin can optionally filter by query param; staff is locked to own branch.
  */
 function getBranchFilter(req) {
+    if (!req.user) return null;
     const role = req.user.role;
     if (['admin', 'manager', 'super_admin'].includes(role)) {
         return req.query.branch_id ? Number(req.query.branch_id) : null;
@@ -660,6 +661,7 @@ router.post('/invoices',
     requirePermission('billing', 'invoice'),
     validate(createInvoiceSchema),
     async (req, res) => {
+        const connection = await pool.getConnection();
         try {
             const data = req.body;
             const invoiceNumber = await generateNumber('BI', 'billing_invoices', 'invoice_number');
@@ -667,7 +669,9 @@ router.post('/invoices',
             const subtotal = data.items.reduce((sum, item) => sum + item.quantity * item.unit_price, 0);
             const grandTotal = Math.max(0, subtotal - data.discount_amount);
 
-            const [result] = await pool.query(
+            await connection.beginTransaction();
+
+            const [result] = await connection.execute(
                 `INSERT INTO billing_invoices
                  (invoice_number, source, customer_type, customer_id, painter_id,
                   customer_name, customer_phone, customer_address,
@@ -696,13 +700,15 @@ router.post('/invoices',
 
             for (const item of data.items) {
                 const lineTotal = item.quantity * item.unit_price;
-                await pool.query(
+                await connection.execute(
                     `INSERT INTO billing_invoice_items
                      (invoice_id, zoho_item_id, item_name, pack_size, quantity, unit_price, line_total)
                      VALUES (?, ?, ?, ?, ?, ?, ?)`,
                     [invoiceId, item.zoho_item_id, item.item_name, item.pack_size, item.quantity, item.unit_price, lineTotal]
                 );
             }
+
+            await connection.commit();
 
             res.json({
                 success: true,
@@ -711,8 +717,11 @@ router.post('/invoices',
                 grand_total: grandTotal
             });
         } catch (error) {
+            await connection.rollback();
             console.error('Create invoice error:', error);
             res.status(500).json({ success: false, message: 'Failed to create invoice' });
+        } finally {
+            connection.release();
         }
     }
 );
@@ -820,6 +829,7 @@ router.put('/invoices/:id',
     validateParams(idParamSchema),
     validate(createInvoiceSchema),
     async (req, res) => {
+        const connection = await pool.getConnection();
         try {
             const { id } = req.params;
             const data = req.body;
@@ -828,19 +838,38 @@ router.put('/invoices/:id',
                 'SELECT id, payment_status, zoho_invoice_id FROM billing_invoices WHERE id = ?', [id]
             );
             if (!existing.length) {
+                connection.release();
                 return res.status(404).json({ success: false, message: 'Invoice not found' });
             }
             if (existing[0].payment_status !== 'unpaid') {
+                connection.release();
                 return res.status(400).json({ success: false, message: 'Only unpaid invoices can be edited' });
             }
             if (existing[0].zoho_invoice_id) {
+                connection.release();
                 return res.status(400).json({ success: false, message: 'Cannot edit an invoice already pushed to Zoho' });
             }
 
             const subtotal = data.items.reduce((sum, item) => sum + item.quantity * item.unit_price, 0);
             const grandTotal = Math.max(0, subtotal - data.discount_amount);
 
-            await pool.query(
+            // Preserve any existing payments when recalculating balance_due
+            const [paySum] = await pool.query(
+                'SELECT COALESCE(SUM(amount_paid), 0) AS total_paid FROM billing_payments WHERE invoice_id = ? AND deleted_at IS NULL',
+                [id]
+            );
+            const totalPaid = Number(paySum[0].total_paid);
+            const balanceDue = Math.max(0, grandTotal - totalPaid);
+
+            // Capture pre-edit items for audit trail (U18)
+            const [beforeInvItems] = await pool.query(
+                'SELECT * FROM billing_invoice_items WHERE invoice_id = ? AND deleted_at IS NULL ORDER BY id',
+                [id]
+            );
+
+            await connection.beginTransaction();
+
+            await connection.execute(
                 `UPDATE billing_invoices SET
                     customer_type = ?, customer_id = ?, painter_id = ?,
                     customer_name = ?, customer_phone = ?, customer_address = ?,
@@ -852,29 +881,28 @@ router.put('/invoices/:id',
                     data.customer_type, data.customer_id || null, data.painter_id || null,
                     data.customer_name, data.customer_phone, data.customer_address,
                     subtotal, data.discount_amount, grandTotal,
-                    grandTotal, // balance_due resets since unpaid
+                    balanceDue,
                     data.notes,
                     id
                 ]
             );
 
-            // Capture pre-edit items for audit trail (U18)
-            const [beforeInvItems] = await pool.query(
-                'SELECT * FROM billing_invoice_items WHERE invoice_id = ? AND deleted_at IS NULL ORDER BY id',
+            // Soft-delete existing items (history preserved for U18 audit trail)
+            await connection.execute(
+                'UPDATE billing_invoice_items SET deleted_at = NOW() WHERE invoice_id = ? AND deleted_at IS NULL',
                 [id]
             );
-
-            // Soft-delete existing items (history preserved for U18 audit trail)
-            await pool.query('UPDATE billing_invoice_items SET deleted_at = NOW() WHERE invoice_id = ? AND deleted_at IS NULL', [id]);
             for (const item of data.items) {
                 const lineTotal = item.quantity * item.unit_price;
-                await pool.query(
+                await connection.execute(
                     `INSERT INTO billing_invoice_items
                      (invoice_id, zoho_item_id, item_name, pack_size, quantity, unit_price, line_total)
                      VALUES (?, ?, ?, ?, ?, ?, ?)`,
                     [id, item.zoho_item_id, item.item_name, item.pack_size, item.quantity, item.unit_price, lineTotal]
                 );
             }
+
+            await connection.commit();
 
             auditLog.record(req, {
                 action: 'billing.invoice.items.replace',
@@ -886,8 +914,11 @@ router.put('/invoices/:id',
 
             res.json({ success: true, message: 'Invoice updated', grand_total: grandTotal });
         } catch (error) {
+            await connection.rollback();
             console.error('Edit invoice error:', error);
             res.status(500).json({ success: false, message: 'Failed to update invoice' });
+        } finally {
+            connection.release();
         }
     }
 );
