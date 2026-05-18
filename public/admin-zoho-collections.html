@@ -306,6 +306,7 @@
                                 <th>Actual</th>
                                 <th>Follow-up</th>
                                 <th>Notes</th>
+                                <th>WA Sent</th>
                                 <th>Actions</th>
                             </tr>
                         </thead>
@@ -406,6 +407,7 @@
                 <div id="pmCustResults" class="border border-gray-200 rounded-lg mt-1 max-h-32 overflow-y-auto text-sm" style="display:none"></div>
                 <input type="hidden" id="pmCustomerId">
                 <input type="hidden" id="pmCustomerName">
+                <input type="hidden" id="pmCustomerPhone">
             </div>
             <div class="grid grid-cols-2 gap-3 mb-3">
                 <div>
@@ -1080,7 +1082,7 @@
             const tbody = document.getElementById('promBody');
 
             if (data.length === 0) {
-                tbody.innerHTML = '<tr><td colspan="9" class="text-center py-8 text-gray-400">No promises found</td></tr>';
+                tbody.innerHTML = '<tr><td colspan="10" class="text-center py-8 text-gray-400">No promises found</td></tr>';
                 document.getElementById('promPagination').innerHTML = '';
                 return;
             }
@@ -1098,11 +1100,16 @@
                     <td>${p.actual_amount ? formatCurrencyFull(p.actual_amount) + (p.actual_payment_date ? ' on ' + formatDate(p.actual_payment_date) : '') : '--'}</td>
                     <td>${p.follow_up_date ? formatDate(p.follow_up_date) : '--'}</td>
                     <td class="max-w-[150px] truncate" title="${esc(p.notes || '')}">${esc(p.notes || '--')}</td>
-                    <td class="flex gap-1">
+                    <td>${p.wa_reminder_sent_at
+                        ? `<span title="${new Date(p.wa_reminder_sent_at).toLocaleString('en-IN')}" style="color:#25D366;font-size:18px;">✓</span>`
+                        : `<span style="color:#ccc;font-size:12px;">—</span>`
+                    }</td>
+                    <td class="flex gap-1 flex-wrap">
                         <button onclick="editPromise(${p.id})" class="px-2 py-1 text-xs bg-indigo-50 text-indigo-700 rounded hover:bg-indigo-100">Edit</button>
                         ${p.status === 'pending' ? `
                             <button onclick="quickUpdatePromise(${p.id},'kept')" class="px-2 py-1 text-xs bg-green-50 text-green-700 rounded hover:bg-green-100">Kept</button>
                             <button onclick="quickUpdatePromise(${p.id},'broken')" class="px-2 py-1 text-xs bg-red-50 text-red-700 rounded hover:bg-red-100">Broken</button>
+                            <button onclick="resendPromiseReminder(${p.id})" title="Resend WhatsApp reminder" class="px-2 py-1 text-xs bg-green-50 text-green-700 rounded hover:bg-green-100">WA</button>
                         ` : ''}
                     </td>
                 </tr>
@@ -1122,6 +1129,7 @@
         document.getElementById('pmCustSearch').value = '';
         document.getElementById('pmCustomerId').value = '';
         document.getElementById('pmCustomerName').value = '';
+        document.getElementById('pmCustomerPhone').value = '';
         document.getElementById('pmDate').value = '';
         document.getElementById('pmAmount').value = '';
         document.getElementById('pmFollowUp').value = '';
@@ -1141,6 +1149,8 @@
         document.getElementById('pmCustomerId').value = customerId;
         document.getElementById('pmCustomerName').value = customerName;
         document.getElementById('pmCustSearch').value = customerName;
+        const cust = customersData?.find(c => c.zoho_customer_id === customerId);
+        document.getElementById('pmCustomerPhone').value = cust?.phone || '';
     }
 
     function openPromiseForInvoice(idx) {
@@ -1149,6 +1159,7 @@
         document.getElementById('pmCustomerId').value = inv.zoho_customer_id;
         document.getElementById('pmCustomerName').value = inv.customer_name;
         document.getElementById('pmCustSearch').value = inv.customer_name;
+        document.getElementById('pmCustomerPhone').value = inv.phone || '';
         document.getElementById('pmAmount').value = inv.balance;
     }
 
@@ -1166,7 +1177,7 @@
                     div.innerHTML = '<div class="p-2 text-gray-400">No customers found</div>';
                 } else {
                     div.innerHTML = data.map(c => `
-                        <div class="p-2 hover:bg-indigo-50 cursor-pointer border-b border-gray-100" onclick="selectPromiseCustomer('${esc(c.zoho_customer_id)}','${esc(c.customer_name)}')">
+                        <div class="p-2 hover:bg-indigo-50 cursor-pointer border-b border-gray-100" onclick="selectPromiseCustomer('${esc(c.zoho_customer_id)}','${esc(c.customer_name)}','${esc(c.phone||'')}')">
                             <div class="font-medium">${esc(c.customer_name)}</div>
                             <div class="text-xs text-gray-500">${formatCurrencyFull(c.total_outstanding)} outstanding</div>
                         </div>
@@ -1177,10 +1188,11 @@
         }, 300);
     }
 
-    function selectPromiseCustomer(id, name) {
+    function selectPromiseCustomer(id, name, phone) {
         document.getElementById('pmCustomerId').value = id;
         document.getElementById('pmCustomerName').value = name;
         document.getElementById('pmCustSearch').value = name;
+        document.getElementById('pmCustomerPhone').value = phone || '';
         document.getElementById('pmCustResults').style.display = 'none';
     }
 
@@ -1204,7 +1216,8 @@
                         promise_date: date,
                         promise_amount: parseFloat(amount),
                         follow_up_date: document.getElementById('pmFollowUp').value || null,
-                        notes: document.getElementById('pmNotes').value || null
+                        notes: document.getElementById('pmNotes').value || null,
+                        customer_phone: document.getElementById('pmCustomerPhone').value || undefined
                     }
                 });
                 showToast('Promise recorded');
@@ -1234,6 +1247,18 @@
                 showToast('Failed: ' + err.message, 'error');
             }
         }
+    }
+
+    async function resendPromiseReminder(promiseId) {
+        try {
+            const res = await apiJson(API + '/promises/' + promiseId + '/remind', { method: 'POST', body: {} });
+            if (res.success) {
+                showToast('WhatsApp reminder queued ✓', 'success');
+                setTimeout(() => loadPromises(promPage), 1000);
+            } else {
+                showToast(res.message || 'Failed', 'error');
+            }
+        } catch(e) { showToast('Error: ' + e.message, 'error'); }
     }
 
     async function editPromise(id) {
