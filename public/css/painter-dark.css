@@ -1,0 +1,90 @@
+/* Painter app dark mode — shared across all painter HTML pages.
+   Dashboard has its own inline block; all others link this file. */
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg-primary: #0F1A12;
+    --bg-surface: #152418;
+    --bg-surface-2: #1C2E1F;
+    --text-primary: #E8F0E9;
+    --text-secondary: #9AB39C;
+    --border-light: #2A3E2D;
+    --color-brand: #2D8A5E;
+    --color-brand-light: #1C5C3D;
+    --color-gold: #C49A3C;
+  }
+
+  body {
+    background-color: var(--bg-primary) !important;
+    color: var(--text-primary) !important;
+  }
+
+  /* Surface containers */
+  .stat-card, .section-card, .action-btn,
+  .type-card, .product-card, .cart-item,
+  .skeleton-card, [class*="card"],
+  .section-body, .form-input,
+  .modal-content, [class*="modal-content"],
+  [class*="bottom-sheet"] {
+    background-color: var(--bg-surface) !important;
+    border-color: var(--border-light) !important;
+    color: var(--text-primary) !important;
+  }
+
+  /* Inputs */
+  input, textarea, select, .form-input, .search-input {
+    background-color: var(--bg-surface-2) !important;
+    color: var(--text-primary) !important;
+    border-color: var(--border-light) !important;
+  }
+
+  input::placeholder, textarea::placeholder {
+    color: var(--text-secondary) !important;
+  }
+
+  /* Text */
+  p, span, label, h1, h2, h3, h4, h5, h6, li, div {
+    color: var(--text-primary);
+  }
+  .text-gray-400, .text-gray-500, .text-gray-600,
+  .text-slate-400, .text-slate-500,
+  .stat-label, [class*="text-muted"], [class*="text-secondary"] {
+    color: var(--text-secondary) !important;
+  }
+
+  /* Borders */
+  [class*="border"], .border-b, .border-t {
+    border-color: var(--border-light) !important;
+  }
+
+  /* Bottom nav */
+  .bottom-nav {
+    background-color: var(--bg-surface) !important;
+    border-top-color: var(--border-light) !important;
+  }
+  .bottom-nav a:not(.active) { color: #6B8A6E !important; }
+  .bottom-nav a.active { color: #4ade80 !important; }
+
+  /* Header gradient — keep it, just darken */
+  .header {
+    background: linear-gradient(135deg, #0D3D23, #8B6A2E) !important;
+  }
+
+  /* Brand buttons — keep green */
+  .btn-primary, button[style*="1B5E3B"], a[style*="1B5E3B"] {
+    background: var(--color-brand) !important;
+  }
+
+  /* Skeleton dark variant */
+  .skeleton {
+    background: linear-gradient(90deg, #1C2E1F 25%, #243526 50%, #1C2E1F 75%) !important;
+    background-size: 200% 100% !important;
+  }
+
+  /* Background utility classes from Tailwind */
+  .bg-white, .bg-gray-50, .bg-gray-100 {
+    background-color: var(--bg-surface) !important;
+  }
+  .bg-green-50, .bg-emerald-50 {
+    background-color: rgba(27,94,59,0.15) !important;
+  }
+}
