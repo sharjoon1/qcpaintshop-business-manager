@@ -403,6 +403,56 @@
     </div>
 </div>
 
+<!-- Promise Detail Modal -->
+<div class="modal-bg" id="staffPromDetailModal" onclick="if(event.target===this)closeModal('staffPromDetailModal')">
+    <div class="modal-sheet">
+        <div class="modal-handle"></div>
+        <h3 style="font-size:1rem;font-weight:700;margin-bottom:16px">Promise Details</h3>
+        <div id="staffPromDetailBody"></div>
+        <button onclick="closeModal('staffPromDetailModal')" style="width:100%;margin-top:16px;padding:12px;background:#f1f5f9;border:none;border-radius:10px;font-weight:600;cursor:pointer">Close</button>
+    </div>
+</div>
+
+<!-- Edit Promise Modal -->
+<div class="modal-bg" id="editPromiseModal" onclick="if(event.target===this)closeModal('editPromiseModal')">
+    <div class="modal-sheet">
+        <div class="modal-handle"></div>
+        <h3 style="font-size:1rem;font-weight:700;margin-bottom:12px">Edit Promise</h3>
+        <input type="hidden" id="epId">
+        <div style="margin-bottom:10px">
+            <div style="font-size:0.7rem;color:#94a3b8;font-weight:600;margin-bottom:4px">Status</div>
+            <select id="epStatus" style="width:100%;padding:10px;border:1px solid #e2e8f0;border-radius:10px;font-size:0.8125rem">
+                <option value="pending">Pending</option>
+                <option value="kept">Kept</option>
+                <option value="broken">Broken</option>
+                <option value="partial">Partial</option>
+            </select>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px">
+            <div>
+                <div style="font-size:0.7rem;color:#94a3b8;font-weight:600;margin-bottom:4px">Actual Payment Date</div>
+                <input type="date" id="epActualDate" style="width:100%;padding:10px;border:1px solid #e2e8f0;border-radius:10px;font-size:0.8125rem">
+            </div>
+            <div>
+                <div style="font-size:0.7rem;color:#94a3b8;font-weight:600;margin-bottom:4px">Actual Amount</div>
+                <input type="number" id="epActualAmount" step="0.01" placeholder="0.00" style="width:100%;padding:10px;border:1px solid #e2e8f0;border-radius:10px;font-size:0.8125rem">
+            </div>
+        </div>
+        <div style="margin-bottom:10px">
+            <div style="font-size:0.7rem;color:#94a3b8;font-weight:600;margin-bottom:4px">Follow-up Date</div>
+            <input type="date" id="epFollowUp" style="width:100%;padding:10px;border:1px solid #e2e8f0;border-radius:10px;font-size:0.8125rem">
+        </div>
+        <div style="margin-bottom:14px">
+            <div style="font-size:0.7rem;color:#94a3b8;font-weight:600;margin-bottom:4px">Notes</div>
+            <textarea id="epNotes" rows="2" style="width:100%;padding:10px;border:1px solid #e2e8f0;border-radius:10px;font-size:0.8125rem;outline:none"></textarea>
+        </div>
+        <div style="display:flex;gap:8px">
+            <button onclick="closeModal('editPromiseModal')" style="flex:1;padding:12px;background:#f1f5f9;border:none;border-radius:10px;font-weight:600;cursor:pointer">Cancel</button>
+            <button onclick="submitEditPromise()" style="flex:1;padding:12px;background:#1B5E3B;color:white;border:none;border-radius:10px;font-weight:600;cursor:pointer">Update</button>
+        </div>
+    </div>
+</div>
+
 <div id="toast"></div>
 
 <!-- Staff sidebar component -->
@@ -837,7 +887,7 @@ async function loadPromises(page, append) {
                 : '<span class="badge" style="background:#fef3c7;color:#92400e;font-size:0.65rem;">Pending</span>';
             return `
             <div class="list-item">
-                <div style="display:flex;justify-content:space-between;align-items:flex-start">
+                <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:10px">
                     <div>
                         <div class="name">${esc(p.customer_name || 'Unknown')}</div>
                         <div class="meta">Promise date: ${fmtDate(p.promise_date)} · by ${esc(p.created_by_name || '--')}</div>
@@ -848,6 +898,11 @@ async function loadPromises(page, append) {
                         ${statusBadge}
                     </div>
                 </div>
+                <div style="display:flex;gap:6px;flex-wrap:wrap">
+                    <button onclick="showStaffPromiseDetail(${p.id})" style="flex:1;padding:7px 0;background:#f1f5f9;border:none;border-radius:8px;font-size:0.75rem;font-weight:600;color:#475569;cursor:pointer;">History</button>
+                    ${p.status === 'pending' ? `<button onclick="editStaffPromise(${p.id})" style="flex:1;padding:7px 0;background:#ede9fe;border:none;border-radius:8px;font-size:0.75rem;font-weight:600;color:#6d28d9;cursor:pointer;">Edit</button>` : ''}
+                    <button onclick="deleteStaffPromise(${p.id})" style="flex:1;padding:7px 0;background:#fee2e2;border:none;border-radius:8px;font-size:0.75rem;font-weight:600;color:#dc2626;cursor:pointer;">Delete</button>
+                </div>
             </div>`;
         }).join('');
 
@@ -855,6 +910,88 @@ async function loadPromises(page, append) {
     } catch (err) {
         showToast('Failed to load promises', 'error');
     }
+}
+
+function showStaffPromiseDetail(id) {
+    const p = promisesData.find(x => x.id === id);
+    if (!p) { showToast('Data not found — reload page', 'error'); return; }
+
+    const isBroken = p.is_broken || (p.status === 'pending' && new Date(p.promise_date) < new Date());
+    const effectiveStatus = isBroken ? 'broken' : p.status;
+    const statusColors = { pending: '#f59e0b', kept: '#10b981', broken: '#ef4444', partial: '#6366f1' };
+    const statusColor = statusColors[effectiveStatus] || '#64748b';
+
+    const rows = [
+        { label: 'Customer', value: p.customer_name || 'Unknown' },
+        { label: 'Invoice', value: p.zoho_invoice_id || 'Customer-level' },
+        { label: 'Promise Date', value: fmtDate(p.promise_date) },
+        { label: 'Amount', value: fmtFull(p.promise_amount) },
+        { label: 'Status', value: `<span style="font-weight:700;color:${statusColor};text-transform:uppercase">${effectiveStatus}</span>` },
+        p.follow_up_date ? { label: 'Follow-up', value: fmtDate(p.follow_up_date) } : null,
+        p.notes ? { label: 'Notes', value: p.notes } : null,
+        p.actual_amount ? { label: 'Actual Amount', value: fmtFull(p.actual_amount) } : null,
+        p.actual_payment_date ? { label: 'Paid On', value: fmtDate(p.actual_payment_date) } : null,
+        p.created_by_name ? { label: 'Recorded By', value: p.created_by_name } : null,
+        p.created_at ? { label: 'Recorded At', value: new Date(p.created_at).toLocaleString('en-IN',{day:'2-digit',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit'}) } : null,
+        p.wa_reminder_sent_at ? { label: 'WA Reminder', value: new Date(p.wa_reminder_sent_at).toLocaleString('en-IN',{day:'2-digit',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit'}) } : null,
+    ].filter(Boolean);
+
+    document.getElementById('staffPromDetailBody').innerHTML = rows.map(r => `
+        <div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid #f1f5f9;">
+            <span style="font-size:0.75rem;color:#94a3b8;font-weight:600">${r.label}</span>
+            <span style="font-size:0.8125rem;color:#1e293b;font-weight:500;text-align:right;max-width:60%">${typeof r.value === 'string' ? r.value : esc(String(r.value))}</span>
+        </div>
+    `).join('');
+
+    document.getElementById('staffPromDetailModal').classList.add('show');
+}
+
+function editStaffPromise(id) {
+    const p = promisesData.find(x => x.id === id);
+    if (!p) { showToast('Data not found — reload page', 'error'); return; }
+    document.getElementById('epId').value = p.id;
+    document.getElementById('epStatus').value = p.status || 'pending';
+    document.getElementById('epActualDate').value = p.actual_payment_date ? p.actual_payment_date.substring(0, 10) : '';
+    document.getElementById('epActualAmount').value = p.actual_amount || '';
+    document.getElementById('epFollowUp').value = p.follow_up_date ? p.follow_up_date.substring(0, 10) : '';
+    document.getElementById('epNotes').value = p.notes || '';
+    document.getElementById('editPromiseModal').classList.add('show');
+}
+
+async function submitEditPromise() {
+    const id = document.getElementById('epId').value;
+    const body = {
+        status: document.getElementById('epStatus').value,
+        actual_payment_date: document.getElementById('epActualDate').value || null,
+        actual_amount: document.getElementById('epActualAmount').value ? parseFloat(document.getElementById('epActualAmount').value) : null,
+        follow_up_date: document.getElementById('epFollowUp').value || null,
+        notes: document.getElementById('epNotes').value
+    };
+    try {
+        const res = await apiJson(API + '/promises/' + id, { method: 'PUT', body });
+        if (res.success) {
+            showToast('Promise updated', 'success');
+            closeModal('editPromiseModal');
+            loadPromises();
+        } else {
+            showToast(res.message || 'Update failed', 'error');
+        }
+    } catch(e) { showToast(e.message, 'error'); }
+}
+
+async function deleteStaffPromise(id) {
+    const p = promisesData.find(x => x.id === id);
+    const name = p ? esc(p.customer_name || 'this customer') : 'this promise';
+    if (!confirm('Delete promise for ' + name + '? This cannot be undone.')) return;
+    try {
+        const res = await apiJson(API + '/promises/' + id, { method: 'DELETE' });
+        if (res.success) {
+            showToast('Promise deleted', 'success');
+            loadPromises();
+        } else {
+            showToast(res.message || 'Delete failed', 'error');
+        }
+    } catch(e) { showToast(e.message, 'error'); }
 }
 
 function fmtDateTime(d) {
