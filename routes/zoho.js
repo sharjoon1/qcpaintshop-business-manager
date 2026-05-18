@@ -306,6 +306,7 @@ router.get('/dashboard/export', requirePermission('zoho', 'view'), async (req, r
 router.get('/dashboard/drilldown', requirePermission('zoho', 'view'), async (req, res) => {
     try {
         const { metric, from_date, to_date, search, sort, order = 'DESC', page = 1, limit = 25 } = req.query;
+        const safeLimit = Math.min(parseInt(limit) || 25, 500);
 
         if (!metric) {
             return res.status(400).json({ success: false, message: 'metric parameter is required' });
@@ -349,7 +350,7 @@ router.get('/dashboard/drilldown', requirePermission('zoho', 'view'), async (req
             const sortCol = allowedSorts.includes(sort) ? sort : 'invoice_date';
             const sortOrder = order.toUpperCase() === 'ASC' ? 'ASC' : 'DESC';
 
-            const offset = (Math.max(1, parseInt(page)) - 1) * parseInt(limit);
+            const offset = (Math.max(1, parseInt(page)) - 1) * safeLimit;
 
             // Count + summary
             const [[counts]] = await pool.query(
@@ -364,7 +365,7 @@ router.get('/dashboard/drilldown', requirePermission('zoho', 'view'), async (req
                 ${where}
                 ORDER BY zi.${sortCol} ${sortOrder}
                 LIMIT ? OFFSET ?
-            `, [...params, parseInt(limit), offset]);
+            `, [...params, safeLimit, offset]);
 
             res.json({
                 success: true,
@@ -373,9 +374,9 @@ router.get('/dashboard/drilldown', requirePermission('zoho', 'view'), async (req
                 pagination: {
                     total: counts.total,
                     page: parseInt(page),
-                    limit: parseInt(limit),
-                    pages: Math.ceil(counts.total / parseInt(limit)),
-                    totalPages: Math.ceil(counts.total / parseInt(limit))
+                    limit: safeLimit,
+                    pages: Math.ceil(counts.total / safeLimit),
+                    totalPages: Math.ceil(counts.total / safeLimit)
                 },
                 summary: { total_amount: counts.total_amount, count: counts.total }
             });
@@ -394,7 +395,7 @@ router.get('/dashboard/drilldown', requirePermission('zoho', 'view'), async (req
             const sortCol = allowedSorts.includes(sort) ? sort : 'payment_date';
             const sortOrder = order.toUpperCase() === 'ASC' ? 'ASC' : 'DESC';
 
-            const offset = (Math.max(1, parseInt(page)) - 1) * parseInt(limit);
+            const offset = (Math.max(1, parseInt(page)) - 1) * safeLimit;
 
             const [[counts]] = await pool.query(
                 `SELECT COUNT(*) as total, COALESCE(SUM(zp.amount), 0) as total_amount FROM zoho_payments zp ${where}`, params
@@ -407,7 +408,7 @@ router.get('/dashboard/drilldown', requirePermission('zoho', 'view'), async (req
                 ${where}
                 ORDER BY zp.${sortCol} ${sortOrder}
                 LIMIT ? OFFSET ?
-            `, [...params, parseInt(limit), offset]);
+            `, [...params, safeLimit, offset]);
 
             res.json({
                 success: true,
@@ -416,9 +417,9 @@ router.get('/dashboard/drilldown', requirePermission('zoho', 'view'), async (req
                 pagination: {
                     total: counts.total,
                     page: parseInt(page),
-                    limit: parseInt(limit),
-                    pages: Math.ceil(counts.total / parseInt(limit)),
-                    totalPages: Math.ceil(counts.total / parseInt(limit))
+                    limit: safeLimit,
+                    pages: Math.ceil(counts.total / safeLimit),
+                    totalPages: Math.ceil(counts.total / safeLimit)
                 },
                 summary: { total_amount: counts.total_amount, count: counts.total }
             });
@@ -467,6 +468,7 @@ router.get('/dashboard/drilldown/export', requirePermission('zoho', 'view'), asy
                        zi.total, zi.balance, zi.status
                 FROM zoho_invoices zi ${where}
                 ORDER BY zi.${sortCol} ${sortOrder}
+                LIMIT 10000
             `, params);
 
             let csv = 'Invoice #,Customer,Date,Due Date,Total,Balance,Status\n';
@@ -500,6 +502,7 @@ router.get('/dashboard/drilldown/export', requirePermission('zoho', 'view'), asy
                        zp.amount, zp.payment_mode, zp.reference_number
                 FROM zoho_payments zp ${where}
                 ORDER BY zp.${sortCol} ${sortOrder}
+                LIMIT 10000
             `, params);
 
             let csv = 'Payment #,Customer,Date,Amount,Mode,Reference\n';
@@ -713,6 +716,7 @@ router.get('/sync/log', requirePermission('zoho', 'view'), async (req, res) => {
 router.get('/invoices', requirePermission('zoho', 'invoices'), async (req, res) => {
     try {
         const { status, search, page = 1, limit = 20, sort = 'invoice_date', order = 'DESC' } = req.query;
+        const safeLimit = Math.min(parseInt(limit) || 20, 500);
 
         let where = 'WHERE 1=1';
         const params = [];
@@ -730,7 +734,7 @@ router.get('/invoices', requirePermission('zoho', 'invoices'), async (req, res) 
         const sortCol = allowedSorts.includes(sort) ? sort : 'invoice_date';
         const sortOrder = order.toUpperCase() === 'ASC' ? 'ASC' : 'DESC';
 
-        const offset = (Math.max(1, parseInt(page)) - 1) * parseInt(limit);
+        const offset = (Math.max(1, parseInt(page)) - 1) * safeLimit;
 
         const [[{ total }]] = await pool.query(
             `SELECT COUNT(*) as total FROM zoho_invoices zi ${where}`, params
@@ -746,7 +750,7 @@ router.get('/invoices', requirePermission('zoho', 'invoices'), async (req, res) 
             ${where}
             ORDER BY zi.${sortCol} ${sortOrder}
             LIMIT ? OFFSET ?
-        `, [...params, parseInt(limit), offset]);
+        `, [...params, safeLimit, offset]);
 
         const [statsRows] = await pool.query(
             `SELECT COUNT(*) AS total,
@@ -763,9 +767,9 @@ router.get('/invoices', requirePermission('zoho', 'invoices'), async (req, res) 
             pagination: {
                 total,
                 page: parseInt(page),
-                limit: parseInt(limit),
-                pages: Math.ceil(total / parseInt(limit)),
-                totalPages: Math.ceil(total / parseInt(limit))
+                limit: safeLimit,
+                pages: Math.ceil(total / safeLimit),
+                totalPages: Math.ceil(total / safeLimit)
             }
         });
     } catch (error) {
@@ -824,6 +828,7 @@ router.get('/invoices/:id', requirePermission('zoho', 'invoices'), async (req, r
 router.get('/payments', requirePermission('zoho', 'view'), async (req, res) => {
     try {
         const { search, from_date, to_date, page = 1, limit = 20 } = req.query;
+        const safeLimit = Math.min(parseInt(limit) || 20, 500);
 
         let where = 'WHERE 1=1';
         const params = [];
@@ -841,7 +846,7 @@ router.get('/payments', requirePermission('zoho', 'view'), async (req, res) => {
             params.push(to_date);
         }
 
-        const offset = (Math.max(1, parseInt(page)) - 1) * parseInt(limit);
+        const offset = (Math.max(1, parseInt(page)) - 1) * safeLimit;
 
         const [[{ total }]] = await pool.query(
             `SELECT COUNT(*) as total FROM zoho_payments zp ${where}`, params
@@ -853,7 +858,7 @@ router.get('/payments', requirePermission('zoho', 'view'), async (req, res) => {
             ${where}
             ORDER BY zp.payment_date DESC
             LIMIT ? OFFSET ?
-        `, [...params, parseInt(limit), offset]);
+        `, [...params, safeLimit, offset]);
 
         res.json({
             success: true,
@@ -861,9 +866,9 @@ router.get('/payments', requirePermission('zoho', 'view'), async (req, res) => {
             pagination: {
                 total,
                 page: parseInt(page),
-                limit: parseInt(limit),
-                pages: Math.ceil(total / parseInt(limit)),
-                totalPages: Math.ceil(total / parseInt(limit))
+                limit: safeLimit,
+                pages: Math.ceil(total / safeLimit),
+                totalPages: Math.ceil(total / safeLimit)
             }
         });
     } catch (error) {
@@ -912,6 +917,7 @@ router.get('/payments/:id', requirePermission('zoho', 'view'), async (req, res) 
 router.get('/customers', requirePermission('zoho', 'view'), async (req, res) => {
     try {
         const { search, mapped, page = 1, limit = 20 } = req.query;
+        const safeLimit = Math.min(parseInt(limit) || 20, 500);
 
         let where = 'WHERE 1=1';
         const params = [];
@@ -926,7 +932,7 @@ router.get('/customers', requirePermission('zoho', 'view'), async (req, res) => 
             where += ' AND zcm.local_customer_id IS NULL';
         }
 
-        const offset = (Math.max(1, parseInt(page)) - 1) * parseInt(limit);
+        const offset = (Math.max(1, parseInt(page)) - 1) * safeLimit;
 
         const [[{ total }]] = await pool.query(
             `SELECT COUNT(*) as total FROM zoho_customers_map zcm ${where}`, params
@@ -939,12 +945,12 @@ router.get('/customers', requirePermission('zoho', 'view'), async (req, res) => 
             ${where}
             ORDER BY zcm.zoho_contact_name ASC
             LIMIT ? OFFSET ?
-        `, [...params, parseInt(limit), offset]);
+        `, [...params, safeLimit, offset]);
 
         res.json({
             success: true,
             data: customers,
-            pagination: { total, page: parseInt(page), limit: parseInt(limit), pages: Math.ceil(total / parseInt(limit)), totalPages: Math.ceil(total / parseInt(limit)) }
+            pagination: { total, page: parseInt(page), limit: safeLimit, pages: Math.ceil(total / safeLimit), totalPages: Math.ceil(total / safeLimit) }
         });
     } catch (error) {
         res.status(500).json({ success: false, message: error.message });
@@ -1181,7 +1187,7 @@ router.get('/oauth/callback', async (req, res) => {
 /**
  * POST /api/zoho/oauth/exchange - Manual code exchange (for when callback doesn't reach local server)
  */
-router.post('/oauth/exchange', requireAuth, async (req, res) => {
+router.post('/oauth/exchange', requirePermission('zoho', 'manage'), async (req, res) => {
     try {
         console.log('[Zoho] Manual code exchange requested by user:', req.user?.id);
         const { code } = req.body;
@@ -1225,6 +1231,7 @@ router.post('/oauth/disconnect', requirePermission('zoho', 'manage'), async (req
 router.get('/whatsapp/queue', requirePermission('zoho', 'whatsapp'), async (req, res) => {
     try {
         const { status, page = 1, limit = 20 } = req.query;
+        const safeLimit = Math.min(parseInt(limit) || 20, 500);
 
         let where = 'WHERE 1=1';
         const params = [];
@@ -1234,7 +1241,7 @@ router.get('/whatsapp/queue', requirePermission('zoho', 'whatsapp'), async (req,
             params.push(status);
         }
 
-        const offset = (Math.max(1, parseInt(page)) - 1) * parseInt(limit);
+        const offset = (Math.max(1, parseInt(page)) - 1) * safeLimit;
 
         const [queue] = await pool.query(`
             SELECT wf.*, u.full_name as created_by_name
@@ -1243,7 +1250,7 @@ router.get('/whatsapp/queue', requirePermission('zoho', 'whatsapp'), async (req,
             ${where}
             ORDER BY wf.created_at DESC
             LIMIT ? OFFSET ?
-        `, [...params, parseInt(limit), offset]);
+        `, [...params, safeLimit, offset]);
 
         res.json({ success: true, data: queue });
     } catch (error) {
@@ -1500,6 +1507,7 @@ router.get('/stock/filter-options', requirePermission('zoho', 'view'), async (re
 router.get('/stock/by-location', requirePermission('zoho', 'view'), async (req, res) => {
     try {
         const { location_id, search, page = 1, limit = 50, sort = 'name_asc', brands, categories, stock_status } = req.query;
+        const safeLimit = Math.min(parseInt(limit) || 50, 500);
         if (!location_id) {
             return res.status(400).json({ success: false, message: 'location_id required' });
         }
@@ -1548,7 +1556,7 @@ router.get('/stock/by-location', requirePermission('zoho', 'view'), async (req, 
         };
         const orderBy = sortMap[sort] || sortMap.name_asc;
 
-        const offset = (Math.max(1, parseInt(page)) - 1) * parseInt(limit);
+        const offset = (Math.max(1, parseInt(page)) - 1) * safeLimit;
         const [[{ total }]] = await pool.query(
             `SELECT COUNT(*) as total FROM zoho_location_stock ls LEFT JOIN zoho_items_map zim ON ls.zoho_item_id = zim.zoho_item_id ${where}`, params
         );
@@ -1563,12 +1571,12 @@ router.get('/stock/by-location', requirePermission('zoho', 'view'), async (req, 
             ${where}
             ORDER BY ${orderBy}
             LIMIT ? OFFSET ?
-        `, [...params, parseInt(limit), offset]);
+        `, [...params, safeLimit, offset]);
 
         res.json({
             success: true,
             data: rows,
-            pagination: { total, page: parseInt(page), limit: parseInt(limit), pages: Math.ceil(total / parseInt(limit)), totalPages: Math.ceil(total / parseInt(limit)) }
+            pagination: { total, page: parseInt(page), limit: safeLimit, pages: Math.ceil(total / safeLimit), totalPages: Math.ceil(total / safeLimit) }
         });
     } catch (error) {
         res.status(500).json({ success: false, message: error.message });
@@ -1581,6 +1589,7 @@ router.get('/stock/by-location', requirePermission('zoho', 'view'), async (req, 
 router.get('/stock/history', requirePermission('zoho', 'view'), async (req, res) => {
     try {
         const { item_id, location_id, page = 1, limit = 50 } = req.query;
+        const safeLimit = Math.min(parseInt(limit) || 50, 500);
         let where = 'WHERE 1=1';
         const params = [];
 
@@ -1593,7 +1602,7 @@ router.get('/stock/history', requirePermission('zoho', 'view'), async (req, res)
             params.push(location_id);
         }
 
-        const offset = (Math.max(1, parseInt(page)) - 1) * parseInt(limit);
+        const offset = (Math.max(1, parseInt(page)) - 1) * safeLimit;
         const [[{ total }]] = await pool.query(
             `SELECT COUNT(*) as total FROM zoho_stock_history sh
              LEFT JOIN zoho_locations_map lm ON sh.zoho_location_id = lm.zoho_location_id
@@ -1607,12 +1616,12 @@ router.get('/stock/history', requirePermission('zoho', 'view'), async (req, res)
             ${where} AND (lm.is_active = 1 OR lm.is_active IS NULL)
             ORDER BY sh.created_at DESC
             LIMIT ? OFFSET ?
-        `, [...params, parseInt(limit), offset]);
+        `, [...params, safeLimit, offset]);
 
         res.json({
             success: true,
             data: rows,
-            pagination: { total, page: parseInt(page), limit: parseInt(limit), pages: Math.ceil(total / parseInt(limit)), totalPages: Math.ceil(total / parseInt(limit)) }
+            pagination: { total, page: parseInt(page), limit: safeLimit, pages: Math.ceil(total / safeLimit), totalPages: Math.ceil(total / safeLimit) }
         });
     } catch (error) {
         res.status(500).json({ success: false, message: error.message });
@@ -1787,6 +1796,7 @@ router.get('/inventory-adjustments', requirePermission('zoho', 'view'), async (r
 router.get('/items', requirePermission('zoho', 'view'), async (req, res) => {
     try {
         const { search, brand, category, page = 1, limit = 50 } = req.query;
+        const safeLimit = Math.min(parseInt(limit) || 50, 500);
 
         const showInactive = req.query.show_inactive === '1';
         let where = showInactive ? "WHERE 1=1" : "WHERE (zim.zoho_status = 'active' OR zim.zoho_status IS NULL)";
@@ -1805,7 +1815,7 @@ router.get('/items', requirePermission('zoho', 'view'), async (req, res) => {
             params.push(`%${category}%`);
         }
 
-        const offset = (Math.max(1, parseInt(page)) - 1) * parseInt(limit);
+        const offset = (Math.max(1, parseInt(page)) - 1) * safeLimit;
 
         const [[{ total }]] = await pool.query(`SELECT COUNT(*) as total FROM zoho_items_map zim ${where}`, params);
 
@@ -1847,12 +1857,12 @@ router.get('/items', requirePermission('zoho', 'view'), async (req, res) => {
                 return `${sortCol} ${sortOrder}`;
             })()}
             LIMIT ? OFFSET ?
-        `, [...params, parseInt(limit), offset]);
+        `, [...params, safeLimit, offset]);
 
         res.json({
             success: true,
             data: items,
-            pagination: { total, page: parseInt(page), limit: parseInt(limit), pages: Math.ceil(total / parseInt(limit)), totalPages: Math.ceil(total / parseInt(limit)) }
+            pagination: { total, page: parseInt(page), limit: safeLimit, pages: Math.ceil(total / safeLimit), totalPages: Math.ceil(total / safeLimit) }
         });
     } catch (error) {
         res.status(500).json({ success: false, message: error.message });
@@ -2844,13 +2854,14 @@ router.post('/items/bulk-edit', requirePermission('zoho', 'manage'), async (req,
 router.get('/items/bulk-jobs', requirePermission('zoho', 'view'), async (req, res) => {
     try {
         const { status, page = 1, limit = 20 } = req.query;
+        const safeLimit = Math.min(parseInt(limit) || 20, 500);
 
         let where = 'WHERE 1=1';
         const params = [];
 
         if (status) { where += ' AND bj.status = ?'; params.push(status); }
 
-        const offset = (Math.max(1, parseInt(page)) - 1) * parseInt(limit);
+        const offset = (Math.max(1, parseInt(page)) - 1) * safeLimit;
 
         const [jobs] = await pool.query(`
             SELECT bj.*, u.full_name as created_by_name
@@ -2859,7 +2870,7 @@ router.get('/items/bulk-jobs', requirePermission('zoho', 'view'), async (req, re
             ${where}
             ORDER BY bj.created_at DESC
             LIMIT ? OFFSET ?
-        `, [...params, parseInt(limit), offset]);
+        `, [...params, safeLimit, offset]);
 
         res.json({ success: true, data: jobs });
     } catch (error) {
@@ -2884,19 +2895,20 @@ router.get('/items/bulk-jobs/:id', requirePermission('zoho', 'view'), async (req
         }
 
         const { page = 1, limit = 50, item_status } = req.query;
+        const safeLimit = Math.min(parseInt(limit) || 50, 500);
         let itemWhere = 'WHERE bji.job_id = ?';
         const itemParams = [req.params.id];
 
         if (item_status) { itemWhere += ' AND bji.status = ?'; itemParams.push(item_status); }
 
-        const offset = (Math.max(1, parseInt(page)) - 1) * parseInt(limit);
+        const offset = (Math.max(1, parseInt(page)) - 1) * safeLimit;
 
         const [items] = await pool.query(`
             SELECT bji.* FROM zoho_bulk_job_items bji
             ${itemWhere}
             ORDER BY bji.id
             LIMIT ? OFFSET ?
-        `, [...itemParams, parseInt(limit), offset]);
+        `, [...itemParams, safeLimit, offset]);
 
         res.json({ success: true, data: { job: jobs[0], items } });
     } catch (error) {
@@ -2952,6 +2964,7 @@ router.get('/items/:id', requirePermission('zoho', 'view'), async (req, res) => 
 router.get('/transactions/daily', requirePermission('zoho', 'view'), async (req, res) => {
     try {
         const { from_date, to_date, location_id, page = 1, limit = 50 } = req.query;
+        const safeLimit = Math.min(parseInt(limit) || 50, 500);
 
         let where = 'WHERE 1=1';
         const params = [];
@@ -2960,7 +2973,7 @@ router.get('/transactions/daily', requirePermission('zoho', 'view'), async (req,
         if (to_date) { where += ' AND dt.transaction_date <= ?'; params.push(to_date); }
         if (location_id) { where += ' AND dt.zoho_location_id = ?'; params.push(location_id); }
 
-        const offset = (Math.max(1, parseInt(page)) - 1) * parseInt(limit);
+        const offset = (Math.max(1, parseInt(page)) - 1) * safeLimit;
 
         const [[{ total }]] = await pool.query(`
             SELECT COUNT(*) as total FROM zoho_daily_transactions dt
@@ -2974,12 +2987,12 @@ router.get('/transactions/daily', requirePermission('zoho', 'view'), async (req,
             ${where} AND (lm.is_active = 1 OR lm.is_active IS NULL)
             ORDER BY dt.transaction_date DESC, dt.location_name ASC
             LIMIT ? OFFSET ?
-        `, [...params, parseInt(limit), offset]);
+        `, [...params, safeLimit, offset]);
 
         res.json({
             success: true,
             data: transactions,
-            pagination: { total, page: parseInt(page), limit: parseInt(limit), pages: Math.ceil(total / parseInt(limit)), totalPages: Math.ceil(total / parseInt(limit)) }
+            pagination: { total, page: parseInt(page), limit: safeLimit, pages: Math.ceil(total / safeLimit), totalPages: Math.ceil(total / safeLimit) }
         });
     } catch (error) {
         res.status(500).json({ success: false, message: error.message });
@@ -3098,6 +3111,7 @@ router.get('/transactions/comparison', requirePermission('zoho', 'view'), async 
 router.get('/reorder/config', requirePermission('zoho', 'view'), branchScope, async (req, res) => {
     try {
         const { item_id, source, page = 1, limit = 50 } = req.query;
+        const safeLimit = Math.min(parseInt(limit) || 50, 500);
 
         let where = 'WHERE 1=1';
         const params = [];
@@ -3113,7 +3127,7 @@ router.get('/reorder/config', requirePermission('zoho', 'view'), branchScope, as
         }
         if (source) { where += ' AND rc.source = ?'; params.push(source); }
 
-        const offset = (Math.max(1, parseInt(page)) - 1) * parseInt(limit);
+        const offset = (Math.max(1, parseInt(page)) - 1) * safeLimit;
 
         const [[{ total }]] = await pool.query(`
             SELECT COUNT(*) as total FROM zoho_reorder_config rc
@@ -3128,12 +3142,12 @@ router.get('/reorder/config', requirePermission('zoho', 'view'), branchScope, as
             ${where} AND (lm.is_active = 1 OR lm.is_active IS NULL)
             ORDER BY rc.item_name ASC
             LIMIT ? OFFSET ?
-        `, [...params, Number(limit), offset]);
+        `, [...params, safeLimit, offset]);
 
         res.json({
             success: true,
             data: configs,
-            pagination: { total, page: parseInt(page), limit: parseInt(limit), pages: Math.ceil(total / parseInt(limit)), totalPages: Math.ceil(total / parseInt(limit)) }
+            pagination: { total, page: parseInt(page), limit: safeLimit, pages: Math.ceil(total / safeLimit), totalPages: Math.ceil(total / safeLimit) }
         });
     } catch (error) {
         res.status(500).json({ success: false, message: error.message });
