@@ -31,6 +31,23 @@
         .toast.show { transform: translateX(0); }
         .toast-success { background: #059669; }
         .toast-error { background: #dc2626; }
+        /* ─── MOBILE: admin-profile.html ─── */
+        @media (max-width: 639px) {
+            .container, .p-6, .p-8 { padding: 12px !important; }
+            .grid.grid-cols-2, .grid.grid-cols-3 { grid-template-columns: 1fr !important; }
+            input, select, textarea { width: 100% !important; min-height: 44px !important; }
+            .flex.justify-between { flex-direction: column !important; gap: 8px !important; }
+            /* Profile photo centered */
+            .flex.items-center.gap-4 { flex-direction: column !important; align-items: center !important; text-align: center !important; }
+            img.rounded-full, .profile-pic, .avatar-img { width: 100px !important; height: 100px !important; }
+            /* Save button: sticky bottom */
+            button[type="submit"], button[onclick*="save"], .save-btn {
+                width: 100% !important; min-height: 48px !important;
+                position: sticky !important; bottom: 64px !important; z-index: 10 !important;
+            }
+            /* Modals */
+            [id$="Modal"] > div { width: 95vw !important; max-width: 95vw !important; max-height: 90vh !important; overflow-y: auto !important; border-radius: 12px !important; }
+        }
     </style>
 </head>
 <body class="bg-gray-50" data-page="profile">
