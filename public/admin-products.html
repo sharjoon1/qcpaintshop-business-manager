@@ -44,6 +44,47 @@
         align-items: flex-end;
     }
 }
+/* ─── MOBILE: admin-products.html ─── */
+@media (max-width: 639px) {
+    .container, .p-6 { padding: 12px !important; }
+    /* Category filter chips: horizontal scroll */
+    .flex.gap-2, .flex.gap-3 {
+        overflow-x: auto !important;
+        flex-wrap: nowrap !important;
+        scrollbar-width: none !important;
+        -webkit-overflow-scrolling: touch !important;
+        padding-bottom: 4px !important;
+    }
+    .flex.gap-2 button, .flex.gap-3 button { flex-shrink: 0 !important; }
+    /* Search: full width */
+    input[type="search"], input[placeholder*="Search"], input[placeholder*="search"] {
+        width: 100% !important; min-height: 44px !important;
+    }
+    /* Header: stack */
+    .flex.justify-between { flex-direction: column !important; gap: 8px !important; }
+    /* Stats grid: 2-column */
+    .grid.grid-cols-4, .grid.grid-cols-3 { grid-template-columns: repeat(2, 1fr) !important; }
+    /* Products table: card layout */
+    table { display: block !important; }
+    table thead { display: none !important; }
+    table tbody { display: grid !important; grid-template-columns: 1fr 1fr !important; gap: 10px !important; }
+    table tbody tr {
+        display: block !important; background: #fff !important;
+        border-radius: 10px !important; padding: 10px !important;
+        box-shadow: 0 1px 4px rgba(0,0,0,0.08) !important;
+        border: 1px solid #e5e7eb !important;
+    }
+    table td { display: block !important; font-size: 12px !important; border: none !important; padding: 2px 0 !important; }
+    table td:nth-child(n+4):nth-child(-n+7) { display: none !important; }
+    /* Add modal: full screen */
+    [id*="product"][id*="Modal"] > div, [id*="Product"][id*="Modal"] > div,
+    [id$="Modal"] > div {
+        width: 100% !important; max-width: 100% !important;
+        max-height: 100% !important; border-radius: 0 !important;
+        overflow-y: auto !important; margin: 0 !important;
+    }
+    [id$="Modal"] .grid-cols-2 { grid-template-columns: 1fr !important; }
+}
     </style>
 </head>
 <body class="bg-gray-50" data-page="products">
@@ -3095,5 +3136,6 @@
     </div>
     <button onclick="closeZohoFilterDrawer()" style="width:100%;background:#1B5E3B;color:#fff;border:none;border-radius:10px;padding:12px;font-size:0.9rem;font-weight:600;cursor:pointer;">Apply</button>
 </div>
+<button onclick="openAddModal()" class="fixed bottom-20 right-4 z-50 md:hidden bg-indigo-600 text-white rounded-full shadow-lg flex items-center justify-center" style="width:56px;height:56px;" aria-label="Add Product"><svg width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg></button>
 </body>
 </html>
