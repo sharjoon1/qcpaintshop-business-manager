@@ -27,12 +27,10 @@
         @keyframes spin { to { transform: rotate(360deg); } }
         .pills-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; scrollbar-width: none; }
         .pills-scroll::-webkit-scrollbar { display: none; }
-        @media (max-width: 640px) {
-            .report-table { font-size: 0.7rem; }
-            .report-table th, .report-table td { padding: 0.375rem 0.5rem; }
-        }
         /* ─── MOBILE: admin-zoho-reports.html ─── */
         @media (max-width: 639px) {
+            .report-table { font-size: 0.7rem; }
+            .report-table th, .report-table td { padding: 0.375rem 0.5rem; }
             .container, .p-6 { padding: 12px !important; }
             .grid.grid-cols-4, .grid.grid-cols-3 { grid-template-columns: repeat(2, 1fr) !important; }
             select { width: 100% !important; min-height: 44px !important; }
@@ -41,7 +39,6 @@
             button[onclick*="export"], button[onclick*="Export"], .export-btn {
                 width: 100% !important; min-height: 48px !important; margin-bottom: 8px !important;
             }
-            table { overflow-x: auto !important; }
             table td:first-child, table th:first-child {
                 position: sticky !important; left: 0 !important; background: #fff !important; z-index: 1 !important;
             }

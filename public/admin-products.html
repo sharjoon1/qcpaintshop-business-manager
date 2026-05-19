@@ -48,14 +48,14 @@
 @media (max-width: 639px) {
     .container, .p-6 { padding: 12px !important; }
     /* Category filter chips: horizontal scroll */
-    .flex.gap-2, .flex.gap-3 {
+    .filter-tabs, [id*="categoryFilter"], .filter-chips {
         overflow-x: auto !important;
         flex-wrap: nowrap !important;
         scrollbar-width: none !important;
         -webkit-overflow-scrolling: touch !important;
         padding-bottom: 4px !important;
     }
-    .flex.gap-2 button, .flex.gap-3 button { flex-shrink: 0 !important; }
+    .filter-tabs button, [id*="categoryFilter"] button { flex-shrink: 0 !important; }
     /* Search: full width */
     input[type="search"], input[placeholder*="Search"], input[placeholder*="search"] {
         width: 100% !important; min-height: 44px !important;
@@ -69,7 +69,9 @@
     table thead { display: none !important; }
     table tbody { display: grid !important; grid-template-columns: 1fr 1fr !important; gap: 10px !important; }
     table tbody tr {
-        display: block !important; background: #fff !important;
+        display: flex !important;
+        flex-direction: column !important;
+        background: #fff !important;
         border-radius: 10px !important; padding: 10px !important;
         box-shadow: 0 1px 4px rgba(0,0,0,0.08) !important;
         border: 1px solid #e5e7eb !important;

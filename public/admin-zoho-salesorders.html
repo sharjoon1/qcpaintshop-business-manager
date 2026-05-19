@@ -38,7 +38,12 @@
             }
             /* Detail modal: anchored bottom sheet */
             [id*="orderModal"], [id*="salesModal"],
-            [id$="Modal"] { position: fixed !important; bottom: 0 !important; left: 0 !important; }
+            [id*="orderDetail"], [id*="salesDetail"] {
+                position: fixed !important;
+                bottom: 0 !important;
+                left: 0 !important;
+                width: 100% !important;
+            }
         }
     </style>
 </head>

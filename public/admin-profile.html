@@ -35,11 +35,16 @@
         @media (max-width: 639px) {
             .container, .p-6, .p-8 { padding: 12px !important; }
             .grid.grid-cols-2, .grid.grid-cols-3 { grid-template-columns: 1fr !important; }
-            input, select, textarea { width: 100% !important; min-height: 44px !important; }
+            input:not([type="checkbox"]):not([type="radio"]):not([type="hidden"]),
+            select,
+            textarea {
+                width: 100% !important;
+                min-height: 44px !important;
+            }
             .flex.justify-between { flex-direction: column !important; gap: 8px !important; }
             /* Profile photo centered */
             .flex.items-center.gap-4 { flex-direction: column !important; align-items: center !important; text-align: center !important; }
-            img.rounded-full, .profile-pic, .avatar-img { width: 100px !important; height: 100px !important; }
+            img.rounded-full, .profile-pic, .avatar-img { width: 7rem !important; height: 7rem !important; }
             /* Save button: sticky bottom */
             button[type="submit"], button[onclick*="save"], .save-btn {
                 width: 100% !important; min-height: 48px !important;

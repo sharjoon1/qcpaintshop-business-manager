@@ -69,8 +69,19 @@
         /* ─── MOBILE: admin-zoho-settings.html ─── */
         @media (max-width: 639px) {
             .container, .p-6 { padding: 12px !important; }
-            .grid.grid-cols-2, .flex.gap-4 { grid-template-columns: 1fr !important; flex-direction: column !important; }
-            input, select, textarea { width: 100% !important; min-height: 44px !important; }
+            .grid.grid-cols-2 {
+                grid-template-columns: 1fr !important;
+            }
+            .settings-section .flex.gap-4,
+            .flex.gap-4 {
+                flex-direction: column !important;
+            }
+            input:not([type="checkbox"]):not([type="radio"]),
+            select,
+            textarea {
+                width: 100% !important;
+                min-height: 44px !important;
+            }
             button[type="submit"], button[onclick*="save"], .save-btn {
                 width: 100% !important; min-height: 48px !important;
                 position: sticky !important; bottom: 64px !important; z-index: 10 !important;
