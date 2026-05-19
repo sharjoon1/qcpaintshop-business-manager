@@ -90,6 +90,70 @@
         @media (max-width: 767px) {
             .review-panel { width: 100vw; }
         }
+
+        /* ─── MOBILE: admin-stock-check.html ─── */
+        @media (max-width: 639px) {
+            .container, .p-6 { padding: 12px !important; }
+
+            /* Stock items: 2-column card grid */
+            #stockTable, table[id*="stock"] { display: block !important; }
+            #stockTable thead, table[id*="stock"] thead { display: none !important; }
+            #stockTable tbody, table[id*="stock"] tbody {
+                display: grid !important;
+                grid-template-columns: 1fr 1fr !important;
+                gap: 10px !important;
+            }
+            /* tr: flex column so it acts as grid item and stacks cells */
+            #stockTable tbody tr, table[id*="stock"] tbody tr {
+                display: flex !important;
+                flex-direction: column !important;
+                background: #fff !important;
+                border-radius: 10px !important;
+                padding: 12px !important;
+                box-shadow: 0 1px 4px rgba(0,0,0,0.08) !important;
+                border: 1px solid #e5e7eb !important;
+            }
+            /* Low stock: red border */
+            .low-stock, [class*="low-stock"] {
+                border-color: #fca5a5 !important;
+                background: #fff5f5 !important;
+            }
+            #stockTable td, table[id*="stock"] td {
+                display: block !important;
+                font-size: 12px !important;
+                border: none !important;
+                padding: 2px 0 !important;
+            }
+
+            /* Search: full width */
+            input[placeholder*="Search"], input[placeholder*="search"] {
+                width: 100% !important;
+                min-height: 44px !important;
+            }
+
+            /* Category filter: chip scroll */
+            [id*="categoryFilter"], [id*="filterChips"] {
+                overflow-x: auto !important;
+                flex-wrap: nowrap !important;
+                scrollbar-width: none !important;
+            }
+
+            /* Barcode scan button: prominent */
+            button[onclick*="scan"], button[onclick*="barcode"], .scan-btn {
+                width: 100% !important;
+                min-height: 52px !important;
+                font-size: 16px !important;
+            }
+
+            /* Submit all changes: sticky bottom */
+            .submit-all-btn {
+                position: sticky !important;
+                bottom: 64px !important;
+                width: 100% !important;
+                min-height: 48px !important;
+                z-index: 10 !important;
+            }
+        }
     </style>
 </head>
 <body data-page="zoho-stock-check" class="bg-gray-50">
