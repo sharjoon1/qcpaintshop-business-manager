@@ -26,6 +26,85 @@
             .invoice-table-wrap { display: block; }
             .invoice-cards { display: none; }
         }
+
+        /* ─── MOBILE: admin-zoho-invoices.html ─── */
+        @media (max-width: 639px) {
+            .container, .p-6, .p-4 { padding: 12px !important; }
+
+            /* Sub-nav tabs: horizontal scroll */
+            .flex.border-b, .tab-row, nav.flex {
+                overflow-x: auto !important;
+                -webkit-overflow-scrolling: touch !important;
+                flex-wrap: nowrap !important;
+                scrollbar-width: none !important;
+                padding-bottom: 2px !important;
+            }
+            .flex.border-b button, .flex.border-b a,
+            nav.flex button, nav.flex a { flex-shrink: 0 !important; }
+
+            /* Summary cards: 2×2 */
+            .grid.grid-cols-4, .grid.grid-cols-3 {
+                grid-template-columns: repeat(2, 1fr) !important;
+                gap: 8px !important;
+            }
+
+            /* Invoice table: card layout (desktop table hidden, mobile cards shown via existing media rules) */
+            table { display: block !important; width: 100% !important; }
+            table thead { display: none !important; }
+            table tbody tr {
+                display: block !important;
+                background: #fff !important;
+                border-radius: 10px !important;
+                margin-bottom: 10px !important;
+                padding: 14px !important;
+                box-shadow: 0 1px 4px rgba(0,0,0,0.08) !important;
+                border: 1px solid #e5e7eb !important;
+            }
+            table td {
+                display: flex !important;
+                justify-content: space-between !important;
+                padding: 4px 0 !important;
+                font-size: 13px !important;
+                border: none !important;
+                border-bottom: 1px solid #f9fafb !important;
+                white-space: normal !important;
+            }
+            table td:last-child {
+                border-bottom: none !important;
+                justify-content: flex-end !important;
+            }
+            /* Show first 5 cols + last (actions); hide rest */
+            table td:nth-child(n+6):not(:last-child) { display: none !important; }
+
+            /* Invoice detail modal: full screen */
+            [id*="invoice"][id*="Modal"] > div,
+            [id*="Invoice"][id*="Modal"] > div,
+            [id$="Modal"] > div {
+                width: 100% !important;
+                max-width: 100% !important;
+                max-height: 100vh !important;
+                overflow-y: auto !important;
+                border-radius: 0 !important;
+                margin: 0 !important;
+            }
+
+            /* PDF/Download button: full width */
+            button[onclick*="pdf"], button[onclick*="PDF"],
+            button[onclick*="download"], button[onclick*="print"],
+            .pdf-btn, .download-btn {
+                width: 100% !important;
+                min-height: 48px !important;
+                margin-top: 8px !important;
+            }
+
+            /* Pagination: centered */
+            .flex.items-center.justify-between,
+            [id*="pagination"], .pagination {
+                flex-direction: column !important;
+                gap: 8px !important;
+                align-items: center !important;
+            }
+        }
     </style>
 </head>
 <body class="bg-gray-50" data-page="zoho-invoices">
