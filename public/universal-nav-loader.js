@@ -131,6 +131,24 @@
         document.head.appendChild(ep);
     })();
 
+    // Inject global mobile stylesheet
+    (function injectMobileCSS() {
+        if (!document.querySelector('link[href="/css/mobile.css"]')) {
+            const link = document.createElement('link');
+            link.rel = 'stylesheet';
+            link.href = '/css/mobile.css';
+            document.head.appendChild(link);
+        }
+    })();
+
+    // Inject mobile DOM auto-fixer
+    (function injectMobileInit() {
+        const s = document.createElement('script');
+        s.src = '/js/mobile-init.js';
+        s.defer = true;
+        document.head.appendChild(s);
+    })();
+
     // Load Socket.io client + socket helper for real-time features
     (function loadSocketScripts() {
         const s1 = document.createElement('script');
