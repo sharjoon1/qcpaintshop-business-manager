@@ -307,6 +307,104 @@
             .edit-grid  { grid-template-columns: 1fr; }
             .header-actions .btn span { display: none; }
         }
+
+        /* ─── MOBILE: admin-salary-monthly.html ─── */
+        @media (max-width: 639px) {
+            .container, .p-6, .p-8 { padding: 12px !important; }
+
+            /* Month/Year filter: stack */
+            .flex.items-center.gap-3, .flex.items-center.gap-4,
+            .flex.gap-3, .flex.gap-4 {
+                flex-wrap: wrap !important;
+                gap: 8px !important;
+            }
+            select, input[type="month"], input[type="text"] {
+                width: 100% !important;
+                min-height: 44px !important;
+            }
+
+            /* Summary stats: 2×2 grid */
+            .grid.grid-cols-4, .grid.grid-cols-3 {
+                grid-template-columns: repeat(2, 1fr) !important;
+            }
+
+            /* Salary table: card layout */
+            #salaryTable, #monthlyTable, table {
+                display: block !important;
+                width: 100% !important;
+            }
+            #salaryTable thead, #monthlyTable thead, table thead {
+                display: none !important;
+            }
+            #salaryTable tbody tr, #monthlyTable tbody tr, table tbody tr {
+                display: block !important;
+                background: #fff !important;
+                border-radius: 10px !important;
+                margin-bottom: 10px !important;
+                padding: 14px !important;
+                box-shadow: 0 1px 4px rgba(0,0,0,0.08) !important;
+                border: 1px solid #e5e7eb !important;
+            }
+            #salaryTable td, #monthlyTable td, table td {
+                display: flex !important;
+                justify-content: space-between !important;
+                align-items: center !important;
+                padding: 5px 0 !important;
+                font-size: 13px !important;
+                border: none !important;
+                border-bottom: 1px solid #f9fafb !important;
+                white-space: normal !important;
+            }
+            table td:last-child {
+                border-bottom: none !important;
+                justify-content: flex-end !important;
+                gap: 8px !important;
+                padding-top: 10px !important;
+            }
+            /* Keep: Name | Net Salary | Status | Actions; hide middle detail cols */
+            table td:nth-child(n+3):nth-child(-n+8) {
+                display: none !important;
+            }
+            table td:nth-child(1), table td:nth-child(2),
+            table td:nth-child(9), table td:last-child {
+                display: flex !important;
+            }
+
+            /* Modals: bottom sheet */
+            #calculateModal > div, #detailModal > div, #paymentModal > div,
+            .modal > div, [id$="Modal"] > div {
+                width: 100% !important;
+                max-width: 100% !important;
+                max-height: 90vh !important;
+                overflow-y: auto !important;
+                border-radius: 16px 16px 0 0 !important;
+                margin: 0 !important;
+            }
+            [id$="Modal"] .grid-cols-2, .modal .grid-cols-2 {
+                grid-template-columns: 1fr !important;
+            }
+
+            /* Modal: pin to bottom of screen */
+            .modal {
+                align-items: flex-end !important;
+                padding: 0 !important;
+            }
+
+            /* Detail grid: single column */
+            .detail-grid {
+                grid-template-columns: 1fr !important;
+            }
+
+            /* Modal footer: full-width stacked buttons */
+            .modal-footer {
+                flex-wrap: wrap !important;
+            }
+            .modal-footer .btn {
+                flex: 1 1 auto !important;
+                justify-content: center !important;
+                min-width: 44px !important;
+            }
+        }
     </style>
     <script src="/universal-nav-loader.js"></script>
 </head>
