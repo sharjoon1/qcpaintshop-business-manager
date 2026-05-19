@@ -217,6 +217,10 @@
                     </button>
                     <div id="colDropdown" class="col-toggle-dropdown hidden"></div>
                 </div>
+                <button onclick="openStockCheckModal()" class="qc-mobile-btn px-3 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-xs font-semibold text-white flex items-center gap-1.5 transition shadow-sm" title="Assign selected items for physical stock check">
+                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"/></svg>
+                    Stock Check
+                </button>
                 <button onclick="openReassignModal()" class="qc-mobile-btn px-3 py-1.5 rounded-lg bg-rose-500 hover:bg-rose-600 text-xs font-semibold text-white flex items-center gap-1.5 transition shadow-sm" title="Find items with wrong brand or category and bulk-fix them">
                     <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
                     Fix Brand/Category
@@ -2521,6 +2525,140 @@
 
         syncLabel();
     }
+
+    // ========================================
+    // STOCK CHECK ASSIGN
+    // ========================================
+    var scItems = [];
+
+    function openStockCheckModal() {
+        if (!selectedItemIds.size) { showToast('Select at least one item first', 'warning'); return; }
+        scItems = [];
+        selectedItemIds.forEach(function(id) {
+            var item = items.find(function(i) { return String(i.item_id || i.zoho_item_id) === String(id); });
+            if (item) {
+                scItems.push({
+                    zoho_item_id: String(id),
+                    item_name: getCurrentValue(id, 'name') || item.name || '',
+                    sku: getCurrentValue(id, 'sku') || item.sku || '',
+                    stock_on_hand: item.stock_on_hand || 0
+                });
+            }
+        });
+        if (!scItems.length) { showToast('No valid items found in selection', 'error'); return; }
+        renderScItems();
+        document.getElementById('scDate').value = new Date().toISOString().split('T')[0];
+        var sel = document.getElementById('scBranch');
+        if (sel.options.length <= 1) {
+            fetch('/api/branches/list', { headers: getAuthHeaders() })
+                .then(function(r) { return r.json(); })
+                .then(function(res) {
+                    if (res.success) {
+                        sel.innerHTML = '<option value="">Select Branch</option>' +
+                            res.data.map(function(b) { return '<option value="' + b.id + '">' + b.name + '</option>'; }).join('');
+                    }
+                });
+        }
+        document.getElementById('scOverlay').style.display = 'block';
+    }
+
+    function closeStockCheckModal() { document.getElementById('scOverlay').style.display = 'none'; }
+
+    function scRemoveItem(id) {
+        scItems = scItems.filter(function(i) { return i.zoho_item_id !== id; });
+        renderScItems();
+    }
+
+    function renderScItems() {
+        var el = document.getElementById('scItemList');
+        document.getElementById('scItemCount').textContent = scItems.length;
+        if (!scItems.length) { el.innerHTML = '<p style="font-size:0.75rem;color:#9ca3af;text-align:center;padding:8px 0">No items</p>'; return; }
+        el.innerHTML = scItems.map(function(item) {
+            var safeId = item.zoho_item_id.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+            return '<div style="display:flex;align-items:center;justify-content:space-between;padding:5px 8px;background:white;border-radius:6px;border:1px solid #e5e7eb;gap:8px">' +
+                '<span style="font-size:0.8125rem;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + scEsc(item.item_name) +
+                ' <span style="color:#9ca3af;font-size:0.75rem">' + scEsc(item.sku) + '</span></span>' +
+                '<div style="display:flex;align-items:center;gap:8px;flex-shrink:0">' +
+                '<span style="font-size:0.75rem;color:#6b7280">Qty: ' + item.stock_on_hand + '</span>' +
+                '<button onclick="scRemoveItem(\'' + safeId + '\')" style="color:#ef4444;background:none;border:none;cursor:pointer;font-size:1rem;line-height:1;padding:0 2px">&times;</button>' +
+                '</div></div>';
+        }).join('');
+    }
+
+    function scEsc(s) {
+        return String(s == null ? '' : s).replace(/[&<>"']/g, function(c) {
+            return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+        });
+    }
+
+    async function scLoadBranchData() {
+        var branchId = document.getElementById('scBranch').value;
+        var staffSel = document.getElementById('scStaff');
+        var locSel = document.getElementById('scLocation');
+        staffSel.innerHTML = '<option value="">Select Staff</option>';
+        locSel.innerHTML = '<option value="">Loading...</option>';
+        if (!branchId) { locSel.innerHTML = '<option value="">Select branch first</option>'; return; }
+        try {
+            var results = await Promise.all([
+                fetch('/api/branches/' + branchId + '/staff', { headers: getAuthHeaders() }).then(function(r) { return r.json(); }),
+                fetch('/api/stock-check/locations/' + branchId, { headers: getAuthHeaders() }).then(function(r) { return r.json(); })
+            ]);
+            var staffRes = results[0], locRes = results[1];
+            if (staffRes.success && staffRes.data && staffRes.data.staff) {
+                staffSel.innerHTML = '<option value="">Select Staff</option>' +
+                    staffRes.data.staff.map(function(s) { return '<option value="' + s.id + '">' + s.full_name + '</option>'; }).join('');
+            }
+            if (locRes.success && locRes.data && locRes.data.length) {
+                locSel.innerHTML = '<option value="">Select Location</option>' +
+                    locRes.data.map(function(l) { return '<option value="' + l.zoho_location_id + '">' + l.zoho_location_name + '</option>'; }).join('');
+                if (locRes.data.length === 1) locSel.value = locRes.data[0].zoho_location_id;
+            } else {
+                locSel.innerHTML = '<option value="">No locations found</option>';
+            }
+        } catch(e) {
+            locSel.innerHTML = '<option value="">Error loading</option>';
+        }
+    }
+
+    async function scCreateAssignment() {
+        var branch_id = document.getElementById('scBranch').value;
+        var staff_id = document.getElementById('scStaff').value;
+        var check_date = document.getElementById('scDate').value;
+        var show_system_qty = document.getElementById('scShowQty').checked;
+        var notes = document.getElementById('scNotes').value.trim();
+        var zoho_location_id = document.getElementById('scLocation').value;
+        if (!branch_id || !staff_id || !check_date) { showToast('Fill in branch, staff, and date', 'warning'); return; }
+        if (!zoho_location_id) { showToast('Select a Zoho location', 'warning'); return; }
+        if (!scItems.length) { showToast('No items to assign', 'warning'); return; }
+        var btn = document.getElementById('scCreateBtn');
+        btn.disabled = true; btn.textContent = 'Creating...';
+        try {
+            var res = await fetch('/api/stock-check/assign', {
+                method: 'POST',
+                headers: Object.assign({}, getAuthHeaders(), { 'Content-Type': 'application/json' }),
+                body: JSON.stringify({
+                    branch_id: parseInt(branch_id),
+                    staff_id: parseInt(staff_id),
+                    check_date: check_date,
+                    show_system_qty: show_system_qty,
+                    zoho_location_id: zoho_location_id,
+                    notes: notes || undefined,
+                    item_ids: scItems.map(function(s) { return s.zoho_item_id; })
+                })
+            });
+            var data = await res.json();
+            btn.disabled = false; btn.textContent = 'Create Assignment';
+            if (data.success) {
+                showToast('Assignment created! (' + data.data.items + ' items)');
+                closeStockCheckModal();
+            } else {
+                showToast(data.message || 'Failed to create assignment', 'error');
+            }
+        } catch(err) {
+            btn.disabled = false; btn.textContent = 'Create Assignment';
+            showToast('Network error', 'error');
+        }
+    }
     </script>
 
 <!-- New Item Modal -->
@@ -2603,6 +2741,66 @@
                 <svg id="newItemSpinner" class="hidden w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path></svg>
                 Create &amp; Push to Zoho
             </button>
+        </div>
+    </div>
+</div>
+
+<!-- Stock Check Assign Modal -->
+<div id="scOverlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.55);z-index:9999;padding:16px;overflow-y:auto" onclick="if(event.target===this)closeStockCheckModal()">
+    <div style="background:white;border-radius:12px;max-width:600px;width:100%;margin:20px auto;box-shadow:0 20px 60px rgba(0,0,0,0.3)" onclick="event.stopPropagation()">
+        <div style="padding:14px 18px;border-bottom:1px solid #e5e7eb;display:flex;align-items:center;justify-content:space-between;background:linear-gradient(135deg,#3b82f6,#1d4ed8);color:white;border-radius:12px 12px 0 0">
+            <div>
+                <h3 style="font-weight:700;font-size:1rem;margin:0">Assign Stock Check</h3>
+                <p style="font-size:0.75rem;opacity:0.9;margin:2px 0 0">Assign selected items to staff for physical verification</p>
+            </div>
+            <button onclick="closeStockCheckModal()" style="color:white;background:rgba(255,255,255,0.2);border:none;border-radius:50%;width:28px;height:28px;cursor:pointer;font-size:16px;line-height:1">&times;</button>
+        </div>
+        <div style="padding:16px 18px">
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-3">
+                <div>
+                    <label class="block text-xs font-semibold text-gray-600 mb-1">Branch <span style="color:#ef4444">*</span></label>
+                    <select id="scBranch" onchange="scLoadBranchData()" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm bg-white">
+                        <option value="">Select Branch</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold text-gray-600 mb-1">Location <span style="color:#ef4444">*</span></label>
+                    <select id="scLocation" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm bg-white">
+                        <option value="">Select branch first</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold text-gray-600 mb-1">Staff <span style="color:#ef4444">*</span></label>
+                    <select id="scStaff" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm bg-white">
+                        <option value="">Select branch first</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold text-gray-600 mb-1">Check Date <span style="color:#ef4444">*</span></label>
+                    <input type="date" id="scDate" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm">
+                </div>
+            </div>
+            <div class="mb-3">
+                <label class="flex items-center gap-2 text-sm cursor-pointer">
+                    <input type="checkbox" id="scShowQty" class="w-4 h-4 rounded border-gray-300 text-blue-600">
+                    <span class="text-gray-700 text-xs font-medium">Show system quantity to staff</span>
+                </label>
+            </div>
+            <div class="mb-3">
+                <label class="block text-xs font-semibold text-gray-600 mb-1">Items to Check (<span id="scItemCount">0</span>)</label>
+                <div id="scItemList" style="max-height:192px;overflow-y:auto;border:1px solid #e5e7eb;border-radius:8px;padding:8px;background:#f9fafb;display:flex;flex-direction:column;gap:4px"></div>
+            </div>
+            <div class="mb-2">
+                <label class="block text-xs font-semibold text-gray-600 mb-1">Notes (optional)</label>
+                <textarea id="scNotes" rows="2" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm resize-none" placeholder="Instructions for staff..."></textarea>
+            </div>
+        </div>
+        <div style="padding:12px 18px;border-top:1px solid #e5e7eb;background:#f9fafb;display:flex;align-items:center;justify-content:space-between;gap:8px;border-radius:0 0 12px 12px">
+            <span style="font-size:0.75rem;color:#6b7280">Items assigned for physical stock verification</span>
+            <div style="display:flex;gap:8px">
+                <button onclick="closeStockCheckModal()" style="padding:8px 16px;border:1px solid #d1d5db;border-radius:8px;background:white;font-size:0.8125rem;font-weight:500;cursor:pointer;color:#374151">Cancel</button>
+                <button onclick="scCreateAssignment()" id="scCreateBtn" style="padding:8px 20px;border:none;border-radius:8px;background:linear-gradient(135deg,#3b82f6,#1d4ed8);color:white;font-size:0.8125rem;font-weight:600;cursor:pointer">Create Assignment</button>
+            </div>
         </div>
     </div>
 </div>
