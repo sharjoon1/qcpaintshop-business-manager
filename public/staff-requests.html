@@ -41,14 +41,25 @@
             }
             /* Grid: single column */
             .grid.grid-cols-2 { grid-template-columns: 1fr !important; }
-            /* Inputs: full width */
-            input:not([type="checkbox"]):not([type="radio"]):not([type="hidden"]),
-            select,
-            textarea { width: 100% !important; min-height: 44px !important; }
-            textarea { min-height: 80px !important; }
+            /* Inputs: full width — scoped to form containers to avoid clobbering nav */
+            .request-form input:not([type="checkbox"]):not([type="radio"]):not([type="hidden"]),
+            [id*="requestForm"] input:not([type="checkbox"]):not([type="radio"]):not([type="hidden"]),
+            .form-container input:not([type="checkbox"]):not([type="radio"]):not([type="hidden"]),
+            .request-form select,
+            [id*="requestForm"] select,
+            .form-container select,
+            .request-form textarea,
+            [id*="requestForm"] textarea,
+            .form-container textarea { width: 100% !important; min-height: 44px !important; }
+            .request-form textarea,
+            [id*="requestForm"] textarea,
+            .form-container textarea { min-height: 80px !important; }
 
-            /* Submit button: full width */
-            button[type="submit"], .submit-btn { width: 100% !important; min-height: 48px !important; }
+            /* Submit button: full width — scoped to form containers; .submit-btn kept global */
+            .request-form button[type="submit"],
+            [id*="requestForm"] button[type="submit"],
+            .form-container button[type="submit"],
+            .submit-btn { width: 100% !important; min-height: 48px !important; }
 
             /* Past requests: card layout */
             table[id*="request"] { display: block !important; }
