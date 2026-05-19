@@ -62,6 +62,93 @@
             .chat-header-back { display: block; }
             .chat-container { position: relative; }
         }
+
+        /* ─── MOBILE: chat.html ─── */
+        @media (max-width: 639px) {
+            /* Chat outer layout: full screen column */
+            .flex.h-screen, .flex.h-full, .chat-container, #chatContainer {
+                flex-direction: column !important;
+                height: 100dvh !important;
+                overflow: hidden !important;
+            }
+
+            /* Sidebar / conversation list: hidden on mobile, shown as drawer overlay */
+            .chat-sidebar, #chatSidebar, #conversationList,
+            .conversation-sidebar, [style*="width: 420px"],
+            [style*="width: 400px"] {
+                display: none !important;
+                position: fixed !important;
+                top: 0 !important; left: 0 !important;
+                bottom: 0 !important;
+                width: 85vw !important;
+                max-width: 320px !important;
+                background: #fff !important;
+                z-index: 9000 !important;
+                overflow-y: auto !important;
+                box-shadow: 4px 0 20px rgba(0,0,0,0.15) !important;
+                transform: translateX(-100%) !important;
+                transition: transform 0.3s ease !important;
+            }
+            .chat-sidebar.mob-show, #chatSidebar.mob-show,
+            #conversationList.mob-show, .conversation-sidebar.mob-show {
+                display: block !important;
+                transform: translateX(0) !important;
+            }
+
+            /* Main chat area: full width */
+            .chat-main, #chatMain, .flex-1.flex.flex-col,
+            .messages-container, #messagesPanel {
+                flex: 1 !important;
+                width: 100% !important;
+                overflow-y: auto !important;
+                -webkit-overflow-scrolling: touch !important;
+            }
+
+            /* Message bubbles */
+            .message-bubble, .msg-bubble, [class*="bubble"] {
+                max-width: 80vw !important;
+            }
+
+            /* Input bar: sticky bottom, keyboard-safe */
+            .chat-compose, #chatCompose, #messageForm,
+            .message-input-area, form[id*="message"],
+            form[id*="chat"], .input-container, .chat-input-bar {
+                position: sticky !important;
+                bottom: 0 !important;
+                width: 100% !important;
+                background: #fff !important;
+                padding: 8px 12px !important;
+                padding-bottom: calc(8px + env(safe-area-inset-bottom, 0px)) !important;
+                border-top: 1px solid #e5e7eb !important;
+                z-index: 10 !important;
+            }
+            .chat-compose input, .chat-compose textarea,
+            #chatCompose input, #chatCompose textarea,
+            input[id*="message"], textarea[id*="message"],
+            .chat-input-bar textarea, #msgInput,
+            input[placeholder*="message"], input[placeholder*="Message"],
+            input[placeholder*="Type"] {
+                font-size: 16px !important;
+                min-height: 44px !important;
+                width: 100% !important;
+            }
+
+            /* New chat modal: bottom sheet */
+            [id*="newChat"] > div, [id*="newConversation"] > div,
+            [id*="chat"][id*="Modal"] > div {
+                width: 95vw !important;
+                max-width: 95vw !important;
+                border-radius: 16px 16px 0 0 !important;
+                max-height: 90vh !important;
+                overflow-y: auto !important;
+            }
+
+            /* Toggle buttons: minimum tap target */
+            .chat-menu-btn, .chat-back-btn, #sidebarToggle, #chatSidebarToggle {
+                min-height: 44px !important;
+                min-width: 44px !important;
+            }
+        }
     </style>
     <script src="/universal-nav-loader.js"></script>
 </head>
@@ -93,6 +180,16 @@
         </div>
         <div id="chatThread" style="display: none; flex: 1; flex-direction: column;">
             <div class="chat-header">
+                <!-- Mobile sidebar toggle -->
+                <button
+                    id="chatSidebarToggle"
+                    class="md:hidden mr-2 flex items-center justify-center rounded-lg"
+                    style="min-width:44px;min-height:44px;background:none;border:none;cursor:pointer;"
+                    onclick="(function(){var s=document.querySelector('.chat-sidebar,#chatSidebar,#conversationList,.conversation-sidebar');if(s)s.classList.toggle('mob-show');})()"
+                    aria-label="Toggle conversations"
+                >
+                    <svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+                </button>
                 <button class="chat-header-back" onclick="backToList()">
                     <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5"/><path d="M12 19l-7-7 7-7"/></svg>
                 </button>
