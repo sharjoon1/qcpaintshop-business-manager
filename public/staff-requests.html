@@ -29,6 +29,47 @@
             transform: translateY(-4px);
             box-shadow: 0 12px 28px rgba(0,0,0,0.15);
         }
+
+        /* ─── MOBILE: staff-requests.html ─── */
+        @media (max-width: 639px) {
+            .container, .p-6 { padding: 12px !important; }
+
+            /* Form container: full width */
+            .request-form, [id*="requestForm"], .form-container {
+                width: 95vw !important;
+                max-width: 95vw !important;
+            }
+            /* Grid: single column */
+            .grid.grid-cols-2 { grid-template-columns: 1fr !important; }
+            /* Inputs: full width */
+            input:not([type="checkbox"]):not([type="radio"]):not([type="hidden"]),
+            select,
+            textarea { width: 100% !important; min-height: 44px !important; }
+            textarea { min-height: 80px !important; }
+
+            /* Submit button: full width */
+            button[type="submit"], .submit-btn { width: 100% !important; min-height: 48px !important; }
+
+            /* Past requests: card layout */
+            table[id*="request"] { display: block !important; }
+            table[id*="request"] thead { display: none !important; }
+            table[id*="request"] tbody tr {
+                display: block !important;
+                background: #fff !important;
+                border-radius: 10px !important;
+                margin-bottom: 8px !important;
+                padding: 12px !important;
+                box-shadow: 0 1px 4px rgba(0,0,0,0.08) !important;
+                border: 1px solid #e5e7eb !important;
+            }
+            table[id*="request"] td {
+                display: flex !important;
+                justify-content: space-between !important;
+                padding: 4px 0 !important;
+                font-size: 13px !important;
+                border: none !important;
+            }
+        }
     </style>
 </head>
 <body class="bg-gray-50">
