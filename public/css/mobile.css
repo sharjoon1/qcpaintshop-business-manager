@@ -47,10 +47,13 @@
         margin: 0 !important;
     }
 
-    /* Generic modal/dialog overrides — targets common patterns in this codebase */
+    /* Generic modal/dialog overrides — targets common patterns in this codebase.
+       IMPORTANT: .fixed.inset-0 selector matches Tailwind modal backdrops' first child.
+       Add .mob-no-override to any non-modal fixed overlay to exclude it. */
     [id$="Modal"]:not(.mob-no-override),
     [id$="-modal"]:not(.mob-no-override),
-    .fixed.inset-0 > div:first-child:not(.mob-no-override) {
+    .fixed.inset-0 > div.bg-white:not(.mob-no-override),
+    .fixed.inset-0 > div.rounded:not(.mob-no-override) {
         width: 95vw !important;
         max-width: 95vw !important;
         max-height: 90vh !important;
@@ -87,10 +90,10 @@
         flex: none !important;
     }
 
-    /* ─── TYPOGRAPHY SCALE ─── */
-    h1 { font-size: clamp(1.25rem, 5vw, 2rem) !important; }
-    h2 { font-size: clamp(1.1rem, 4.5vw, 1.75rem) !important; }
-    h3 { font-size: clamp(1rem, 4vw, 1.5rem) !important; }
+    /* ─── TYPOGRAPHY SCALE — add .mob-no-scale to opt out ─── */
+    h1:not(.mob-no-scale) { font-size: clamp(1.25rem, 5vw, 2rem) !important; }
+    h2:not(.mob-no-scale) { font-size: clamp(1.1rem, 4.5vw, 1.75rem) !important; }
+    h3:not(.mob-no-scale) { font-size: clamp(1rem, 4vw, 1.5rem) !important; }
 
     /* ─── UTILITY CLASSES ─── */
     .mob-hidden { display: none !important; }
@@ -109,6 +112,12 @@
     /* ─── TABLE CELLS — prevent nowrap causing overflow ─── */
     td, th {
         white-space: normal !important;
+    }
+
+    /* Restore nowrap for tables inside scroll-wrappers (they scroll, don't wrap) */
+    .mob-table-wrap td,
+    .mob-table-wrap th {
+        white-space: nowrap !important;
     }
 
     /* ─── CARDS FULL WIDTH ─── */
