@@ -86,29 +86,49 @@
         .status-adjusted { background: #ede9fe; color: #5b21b6; }
         .badge-self { background: #fce7f3; color: #9d174d; font-size: 0.6rem; padding: 1px 6px; }
 
-        /* Item card */
+        /* Item card — single-row compact layout */
         .item-card {
+            display: flex;
+            flex-direction: row;
+            align-items: center;
+            gap: 8px;
             border: 1px solid #e2e8f0;
-            border-radius: 10px;
-            padding: 10px 12px;
-            margin-bottom: 6px;
+            border-radius: 8px;
+            padding: 6px 10px;
+            margin-bottom: 4px;
             transition: border-color 0.2s;
         }
         .item-card.filled { border-color: #a5b4fc; background: #f8f7ff; }
-        .item-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 5px; }
-        .item-name { font-size: 0.8rem; font-weight: 600; color: #1e293b; }
-        .item-sku { font-size: 0.65rem; color: #94a3b8; }
-        .item-system-qty { font-size: 0.68rem; color: #6366f1; font-weight: 500; background: #eef2ff; padding: 1px 6px; border-radius: 5px; }
 
-        .item-input-row { display: flex; gap: 6px; align-items: center; margin-bottom: 5px; }
-        .item-input-row label { font-size: 0.7rem; color: #64748b; font-weight: 500; white-space: nowrap; }
-        .qty-input {
+        /* Header takes remaining space — name + sku stacked, badge + check on right */
+        .item-header {
             flex: 1;
-            padding: 7px 8px;
-            border: 2px solid #e2e8f0;
-            border-radius: 8px;
-            font-size: 0.95rem;
+            min-width: 0;
+            margin-bottom: 0;
+            align-items: center;
+        }
+        .item-header > div:first-child { min-width: 0; overflow: hidden; }
+        .item-name {
+            font-size: 0.78rem;
             font-weight: 600;
+            color: #1e293b;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        .item-sku { font-size: 0.62rem; color: #94a3b8; }
+        .item-system-qty { font-size: 0.6rem; color: #6366f1; font-weight: 500; background: #eef2ff; padding: 1px 5px; border-radius: 4px; white-space: nowrap; }
+
+        /* Input row — fixed width, label hidden */
+        .item-input-row { flex-shrink: 0; display: flex; gap: 0; align-items: center; margin-bottom: 0; }
+        .item-input-row label { display: none; }
+        .qty-input {
+            width: 76px;
+            padding: 5px 4px;
+            border: 1.5px solid #e2e8f0;
+            border-radius: 7px;
+            font-size: 0.9rem;
+            font-weight: 700;
             text-align: center;
             outline: none;
             transition: border-color 0.2s;
@@ -116,39 +136,30 @@
         .qty-input:focus { border-color: #1B5E3B; }
         .qty-input.has-value { border-color: #a5b4fc; }
 
-        /* Photo button row — sits inline with input row via sibling flex */
-        .photo-row { display: flex; gap: 6px; align-items: center; margin-bottom: 5px; }
+        /* Photo button — icon only, compact */
+        .photo-row { flex-shrink: 0; display: flex; gap: 4px; align-items: center; margin-bottom: 0; }
         .photo-btn {
             display: flex;
             align-items: center;
             justify-content: center;
-            gap: 4px;
-            padding: 5px 10px;
+            padding: 5px 7px;
             background: #f1f5f9;
             border: 1px dashed #cbd5e1;
-            border-radius: 7px;
-            font-size: 0.72rem;
+            border-radius: 6px;
+            font-size: 0.85rem;
             color: #475569;
             cursor: pointer;
             transition: all 0.2s;
+            line-height: 1;
         }
         .photo-btn:hover { background: #e2e8f0; }
         .photo-btn.has-photo { background: #ecfdf5; border-color: #6ee7b7; color: #065f46; border-style: solid; }
-        /* Hide "Add Photo" / "Change Photo" label text — show only the camera icon */
         .photo-btn span:last-child { display: none; }
 
-        .photo-preview { width: 38px; height: 38px; border-radius: 6px; object-fit: cover; border: 1px solid #e2e8f0; }
+        .photo-preview { width: 30px; height: 30px; border-radius: 5px; object-fit: cover; border: 1px solid #e2e8f0; }
 
-        .notes-input {
-            width: 100%;
-            padding: 5px 8px;
-            border: 1px solid #e2e8f0;
-            border-radius: 7px;
-            font-size: 0.72rem;
-            resize: none;
-            outline: none;
-        }
-        .notes-input:focus { border-color: #1B5E3B; }
+        /* Notes hidden — still in DOM for submission */
+        .notes-input { display: none; }
 
         .submit-btn {
             width: 100%;
