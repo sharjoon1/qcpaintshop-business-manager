@@ -17,6 +17,25 @@
     <script src="/universal-nav-loader.js"></script>
     <script src="/js/auth-helper.js"></script>
     <script>requireAdminOrRedirect();</script>
+    <style>
+        /* ─── MOBILE: admin-zoho-expenses.html ─── */
+        @media (max-width: 639px) {
+            .container, .p-6 { padding: 12px !important; }
+            .grid.grid-cols-4, .grid.grid-cols-3 { grid-template-columns: repeat(2, 1fr) !important; }
+            table { display: block !important; }
+            table thead { display: none !important; }
+            table tbody tr {
+                display: block !important; background: #fff !important; border-radius: 10px !important;
+                margin-bottom: 8px !important; padding: 12px !important;
+                box-shadow: 0 1px 4px rgba(0,0,0,0.08) !important; border: 1px solid #e5e7eb !important;
+            }
+            table td { display: flex !important; justify-content: space-between !important; padding: 4px 0 !important; font-size: 13px !important; border: none !important; }
+            canvas { width: 100% !important; height: auto !important; }
+            input[type="file"] { min-height: 56px !important; width: 100% !important; }
+            .flex.gap-2 { overflow-x: auto !important; flex-wrap: nowrap !important; scrollbar-width: none !important; }
+            .flex.gap-2 button { flex-shrink: 0 !important; }
+        }
+    </style>
 </head>
 <body class="bg-gray-50" data-page="zoho-expenses">
     <div class="container mx-auto p-4 md:p-6">
