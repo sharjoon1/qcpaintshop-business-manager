@@ -1,0 +1,175 @@
+/**
+ * mobile.css — Global Mobile Responsive Utilities
+ * Applied to every page via universal-nav-loader.js injection
+ * Breakpoints: Mobile < 640px | Tablet 640–1023px | Desktop 1024px+
+ */
+
+/* ─── TABLE SCROLL WRAPPER ─── */
+.mob-table-wrap {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    width: 100%;
+    position: relative;
+    border-radius: 8px;
+}
+
+/* Right-edge fade to indicate horizontal scroll is available */
+.mob-table-wrap::after {
+    content: '';
+    position: absolute;
+    top: 0; right: 0; bottom: 0;
+    width: 32px;
+    background: linear-gradient(to right, transparent, rgba(255,255,255,0.85));
+    pointer-events: none;
+    border-radius: 0 8px 8px 0;
+}
+
+/* Hide fade gradient when not overflowing (set by mobile-init.js) */
+.mob-table-wrap.no-overflow::after { display: none; }
+
+/* ─── RESPONSIVE MODAL ─── */
+@media (max-width: 639px) {
+    /* Any element with class mob-modal becomes a bottom sheet */
+    .mob-modal {
+        position: fixed !important;
+        bottom: 0 !important;
+        left: 0 !important;
+        right: 0 !important;
+        top: auto !important;
+        width: 100% !important;
+        max-width: 100% !important;
+        max-height: 92vh !important;
+        overflow-y: auto !important;
+        -webkit-overflow-scrolling: touch !important;
+        border-radius: 16px 16px 0 0 !important;
+        padding-bottom: calc(16px + env(safe-area-inset-bottom, 0px)) !important;
+        transform: none !important;
+        margin: 0 !important;
+    }
+
+    /* Generic modal/dialog overrides — targets common patterns in this codebase */
+    [id$="Modal"]:not(.mob-no-override),
+    [id$="-modal"]:not(.mob-no-override),
+    .fixed.inset-0 > div:first-child:not(.mob-no-override) {
+        width: 95vw !important;
+        max-width: 95vw !important;
+        max-height: 90vh !important;
+        overflow-y: auto !important;
+        margin: auto !important;
+        border-radius: 12px !important;
+    }
+
+    /* ─── FORMS & INPUTS ─── */
+    input:not([type="checkbox"]):not([type="radio"]),
+    select,
+    textarea {
+        font-size: 16px !important;
+        min-height: 44px !important;
+    }
+
+    /* ─── BUTTONS — minimum 44px tap target ─── */
+    button:not(.mob-no-tap),
+    a[role="button"]:not(.mob-no-tap),
+    [type="submit"]:not(.mob-no-tap) {
+        min-height: 44px;
+        min-width: 44px;
+    }
+
+    /* ─── FILTER BAR STACKING ─── */
+    .mob-filter-bar {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+        width: 100%;
+    }
+    .mob-filter-bar > * {
+        width: 100% !important;
+        flex: none !important;
+    }
+
+    /* ─── TYPOGRAPHY SCALE ─── */
+    h1 { font-size: clamp(1.25rem, 5vw, 2rem) !important; }
+    h2 { font-size: clamp(1.1rem, 4.5vw, 1.75rem) !important; }
+    h3 { font-size: clamp(1rem, 4vw, 1.5rem) !important; }
+
+    /* ─── UTILITY CLASSES ─── */
+    .mob-hidden { display: none !important; }
+    .mob-full-w { width: 100% !important; max-width: 100% !important; }
+    .mob-p-4 { padding: 1rem !important; }
+    .mob-stack { flex-direction: column !important; }
+    .mob-stack > * { width: 100% !important; }
+
+    /* ─── FIXED-WIDTH ELEMENT OVERRIDES ─── */
+    .container, .mx-auto {
+        max-width: 100% !important;
+        padding-left: 12px !important;
+        padding-right: 12px !important;
+    }
+
+    /* ─── TABLE CELLS — prevent nowrap causing overflow ─── */
+    td, th {
+        white-space: normal !important;
+    }
+
+    /* ─── CARDS FULL WIDTH ─── */
+    .mob-card-full {
+        width: 100% !important;
+        margin-left: 0 !important;
+        margin-right: 0 !important;
+    }
+
+    /* ─── NOTIFICATION PANEL ─── */
+    .qc-notification-panel {
+        width: calc(100vw - 24px) !important;
+        right: 0 !important;
+        left: 12px !important;
+        max-height: 80vh !important;
+    }
+}
+
+/* ─── SAFE-AREA AWARE FIXED BOTTOM BARS ─── */
+.mob-safe-bottom {
+    padding-bottom: calc(16px + env(safe-area-inset-bottom, 0px));
+}
+
+/* ─── MOBILE CARD TABLE (replaces table rows on small screens) ─── */
+@media (max-width: 639px) {
+    .mob-card-table thead { display: none; }
+    .mob-card-table tbody tr {
+        display: block;
+        background: #fff;
+        border-radius: 8px;
+        margin-bottom: 10px;
+        padding: 12px;
+        box-shadow: 0 1px 4px rgba(0,0,0,0.08);
+        border: 1px solid #e5e7eb;
+    }
+    .mob-card-table td {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+        padding: 4px 0;
+        font-size: 13px;
+        border: none;
+    }
+    .mob-card-table td::before {
+        content: attr(data-label);
+        font-weight: 600;
+        color: #6b7280;
+        font-size: 11px;
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+        min-width: 90px;
+        flex-shrink: 0;
+    }
+    .mob-card-table td.mob-card-hide { display: none; }
+    .mob-card-table td.mob-card-actions {
+        display: flex;
+        justify-content: flex-end;
+        gap: 8px;
+        padding-top: 8px;
+        border-top: 1px solid #f3f4f6;
+        margin-top: 4px;
+    }
+    .mob-card-table td.mob-card-actions::before { display: none; }
+}
