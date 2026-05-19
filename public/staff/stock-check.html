@@ -618,6 +618,68 @@
         }
         .submit-batch-btn:active { transform: scale(0.97); }
         .submit-batch-btn:disabled { opacity: 0.6; cursor: not-allowed; }
+
+        /* ── View toggle ─────────────────────── */
+        .view-toggle { display: flex; gap: 2px; background: #f1f5f9; border-radius: 8px; padding: 2px; flex-shrink: 0; }
+        .view-btn { display: flex; align-items: center; justify-content: center; width: 28px; height: 28px; border: none; border-radius: 6px; background: transparent; color: #94a3b8; cursor: pointer; transition: all 0.15s; }
+        .view-btn.active { background: white; color: #1B5E3B; box-shadow: 0 1px 3px rgba(0,0,0,0.12); }
+
+        /* info-col: transparent to layout by default so children act as direct card flex items */
+        .product-card .info-col { display: contents; }
+
+        /* ── Horizontal card scroll ───────────── */
+        .product-grid.h-scroll {
+            display: flex;
+            overflow-x: auto;
+            -webkit-overflow-scrolling: touch;
+            gap: 10px;
+            padding-bottom: 8px;
+            scroll-snap-type: x mandatory;
+        }
+        .product-grid.h-scroll .product-card {
+            width: 150px;
+            min-width: 150px;
+            flex-shrink: 0;
+            scroll-snap-align: start;
+        }
+        .product-grid.h-scroll .product-card .thumb-wrap { aspect-ratio: 1; }
+        .product-grid.h-scroll .product-card .req-btn { font-size: 0.7rem; padding: 6px 8px; }
+        .product-grid.h-scroll .product-card .recon-actions { grid-template-columns: 1fr; }
+        .product-grid.h-scroll .grid-empty,
+        .product-grid.h-scroll .grid-loading { flex: 1; min-width: 200px; }
+
+        /* ── List view ───────────────────────── */
+        .product-grid.list-view { display: flex; flex-direction: column; gap: 4px; }
+        .product-grid.list-view .product-card {
+            flex-direction: row;
+            flex-wrap: wrap;
+            align-items: center;
+            gap: 8px;
+            padding: 8px 10px;
+        }
+        .product-grid.list-view .product-card .thumb-wrap {
+            width: 48px; min-width: 48px; height: 48px;
+            aspect-ratio: 1; flex-shrink: 0; order: 1; border-radius: 6px;
+        }
+        .product-grid.list-view .product-card .info-col {
+            display: flex !important;
+            flex-direction: column; flex: 1; min-width: 0; gap: 2px; order: 2;
+        }
+        .product-grid.list-view .product-card .info-col .name { -webkit-line-clamp: 1; font-size: 0.8rem; }
+        .product-grid.list-view .product-card .info-col .stock-line { font-size: 0.7rem; }
+        .product-grid.list-view .product-card .last-line,
+        .product-grid.list-view .product-card .last-change-line { display: none; }
+        .product-grid.list-view .product-card .req-btn {
+            order: 3; align-self: center; margin-top: 0;
+            padding: 6px 10px; font-size: 0.7rem; white-space: nowrap;
+        }
+        .product-grid.list-view .product-card .recon-actions {
+            order: 3; align-self: center; margin-top: 0;
+            display: flex; flex-direction: column; gap: 3px; min-width: 78px;
+        }
+        .product-grid.list-view .product-card .recon-actions .recon-btn { padding: 5px 8px; font-size: 0.65rem; }
+        .product-grid.list-view .product-card .verified-stamp { order: 3; align-self: center; font-size: 0.65rem; padding: 4px 8px; }
+        .product-grid.list-view .product-card [id^="recon-diff-"] { order: 4; flex-basis: 100%; }
     </style>
 </head>
 <body data-page="stock-check">
@@ -663,6 +725,16 @@
             </div>
 
             <div id="reconIntro" class="recon-intro" style="display:none;"></div>
+            <div style="display:flex; justify-content:flex-end; margin-bottom:6px;">
+                <div class="view-toggle">
+                    <button class="view-btn" data-view="card" onclick="setProductView('card')" title="Card scroll">
+                        <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><rect x="1" y="1" width="6" height="6" rx="1"/><rect x="9" y="1" width="6" height="6" rx="1"/><rect x="1" y="9" width="6" height="6" rx="1"/><rect x="9" y="9" width="6" height="6" rx="1"/></svg>
+                    </button>
+                    <button class="view-btn" data-view="list" onclick="setProductView('list')" title="List view">
+                        <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><line x1="5" y1="4" x2="14" y2="4"/><line x1="5" y1="8" x2="14" y2="8"/><line x1="5" y1="12" x2="14" y2="12"/><circle cx="2" cy="4" r="1" fill="currentColor"/><circle cx="2" cy="8" r="1" fill="currentColor"/><circle cx="2" cy="12" r="1" fill="currentColor"/></svg>
+                    </button>
+                </div>
+            </div>
             <div id="reconGrid" class="product-grid">
                 <div class="grid-loading">Loading...</div>
             </div>
@@ -729,10 +801,20 @@
             <!-- Catalog-style product grid -->
             <div class="product-grid-header" id="reqGridHeader" style="display:none;">
                 <span><span class="count" id="reqGridCount">0</span> products</span>
-                <button type="button" id="reqGridClear"
-                        style="background:none; border:none; color:#64748b; font-size:0.7rem; cursor:pointer; font-weight:500;">
-                    Clear filters
-                </button>
+                <div style="display:flex; align-items:center; gap:8px;">
+                    <div class="view-toggle">
+                        <button class="view-btn" data-view="card" onclick="setProductView('card')" title="Card scroll">
+                            <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><rect x="1" y="1" width="6" height="6" rx="1"/><rect x="9" y="1" width="6" height="6" rx="1"/><rect x="1" y="9" width="6" height="6" rx="1"/><rect x="9" y="9" width="6" height="6" rx="1"/></svg>
+                        </button>
+                        <button class="view-btn" data-view="list" onclick="setProductView('list')" title="List view">
+                            <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><line x1="5" y1="4" x2="14" y2="4"/><line x1="5" y1="8" x2="14" y2="8"/><line x1="5" y1="12" x2="14" y2="12"/><circle cx="2" cy="4" r="1" fill="currentColor"/><circle cx="2" cy="8" r="1" fill="currentColor"/><circle cx="2" cy="12" r="1" fill="currentColor"/></svg>
+                        </button>
+                    </div>
+                    <button type="button" id="reqGridClear"
+                            style="background:none; border:none; color:#64748b; font-size:0.7rem; cursor:pointer; font-weight:500;">
+                        Clear filters
+                    </button>
+                </div>
             </div>
             <div id="reqProductGrid" class="product-grid">
                 <div class="grid-empty">Pick a brand or category above, or type 2+ characters to find products.</div>
@@ -1902,15 +1984,17 @@ function renderProductCard(item) {
     return `
         <div class="product-card${already ? ' added' : ''}" data-card-id="${id}">
             <div class="thumb-wrap">${thumb}</div>
-            <div class="name" title="${escAttr(item.item_name)}">${escHtml(item.item_name)}</div>
-            <div class="meta">
-                ${item.sku ? '<span>' + escHtml(item.sku) + '</span>' : ''}
-                ${meta ? '<span>' + meta + '</span>' : ''}
+            <div class="info-col">
+                <div class="name" title="${escAttr(item.item_name)}">${escHtml(item.item_name)}</div>
+                <div class="meta">
+                    ${item.sku ? '<span>' + escHtml(item.sku) + '</span>' : ''}
+                    ${meta ? '<span>' + meta + '</span>' : ''}
+                </div>
+                <div class="stock-line">
+                    <span class="stock-badge ${stockClass}">${stock} in stock</span>
+                </div>
+                <div class="last-line">${lastLine}</div>
             </div>
-            <div class="stock-line">
-                <span class="stock-badge ${stockClass}">${stock} in stock</span>
-            </div>
-            <div class="last-line">${lastLine}</div>
             <button type="button" class="req-btn" data-add-id="${id}" ${already ? 'disabled' : ''}>
                 ${already ? '&#10003; Added' : '+ Request Stock Check'}
             </button>
@@ -2389,16 +2473,18 @@ function renderReconCard(item) {
     return `
         <div class="product-card recon-card${verifiedToday ? ' verified-today' : ''}" data-card-id="${id}">
             <div class="thumb-wrap">${thumb}</div>
-            <div class="name" title="${escAttr(item.item_name)}">${escHtml(item.item_name)}</div>
-            <div class="meta">
-                ${item.sku ? '<span>' + escHtml(item.sku) + '</span>' : ''}
-                ${meta ? '<span>' + meta + '</span>' : ''}
+            <div class="info-col">
+                <div class="name" title="${escAttr(item.item_name)}">${escHtml(item.item_name)}</div>
+                <div class="meta">
+                    ${item.sku ? '<span>' + escHtml(item.sku) + '</span>' : ''}
+                    ${meta ? '<span>' + meta + '</span>' : ''}
+                </div>
+                <div class="stock-line">
+                    <span class="stock-badge ${stockClass}">${stock} in stock</span>
+                </div>
+                <div class="last-change-line">${lastChangeLine}</div>
+                ${verifyLine}
             </div>
-            <div class="stock-line">
-                <span class="stock-badge ${stockClass}">${stock} in stock</span>
-            </div>
-            <div class="last-change-line">${lastChangeLine}</div>
-            ${verifyLine}
             ${actionsBlock}
         </div>
     `;
@@ -2533,10 +2619,29 @@ window.addEventListener('qc-notification', function(e) {
 });
 
 // ========================================
+// PRODUCT VIEW TOGGLE
+// ========================================
+var productView = localStorage.getItem('sc_product_view') || 'card';
+
+function setProductView(view) {
+    productView = view;
+    localStorage.setItem('sc_product_view', view);
+    document.querySelectorAll('.product-grid').forEach(function(g) {
+        g.classList.remove('h-scroll', 'list-view');
+        if (view === 'card') g.classList.add('h-scroll');
+        else g.classList.add('list-view');
+    });
+    document.querySelectorAll('.view-btn[data-view]').forEach(function(btn) {
+        btn.classList.toggle('active', btn.getAttribute('data-view') === view);
+    });
+}
+
+// ========================================
 // INIT
 // ========================================
 const today = new Date();
 document.getElementById('headerDate').textContent = today.toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+setProductView(productView);
 loadAssignments();
 </script>
 </body>
