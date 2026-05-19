@@ -40,6 +40,38 @@
             input, select { width: 100% !important; min-height: 44px !important; }
             /* Modals: bottom sheet */
             [id$="Modal"] > div { width: 95vw !important; max-width: 95vw !important; max-height: 90vh !important; overflow-y: auto !important; border-radius: 16px 16px 0 0 !important; margin: 0 !important; }
+
+            /* Filter panel: full width */
+            .filter-panel, [id*="filterPanel"] { width: 100% !important; }
+            .filter-panel input { width: 100% !important; min-height: 44px !important; }
+
+            /* Total section: sticky bottom bar */
+            .total-section, [id*="totalSection"] {
+                position: sticky !important;
+                bottom: 64px !important;
+                background: #fff !important;
+                padding: 12px !important;
+                border-top: 1px solid #e5e7eb !important;
+                z-index: 10 !important;
+            }
+
+            /* Line items in modal: card layout */
+            [id*="lineItems"] table, [id*="estimateItems"] table { display: block !important; }
+            [id*="lineItems"] thead, [id*="estimateItems"] thead { display: none !important; }
+            [id*="lineItems"] tbody tr, [id*="estimateItems"] tbody tr {
+                display: block !important;
+                background: #f8fafc !important;
+                border-radius: 8px !important;
+                margin-bottom: 6px !important;
+                padding: 10px !important;
+            }
+            [id*="lineItems"] td, [id*="estimateItems"] td {
+                display: flex !important;
+                justify-content: space-between !important;
+                font-size: 12px !important;
+                border: none !important;
+                padding: 3px 0 !important;
+            }
         }
     </style>
 </head>

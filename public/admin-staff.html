@@ -24,7 +24,11 @@
             .container, .p-6 { padding: 12px !important; }
             /* Search: sticky full width */
             input[placeholder*="Search"], input[placeholder*="staff"] {
-                width: 100% !important; min-height: 44px !important;
+                width: 100% !important;
+                min-height: 44px !important;
+                position: sticky !important;
+                top: 60px !important;
+                z-index: 10 !important;
             }
             /* Filter chips: horizontal scroll */
             .flex.gap-2 {

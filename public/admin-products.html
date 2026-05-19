@@ -84,6 +84,10 @@
         overflow-y: auto !important; margin: 0 !important;
     }
     [id$="Modal"] .grid-cols-2 { grid-template-columns: 1fr !important; }
+    /* Stock badge: smaller text */
+    .stock-badge, [class*="stock"] { font-size: 11px !important; }
+    /* Action buttons: icon-only on mobile */
+    .action-btn span, .btn-text { display: none !important; }
 }
     </style>
 </head>
