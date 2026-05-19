@@ -118,6 +118,25 @@
         .act-badge-active { background: #d1fae5; color: #065f46; }
         .act-badge-idle { background: #fef3c7; color: #92400e; }
         .act-badge-break { background: #dbeafe; color: #1e40af; }
+        /* ─── MOBILE: admin-dashboard.html ─── */
+        @media (max-width: 639px) {
+            .container, .p-6, .p-8 { padding: 12px !important; }
+            /* Quick links: 2-column */
+            .grid.grid-cols-3 { grid-template-columns: repeat(2, 1fr) !important; }
+            /* Data cards: 2-column */
+            .grid.grid-cols-4, .grid.grid-cols-6 { grid-template-columns: repeat(2, 1fr) !important; }
+            /* Notice board + activity: full width stacked */
+            .grid.grid-cols-2 { grid-template-columns: 1fr !important; }
+            /* Section headings */
+            h3.text-lg, h3.text-xl { font-size: 1rem !important; }
+            /* Header title + action buttons: stack */
+            .flex.justify-between.items-center.mb-6,
+            .flex.justify-between.items-center.mb-4 {
+                flex-direction: column !important;
+                align-items: stretch !important;
+                gap: 8px !important;
+            }
+        }
     </style>
 </head>
 <body class="bg-gray-50">
