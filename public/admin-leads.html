@@ -31,6 +31,87 @@
         .priority-low { border-left: 4px solid #9ca3af; }
         .priority-medium { border-left: 4px solid #3b82f6; }
         .priority-high { border-left: 4px solid #f59e0b; }
+
+        /* ─── MOBILE: admin-leads.html ─── */
+        @media (max-width: 639px) {
+            .container { padding: 12px !important; }
+
+            /* Header row: stack title + buttons */
+            .flex.justify-between.items-center.mb-6 {
+                flex-direction: column !important;
+                align-items: stretch !important;
+                gap: 12px !important;
+            }
+            .flex.justify-between.items-center.mb-6 .flex.gap-3 {
+                display: grid !important;
+                grid-template-columns: 1fr 1fr !important;
+                gap: 8px !important;
+            }
+            .flex.justify-between.items-center.mb-6 .flex.gap-3 button {
+                width: 100% !important;
+                font-size: 13px !important;
+                padding: 10px 8px !important;
+            }
+
+            /* Stats cards: 2-column grid */
+            .grid.grid-cols-2.sm\:grid-cols-3.md\:grid-cols-4.lg\:grid-cols-6 {
+                grid-template-columns: repeat(2, 1fr) !important;
+            }
+
+            /* Filter bar: stack vertically */
+            #filterSection .flex, .filter-row {
+                flex-direction: column !important;
+                gap: 8px !important;
+            }
+            #filterSection input, #filterSection select,
+            .filter-row input, .filter-row select,
+            #searchInput, #statusFilter, #priorityFilter, #dateFrom, #dateTo {
+                width: 100% !important;
+                min-height: 44px !important;
+            }
+
+            /* Leads table: card layout */
+            #leadsTable, #leadTable {
+                display: block !important;
+            }
+            #leadsTable thead, #leadTable thead {
+                display: none !important;
+            }
+            #leadsTable tbody tr, #leadTable tbody tr {
+                display: block !important;
+                background: #fff !important;
+                border-radius: 10px !important;
+                margin-bottom: 10px !important;
+                padding: 12px !important;
+                box-shadow: 0 1px 4px rgba(0,0,0,0.08) !important;
+                border: 1px solid #e5e7eb !important;
+                border-left: 4px solid #6366f1 !important;
+            }
+            #leadsTable td, #leadTable td {
+                display: flex !important;
+                justify-content: space-between !important;
+                padding: 4px 0 !important;
+                font-size: 13px !important;
+                border: none !important;
+                white-space: normal !important;
+            }
+            /* Hide low-priority columns beyond the 5th */
+            #leadsTable td:nth-child(n+6):not(:last-child),
+            #leadTable td:nth-child(n+6):not(:last-child) {
+                display: none !important;
+            }
+
+            /* Lead modal: full screen */
+            #leadModal, #addLeadModal, #editLeadModal {
+                width: 100% !important;
+                max-width: 100% !important;
+                border-radius: 0 !important;
+                overflow-y: auto !important;
+            }
+            #leadModal .grid-cols-2, #addLeadModal .grid-cols-2, #editLeadModal .grid-cols-2 {
+                grid-template-columns: 1fr !important;
+            }
+        }
     </style>
     <!-- Shared skeleton helpers for loading state -->
     <link rel="stylesheet" href="/css/skeletons.css">
@@ -178,7 +259,7 @@
             <!-- Mobile lead cards (hidden on md+) -->
             <div id="leadsMobileList" class="md:hidden space-y-3 mb-4"></div>
             <div class="overflow-x-auto hidden md:block">
-                <table class="w-full">
+                <table class="w-full mob-card-table">
                     <thead class="bg-gradient-to-r from-purple-600 to-purple-700 text-white">
                         <tr>
                             <th class="px-6 py-4 text-left text-sm font-semibold">Lead #</th>
@@ -1535,5 +1616,15 @@
             }
         }
     </script>
+
+<!-- Mobile FAB: Add Lead -->
+<button
+    onclick="openAddModal ? openAddModal() : null"
+    class="fixed bottom-20 right-4 z-50 md:hidden bg-indigo-600 text-white rounded-full shadow-lg flex items-center justify-center"
+    style="width:56px;height:56px;"
+    aria-label="Add Lead"
+>
+    <svg width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+</button>
 </body>
 </html>

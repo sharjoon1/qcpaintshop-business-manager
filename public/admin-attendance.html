@@ -265,7 +265,7 @@
             background: white;
             border-radius: 12px;
             box-shadow: 0 2px 8px rgba(0,0,0,0.08);
-            overflow: hidden;
+            overflow: visible;
         }
 
         .permission-card {
@@ -378,6 +378,79 @@
 
         @media (max-width: 768px) {
             .hide-mobile { display: none !important; }
+        }
+
+        /* ─── MOBILE: admin-attendance.html ─── */
+        @media (max-width: 639px) {
+            .container, body > .p-6, .p-4 { padding: 8px !important; }
+
+            /* Summary stats: 2×2 grid */
+            .grid.grid-cols-4, .grid.grid-cols-3, .grid.grid-cols-2 {
+                grid-template-columns: repeat(2, 1fr) !important;
+                gap: 8px !important;
+            }
+
+            /* Month navigation: scrollable strip */
+            .flex.border-b, .tabs-row, .month-tabs {
+                overflow-x: auto !important;
+                -webkit-overflow-scrolling: touch !important;
+                flex-wrap: nowrap !important;
+                scrollbar-width: none !important;
+            }
+            .flex.border-b button, .tabs-row button { flex-shrink: 0 !important; }
+
+            /* Attendance table: card layout */
+            table {
+                display: block !important;
+                width: 100% !important;
+            }
+            table thead { display: none !important; }
+            table tbody tr {
+                display: block !important;
+                background: #fff !important;
+                border-radius: 10px !important;
+                margin-bottom: 10px !important;
+                padding: 12px !important;
+                box-shadow: 0 1px 4px rgba(0,0,0,0.07) !important;
+                border: 1px solid #e5e7eb !important;
+            }
+            table td {
+                display: flex !important;
+                justify-content: space-between !important;
+                padding: 4px 0 !important;
+                font-size: 13px !important;
+                border: none !important;
+                border-bottom: 1px solid #f9fafb !important;
+                white-space: normal !important;
+                min-width: 0 !important;
+            }
+            table td:last-child { border-bottom: none !important; }
+
+            /* Hide day columns 6–32, keep Name + summary cols */
+            table td:nth-child(n+6):nth-child(-n+35) {
+                display: none !important;
+            }
+            table td:nth-child(1), table td:nth-child(2),
+            table td:nth-child(3), table td:nth-child(4),
+            table td:nth-child(5), table td:last-child {
+                display: flex !important;
+            }
+
+            /* Export button: full width */
+            button[onclick*="export"], button[onclick*="download"],
+            button[onclick*="Export"], button[id*="export"] {
+                width: 100% !important;
+                margin-top: 8px !important;
+            }
+
+            /* All modals: bottom sheet */
+            [id$="Modal"] > div, .modal-content {
+                max-width: 100% !important;
+                max-height: 90vh !important;
+                overflow-y: auto !important;
+                border-radius: 16px 16px 0 0 !important;
+                width: 100% !important;
+            }
         }
     </style>
 </head>
