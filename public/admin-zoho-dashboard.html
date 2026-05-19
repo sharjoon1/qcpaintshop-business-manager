@@ -721,6 +721,19 @@
             color: white;
         }
         .preview-footer .btn-primary:hover { opacity: 0.9; }
+        /* ─── MOBILE: admin-zoho-dashboard.html ─── */
+        @media (max-width: 639px) {
+            .container, .p-6 { padding: 12px !important; }
+            .grid.grid-cols-4, .grid.grid-cols-3, .grid.grid-cols-6 { grid-template-columns: repeat(2, 1fr) !important; }
+            nav.flex, .flex.border-b, .tab-row {
+                overflow-x: auto !important; flex-wrap: nowrap !important;
+                scrollbar-width: none !important; -webkit-overflow-scrolling: touch !important;
+            }
+            nav.flex a, nav.flex button, .flex.border-b button { flex-shrink: 0 !important; }
+            canvas, .chart-container, .chart-wrapper { width: 100% !important; max-width: 100% !important; }
+            input[type="date"] { width: 100% !important; min-height: 44px !important; display: block !important; }
+            .flex.justify-between { flex-direction: column !important; gap: 8px !important; }
+        }
     </style>
 </head>
 <body class="bg-gray-50" data-page="zoho-dashboard">
