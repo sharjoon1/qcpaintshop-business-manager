@@ -89,25 +89,25 @@
         /* Item card */
         .item-card {
             border: 1px solid #e2e8f0;
-            border-radius: 12px;
-            padding: 14px;
-            margin-bottom: 10px;
+            border-radius: 10px;
+            padding: 10px 12px;
+            margin-bottom: 6px;
             transition: border-color 0.2s;
         }
         .item-card.filled { border-color: #a5b4fc; background: #f8f7ff; }
-        .item-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 8px; }
-        .item-name { font-size: 0.875rem; font-weight: 600; color: #1e293b; }
-        .item-sku { font-size: 0.7rem; color: #94a3b8; }
-        .item-system-qty { font-size: 0.75rem; color: #6366f1; font-weight: 500; background: #eef2ff; padding: 2px 8px; border-radius: 6px; }
+        .item-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 5px; }
+        .item-name { font-size: 0.8rem; font-weight: 600; color: #1e293b; }
+        .item-sku { font-size: 0.65rem; color: #94a3b8; }
+        .item-system-qty { font-size: 0.68rem; color: #6366f1; font-weight: 500; background: #eef2ff; padding: 1px 6px; border-radius: 5px; }
 
-        .item-input-row { display: flex; gap: 8px; align-items: center; margin-bottom: 8px; }
-        .item-input-row label { font-size: 0.75rem; color: #64748b; font-weight: 500; white-space: nowrap; }
+        .item-input-row { display: flex; gap: 6px; align-items: center; margin-bottom: 5px; }
+        .item-input-row label { font-size: 0.7rem; color: #64748b; font-weight: 500; white-space: nowrap; }
         .qty-input {
             flex: 1;
-            padding: 10px 12px;
+            padding: 7px 8px;
             border: 2px solid #e2e8f0;
-            border-radius: 10px;
-            font-size: 1.1rem;
+            border-radius: 8px;
+            font-size: 0.95rem;
             font-weight: 600;
             text-align: center;
             outline: none;
@@ -116,31 +116,35 @@
         .qty-input:focus { border-color: #1B5E3B; }
         .qty-input.has-value { border-color: #a5b4fc; }
 
-        .photo-row { display: flex; gap: 8px; align-items: center; margin-bottom: 8px; }
+        /* Photo button row — sits inline with input row via sibling flex */
+        .photo-row { display: flex; gap: 6px; align-items: center; margin-bottom: 5px; }
         .photo-btn {
             display: flex;
             align-items: center;
-            gap: 6px;
-            padding: 8px 14px;
+            justify-content: center;
+            gap: 4px;
+            padding: 5px 10px;
             background: #f1f5f9;
             border: 1px dashed #cbd5e1;
-            border-radius: 8px;
-            font-size: 0.75rem;
+            border-radius: 7px;
+            font-size: 0.72rem;
             color: #475569;
             cursor: pointer;
             transition: all 0.2s;
         }
         .photo-btn:hover { background: #e2e8f0; }
         .photo-btn.has-photo { background: #ecfdf5; border-color: #6ee7b7; color: #065f46; border-style: solid; }
+        /* Hide "Add Photo" / "Change Photo" label text — show only the camera icon */
+        .photo-btn span:last-child { display: none; }
 
-        .photo-preview { width: 50px; height: 50px; border-radius: 8px; object-fit: cover; border: 1px solid #e2e8f0; }
+        .photo-preview { width: 38px; height: 38px; border-radius: 6px; object-fit: cover; border: 1px solid #e2e8f0; }
 
         .notes-input {
             width: 100%;
-            padding: 8px 10px;
+            padding: 5px 8px;
             border: 1px solid #e2e8f0;
-            border-radius: 8px;
-            font-size: 0.75rem;
+            border-radius: 7px;
+            font-size: 0.72rem;
             resize: none;
             outline: none;
         }
