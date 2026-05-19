@@ -66,6 +66,18 @@
             max-height: 250px;
             overflow-y: auto;
         }
+        /* ─── MOBILE: admin-zoho-settings.html ─── */
+        @media (max-width: 639px) {
+            .container, .p-6 { padding: 12px !important; }
+            .grid.grid-cols-2, .flex.gap-4 { grid-template-columns: 1fr !important; flex-direction: column !important; }
+            input, select, textarea { width: 100% !important; min-height: 44px !important; }
+            button[type="submit"], button[onclick*="save"], .save-btn {
+                width: 100% !important; min-height: 48px !important;
+                position: sticky !important; bottom: 64px !important; z-index: 10 !important;
+            }
+            .flex.border-b { overflow-x: auto !important; flex-wrap: nowrap !important; scrollbar-width: none !important; }
+            .flex.border-b button, .flex.border-b a { flex-shrink: 0 !important; }
+        }
     </style>
 </head>
 <body class="bg-gray-50" data-page="zoho-settings">
