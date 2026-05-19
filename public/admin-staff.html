@@ -19,6 +19,40 @@
         @media (max-width: 768px) {
             .hide-mobile { display: none !important; }
         }
+        /* ─── MOBILE: admin-staff.html ─── */
+        @media (max-width: 639px) {
+            .container, .p-6 { padding: 12px !important; }
+            /* Search: sticky full width */
+            input[placeholder*="Search"], input[placeholder*="staff"] {
+                width: 100% !important; min-height: 44px !important;
+            }
+            /* Filter chips: horizontal scroll */
+            .flex.gap-2 {
+                overflow-x: auto !important; flex-wrap: nowrap !important;
+                scrollbar-width: none !important; padding-bottom: 4px !important;
+            }
+            .flex.gap-2 button { flex-shrink: 0 !important; }
+            /* Header: stack */
+            .flex.justify-between { flex-direction: column !important; gap: 8px !important; }
+            /* Staff table: profile card */
+            table { display: block !important; }
+            table thead { display: none !important; }
+            table tbody tr {
+                display: grid !important; grid-template-columns: auto 1fr auto !important;
+                align-items: center !important; gap: 10px !important;
+                background: #fff !important; border-radius: 10px !important;
+                margin-bottom: 8px !important; padding: 12px !important;
+                box-shadow: 0 1px 4px rgba(0,0,0,0.08) !important; border: 1px solid #e5e7eb !important;
+            }
+            table td { display: block !important; font-size: 13px !important; border: none !important; padding: 1px 0 !important; }
+            table td:nth-child(n+6) { display: none !important; }
+            /* Staff form modal: full screen */
+            [id*="staff"][id*="Modal"] > div, [id*="Staff"][id*="Modal"] > div, [id$="Modal"] > div {
+                width: 100% !important; max-width: 100% !important;
+                height: 100% !important; border-radius: 0 !important; overflow-y: auto !important; margin: 0 !important;
+            }
+            [id$="Modal"] .grid-cols-2 { grid-template-columns: 1fr !important; }
+        }
     </style>
 </head>
 <body class="bg-gray-50" data-page="staff">
