@@ -59,13 +59,10 @@
             }
 
             /* Filter bar: stack vertically */
-            #filterSection .flex, .filter-row {
-                flex-direction: column !important;
-                gap: 8px !important;
-            }
-            #filterSection input, #filterSection select,
-            .filter-row input, .filter-row select,
-            #searchInput, #statusFilter, #priorityFilter, #dateFrom, #dateTo {
+            #filterSection, .filter-container { flex-direction: column !important; gap: 8px !important; }
+            #searchInput, #filterStatus, #filterSource, #filterBranch,
+            #dateFrom, #dateTo, input[placeholder*="Search"],
+            input[placeholder*="search"], select {
                 width: 100% !important;
                 min-height: 44px !important;
             }
@@ -110,6 +107,15 @@
             }
             #leadModal .grid-cols-2, #addLeadModal .grid-cols-2, #editLeadModal .grid-cols-2 {
                 grid-template-columns: 1fr !important;
+            }
+            /* Inner modal card: full screen */
+            #leadModal > div, #addLeadModal > div, #editLeadModal > div {
+                max-width: 100% !important;
+                width: 100% !important;
+                border-radius: 0 !important;
+                margin: 0 !important;
+                max-height: 100vh !important;
+                overflow-y: auto !important;
             }
         }
     </style>
@@ -1619,7 +1625,7 @@
 
 <!-- Mobile FAB: Add Lead -->
 <button
-    onclick="openAddModal ? openAddModal() : null"
+    onclick="openAddModal()"
     class="fixed bottom-20 right-4 z-50 md:hidden bg-indigo-600 text-white rounded-full shadow-lg flex items-center justify-center"
     style="width:56px;height:56px;"
     aria-label="Add Lead"
