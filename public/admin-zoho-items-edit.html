@@ -251,7 +251,7 @@
                 </div>
                 <!-- Filters row -->
                 <div class="flex flex-wrap gap-2 items-center">
-                    <select id="brandFilter" onchange="currentPage=1;loadItems()" class="px-3 py-2 rounded-lg border border-gray-200 text-sm bg-gray-50 focus:bg-white focus:border-indigo-400 focus:ring-2 focus:ring-indigo-400 outline-none min-w-[130px] transition">
+                    <select id="brandFilter" onchange="onBrandFilterChange()" class="px-3 py-2 rounded-lg border border-gray-200 text-sm bg-gray-50 focus:bg-white focus:border-indigo-400 focus:ring-2 focus:ring-indigo-400 outline-none min-w-[130px] transition">
                         <option value="">All Brands</option>
                     </select>
                     <select id="categoryFilter" onchange="currentPage=1;loadItems()" class="px-3 py-2 rounded-lg border border-gray-200 text-sm bg-gray-50 focus:bg-white focus:border-indigo-400 focus:ring-2 focus:ring-indigo-400 outline-none min-w-[150px] transition">
@@ -772,7 +772,8 @@
     function clearAllFilters() {
         document.getElementById('searchInput').value = '';
         var bf = document.getElementById('brandFilter'); if (bf) bf.value = '';
-        var cf = document.getElementById('categoryFilter'); if (cf) cf.value = '';
+        var cf = document.getElementById('categoryFilter');
+        if (cf) { cf.innerHTML = buildCategoryOptions(_allCatNames); cf.value = ''; }
         currentPage = 1;
         loadItems();
     }
@@ -2398,6 +2399,26 @@
     }
 
     // ============ INIT ============
+    var _allCatNames = [];
+    var _brandCatMap = {};
+
+    function buildCategoryOptions(catNames) {
+        return '<option value="">All Categories</option>' +
+            catNames.map(function(n){
+                return '<option value="'+escapeHtml(n)+'">'+escapeHtml(n)+'</option>';
+            }).join('');
+    }
+
+    function onBrandFilterChange() {
+        var brand = document.getElementById('brandFilter').value;
+        var csel = document.getElementById('categoryFilter');
+        var cats = brand ? (_brandCatMap[brand] || []) : _allCatNames;
+        csel.innerHTML = buildCategoryOptions(cats);
+        csel.value = '';
+        currentPage = 1;
+        loadItems();
+    }
+
     async function loadFilterOptions() {
         try {
             var resp = await fetch('/api/zoho/items/filters/list', { headers: getAuthHeaders() });
@@ -2406,22 +2427,20 @@
             var bsel = document.getElementById('brandFilter');
             var csel = document.getElementById('categoryFilter');
             var brandNames = (data.brands || []).map(function(b){ return b.name; }).filter(Boolean).sort();
-            var catNames   = (data.categories || []).map(function(c){ return c.name; }).filter(Boolean).sort();
+            _allCatNames   = (data.categories || []).map(function(c){ return c.name; }).filter(Boolean).sort();
+            _brandCatMap   = data.brandCategories || {};
 
             if (bsel) bsel.innerHTML = '<option value="">All Brands</option>' +
                 brandNames.map(function(n){
                     return '<option value="'+escapeHtml(n)+'">'+escapeHtml(n)+'</option>';
                 }).join('');
-            if (csel) csel.innerHTML = '<option value="">All Categories</option>' +
-                catNames.map(function(n){
-                    return '<option value="'+escapeHtml(n)+'">'+escapeHtml(n)+'</option>';
-                }).join('');
+            if (csel) csel.innerHTML = buildCategoryOptions(_allCatNames);
 
             // Update inline-edit dropdown options for Brand and Category columns
             var brandCol = allColumns.find(function(c){ return c.key === 'brand'; });
             if (brandCol) brandCol.options = [''].concat(brandNames);
             var catCol = allColumns.find(function(c){ return c.key === 'category_name'; });
-            if (catCol) catCol.options = [''].concat(catNames);
+            if (catCol) catCol.options = [''].concat(_allCatNames);
         } catch (_) { /* non-blocking */ }
     }
 

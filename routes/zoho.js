@@ -4749,10 +4749,23 @@ router.get('/items/filters/list', requirePermission('zoho', 'view'), async (req,
             WHERE zoho_status = 'active' AND zoho_category_name IS NOT NULL AND zoho_category_name <> ''
             GROUP BY zoho_category_name ORDER BY zoho_category_name
         `);
+        const [brandCatRows] = await pool.query(`
+            SELECT DISTINCT zoho_brand AS brand, zoho_category_name AS category FROM zoho_items_map
+            WHERE zoho_status = 'active'
+              AND zoho_brand IS NOT NULL AND zoho_brand <> ''
+              AND zoho_category_name IS NOT NULL AND zoho_category_name <> ''
+            ORDER BY zoho_brand, zoho_category_name
+        `);
+        const brandCategories = {};
+        for (const row of brandCatRows) {
+            if (!brandCategories[row.brand]) brandCategories[row.brand] = [];
+            brandCategories[row.brand].push(row.category);
+        }
         res.json({
             success: true,
             brands: brands.map(b => ({ name: b.name, count: b.n })),
-            categories: categories.map(c => ({ name: c.name, count: c.n }))
+            categories: categories.map(c => ({ name: c.name, count: c.n })),
+            brandCategories
         });
     } catch (error) {
         console.error('Filter options error:', error);
