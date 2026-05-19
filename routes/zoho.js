@@ -1889,7 +1889,7 @@ router.post('/items', requirePermission('zoho', 'manage'), async (req, res) => {
             return res.status(400).json({ success: false, message: 'Rate is required' });
         }
 
-        const zohoPayload = {};
+        const zohoPayload = { item_type: 'inventory' };
         if (name)              zohoPayload.name           = name.trim();
         if (rate !== undefined) zohoPayload.rate          = parseFloat(rate) || 0;
         if (sku)               zohoPayload.sku            = sku.trim();
@@ -1908,9 +1908,12 @@ router.post('/items', requirePermission('zoho', 'manage'), async (req, res) => {
         if (cf_dpl)            zohoPayload.cf_dpl         = parseFloat(cf_dpl) || 0;
 
         // Create in Zoho
+        console.log('[Zoho Items] Creating item in Zoho:', JSON.stringify(zohoPayload));
         const zohoResp = await zohoAPI.createItem(zohoPayload);
+        console.log('[Zoho Items] Zoho response code:', zohoResp.code, 'item_id:', zohoResp.item?.item_id);
         const createdItem = zohoResp.item;
         if (!createdItem || !createdItem.item_id) {
+            console.error('[Zoho Items] No item_id in Zoho response:', JSON.stringify(zohoResp));
             return res.status(500).json({ success: false, message: 'Zoho did not return item_id' });
         }
 
