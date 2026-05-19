@@ -90,15 +90,12 @@
                 width: 100% !important; min-height: 44px !important;
             }
 
-            /* Status filter chips: horizontal scroll */
-            .flex.gap-2, .flex.space-x-2 {
-                overflow-x: auto !important;
-                -webkit-overflow-scrolling: touch !important;
-                flex-wrap: nowrap !important;
-                scrollbar-width: none !important;
-                padding-bottom: 4px !important;
+            /* Status filter: keep vertical stack on mobile (page uses column layout naturally) */
+            /* Modal footer button rows: preserve wrap */
+            .modal-footer, [id$="Modal"] .flex.gap-2 {
+                flex-wrap: wrap !important;
+                overflow-x: visible !important;
             }
-            .flex.gap-2 button, .flex.space-x-2 button { flex-shrink: 0 !important; }
 
             /* Collections table: card layout */
             table {
@@ -150,6 +147,12 @@
             [id$="Modal"] textarea { width: 100% !important; min-height: 80px !important; }
             [id$="Modal"] button { min-height: 44px !important; }
             [id$="Modal"] .grid-cols-2 { grid-template-columns: 1fr !important; }
+
+            /* Pin modal overlay to bottom for true bottom-sheet behavior */
+            .modal-overlay.show, [id$="Modal"].show, .modal-overlay {
+                align-items: flex-end !important;
+                padding: 0 !important;
+            }
         }
     </style>
 </head>
