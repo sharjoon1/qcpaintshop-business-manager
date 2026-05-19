@@ -1491,10 +1491,23 @@ router.get('/stock/filter-options', requirePermission('zoho', 'view'), async (re
         const [categories] = await pool.query(
             `SELECT DISTINCT zoho_category_name FROM zoho_items_map WHERE zoho_status = 'active' AND zoho_category_name IS NOT NULL AND zoho_category_name != '' ORDER BY zoho_category_name ASC`
         );
+        const [brandCatRows] = await pool.query(
+            `SELECT DISTINCT zoho_brand AS brand, zoho_category_name AS category FROM zoho_items_map
+             WHERE zoho_status = 'active'
+               AND zoho_brand IS NOT NULL AND zoho_brand != ''
+               AND zoho_category_name IS NOT NULL AND zoho_category_name != ''
+             ORDER BY zoho_brand, zoho_category_name`
+        );
+        const brandCategories = {};
+        for (const row of brandCatRows) {
+            if (!brandCategories[row.brand]) brandCategories[row.brand] = [];
+            brandCategories[row.brand].push(row.category);
+        }
         res.json({
             success: true,
             brands: brands.map(r => r.zoho_brand),
-            categories: categories.map(r => r.zoho_category_name)
+            categories: categories.map(r => r.zoho_category_name),
+            brandCategories
         });
     } catch (error) {
         res.status(500).json({ success: false, message: error.message });

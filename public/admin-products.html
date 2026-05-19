@@ -339,7 +339,7 @@
                                 <td class="px-1 py-1"></td>
                                 <td class="px-1 py-1"><input type="text" id="zohoSearchInput" placeholder="Search..." class="w-full px-2 py-1 text-xs border border-gray-300 rounded focus:border-purple-500 focus:outline-none" oninput="debounceZohoSearch()"></td>
                                 <td class="px-1 py-1"></td>
-                                <td class="px-1 py-1"><select id="zohoFilterBrand" class="w-full px-1 py-1 text-xs border border-gray-300 rounded focus:border-purple-500 focus:outline-none" onchange="zohoCurrentPage=1; loadZohoItems()"><option value="">All</option></select></td>
+                                <td class="px-1 py-1"><select id="zohoFilterBrand" class="w-full px-1 py-1 text-xs border border-gray-300 rounded focus:border-purple-500 focus:outline-none" onchange="onZohoBrandFilterChange()"><option value="">All</option></select></td>
                                 <td class="px-1 py-1"><select id="zohoFilterCategory" class="w-full px-1 py-1 text-xs border border-gray-300 rounded focus:border-purple-500 focus:outline-none" onchange="zohoCurrentPage=1; loadZohoItems()"><option value="">All</option></select></td>
                                 <td class="px-1 py-1"></td>
                                 <td class="px-1 py-1"></td>
@@ -1557,24 +1557,40 @@
             } catch (e) { console.error('Failed to load mapped IDs:', e); }
         }
 
+        var _zohoBrandCatMap = {};
+        var _zohoAllCatNames = [];
+
+        function buildZohoCatOptions(cats) {
+            return '<option value="">All Categories</option>' +
+                cats.map(c => `<option value="${escH(c)}">${escH(c)}</option>`).join('');
+        }
+
+        function onZohoBrandFilterChange() {
+            const brand = document.getElementById('zohoFilterBrand').value;
+            const cats = brand ? (_zohoBrandCatMap[brand] || []) : _zohoAllCatNames;
+            const html = buildZohoCatOptions(cats);
+            document.getElementById('zohoFilterCategory').innerHTML = html;
+            document.getElementById('zohoFilterCategory').value = '';
+            const mCat = document.getElementById('zohoFilterCategoryMobile');
+            if (mCat) { mCat.innerHTML = html; mCat.value = ''; }
+            zohoCurrentPage = 1;
+            loadZohoItems();
+        }
+
         async function loadZohoFilters() {
             try {
                 await loadZohoMappedIds();
-                // Load brands/categories from the existing zoho endpoint
-                const res = await fetch('/api/zoho/items?limit=1', { headers: getAuthHeaders() });
-                const data = await res.json();
-                // We'll populate from the items themselves via a separate query
-                // Use the /api/zoho stock-filters endpoint pattern
                 const bRes = await fetch('/api/zoho/stock/filter-options', { headers: getAuthHeaders() });
                 if (bRes.ok) {
                     const bData = await bRes.json();
                     if (bData.success) {
+                        _zohoAllCatNames = bData.categories || [];
+                        _zohoBrandCatMap = bData.brandCategories || {};
                         const brandSel = document.getElementById('zohoFilterBrand');
                         const catSel = document.getElementById('zohoFilterCategory');
                         brandSel.innerHTML = '<option value="">All Brands</option>' +
                             (bData.brands || []).map(b => `<option value="${escH(b)}">${escH(b)}</option>`).join('');
-                        catSel.innerHTML = '<option value="">All Categories</option>' +
-                            (bData.categories || []).map(c => `<option value="${escH(c)}">${escH(c)}</option>`).join('');
+                        catSel.innerHTML = buildZohoCatOptions(_zohoAllCatNames);
                     }
                 }
             } catch (e) { console.error('Failed to load zoho filters:', e); }
@@ -3126,7 +3142,7 @@
     </div>
     <div style="margin-bottom:12px;">
         <div style="font-size:0.72rem;color:#64748b;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:5px;">Brand</div>
-        <select id="zohoFilterBrandMobile" onchange="document.getElementById('zohoFilterBrand').value=this.value;zohoCurrentPage=1;loadZohoItems();" style="width:100%;border:1px solid #e2e8f0;border-radius:8px;padding:8px 10px;font-size:0.85rem;"><option value="">All Brands</option></select>
+        <select id="zohoFilterBrandMobile" onchange="document.getElementById('zohoFilterBrand').value=this.value;onZohoBrandFilterChange();" style="width:100%;border:1px solid #e2e8f0;border-radius:8px;padding:8px 10px;font-size:0.85rem;"><option value="">All Brands</option></select>
     </div>
     <div style="margin-bottom:12px;">
         <div style="font-size:0.72rem;color:#64748b;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:5px;">Category</div>
