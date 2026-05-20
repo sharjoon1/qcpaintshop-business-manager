@@ -2100,8 +2100,10 @@
               + '<td style="padding:7px 8px;text-align:right">New DPL</td>'
               + '</tr>';
 
-        // Pre-compute PDF picker options once — reused for every unmatched Zoho row
-        var cachedPdfOpts = zohoAllUnmatchedPdfOpts();
+        // Cache unmatched PDF options once as a string (reused by zohoAllInitPicker).
+        // Reset the lazy-init tracker so stale pickers aren't skipped after re-render.
+        _zohoAllCachedPdfOpts = zohoAllUnmatchedPdfOpts();
+        _zohoAllPickerInited  = {};
 
         var visible = 0;
         sorted.forEach(function(z) {
@@ -2189,14 +2191,16 @@
                       + 'style="font-size:10px;padding:2px 8px;border:1px solid #e5e7eb;border-radius:4px;background:#f8fafc;color:#64748b;cursor:pointer">Cancel</button>';
                 html += '</div></td>'; // end picker pane + cell
             } else {
+                // Select starts empty — options injected lazily on first focus (zohoAllInitPicker)
+                // This avoids creating 990 option nodes × 300 rows = 300K DOM nodes on render.
                 html += '<td style="padding:5px 8px;min-width:200px">'
                       + '<input type="text" placeholder="🔍 Search product..." '
+                      + 'onfocus="zohoAllInitPicker(\'' + zid + '\')" '
                       + 'oninput="zohoAllFilterPicker(\'' + zid + '\', this.value, false)" '
                       + 'style="width:100%;font-size:11px;padding:3px 6px;border:1px solid #d1d5db;border-radius:4px;margin-bottom:4px;box-sizing:border-box">'
                       + '<select id="zohoAllSel-' + zid + '" onchange="zohoAllAssignPdf(\'' + zid + '\', this.value)" '
                       + 'style="width:100%;font-size:11px;padding:4px 6px;border:1px solid #f59e0b;border-radius:4px;background:#fff;color:#374151">'
                       + '<option value="">— assign DPL row —</option>'
-                      + cachedPdfOpts
                       + '</select>'
                       + '</td>';
             }
@@ -2226,6 +2230,19 @@
 
         bodyEl.innerHTML = html;
         zohoAllUpdateBtn();
+    }
+
+    // Module-level cache for lazy picker initialisation (reset on each renderZohoAllTable call).
+    var _zohoAllCachedPdfOpts = '';
+    var _zohoAllPickerInited  = {};
+
+    // Populate an unmatched-row select on first focus instead of at render time.
+    // Eliminates 300+ × 990 option nodes from the initial DOM paint.
+    function zohoAllInitPicker(zid) {
+        if (_zohoAllPickerInited[zid]) return;
+        _zohoAllPickerInited[zid] = true;
+        var sel = document.getElementById('zohoAllSel-' + zid);
+        if (sel) sel.innerHTML = '<option value="">— assign DPL row —</option>' + _zohoAllCachedPdfOpts;
     }
 
     // Returns <option> tags for PDF items that are not yet matched to any Zoho item.
