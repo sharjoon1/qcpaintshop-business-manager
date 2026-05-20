@@ -1313,6 +1313,31 @@ function buildBirlaName({ sku, pdfProduct, category, packFormatted }) {
     return `${skuU} ${body} ${brand} ${packFormatted}`.replace(/\s+/g, ' ').trim();
 }
 
+// ============ CSV BUILDER HELPERS ============
+
+function buildProperBirlaItemName({ baseCode, productName, colourName, size }) {
+    const base    = String(baseCode    || '').toUpperCase();
+    const product = String(productName || '').toUpperCase();
+    const colour  = String(colourName  || '').toUpperCase();
+    return `${base} ${product} ${colour} BIRLA OPUS ${size}`.replace(/\s{2,}/g, ' ').trim();
+}
+
+function buildProperBirlaZohoSku({ baseCode, size }) {
+    const skuClean = String(baseCode || '').replace(/\s+/g, '').toUpperCase();
+    return `${skuClean}-${size}`;
+}
+
+function buildProperBirlaDescription({ productName, colourCode, colourName, size, productCode, category, segment, dpl }, effectiveDate) {
+    const effDate = (effectiveDate && /^\d{4}-\d{2}-\d{2}$/.test(effectiveDate))
+        ? (() => {
+              const [y, m, d] = effectiveDate.split('-');
+              const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+              return `${parseInt(d, 10)} ${months[parseInt(m, 10) - 1]} ${y}`;
+          })()
+        : '';
+    return `Birla Opus ${productName} | ${colourCode} - ${colourName} | Pack: ${size} | Code: ${productCode} | ${category} - ${segment} | DPL: ₹${dpl} | Effective: ${effDate}`;
+}
+
 // ============ MATCH WITH ZOHO ITEMS ============
 function matchWithZohoItems(parsedItems, zohoItems) {
     const matched = [];
@@ -1827,5 +1852,9 @@ module.exports = {
     parseJSW,
     parseNippon,
     // Pack-size normalization helper (also used by paste-text mode)
-    normalizePackSize
+    normalizePackSize,
+    // CSV builder helpers
+    buildProperBirlaItemName,
+    buildProperBirlaZohoSku,
+    buildProperBirlaDescription,
 };
