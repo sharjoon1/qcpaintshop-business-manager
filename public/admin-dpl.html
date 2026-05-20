@@ -2163,7 +2163,8 @@
                       + 'style="width:100%;font-size:11px;padding:2px 5px;border:1px solid #a5b4fc;border-radius:4px;color:#166534;font-weight:600;box-sizing:border-box">'
                       + (z.name && z.name !== nameVal
                           ? '<div style="font-size:10px;color:#9ca3af;margin-top:2px;word-break:break-word">' + esc(z.name) + '</div>'
-                          : '');
+                          : '')
+                      + (dplDate ? '<div style="font-size:10px;color:#9ca3af;margin-top:2px">DPL updated: ' + esc(dplDate) + '</div>' : '');
             } else {
                 html += '<div style="word-break:break-word" title="' + esc(z.name || '') + '">' + esc(z.name || '') + '</div>'
                       + (dplDate ? '<div style="font-size:10px;color:#9ca3af">DPL: ' + esc(dplDate) + '</div>' : '');
@@ -2418,11 +2419,13 @@
     // Select / deselect all matched rows without rebuilding the table.
     function zohoAllToggleAll(checked) {
         var pdfRows = (aiData && aiData.items) || [];
+        // Only toggle rows whose checkbox is currently rendered (i.e. visible under current filter)
         pdfRows.forEach(function(r, idx) {
             if (!r._matchedZohoId) return;
-            r._selected = checked;
             var cb = document.getElementById('zohoAllCb-' + idx);
-            if (cb) cb.checked = checked;
+            if (!cb) return; // filtered out — skip
+            r._selected = checked;
+            cb.checked = checked;
         });
         zohoAllUpdateBtn();
     }
@@ -2430,8 +2433,13 @@
     // Sync push button count + header checkbox state.
     function zohoAllUpdateBtn() {
         var pdfRows  = (aiData && aiData.items) || [];
-        var matched  = pdfRows.filter(function(r) { return !!r._matchedZohoId; });
-        var count    = matched.filter(function(r) { return r._selected; }).length;
+        // Push count = all selected (regardless of filter)
+        var count    = pdfRows.filter(function(r) { return r._selected && r._matchedZohoId; }).length;
+        // Header checkbox = are all VISIBLE matched rows selected?
+        var visibleMatched   = pdfRows.filter(function(r, idx) {
+            return !!r._matchedZohoId && !!document.getElementById('zohoAllCb-' + idx);
+        });
+        var visibleSelected  = visibleMatched.filter(function(r) { return r._selected; }).length;
         var btn      = document.getElementById('zohoAllPushBtn');
         var countEl  = document.getElementById('zohoAllPushCount');
         var headerCb = document.getElementById('zohoAllHeaderCb');
@@ -2441,7 +2449,7 @@
             btn.style.opacity = count === 0 ? '0.5' : '1';
             btn.style.cursor  = count === 0 ? 'not-allowed' : 'pointer';
         }
-        if (headerCb) headerCb.checked = matched.length > 0 && count === matched.length;
+        if (headerCb) headerCb.checked = visibleMatched.length > 0 && visibleSelected === visibleMatched.length;
         aiUpdateSelectedCount();
     }
 
