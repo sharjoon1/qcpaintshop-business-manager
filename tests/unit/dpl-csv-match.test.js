@@ -76,7 +76,7 @@ describe('matchWithZohoItems — exact SKU branch', () => {
         expect(result.unmatched).toHaveLength(1);
     });
 
-    test('non-CSV items (no _proposedZohoSku) go through fuzzy matching unchanged', () => {
+    test('non-CSV items (no _proposedZohoSku) go through fuzzy matching, not thrown', () => {
         const pdfItem = {
             product: 'One Pure Elegance - White',
             packSize: '1L',
@@ -85,6 +85,10 @@ describe('matchWithZohoItems — exact SKU branch', () => {
             category: 'INTERIOR EMULSION',
         };
         const zoho = [makeZohoItem('PEWHITE-1L', 'PE WHITE ONE PURE ELEGANCE WHITE BIRLA OPUS 1L')];
-        expect(() => matchWithZohoItems([pdfItem], zoho)).not.toThrow();
+        const result = matchWithZohoItems([pdfItem], zoho);
+        // Result must have matched + unmatched arrays (fuzzy path ran without error)
+        expect(Array.isArray(result.matched)).toBe(true);
+        expect(Array.isArray(result.unmatched)).toBe(true);
+        expect(result.matched.length + result.unmatched.length).toBe(1);
     });
 });

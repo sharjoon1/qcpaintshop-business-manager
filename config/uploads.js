@@ -159,6 +159,18 @@ const uploadPriceList = multer({
     }
 });
 
+// Price list CSV upload (5MB, memory storage for parsing, CSV only)
+const uploadPriceCsv = multer({
+    storage: multer.memoryStorage(),
+    limits: { fileSize: 5 * 1024 * 1024 },
+    fileFilter: (req, file, cb) => {
+        const ok = file.mimetype === 'text/csv'
+            || file.mimetype === 'application/vnd.ms-excel'
+            || file.originalname.toLowerCase().endsWith('.csv');
+        ok ? cb(null, true) : cb(new Error('Only CSV files allowed'));
+    }
+});
+
 // Vendor bill photo upload (10MB, images + PDF)
 const uploadVendorBill = multer({
     storage: createDiskStorage('uploads/vendor-bills/', 'bill'),
@@ -209,6 +221,7 @@ module.exports = {
     uploadPainterVisualization,
     uploadActivity,
     uploadPriceList,
+    uploadPriceCsv,
     uploadVendorBill,
     uploadDplPdf
 };

@@ -1669,18 +1669,15 @@ function matchWithZohoItems(parsedItems, zohoItems) {
     }
 
     const zohoByExactSku = new Map();
-    scopedZoho.forEach(zi => {
-        const sku = (zi.sku || zi.zoho_sku || '').toUpperCase().trim();
-        if (sku) zohoByExactSku.set(sku, zi);
-    });
-
     const zohoByName = new Map();
     const zohoByWords = [];
     const zohoBySku = []; // [{item, struct:{abbrev,base,packCode}, name, sku, finish}]
 
     scopedZoho.forEach(zi => {
-        const name = (zi.name || zi.zoho_item_name || '').toUpperCase().trim();
         const sku = (zi.sku || zi.zoho_sku || '').toUpperCase().trim();
+        if (sku) zohoByExactSku.set(sku, zi);
+
+        const name = (zi.name || zi.zoho_item_name || '').toUpperCase().trim();
         const finish = detectFinish(name);
         if (name) {
             zohoByName.set(name, zi);
