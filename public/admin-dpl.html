@@ -2134,15 +2134,32 @@
                 html += '<td style="padding:5px 5px"></td>';
             }
 
-            // SKU
-            html += '<td style="padding:5px 8px;font-family:monospace;font-size:11px;color:#4338ca;white-space:nowrap">'
-                  + esc(z.sku || '—') + '</td>';
+            // SKU — editable input pre-filled with proposed SKU when matched
+            html += '<td style="padding:5px 8px;font-family:monospace;font-size:11px;color:#4338ca">';
+            if (hasMatch && pdf._proposed && (pdf._proposed.proposedSku || pdf._proposed.editedSku != null)) {
+                var skuVal = pdf._proposed.editedSku != null ? pdf._proposed.editedSku : (pdf._proposed.proposedSku || '');
+                html += '<input type="text" value="' + esc(skuVal) + '" '
+                      + 'oninput="zohoAllEditSku(' + pdfIdx + ', this.value)" '
+                      + 'style="width:100%;font-family:monospace;font-size:11px;padding:2px 5px;border:1px solid #a5b4fc;border-radius:4px;color:#4338ca;font-weight:600;box-sizing:border-box">'
+                      + '<div style="font-size:9px;color:#9ca3af;margin-top:1px">' + esc(z.sku || '') + '</div>';
+            } else {
+                html += esc(z.sku || '—');
+            }
+            html += '</td>';
 
-            // Name
-            html += '<td style="padding:5px 8px;font-size:12px;max-width:260px">'
-                  + '<div style="word-break:break-word" title="' + esc(z.name || '') + '">' + esc(z.name || '') + '</div>'
-                  + (dplDate ? '<div style="font-size:10px;color:#9ca3af">DPL: ' + esc(dplDate) + '</div>' : '')
-                  + '</td>';
+            // Name — editable input pre-filled with proposed name when matched
+            html += '<td style="padding:5px 8px;font-size:12px;max-width:260px">';
+            if (hasMatch && pdf._proposed && pdf._proposed.proposedName) {
+                var nameVal = pdf._proposed.editedName != null ? pdf._proposed.editedName : pdf._proposed.proposedName;
+                html += '<input type="text" value="' + esc(nameVal) + '" '
+                      + 'oninput="zohoAllEditName(' + pdfIdx + ', this.value)" '
+                      + 'style="width:100%;font-size:11px;padding:2px 5px;border:1px solid #a5b4fc;border-radius:4px;color:#166534;font-weight:600;box-sizing:border-box">'
+                      + '<div style="font-size:10px;color:#9ca3af;margin-top:2px">' + esc(z.name || '') + '</div>';
+            } else {
+                html += '<div style="word-break:break-word" title="' + esc(z.name || '') + '">' + esc(z.name || '') + '</div>'
+                      + (dplDate ? '<div style="font-size:10px;color:#9ca3af">DPL: ' + esc(dplDate) + '</div>' : '');
+            }
+            html += '</td>';
 
             // Category
             html += '<td style="padding:5px 8px;font-size:11px;color:#64748b;white-space:nowrap">' + esc(z.category || '—') + '</td>';
@@ -2345,6 +2362,16 @@
         var pdfRows = (aiData && aiData.items) || [];
         if (pdfRows[pdfIdx]) pdfRows[pdfIdx]._selected = checked;
         zohoAllUpdateBtn();
+    }
+
+    function zohoAllEditName(pdfIdx, value) {
+        var r = (aiData && aiData.items && aiData.items[pdfIdx]);
+        if (r && r._proposed) r._proposed.editedName = value;
+    }
+
+    function zohoAllEditSku(pdfIdx, value) {
+        var r = (aiData && aiData.items && aiData.items[pdfIdx]);
+        if (r && r._proposed) r._proposed.editedSku = value;
     }
 
     // Select / deselect all matched PDF rows from the zoho-all view.
@@ -2800,7 +2827,8 @@
             var changes = { cf_dpl: parseFloat(row.dpl) };
             var p = row._proposed || {};
             if (p.proposedRate)        changes.rate = p.proposedRate;
-            if (p.proposedName)        changes.name = p.proposedName;
+            var finalName = p.editedName != null ? p.editedName : p.proposedName;
+            if (finalName)             changes.name = finalName;
             var finalSku = p.editedSku != null ? p.editedSku : p.proposedSku;
             if (finalSku)              changes.sku  = finalSku;
             if (p.proposedDescription) changes.description = p.proposedDescription;
