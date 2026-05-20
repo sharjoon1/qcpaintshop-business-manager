@@ -73,6 +73,18 @@ const PASTE_CAT_TO_CANON = {
     'STAINERS':              'COLORANT',
 };
 
+// Category names as they appear in the Birla Opus CSV SKU Report (column 1).
+// Maps the raw CSV category header to the canonical category string expected by
+// matchWithZohoItems / propose-naming. Empty string = skip / no canonical.
+const CSV_CAT_TO_CANON = {
+    'INTERIOR':       'INTERIOR EMULSION',
+    'EXTERIOR':       'EXTERIOR EMULSION',
+    'ENAMEL':         'ENAMEL',
+    'WOOD FINISHES':  'WOOD FINISH',
+    'COLORANTS':      'COLORANT',
+    'PAINTING TOOLS': '',
+};
+
 // Brands supported by the paste-text → save → match flow. Each entry maps the
 // lowercase URL key (`:brand` param) to the human-readable display name used
 // inside matchWithZohoItems / normalizeBrand calls.
@@ -4486,7 +4498,7 @@ router.post('/reorder/create-po', requirePermission('zoho', 'reorder'), async (r
  * Returns extracted items with product name, pack size, and DPL
  * Optionally matches against existing Zoho items
  */
-const { uploadPriceList } = require('../config/uploads');
+const { uploadPriceList, uploadPriceCsv } = require('../config/uploads');
 const priceListParser = require('../services/price-list-parser');
 const http = require('http');
 
@@ -5753,6 +5765,95 @@ async function runBrandDplMatch(brand, parsedRows) {
         source: { type: 'stored-dpl', parsed: parsedRows.length },
     };
 }
+
+/**
+ * POST /api/zoho/items/dpl-parse-csv
+ *
+ * Upload a Birla Opus SKU Report CSV → parse → save to brand_dpl_lists → match.
+ * Returns the same aiData shape as POST /items/brand-dpl/:brand so the frontend
+ * can reuse showAiResults() directly.
+ *
+ * Multipart field: csv (required)
+ * Body params:
+ *   effective_date  optional YYYY-MM-DD; extracted from filename if absent
+ *   match           optional boolean string, default "true"
+ */
+router.post('/items/dpl-parse-csv', requirePermission('zoho', 'manage'), uploadPriceCsv.single('csv'), async (req, res) => {
+    try {
+        if (!req.file) return res.status(400).json({ success: false, message: 'No CSV file uploaded' });
+
+        // Derive effective date: filename regex → body param → today
+        let effectiveDate = new Date().toISOString().slice(0, 10);
+        const fnMatch = (req.file.originalname || '').match(/(\d{1,2})([A-Za-z]{3})(\d{4})/);
+        if (fnMatch) {
+            const monthMap = { Jan:'01',Feb:'02',Mar:'03',Apr:'04',May:'05',Jun:'06',
+                               Jul:'07',Aug:'08',Sep:'09',Oct:'10',Nov:'11',Dec:'12' };
+            const mm = monthMap[fnMatch[2]];
+            if (mm) {
+                const dd = String(fnMatch[1]).padStart(2, '0');
+                effectiveDate = `${fnMatch[3]}-${mm}-${dd}`;
+            }
+        }
+        if (req.body && req.body.effective_date) {
+            const ed = String(req.body.effective_date);
+            if (/^\d{4}-\d{2}-\d{2}$/.test(ed)) effectiveDate = ed;
+        }
+
+        const csvString = req.file.buffer.toString('utf8');
+        const parsedRows = priceListParser.parseBirlaOpusCsv(req.file.buffer, effectiveDate);
+        if (parsedRows.length === 0) {
+            return res.status(400).json({ success: false, message: 'No data rows found in CSV — check file format' });
+        }
+
+        // Canonicalize CSV categories for match compatibility
+        const rowsForMatch = parsedRows.map(r => {
+            const rawCat = r.category.toUpperCase();
+            const canon = CSV_CAT_TO_CANON[rawCat];
+            return canon !== undefined ? { ...r, category: canon } : r;
+        });
+
+        const before = await brandDplService.get('birlaopus');
+        const updatedBy = req.user && req.user.username ? req.user.username : null;
+        const saved = await brandDplService.save({
+            brand: 'birlaopus',
+            rawText: csvString,
+            parsedRows: rowsForMatch,
+            effectiveDate,
+            updatedBy,
+        });
+
+        try {
+            const audit = require('../services/audit-log');
+            await audit.record(req, {
+                action: 'brand_dpl.save',
+                entity_type: 'brand_dpl_lists',
+                entity_id: 'birlaopus',
+                before: before ? { parsed_count: before.parsed_count, effective_date: before.effective_date } : null,
+                after: { parsed_count: saved.parsed_count, effective_date: saved.effective_date },
+            });
+        } catch (e) {
+            console.warn('[dpl-parse-csv] audit-log failed:', e.message);
+        }
+
+        let match = null;
+        const runMatch = !req.body || String(req.body.match) !== 'false';
+        if (runMatch) {
+            match = await runBrandDplMatch('birlaopus', rowsForMatch);
+        }
+
+        return res.json({
+            success: true,
+            data: {
+                saved,
+                parsed_count: parsedRows.length,
+                ...(match ? { match } : {}),
+            },
+        });
+    } catch (err) {
+        console.error('[dpl-parse-csv] error:', err);
+        return res.status(500).json({ success: false, message: err.message || 'Server error' });
+    }
+});
 
 /**
  * GET /api/zoho/items/propose-naming
