@@ -2089,7 +2089,7 @@
 
         // Header
         html += '<tr style="background:#f1f5f9;font-weight:600;color:#475569;font-size:11px">'
-              + '<td style="padding:7px 5px;text-align:center"><input type="checkbox" onchange="zohoAllToggleAll(this.checked)" title="Select all matched"></td>'
+              + '<td style="padding:7px 5px;text-align:center"><input type="checkbox" id="zohoAllHeaderCb" onchange="zohoAllToggleAll(this.checked)" title="Select all matched"></td>'
               + '<td style="padding:7px 8px">SKU</td>'
               + '<td style="padding:7px 8px">Zoho Item Name</td>'
               + '<td style="padding:7px 8px">Category</td>'
@@ -2124,37 +2124,45 @@
 
             html += '<tr style="background:' + rowBg + ';border-top:1px solid ' + rowBorder + '">';
 
-            // Checkbox (matched rows only)
+            // Checkbox (matched rows only) — ID used by zohoAllToggleAll for direct DOM update
             if (hasMatch) {
                 html += '<td style="padding:5px 5px;text-align:center">'
-                      + '<input type="checkbox" ' + (pdf._selected ? 'checked' : '')
+                      + '<input type="checkbox" id="zohoAllCb-' + pdfIdx + '" ' + (pdf._selected ? 'checked' : '')
                       + ' onchange="zohoAllTogglePdf(' + pdfIdx + ', this.checked)">'
                       + '</td>';
             } else {
                 html += '<td style="padding:5px 5px"></td>';
             }
 
-            // SKU — editable input pre-filled with proposed SKU when matched
+            // SKU — always editable when matched.
+            // Priority: editedSku > _proposed.proposedSku > pdf.proposed_sku (backend) > z.sku
             html += '<td style="padding:5px 8px;font-family:monospace;font-size:11px;color:#4338ca">';
-            if (hasMatch && pdf._proposed && (pdf._proposed.proposedSku || pdf._proposed.editedSku != null)) {
-                var skuVal = pdf._proposed.editedSku != null ? pdf._proposed.editedSku : (pdf._proposed.proposedSku || '');
+            if (hasMatch) {
+                var p2 = pdf._proposed || {};
+                var skuVal = p2.editedSku != null   ? p2.editedSku
+                           : (p2.proposedSku        || pdf.proposed_sku || z.sku || '');
                 html += '<input type="text" value="' + esc(skuVal) + '" '
                       + 'oninput="zohoAllEditSku(' + pdfIdx + ', this.value)" '
                       + 'style="width:100%;font-family:monospace;font-size:11px;padding:2px 5px;border:1px solid #a5b4fc;border-radius:4px;color:#4338ca;font-weight:600;box-sizing:border-box">'
-                      + '<div style="font-size:9px;color:#9ca3af;margin-top:1px">' + esc(z.sku || '') + '</div>';
+                      + (z.sku && z.sku !== skuVal ? '<div style="font-size:9px;color:#9ca3af;margin-top:1px">' + esc(z.sku) + '</div>' : '');
             } else {
                 html += esc(z.sku || '—');
             }
             html += '</td>';
 
-            // Name — editable input pre-filled with proposed name when matched
+            // Name — always editable when matched.
+            // Priority: editedName > _proposed.proposedName > pdf.proposed_name (backend) > z.name
             html += '<td style="padding:5px 8px;font-size:12px;max-width:260px">';
-            if (hasMatch && pdf._proposed && pdf._proposed.proposedName) {
-                var nameVal = pdf._proposed.editedName != null ? pdf._proposed.editedName : pdf._proposed.proposedName;
+            if (hasMatch) {
+                var p3 = pdf._proposed || {};
+                var nameVal = p3.editedName != null  ? p3.editedName
+                            : (p3.proposedName        || pdf.proposed_name || z.name || '');
                 html += '<input type="text" value="' + esc(nameVal) + '" '
                       + 'oninput="zohoAllEditName(' + pdfIdx + ', this.value)" '
                       + 'style="width:100%;font-size:11px;padding:2px 5px;border:1px solid #a5b4fc;border-radius:4px;color:#166534;font-weight:600;box-sizing:border-box">'
-                      + '<div style="font-size:10px;color:#9ca3af;margin-top:2px">' + esc(z.name || '') + '</div>';
+                      + (z.name && z.name !== nameVal
+                          ? '<div style="font-size:10px;color:#9ca3af;margin-top:2px;word-break:break-word">' + esc(z.name) + '</div>'
+                          : '');
             } else {
                 html += '<div style="word-break:break-word" title="' + esc(z.name || '') + '">' + esc(z.name || '') + '</div>'
                       + (dplDate ? '<div style="font-size:10px;color:#9ca3af">DPL: ' + esc(dplDate) + '</div>' : '');
@@ -2375,24 +2383,33 @@
     }
 
     // Select / deselect all matched PDF rows from the zoho-all view.
+    // Select / deselect all matched rows without rebuilding the table.
     function zohoAllToggleAll(checked) {
         var pdfRows = (aiData && aiData.items) || [];
-        pdfRows.forEach(function(r) { if (r._matchedZohoId) r._selected = checked; });
-        renderAiTable();
+        pdfRows.forEach(function(r, idx) {
+            if (!r._matchedZohoId) return;
+            r._selected = checked;
+            var cb = document.getElementById('zohoAllCb-' + idx);
+            if (cb) cb.checked = checked;
+        });
+        zohoAllUpdateBtn();
     }
 
-    // Sync the push button label and enabled state for the zoho-all view.
+    // Sync push button count + header checkbox state.
     function zohoAllUpdateBtn() {
-        var pdfRows = (aiData && aiData.items) || [];
-        var count   = pdfRows.filter(function(r) { return r._selected && r._matchedZohoId; }).length;
-        var btn     = document.getElementById('zohoAllPushBtn');
-        var countEl = document.getElementById('zohoAllPushCount');
-        if (countEl) countEl.textContent = count;
+        var pdfRows  = (aiData && aiData.items) || [];
+        var matched  = pdfRows.filter(function(r) { return !!r._matchedZohoId; });
+        var count    = matched.filter(function(r) { return r._selected; }).length;
+        var btn      = document.getElementById('zohoAllPushBtn');
+        var countEl  = document.getElementById('zohoAllPushCount');
+        var headerCb = document.getElementById('zohoAllHeaderCb');
+        if (countEl)  countEl.textContent = count;
         if (btn) {
-            btn.disabled     = count === 0;
+            btn.disabled      = count === 0;
             btn.style.opacity = count === 0 ? '0.5' : '1';
             btn.style.cursor  = count === 0 ? 'not-allowed' : 'pointer';
         }
+        if (headerCb) headerCb.checked = matched.length > 0 && count === matched.length;
         aiUpdateSelectedCount();
     }
 
