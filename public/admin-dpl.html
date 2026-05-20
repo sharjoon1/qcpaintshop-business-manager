@@ -2050,10 +2050,10 @@
         var search    = (document.getElementById('aiRowSearch').value || '').toLowerCase();
         var catF      = (document.getElementById('aiCatFilter') ? document.getElementById('aiCatFilter').value : '');
 
-        // Filter to current brand only
+        // Filter to current brand only — require non-empty brand that contains brandKey
         var brandZoho = zohoItems.filter(function(z) {
             var b = (z.brand || '').replace(/[\s\-]/g, '').toLowerCase();
-            return brandKey && (b.indexOf(brandKey) !== -1 || brandKey.indexOf(b) !== -1);
+            return brandKey && b && b.indexOf(brandKey) !== -1;
         });
 
         // Build reverse map: zoho_item_id → pdf row index
@@ -2099,6 +2099,9 @@
               + '<td style="padding:7px 8px;text-align:right">Pack</td>'
               + '<td style="padding:7px 8px;text-align:right">New DPL</td>'
               + '</tr>';
+
+        // Pre-compute PDF picker options once — reused for every unmatched Zoho row
+        var cachedPdfOpts = zohoAllUnmatchedPdfOpts();
 
         var visible = 0;
         sorted.forEach(function(z) {
@@ -2165,7 +2168,7 @@
                       + '<select onchange="zohoAllAssignPdf(\'' + zid + '\', this.value)" '
                       + 'style="width:100%;font-size:11px;padding:4px 6px;border:1px solid #f59e0b;border-radius:4px;background:#fff;color:#374151">'
                       + '<option value="">— assign DPL row —</option>'
-                      + zohoAllUnmatchedPdfOpts()
+                      + cachedPdfOpts
                       + '</select>'
                       + '</td>';
             }
