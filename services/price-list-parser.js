@@ -1012,6 +1012,15 @@ function computeProposedFields(pdfItem, zohoItem, brandKey) {
 
     const base = { proposed_rate: proposedRate, current_sku: currentSku, current_description: currentDesc };
 
+    if (pdfItem._proposedName) {
+        return {
+            ...base,
+            proposed_name:        pdfItem._proposedName,
+            proposed_sku:         pdfItem._proposedZohoSku || currentSku,
+            proposed_description: pdfItem._proposedDescription,
+        };
+    }
+
     if (brandKey !== 'birlaopus') return base;
 
     const skuUpper = currentSku.toUpperCase();
@@ -1659,6 +1668,12 @@ function matchWithZohoItems(parsedItems, zohoItems) {
         }
     }
 
+    const zohoByExactSku = new Map();
+    scopedZoho.forEach(zi => {
+        const sku = (zi.sku || zi.zoho_sku || '').toUpperCase().trim();
+        if (sku) zohoByExactSku.set(sku, zi);
+    });
+
     const zohoByName = new Map();
     const zohoByWords = [];
     const zohoBySku = []; // [{item, struct:{abbrev,base,packCode}, name, sku, finish}]
@@ -1697,6 +1712,12 @@ function matchWithZohoItems(parsedItems, zohoItems) {
         let match = null;
         if (parsed._assignedZohoId) {
             match = zohoById.get(String(parsed._assignedZohoId)) || null;
+        }
+
+        if (!match && parsed._proposedZohoSku) {
+            match = zohoByExactSku.get(parsed._proposedZohoSku.toUpperCase()) || null;
+            // CSV items with a pre-assigned SKU must only match via exact SKU — skip fuzzy fallback.
+            if (!match) { unmatched.push(parsed); continue; }
         }
 
         if (!match) match = zohoByName.get(productName);

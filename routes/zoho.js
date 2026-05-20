@@ -5670,11 +5670,15 @@ async function runBrandDplMatch(brand, parsedRows) {
             unmappedCats.add(rawCat);
             canonCat = r.category || '';
         }
-        return {
+        const item = {
             product: r.product, packSize: r.packSize, dpl: r.dpl,
             category: canonCat || '',
             brand: r.brand, baseCode: r.baseCode,
         };
+        if (r._proposedName)        item._proposedName        = r._proposedName;
+        if (r._proposedZohoSku)     item._proposedZohoSku     = r._proposedZohoSku;
+        if (r._proposedDescription) item._proposedDescription = r._proposedDescription;
+        return item;
     });
     if (unmappedCats.size > 0) {
         console.warn('[brand-dpl] Unmapped categories — pass-through (may mis-match): ' + Array.from(unmappedCats).join(', '));
