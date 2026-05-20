@@ -2153,20 +2153,45 @@
             html += '<td style="padding:5px 8px;text-align:right;font-size:11px;font-weight:600;color:#059669;white-space:nowrap">'
                   + (z.cf_dpl > 0 ? fmt(z.cf_dpl) : '—') + '</td>';
 
-            // DPL row / assign picker
+            // DPL row / assign picker (always editable)
+            var zid = esc(String(z.zoho_item_id));
             if (hasMatch) {
-                var isPushed = pdf._alreadyPushed;
-                html += '<td style="padding:5px 8px;font-size:12px;max-width:220px">'
-                      + '<div style="word-break:break-word;color:#166534">' + esc(pdf.product || '') + '</div>'
-                      + (isPushed
-                          ? '<span style="background:#d1fae5;color:#065f46;border:1px solid #6ee7b7;border-radius:3px;font-size:9px;font-weight:700;padding:1px 4px">✓ Pushed</span>'
-                          : '')
-                      + '</td>';
+                var isPushed      = pdf._alreadyPushed;
+                var proposedName  = (pdf._proposed && pdf._proposed.proposedName)  || pdf._proposedName  || '';
+                var proposedSku   = (pdf._proposed && (pdf._proposed.proposedSku || pdf._proposed.editedSku)) || pdf._proposedZohoSku || '';
+                html += '<td style="padding:5px 8px;min-width:200px">';
+                // Display pane (visible by default)
+                html += '<div id="zohoAllMatchDisplay-' + zid + '">';
+                if (proposedName) {
+                    html += '<div style="font-size:11px;font-weight:600;color:#166534;word-break:break-word;margin-bottom:2px">' + esc(proposedName) + '</div>';
+                }
+                if (proposedSku) {
+                    html += '<div style="font-family:monospace;font-size:10px;color:#4338ca;margin-bottom:2px">' + esc(proposedSku) + '</div>';
+                }
+                html += '<div style="font-size:10px;color:#64748b;word-break:break-word">'
+                      + esc((pdf.product || '') + (pdf.packSize ? ' · ' + pdf.packSize : '')) + '</div>';
+                html += '<div style="margin-top:5px;display:flex;align-items:center;gap:6px;flex-wrap:wrap">';
+                if (isPushed) {
+                    html += '<span style="background:#d1fae5;color:#065f46;border:1px solid #6ee7b7;border-radius:3px;font-size:9px;font-weight:700;padding:1px 5px">✓ Pushed</span>';
+                }
+                html += '<button onclick="zohoAllShowPicker(\'' + zid + '\',' + pdfIdx + ')" '
+                      + 'style="font-size:10px;padding:2px 8px;border:1px solid #d1d5db;border-radius:4px;background:#fff;color:#374151;cursor:pointer">Change</button>';
+                html += '</div></div>'; // end display pane
+                // Picker pane (hidden by default, loaded lazily)
+                html += '<div id="zohoAllPicker-' + zid + '" style="display:none">';
+                html += '<input type="text" placeholder="🔍 Search..." '
+                      + 'oninput="zohoAllFilterPicker(\'' + zid + '\', this.value, true)" '
+                      + 'style="width:100%;font-size:11px;padding:3px 6px;border:1px solid #d1d5db;border-radius:4px;margin-bottom:4px;box-sizing:border-box">';
+                html += '<select id="zohoAllSel-' + zid + '" onchange="zohoAllAssignPdf(\'' + zid + '\', this.value)" '
+                      + 'style="width:100%;font-size:11px;padding:4px 6px;border:1px solid #4338ca;border-radius:4px;background:#fff;color:#374151;margin-bottom:4px">'
+                      + '</select>';
+                html += '<button onclick="zohoAllHidePicker(\'' + zid + '\')" '
+                      + 'style="font-size:10px;padding:2px 8px;border:1px solid #e5e7eb;border-radius:4px;background:#f8fafc;color:#64748b;cursor:pointer">Cancel</button>';
+                html += '</div></td>'; // end picker pane + cell
             } else {
-                var zid = esc(String(z.zoho_item_id));
                 html += '<td style="padding:5px 8px;min-width:200px">'
                       + '<input type="text" placeholder="🔍 Search product..." '
-                      + 'oninput="zohoAllFilterPicker(\'' + zid + '\', this.value)" '
+                      + 'oninput="zohoAllFilterPicker(\'' + zid + '\', this.value, false)" '
                       + 'style="width:100%;font-size:11px;padding:3px 6px;border:1px solid #d1d5db;border-radius:4px;margin-bottom:4px;box-sizing:border-box">'
                       + '<select id="zohoAllSel-' + zid + '" onchange="zohoAllAssignPdf(\'' + zid + '\', this.value)" '
                       + 'style="width:100%;font-size:11px;padding:4px 6px;border:1px solid #f59e0b;border-radius:4px;background:#fff;color:#374151">'
@@ -2215,15 +2240,18 @@
         return opts;
     }
 
-    // Filter the DPL picker dropdown for a specific Zoho item as the user types.
-    function zohoAllFilterPicker(zid, query) {
+    // Filter the DPL picker dropdown as the user types.
+    // includeAll=true → search all PDF rows (for re-assigning a matched row)
+    // includeAll=false → search only unmatched PDF rows (for new assignment)
+    function zohoAllFilterPicker(zid, query, includeAll) {
         var sel = document.getElementById('zohoAllSel-' + zid);
         if (!sel) return;
         var q = query.trim().toLowerCase();
         var pdfRows = (aiData && aiData.items) || [];
-        var opts = '<option value="">— assign DPL row —</option>';
+        var hdr = includeAll ? '— change match —' : '— assign DPL row —';
+        var opts = '<option value="">' + hdr + '</option>';
         pdfRows.forEach(function(r, idx) {
-            if (r._matchedZohoId) return;
+            if (!includeAll && r._matchedZohoId) return;
             var label = (r.product || '') + (r.packSize ? ' ' + r.packSize : '') + (r.dpl ? ' ₹' + r.dpl : '');
             if (q && label.toLowerCase().indexOf(q) === -1) return;
             opts += '<option value="' + idx + '">' + esc(label) + '</option>';
@@ -2231,7 +2259,34 @@
         sel.innerHTML = opts;
     }
 
-    // Assign a PDF row to an unmatched Zoho item from the zoho-all view.
+    // Open the picker for an already-matched Zoho row. Loads all PDF options lazily.
+    function zohoAllShowPicker(zid, currentPdfIdx) {
+        var displayEl = document.getElementById('zohoAllMatchDisplay-' + zid);
+        var pickerEl  = document.getElementById('zohoAllPicker-' + zid);
+        var selEl     = document.getElementById('zohoAllSel-' + zid);
+        if (displayEl) displayEl.style.display = 'none';
+        if (pickerEl)  pickerEl.style.display  = 'block';
+        if (selEl) {
+            var pdfRows = (aiData && aiData.items) || [];
+            var opts = '<option value="">— change match —</option>';
+            pdfRows.forEach(function(r, idx) {
+                var label = (r.product || '') + (r.packSize ? ' ' + r.packSize : '') + (r.dpl ? ' ₹' + r.dpl : '');
+                opts += '<option value="' + idx + '"' + (idx === currentPdfIdx ? ' selected' : '') + '>' + esc(label) + '</option>';
+            });
+            selEl.innerHTML = opts;
+        }
+    }
+
+    // Close the picker and restore the display pane.
+    function zohoAllHidePicker(zid) {
+        var displayEl = document.getElementById('zohoAllMatchDisplay-' + zid);
+        var pickerEl  = document.getElementById('zohoAllPicker-' + zid);
+        if (displayEl) displayEl.style.display = 'block';
+        if (pickerEl)  pickerEl.style.display  = 'none';
+    }
+
+    // Assign (or re-assign) a PDF row to a Zoho item from the zoho-all view.
+    // Clears any previous match for this Zoho item before setting the new one.
     function zohoAllAssignPdf(zohoItemIdStr, pdfIdxStr) {
         if (!aiData || pdfIdxStr === '') return;
         var pdfIdx    = parseInt(pdfIdxStr, 10);
@@ -2241,8 +2296,19 @@
         var zohoItem  = zohoItems.find(function(z) { return String(z.zoho_item_id) === String(zohoItemIdStr); });
         if (!pdfRow || !zohoItem) return;
 
+        // Clear previous match for this Zoho item (enables re-assignment)
+        pdfRows.forEach(function(r) {
+            if (String(r._matchedZohoId) === String(zohoItem.zoho_item_id)) {
+                r._matchedZohoId = null;
+                r._selected      = false;
+                r._proposed      = null;
+            }
+        });
+
         pdfRow._matchedZohoId = zohoItem.zoho_item_id;
         pdfRow._selected = true;
+        // For CSV rows: use pre-built proposed fields (which carry the correct SKU)
+        // For PDF/text rows: compute from aiComputeProposed (also sets proposedSku)
         if (pdfRow._proposedName) {
             pdfRow._proposed = {
                 proposedRate:        Math.ceil(parseFloat(pdfRow.dpl || 0) * 1.18 * 1.10),
