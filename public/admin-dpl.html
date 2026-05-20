@@ -2172,9 +2172,25 @@
             // Category
             html += '<td style="padding:5px 8px;font-size:11px;color:#64748b;white-space:nowrap">' + esc(z.category || '—') + '</td>';
 
-            // Rate
-            html += '<td style="padding:5px 8px;text-align:right;font-size:11px;color:#374151;white-space:nowrap">'
-                  + (z.rate > 0 ? fmt(z.rate) : '—') + '</td>';
+            // Rate — show proposed rate for matched rows
+            html += '<td style="padding:5px 8px;text-align:right;font-size:11px;white-space:nowrap">';
+            if (hasMatch) {
+                var proposedRate = (pdf._proposed && pdf._proposed.proposedRate) || pdf.proposed_rate || null;
+                if (!proposedRate && pdf.dpl) proposedRate = Math.ceil(parseFloat(pdf.dpl) * 1.18 * 1.10);
+                if (proposedRate) {
+                    var rateChanged = z.rate && Math.abs(proposedRate - parseFloat(z.rate)) >= 1;
+                    html += '<div style="font-weight:700;color:' + (rateChanged ? '#dc2626' : '#059669') + '">'
+                          + fmt(proposedRate)
+                          + (rateChanged ? ' <span style="font-size:9px">▲</span>' : '')
+                          + '</div>';
+                    if (rateChanged) html += '<div style="font-size:9px;color:#9ca3af">' + fmt(z.rate) + '</div>';
+                } else {
+                    html += '<span style="color:#374151">' + (z.rate > 0 ? fmt(z.rate) : '—') + '</span>';
+                }
+            } else {
+                html += '<span style="color:#374151">' + (z.rate > 0 ? fmt(z.rate) : '—') + '</span>';
+            }
+            html += '</td>';
 
             // Current DPL
             html += '<td style="padding:5px 8px;text-align:right;font-size:11px;font-weight:600;color:#059669;white-space:nowrap">'
