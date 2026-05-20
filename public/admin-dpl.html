@@ -385,6 +385,7 @@
                                 <option value="hide-pushed">Hide pushed</option>
                                 <option value="pushed">Pushed only</option>
                                 <option value="zoho-uncovered">Zoho uncovered (0)</option>
+                                <option value="zoho-all">All Zoho items</option>
                             </select>
                             <button onclick="aiClearAll()" class="px-2 py-1 border border-gray-300 rounded text-xs hover:bg-gray-50">Clear</button>
                         </div>
@@ -2037,6 +2038,133 @@
         aiUpdateSelectedCount();
     }
 
+    // Render a Zoho-first view: every Zoho item in the brand, with the DPL row
+    // that matched it (if any). Unlike zoho-uncovered, this shows ALL Zoho items.
+    function renderZohoAllTable() {
+        var bodyEl = document.getElementById('aiMatchBody');
+        if (!bodyEl) return;
+
+        var zohoItems = (aiData && aiData.zohoItems) || [];
+        var pdfRows   = (aiData && aiData.items) || [];
+        var search    = (document.getElementById('aiRowSearch').value || '').toLowerCase();
+        var catF      = (document.getElementById('aiCatFilter') ? document.getElementById('aiCatFilter').value : '');
+
+        // Build reverse map: zoho_item_id → matched pdf row
+        var zohoToPdf = {};
+        pdfRows.forEach(function(r) {
+            if (r._matchedZohoId) zohoToPdf[r._matchedZohoId] = r;
+        });
+
+        // Sort Zoho items by category then name
+        var sorted = zohoItems.slice().sort(function(a, b) {
+            var ca = (a.category || '').toUpperCase();
+            var cb = (b.category || '').toUpperCase();
+            if (ca !== cb) return ca < cb ? -1 : 1;
+            return (a.name || '').localeCompare(b.name || '');
+        });
+
+        var matchedCount = 0;
+        var html = '';
+
+        // Banner row
+        var totalMatched = Object.keys(zohoToPdf).length;
+        html += '<tr><td colspan="8" style="padding:10px;background:#f0fdf4;border-bottom:1px solid #bbf7d0;font-size:12px;color:#14532d">'
+              + '<b>' + totalMatched + '/' + zohoItems.length + '</b> Zoho items matched with DPL entries. '
+              + (zohoItems.length - totalMatched) + ' have no DPL row.'
+              + '</td></tr>';
+
+        // Header row inside tbody
+        html += '<tr style="background:#f1f5f9;font-weight:600;color:#475569;font-size:11px">'
+              + '<td style="padding:7px 8px">SKU</td>'
+              + '<td style="padding:7px 8px">Zoho Item Name</td>'
+              + '<td style="padding:7px 8px">Category</td>'
+              + '<td style="padding:7px 8px;text-align:right">Rate</td>'
+              + '<td style="padding:7px 8px;text-align:right">Current DPL</td>'
+              + '<td style="padding:7px 8px">Matched DPL Product</td>'
+              + '<td style="padding:7px 8px;text-align:right">Pack</td>'
+              + '<td style="padding:7px 8px;text-align:right">New DPL</td>'
+              + '</tr>';
+
+        var visible = 0;
+        sorted.forEach(function(z) {
+            var searchTxt = ((z.name || '') + ' ' + (z.sku || '') + ' ' + (z.category || '')).toLowerCase();
+            if (search && searchTxt.indexOf(search) === -1) return;
+            if (catF && (z.category || '').trim() !== catF) return;
+            visible++;
+
+            var pdf = zohoToPdf[z.zoho_item_id] || null;
+            var hasMatch = !!pdf;
+            if (hasMatch) matchedCount++;
+
+            var dplDate = z.dpl_updated_at
+                ? new Date(z.dpl_updated_at).toLocaleDateString('en-IN', { day:'2-digit', month:'short', year:'numeric' })
+                : '';
+
+            // Row background: green tint if matched, amber if no DPL entry
+            var rowBg = hasMatch ? '#f0fdf4' : '#fffbeb';
+            var rowBorder = hasMatch ? '#bbf7d0' : '#fde68a';
+
+            html += '<tr style="background:' + rowBg + ';border-top:1px solid ' + rowBorder + '">';
+
+            // SKU
+            html += '<td style="padding:5px 8px;font-family:monospace;font-size:11px;color:#4338ca;white-space:nowrap">'
+                  + esc(z.sku || '—') + '</td>';
+
+            // Zoho Name
+            html += '<td style="padding:5px 8px;font-size:12px;max-width:280px">'
+                  + '<div class="break-words" title="' + esc(z.name || '') + '">' + esc(z.name || '') + '</div>'
+                  + (dplDate ? '<div style="font-size:10px;color:#9ca3af">DPL updated: ' + dplDate + '</div>' : '')
+                  + '</td>';
+
+            // Category
+            html += '<td style="padding:5px 8px;font-size:11px;color:#64748b;white-space:nowrap">' + esc(z.category || '—') + '</td>';
+
+            // Current Rate
+            html += '<td style="padding:5px 8px;text-align:right;font-size:11px;color:#374151;white-space:nowrap">'
+                  + (z.rate > 0 ? fmt(z.rate) : '—') + '</td>';
+
+            // Current DPL
+            html += '<td style="padding:5px 8px;text-align:right;font-size:11px;font-weight:600;color:#059669;white-space:nowrap">'
+                  + (z.cf_dpl > 0 ? fmt(z.cf_dpl) : '—') + '</td>';
+
+            // Matched DPL Product
+            if (hasMatch) {
+                var isPushed = pdf._alreadyPushed;
+                html += '<td style="padding:5px 8px;font-size:12px;max-width:240px">'
+                      + '<div class="break-words" style="color:#166534">' + esc(pdf.product || '') + '</div>'
+                      + (isPushed ? '<span style="background:#d1fae5;color:#065f46;border:1px solid #6ee7b7;border-radius:3px;font-size:9px;font-weight:700;padding:1px 4px">✓ Pushed</span>' : '')
+                      + '</td>';
+            } else {
+                html += '<td style="padding:5px 8px;font-size:11px;color:#92400e;font-style:italic">No DPL entry</td>';
+            }
+
+            // Pack
+            html += '<td style="padding:5px 8px;text-align:right;font-size:11px;white-space:nowrap">'
+                  + (hasMatch ? esc(pdf.packSize || '—') : '—') + '</td>';
+
+            // New DPL from PDF
+            if (hasMatch) {
+                var dplChanged = pdf.dpl && z.cf_dpl && Math.abs(parseFloat(pdf.dpl) - parseFloat(z.cf_dpl)) >= 0.01;
+                var dplColor = dplChanged ? '#dc2626' : '#059669';
+                html += '<td style="padding:5px 8px;text-align:right;font-size:11px;font-weight:700;color:' + dplColor + ';white-space:nowrap">'
+                      + fmt(pdf.dpl)
+                      + (dplChanged ? ' <span style="font-size:9px;color:#dc2626">▲</span>' : '')
+                      + '</td>';
+            } else {
+                html += '<td style="padding:5px 8px;text-align:right;font-size:11px;color:#9ca3af">—</td>';
+            }
+
+            html += '</tr>';
+        });
+
+        if (visible === 0) {
+            html += '<tr><td colspan="8" style="padding:24px;text-align:center;color:#9ca3af;font-size:12px">No items match the current filter.</td></tr>';
+        }
+
+        bodyEl.innerHTML = html;
+        aiUpdateSelectedCount();
+    }
+
     // Render the mobile card view for Zoho-uncovered mode.
     function renderZohoUncoveredCards() {
         var uncov = computeZohoUncovered(aiData && aiData.items, aiData && aiData.zohoItems);
@@ -2179,6 +2307,7 @@
             case 'pushed':      return !!row._alreadyPushed;
             case 'all':
             case 'zoho-uncovered':
+            case 'zoho-all':
             default:            return true;
         }
     }
@@ -2226,6 +2355,11 @@
         // Zoho-uncovered mode renders a different dataset (zohoItems minus matched).
         if (aiViewMode === 'zoho-uncovered') {
             renderZohoUncoveredTable();
+            return;
+        }
+        // Zoho-all mode: all Zoho items, each showing its matched PDF row.
+        if (aiViewMode === 'zoho-all') {
+            renderZohoAllTable();
             return;
         }
 
