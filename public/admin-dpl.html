@@ -2164,8 +2164,11 @@
                       + '</td>';
             } else {
                 var zid = esc(String(z.zoho_item_id));
-                html += '<td style="padding:5px 8px">'
-                      + '<select onchange="zohoAllAssignPdf(\'' + zid + '\', this.value)" '
+                html += '<td style="padding:5px 8px;min-width:200px">'
+                      + '<input type="text" placeholder="🔍 Search product..." '
+                      + 'oninput="zohoAllFilterPicker(\'' + zid + '\', this.value)" '
+                      + 'style="width:100%;font-size:11px;padding:3px 6px;border:1px solid #d1d5db;border-radius:4px;margin-bottom:4px;box-sizing:border-box">'
+                      + '<select id="zohoAllSel-' + zid + '" onchange="zohoAllAssignPdf(\'' + zid + '\', this.value)" '
                       + 'style="width:100%;font-size:11px;padding:4px 6px;border:1px solid #f59e0b;border-radius:4px;background:#fff;color:#374151">'
                       + '<option value="">— assign DPL row —</option>'
                       + cachedPdfOpts
@@ -2210,6 +2213,22 @@
             opts += '<option value="' + idx + '">' + esc(label) + '</option>';
         });
         return opts;
+    }
+
+    // Filter the DPL picker dropdown for a specific Zoho item as the user types.
+    function zohoAllFilterPicker(zid, query) {
+        var sel = document.getElementById('zohoAllSel-' + zid);
+        if (!sel) return;
+        var q = query.trim().toLowerCase();
+        var pdfRows = (aiData && aiData.items) || [];
+        var opts = '<option value="">— assign DPL row —</option>';
+        pdfRows.forEach(function(r, idx) {
+            if (r._matchedZohoId) return;
+            var label = (r.product || '') + (r.packSize ? ' ' + r.packSize : '') + (r.dpl ? ' ₹' + r.dpl : '');
+            if (q && label.toLowerCase().indexOf(q) === -1) return;
+            opts += '<option value="' + idx + '">' + esc(label) + '</option>';
+        });
+        sel.innerHTML = opts;
     }
 
     // Assign a PDF row to an unmatched Zoho item from the zoho-all view.
