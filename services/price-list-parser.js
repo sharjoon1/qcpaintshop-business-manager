@@ -1338,6 +1338,121 @@ function buildProperBirlaDescription({ productName, colourCode, colourName, size
     return `Birla Opus ${productName} | ${colourCode} - ${colourName} | Pack: ${size} | Code: ${productCode} | ${category} - ${segment} | DPL: ₹${dpl} | Effective: ${effDate}`;
 }
 
+const BIRLA_OPUS_SIZE_COLUMNS = [
+    '50ML','100ML','200ML','400ML','500ML',
+    '0.2L','0.5L','0.9L','1L','2.5L','3.6L','4L','5L','6L','7.5L','9L',
+    '10L','12.5L','18L','20L','25L','30L','37.5L',
+    '0.5KG','1KG','2KG','3KG','5KG','10KG','12KG','15KG','20KG','25KG','30KG',
+    'Per Unit','Per Tube','Per Sheet',
+];
+const BIRLA_OPUS_SIZE_SET = new Set(BIRLA_OPUS_SIZE_COLUMNS);
+
+function parseBirlaOpusCsv(csvBuffer, effectiveDate) {
+    if (!Buffer.isBuffer(csvBuffer) || csvBuffer.length === 0) return [];
+
+    let text = csvBuffer.toString('utf8');
+    if (text.charCodeAt(0) === 0xFEFF) text = text.slice(1);
+
+    const lines = text.split(/\r?\n/);
+    if (lines.length < 2) return [];
+
+    const headerCols = splitCsvLine(lines[0]);
+    const colIndex = {};
+    headerCols.forEach((h, i) => { colIndex[h.trim()] = i; });
+
+    const sizeColEntries = [];
+    headerCols.forEach((h, i) => {
+        const name = h.trim();
+        if (BIRLA_OPUS_SIZE_SET.has(name)) sizeColEntries.push({ name, idx: i });
+    });
+
+    const required = ['Category', 'Segment', 'Product Name', 'Product Code', 'Base Code (SKU)', 'Base / Colour Name'];
+    for (const r of required) {
+        if (colIndex[r] == null) return [];
+    }
+
+    const results = [];
+
+    for (let li = 1; li < lines.length; li++) {
+        const line = lines[li];
+        if (!line.trim()) continue;
+        const cols = splitCsvLine(line);
+        if (cols.length < headerCols.length) continue;
+
+        const category    = (cols[colIndex['Category']]           || '').trim();
+        const segment     = (cols[colIndex['Segment']]            || '').trim();
+        const productName = (cols[colIndex['Product Name']]       || '').trim();
+        const productCode = (cols[colIndex['Product Code']]       || '').trim();
+        const baseCode    = (cols[colIndex['Base Code (SKU)']]    || '').trim();
+        const colourRaw   = (cols[colIndex['Base / Colour Name']] || '').trim();
+
+        if (!productName || !baseCode) continue;
+
+        let colourCode = '';
+        let colourName = colourRaw;
+        const sepIdx = colourRaw.indexOf(' - ');
+        if (sepIdx > -1) {
+            colourCode = colourRaw.slice(0, sepIdx).trim();
+            colourName = colourRaw.slice(sepIdx + 3).trim();
+        }
+
+        for (const { name: size, idx } of sizeColEntries) {
+            const raw = (cols[idx] || '').trim();
+            if (!raw) continue;
+
+            const cleaned = raw.replace(/,/g, '');
+            if (!/^\d+(\.\d+)?$/.test(cleaned)) continue;
+            const dpl = parseFloat(cleaned);
+            if (!isFinite(dpl) || dpl <= 0) continue;
+
+            // size comes from BIRLA_OPUS_SIZE_SET so it already has canonical casing
+            const packSize = size;
+
+            results.push({
+                product:              colourName ? `${productName} - ${colourName}` : productName,
+                packSize,
+                dpl,
+                brand:                'Birla Opus',
+                category,
+                segment,
+                baseCode,
+                productCode,
+                colourCode,
+                colourName,
+                productName,
+                _proposedName:        buildProperBirlaItemName({ baseCode, productName, colourName, size: packSize }),
+                _proposedZohoSku:     buildProperBirlaZohoSku({ baseCode, size: packSize }),
+                _proposedDescription: buildProperBirlaDescription(
+                    { productName, colourCode, colourName, size: packSize, productCode, category, segment, dpl },
+                    effectiveDate
+                ),
+            });
+        }
+    }
+
+    return results;
+}
+
+function splitCsvLine(line) {
+    const cols = [];
+    let cur = '';
+    let inQuotes = false;
+    for (let i = 0; i < line.length; i++) {
+        const ch = line[i];
+        if (ch === '"') {
+            if (inQuotes && line[i + 1] === '"') { cur += '"'; i++; }
+            else { inQuotes = !inQuotes; }
+        } else if (ch === ',' && !inQuotes) {
+            cols.push(cur);
+            cur = '';
+        } else {
+            cur += ch;
+        }
+    }
+    cols.push(cur.replace(/\r$/, ''));
+    return cols;
+}
+
 // ============ MATCH WITH ZOHO ITEMS ============
 function matchWithZohoItems(parsedItems, zohoItems) {
     const matched = [];
@@ -1857,4 +1972,6 @@ module.exports = {
     buildProperBirlaItemName,
     buildProperBirlaZohoSku,
     buildProperBirlaDescription,
+    // CSV parser
+    parseBirlaOpusCsv,
 };
