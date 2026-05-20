@@ -126,7 +126,7 @@
         <div id="step1" class="bg-white rounded-lg shadow-sm p-5 mb-4">
             <h3 class="font-bold text-gray-800 text-sm mb-3 flex items-center gap-2">
                 <svg class="w-4 h-4 text-indigo-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"/></svg>
-                Upload Brand Price List PDF
+                Upload Brand Price List PDF / CSV
             </h3>
 
             <!-- Naming rules info box -->
@@ -168,6 +168,52 @@
                 </div>
             </div>
 
+            <!-- Upload mode tabs -->
+            <div class="flex gap-2 mb-4 border-b border-gray-200 pb-2">
+                <button id="tabPdf" onclick="switchUploadTab('pdf')"
+                    class="px-3 py-1.5 rounded-lg text-xs font-semibold border transition"
+                    style="background:#667eea;color:white;border-color:#667eea">
+                    📄 Upload PDF
+                </button>
+                <button id="tabCsv" onclick="switchUploadTab('csv')"
+                    class="px-3 py-1.5 rounded-lg text-xs font-semibold border border-gray-300 bg-white text-gray-600 transition">
+                    📊 Upload CSV (SKU Report)
+                </button>
+            </div>
+
+            <!-- CSV upload area (hidden by default) -->
+            <div id="csvUploadArea" class="hidden mb-4">
+                <div class="bg-emerald-50 border border-emerald-200 rounded-lg p-4">
+                    <p class="text-xs text-emerald-800 font-semibold mb-1">Birla Opus SKU Report CSV</p>
+                    <p class="text-[11px] text-emerald-700 mb-3">e.g. <code>BirlaOpus_DPL_15May2026_SKU_Report.csv</code> — sparse matrix format, max 5 MB. Parses all size columns automatically.</p>
+                    <div class="flex flex-col sm:flex-row gap-3 items-start sm:items-end">
+                        <div class="flex-1">
+                            <label class="text-[11px] text-gray-600 font-medium block mb-1">CSV File</label>
+                            <input type="file" id="csvFileInput" accept=".csv"
+                                class="block w-full text-xs text-gray-600 file:mr-3 file:py-1.5 file:px-3 file:rounded file:border-0 file:text-xs file:font-semibold file:bg-emerald-100 file:text-emerald-700 hover:file:bg-emerald-200 cursor-pointer"
+                                onchange="onCsvFileSelect()">
+                        </div>
+                        <div>
+                            <label class="text-[11px] text-gray-600 font-medium block mb-1">Effective Date</label>
+                            <input type="date" id="csvEffectiveDate"
+                                class="px-2 py-1.5 border border-gray-300 rounded text-xs bg-white focus:border-emerald-500 outline-none">
+                        </div>
+                    </div>
+                    <div id="csvFileInfo" class="hidden mt-2 text-[11px] text-emerald-700 font-medium"></div>
+                    <div class="mt-3 flex items-center gap-3">
+                        <button onclick="parseCsv()" id="parseCsvBtn"
+                            class="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-bold transition flex items-center gap-2 disabled:opacity-50" disabled>
+                            <svg id="parseCsvSpinner" class="hidden w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
+                            Parse &amp; Match CSV
+                        </button>
+                        <span id="csvParseStatus" class="text-[11px] text-gray-500"></span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- PDF upload area (shown by default, wrapped for tab switching) -->
+            <div id="pdfUploadArea">
+
             <!-- Upload area -->
             <div class="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center hover:border-indigo-400 transition" id="dropZone"
                  ondragover="event.preventDefault(); this.classList.add('border-indigo-400','bg-indigo-50')"
@@ -205,6 +251,8 @@
                     </button>
                 </div>
             </div>
+
+            </div><!-- /pdfUploadArea -->
 
             <!-- Brand DPL Mode — saved per-brand DPL price list -->
             <div id="brandDplPanel" class="mt-4 border-t pt-4 hidden">
@@ -3115,6 +3163,85 @@
         clearTimeout(_aiRszTimer);
         _aiRszTimer = setTimeout(function() { if (aiData) { aiApplyLayout(); renderAiTable(); } }, 200);
     });
+
+    // ── CSV Upload Tab ──────────────────────────────────────────────
+    function switchUploadTab(tab) {
+        var isPdf = tab === 'pdf';
+        document.getElementById('pdfUploadArea').classList.toggle('hidden', !isPdf);
+        document.getElementById('csvUploadArea').classList.toggle('hidden',  isPdf);
+        var pdfBtn = document.getElementById('tabPdf');
+        var csvBtn = document.getElementById('tabCsv');
+        if (isPdf) {
+            pdfBtn.style.background = '#667eea'; pdfBtn.style.color = 'white'; pdfBtn.style.borderColor = '#667eea';
+            csvBtn.style.background = 'white';   csvBtn.style.color = '#4b5563'; csvBtn.style.borderColor = '#d1d5db';
+        } else {
+            csvBtn.style.background = '#059669'; csvBtn.style.color = 'white'; csvBtn.style.borderColor = '#059669';
+            pdfBtn.style.background = 'white';   pdfBtn.style.color = '#4b5563'; pdfBtn.style.borderColor = '#d1d5db';
+        }
+    }
+
+    function onCsvFileSelect() {
+        var file = document.getElementById('csvFileInput').files[0];
+        if (!file) return;
+        document.getElementById('parseCsvBtn').disabled = false;
+        var info = document.getElementById('csvFileInfo');
+        info.textContent = file.name + ' — ' + (file.size / 1024).toFixed(1) + ' KB';
+        info.classList.remove('hidden');
+        var m = file.name.match(/(\d{1,2})(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)(\d{4})/i);
+        if (m) {
+            var months = {jan:'01',feb:'02',mar:'03',apr:'04',may:'05',jun:'06',
+                          jul:'07',aug:'08',sep:'09',oct:'10',nov:'11',dec:'12'};
+            var mm = months[m[2].toLowerCase()];
+            var dd = ('0' + m[1]).slice(-2);
+            document.getElementById('csvEffectiveDate').value = m[3] + '-' + mm + '-' + dd;
+        }
+    }
+
+    async function parseCsv() {
+        var file = document.getElementById('csvFileInput').files[0];
+        if (!file) { showToast('Please select a CSV file first', 'error'); return; }
+
+        var btn = document.getElementById('parseCsvBtn');
+        var sp  = document.getElementById('parseCsvSpinner');
+        var statusEl = document.getElementById('csvParseStatus');
+        btn.disabled = true; sp.classList.remove('hidden');
+        statusEl.textContent = 'Uploading and parsing...';
+
+        try {
+            var fd = new FormData();
+            fd.append('csv', file);
+            var effDate = document.getElementById('csvEffectiveDate').value;
+            if (effDate) fd.append('effective_date', effDate);
+            fd.append('match', 'true');
+
+            var resp = await fetch('/api/zoho/items/dpl-parse-csv', {
+                method: 'POST',
+                headers: { 'Authorization': 'Bearer ' + getToken() },
+                body: fd,
+            });
+            var body = await resp.json();
+            if (!body.success) throw new Error(body.message || 'Parse failed');
+
+            var parsed = body.data.parsed_count || 0;
+            statusEl.textContent = parsed + ' line items parsed';
+
+            if (body.data.match) {
+                aiData = body.data.match;
+                showAiResults();
+            }
+            if (body.data.saved) {
+                renderSavedDplCard(body.data.saved);
+            }
+            showToast(parsed + ' items parsed and matched from CSV', 'success');
+        } catch (err) {
+            showToast('CSV parse error: ' + err.message, 'error');
+            statusEl.textContent = 'Error: ' + err.message;
+        } finally {
+            btn.disabled = false; sp.classList.add('hidden');
+        }
+    }
+    // ── /CSV Upload Tab ─────────────────────────────────────────────
+
     </script>
 
 <!-- ===== ZOHO ITEM PICKER MODAL ===== -->
