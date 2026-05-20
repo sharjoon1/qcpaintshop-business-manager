@@ -2098,6 +2098,7 @@
               + '<td style="padding:7px 8px">DPL Row / Assign</td>'
               + '<td style="padding:7px 8px;text-align:right">Pack</td>'
               + '<td style="padding:7px 8px;text-align:right">New DPL</td>'
+              + '<td style="padding:7px 8px;text-align:right">Purchase Price</td>'
               + '</tr>';
 
         // Cache unmatched PDF options once as a string (reused by zohoAllInitPicker).
@@ -2262,11 +2263,26 @@
                 html += '<td style="padding:5px 8px;text-align:right;font-size:11px;color:#9ca3af">—</td>';
             }
 
+            // Purchase Price — equals New DPL for matched rows
+            if (hasMatch && pdf.dpl) {
+                var purchasePrice = parseFloat(pdf.dpl);
+                var purchaseChanged = z.purchase_rate && Math.abs(purchasePrice - parseFloat(z.purchase_rate)) >= 0.01;
+                var ppColor = purchaseChanged ? '#dc2626' : '#059669';
+                html += '<td style="padding:5px 8px;text-align:right;font-size:11px;white-space:nowrap">'
+                      + '<div style="font-weight:700;color:' + ppColor + '">' + fmt(purchasePrice)
+                      + (purchaseChanged ? ' <span style="font-size:9px">▲</span>' : '') + '</div>';
+                if (purchaseChanged) html += '<div style="font-size:9px;color:#9ca3af">' + fmt(z.purchase_rate) + '</div>';
+                html += '</td>';
+            } else {
+                html += '<td style="padding:5px 8px;text-align:right;font-size:11px;color:' + (z.purchase_rate > 0 ? '#374151' : '#9ca3af') + '">'
+                      + (z.purchase_rate > 0 ? fmt(z.purchase_rate) : '—') + '</td>';
+            }
+
             html += '</tr>';
         });
 
         if (visible === 0) {
-            html += '<tr><td colspan="9" style="padding:24px;text-align:center;color:#9ca3af;font-size:12px">No items match the current filter.</td></tr>';
+            html += '<tr><td colspan="10" style="padding:24px;text-align:center;color:#9ca3af;font-size:12px">No items match the current filter.</td></tr>';
         }
 
         bodyEl.innerHTML = html;
