@@ -5,6 +5,7 @@ const { computeFinalPrice, groupRowsForPdf, generatePriceListPdf } = require('..
 const fs = require('fs');
 const path = require('path');
 const os = require('os');
+const sessionManager = require('../services/whatsapp-session-manager');
 
 let pool;
 function setPool(p) { pool = p; }
@@ -61,7 +62,7 @@ router.get('/brands', perm, async (req, res) => {
 
         res.json({ success: true, data });
     } catch (err) {
-        console.error('[price-list] GET /brands:', err.message);
+        console.error('[price-list] GET /brands:', err);
         res.status(500).json({ success: false, message: 'Failed to load brands' });
     }
 });
@@ -75,9 +76,18 @@ router.post('/generate', perm, async (req, res) => {
             return res.status(400).json({ success: false, message: 'customer_name is required' });
         }
         customer_name = customer_name.trim().slice(0, 100);
+        const safeName = customer_name.replace(/[^a-zA-Z0-9\-_]/g, '_');
 
         if (!Array.isArray(brands) || brands.length === 0) {
             return res.status(400).json({ success: false, message: 'brands must be a non-empty array' });
+        }
+        if (brands.length > 20) {
+            return res.status(400).json({ success: false, message: 'Too many brands requested' });
+        }
+        const VALID_BRANDS = Object.keys(BRAND_LABELS);
+        const validatedBrands = brands.filter(b => VALID_BRANDS.includes(b));
+        if (validatedBrands.length === 0) {
+            return res.status(400).json({ success: false, message: 'No valid brands supplied' });
         }
 
         const markupPct = parseFloat(markup_percent);
@@ -97,7 +107,7 @@ router.post('/generate', perm, async (req, res) => {
         }
 
         const brandGroups = [];
-        for (const brand of brands) {
+        for (const brand of validatedBrands) {
             const [rows] = await pool.query(
                 'SELECT parsed_rows FROM brand_dpl_lists WHERE brand = ?', [brand]
             );
@@ -140,12 +150,11 @@ router.post('/generate', perm, async (req, res) => {
         });
 
         if (waNumber) {
+            let tmpPath = null;
             try {
-                const sessionManager = require('../services/whatsapp-session-manager');
                 const tmpDir = path.join(os.tmpdir(), 'qc-price-lists');
                 fs.mkdirSync(tmpDir, { recursive: true });
-                const safeName = customer_name.replace(/[^a-zA-Z0-9\-_]/g, '_');
-                const tmpPath = path.join(tmpDir, `PL-${safeName}-${Date.now()}.pdf`);
+                tmpPath = path.join(tmpDir, `PL-${safeName}-${Date.now()}.pdf`);
                 fs.writeFileSync(tmpPath, pdfBuffer);
 
                 const caption = `Hi! Please find your price list attached.\nCustomer: ${customer_name}\nDate: ${effective_date || new Date().toISOString().slice(0, 10)}\nMarkup: +${markupPct}%`;
@@ -159,13 +168,12 @@ router.post('/generate', perm, async (req, res) => {
                 if (!sent) {
                     try { sent = await sessionManager.sendMedia(GENERAL_ID, waNumber, mediaOpts, source); } catch (e) { /* ignore */ }
                 }
-                try { fs.unlinkSync(tmpPath); } catch (e) { /* ignore */ }
             } catch (e) {
                 console.warn('[price-list] WhatsApp send failed:', e.message);
+            } finally {
+                if (tmpPath) try { fs.unlinkSync(tmpPath); } catch (_) {}
             }
         }
-
-        const safeName = customer_name.replace(/[^a-zA-Z0-9\-_]/g, '_');
         const dateStr  = (effective_date || new Date().toISOString().slice(0, 10)).replace(/-/g, '');
         res.setHeader('Content-Type', 'application/pdf');
         res.setHeader('Content-Disposition', `attachment; filename="PriceList-${safeName}-${dateStr}.pdf"`);
@@ -173,7 +181,7 @@ router.post('/generate', perm, async (req, res) => {
         res.end(pdfBuffer);
 
     } catch (err) {
-        console.error('[price-list] POST /generate:', err.message);
+        console.error('[price-list] POST /generate:', err);
         res.status(500).json({ success: false, message: 'Failed to generate price list' });
     }
 });
