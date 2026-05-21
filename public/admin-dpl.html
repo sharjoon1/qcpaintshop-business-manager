@@ -2877,11 +2877,14 @@
     async function aiApplyAndPushToZoho() {
         if (!aiData) { showToast('No AI data', 'error'); return; }
         var items = [];
+        var pdfRowByZohoId = {};  // client-only map for post-push in-memory update
         var skipped_no_match = 0;
         (aiData.items || []).forEach(function(row) {
             if (!row._selected) return;
             if (!row._matchedZohoId) { skipped_no_match++; return; }
             var changes = { cf_dpl: parseFloat(row.dpl) };
+            // purchase_rate (Cost Price in Zoho) = DPL
+            changes.purchase_rate = parseFloat(row.dpl);
             var p = row._proposed || {};
             if (p.proposedRate)        changes.rate = p.proposedRate;
             var finalName = p.editedName != null ? p.editedName : p.proposedName;
@@ -2894,6 +2897,7 @@
             if (row._brandOverride != null && row._brandOverride !== (zohoItem2&&zohoItem2.brand||'')) changes.brand    = row._brandOverride;
             if (row._catOverride   != null && row._catOverride   !== (zohoItem2&&zohoItem2.category||'')) changes.category = row._catOverride;
             var zohoItem = (aiData.zohoItems || []).find(function(z){ return z.zoho_item_id === row._matchedZohoId; });
+            pdfRowByZohoId[row._matchedZohoId] = row;
             items.push({
                 zoho_item_id: row._matchedZohoId,
                 item_name: p.proposedName || (zohoItem && zohoItem.name) || '',
@@ -2914,6 +2918,25 @@
         btn.disabled = true; sp.classList.remove('hidden');
         try {
             await postBulkEditWithDupCheck(items);
+            // Update aiData in-memory so items stay matched and show PUSHED state without re-upload
+            var nowIso = new Date().toISOString();
+            items.forEach(function(it) {
+                var z = (aiData.zohoItems || []).find(function(x) { return x.zoho_item_id === it.zoho_item_id; });
+                if (z) {
+                    if (it.changes.name)          z.name          = it.changes.name;
+                    if (it.changes.sku)           z.sku           = it.changes.sku;
+                    if (it.changes.rate != null)  z.rate          = it.changes.rate;
+                    if (it.changes.cf_dpl)        { z.cf_dpl = it.changes.cf_dpl; z.dpl_updated_at = nowIso; }
+                    if (it.changes.purchase_rate) z.purchase_rate = it.changes.purchase_rate;
+                }
+                var pdfRow = pdfRowByZohoId[it.zoho_item_id];
+                if (pdfRow) {
+                    pdfRow._alreadyPushed = true;
+                    pdfRow._pushedAt      = nowIso;
+                    pdfRow._selected      = false;
+                }
+            });
+            renderAiTable();
             setStep(3);
             document.getElementById('doneTitle').textContent = 'Items Updated & Queued!';
             document.getElementById('doneMsg').textContent = items.length + ' items updated. Zoho Books sync running in background.';
