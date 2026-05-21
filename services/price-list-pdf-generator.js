@@ -67,8 +67,8 @@ function generatePriceListPdf(brandGroups, { customerName, markupPercent, effect
         doc.on('error', reject);
 
         const MARGIN = 40;
-        const PAGE_W = 515;          // 595 - 2×40
-        const PAGE_H = 841.89;
+        const PAGE_W = doc.page.width - 2 * MARGIN;
+        const PAGE_H = doc.page.height;
         const FOOTER_RESERVE = 45;
         const ROW_H = 18;
 
