@@ -110,7 +110,7 @@ var allItems    = [];
 var selectedIds = new Set();
 
 function esc(s) {
-    return String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+    return String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#x27;');
 }
 
 function itemId(item) {
@@ -247,13 +247,12 @@ function toggleCategory(cat, checked) {
 }
 
 function selectAllItems(checked) {
-    document.querySelectorAll('.item-cb').forEach(function(cb) {
-        if (!cb.closest('.item-row').classList.contains('hidden')) {
-            cb.checked = checked;
-            var item = allItems[parseInt(cb.dataset.idx, 10)];
-            if (item) { if (checked) selectedIds.add(itemId(item)); else selectedIds.delete(itemId(item)); }
-        }
-    });
+    if (checked) {
+        allItems.forEach(function(item) { selectedIds.add(itemId(item)); });
+    } else {
+        selectedIds.clear();
+    }
+    document.querySelectorAll('.item-cb').forEach(function(cb) { cb.checked = checked; });
     document.querySelectorAll('.accordion-body[data-cat]').forEach(function(b) { updateCatCount(b.dataset.cat); });
     refreshSelectionCount();
 }
