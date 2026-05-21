@@ -11,6 +11,11 @@
         .accordion-body { display: none; }
         .accordion-body.open { display: block; }
         .item-row.hidden { display: none; }
+        .cat-name-input { background: transparent; border: none; outline: none; font-weight: 500; color: #1f2937; font-size: 0.875rem; min-width: 120px; }
+        .cat-name-input:focus { background: #fff; border: 1px solid #d1fae5; border-radius: 4px; padding: 1px 4px; }
+        .range-input { border: 1px solid #d1d5db; border-radius: 6px; padding: 3px 8px; font-size: 0.75rem; color: #374151; width: 110px; }
+        .range-input:focus { outline: none; border-color: #6ee7b7; }
+        .range-input::placeholder { color: #9ca3af; }
     </style>
 </head>
 <body class="bg-gray-50 min-h-screen">
@@ -73,7 +78,8 @@
 
     <!-- Step 2: Product selection -->
     <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-6 mb-6 hidden" id="step2">
-        <h2 class="text-base font-semibold text-gray-700 mb-4">Step 2 — Select Products</h2>
+        <h2 class="text-base font-semibold text-gray-700 mb-1">Step 2 — Select Products</h2>
+        <p class="text-xs text-gray-400 mb-4">Click a category name to rename it. Fill "Range" to add a Range column in the PDF.</p>
 
         <div class="flex flex-col sm:flex-row gap-3 mb-4">
             <input id="searchBox" type="text" placeholder="🔍 Search products…" oninput="filterItems(this.value)"
@@ -86,7 +92,7 @@
 
         <div id="accordion" class="space-y-2"></div>
 
-        <div class="mt-4 pt-4 border-t border-gray-100 text-sm text-gray-600" id="selectionFooter">
+        <div class="mt-4 pt-4 border-t border-gray-100 text-sm text-gray-600">
             <span id="selectionCount">0 items selected</span>
         </div>
     </div>
@@ -106,8 +112,10 @@
 </div>
 
 <script>
-var allItems    = [];
-var selectedIds = new Set();
+var allItems      = [];
+var selectedIds   = new Set();
+var categoryEdits  = {}; // { 'brand||origCat': 'renamed category' }
+var categoryRanges = {}; // { 'brand||origCat': 'range label' }
 
 function esc(s) {
     return String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#x27;');
@@ -118,44 +126,44 @@ function itemId(item) {
 }
 
 function updateMarkupPreview() {
-    const m = parseFloat(document.getElementById('markupPct').value);
+    var m = parseFloat(document.getElementById('markupPct').value);
     if (!isFinite(m)) { document.getElementById('markupPreview').textContent = ''; return; }
-    const final = Math.ceil(500 * (1 + m / 100) * 1.18);
+    var final = Math.ceil(500 * (1 + m / 100) * 1.18);
     document.getElementById('markupPreview').textContent = 'DPL ₹500 → Final ₹' + final.toLocaleString('en-IN');
 }
 
 async function loadBrands() {
     try {
-        const r = await fetch('/api/price-list/brands', { headers: authHeaders() });
-        const d = await r.json();
-        const container = document.getElementById('brandCheckboxes');
+        var r = await fetch('/api/price-list/brands', { headers: authHeaders() });
+        var d = await r.json();
+        var container = document.getElementById('brandCheckboxes');
         if (!d.success || !d.data.length) {
             container.innerHTML = '<span class="text-red-500 text-xs">No DPL data found. Please upload DPL files first.</span>';
             return;
         }
-        container.innerHTML = d.data.map(b =>
-            '<label class="flex items-center gap-2 cursor-pointer">' +
-            '<input type="checkbox" value="' + esc(b.brand) + '" class="brand-cb rounded" checked>' +
-            '<span>' + esc(b.label) + '</span>' +
-            '<span class="text-gray-400 text-xs">(' + b.item_count + ')</span>' +
-            '</label>'
-        ).join('');
+        container.innerHTML = d.data.map(function(b) {
+            return '<label class="flex items-center gap-2 cursor-pointer">' +
+                '<input type="checkbox" value="' + esc(b.brand) + '" class="brand-cb rounded" checked>' +
+                '<span>' + esc(b.label) + '</span>' +
+                '<span class="text-gray-400 text-xs">(' + b.item_count + ')</span>' +
+                '</label>';
+        }).join('');
     } catch (e) {
         document.getElementById('brandCheckboxes').innerHTML = '<span class="text-red-500 text-xs">Failed to load brands.</span>';
     }
 }
 
 async function loadItems() {
-    const errEl = document.getElementById('loadError');
+    var errEl = document.getElementById('loadError');
     errEl.classList.add('hidden');
 
-    const name = document.getElementById('customerName').value.trim();
+    var name = document.getElementById('customerName').value.trim();
     if (!name) { errEl.textContent = 'Customer name is required.'; errEl.classList.remove('hidden'); return; }
 
-    const brands = Array.from(document.querySelectorAll('.brand-cb:checked')).map(function(c) { return c.value; });
+    var brands = Array.from(document.querySelectorAll('.brand-cb:checked')).map(function(c) { return c.value; });
     if (!brands.length) { errEl.textContent = 'Select at least one brand.'; errEl.classList.remove('hidden'); return; }
 
-    const markup = parseFloat(document.getElementById('markupPct').value);
+    var markup = parseFloat(document.getElementById('markupPct').value);
     if (!isFinite(markup) || markup < -99 || markup > 200) {
         errEl.textContent = 'Markup must be between -99 and 200.'; errEl.classList.remove('hidden'); return;
     }
@@ -164,10 +172,12 @@ async function loadItems() {
     document.getElementById('loadBtn').textContent = 'Loading…';
 
     try {
-        const r = await fetch('/api/price-list/items?brands=' + encodeURIComponent(brands.join(',')), { headers: authHeaders() });
-        const d = await r.json();
+        var r = await fetch('/api/price-list/items?brands=' + encodeURIComponent(brands.join(',')), { headers: authHeaders() });
+        var d = await r.json();
         if (!d.success) throw new Error(d.message || 'Failed');
         allItems = d.data;
+        categoryEdits = {};
+        categoryRanges = {};
         selectedIds = new Set(allItems.map(itemId));
         renderAccordion(allItems);
         document.getElementById('step2').classList.remove('hidden');
@@ -191,19 +201,27 @@ function renderAccordion(items) {
 
     var html = '';
     catMap.forEach(function(val, key) {
-        var catLabel = esc(val.brandLabel) + ' — ' + esc(val.category);
-        var safeKey  = esc(key);
+        var safeKey      = esc(key);
+        var displayLabel = esc(categoryEdits[key] || val.category);
+        var brandPart    = esc(val.brandLabel);
+        var rangeVal     = esc(categoryRanges[key] || '');
+
         html += '<div class="border border-gray-200 rounded-lg overflow-hidden">' +
-            '<div class="flex items-center justify-between bg-gray-50 px-4 py-3 cursor-pointer select-none" onclick="toggleAccordion(\'' + safeKey + '\')">' +
-            '<div class="flex items-center gap-2">' +
-            '<span class="text-sm font-medium text-gray-800">' + catLabel + '</span>' +
-            '<span class="text-xs text-gray-400 cat-count" data-cat="' + safeKey + '">(' + val.indices.length + ' / ' + val.indices.length + ')</span>' +
+            '<div class="bg-gray-50 px-4 py-2.5">' +
+            '<div class="flex items-center justify-between">' +
+            '<div class="flex items-center gap-2 min-w-0 flex-1">' +
+            '<span class="text-xs text-gray-500 shrink-0">' + brandPart + ' —</span>' +
+            '<input type="text" class="cat-name-input" value="' + displayLabel + '" data-key="' + safeKey + '"' +
+            ' onchange="onCatRename(this)" onclick="event.stopPropagation()" title="Click to rename category">' +
+            '<span class="text-xs text-gray-400 cat-count shrink-0" data-cat="' + safeKey + '">(' + val.indices.length + ' / ' + val.indices.length + ')</span>' +
             '</div>' +
-            '<div class="flex items-center gap-2">' +
+            '<div class="flex items-center gap-2 ml-2 shrink-0">' +
+            '<input type="text" class="range-input" placeholder="Range…" value="' + rangeVal + '" data-key="' + safeKey + '"' +
+            ' onchange="onRangeEdit(this)" onclick="event.stopPropagation()" title="Optional: Range label for PDF column">' +
             '<button class="text-xs px-2 py-1 bg-white border border-gray-300 rounded hover:bg-gray-50" onclick="event.stopPropagation(); toggleCategory(\'' + safeKey + '\', true)">All</button>' +
             '<button class="text-xs px-2 py-1 bg-white border border-gray-300 rounded hover:bg-gray-50" onclick="event.stopPropagation(); toggleCategory(\'' + safeKey + '\', false)">None</button>' +
-            '<span class="text-gray-400 text-xs accordion-chevron" data-cat="' + safeKey + '">▼</span>' +
-            '</div></div>' +
+            '<span class="text-gray-400 text-xs accordion-chevron cursor-pointer" data-cat="' + safeKey + '" onclick="toggleAccordion(\'' + safeKey + '\')">▼</span>' +
+            '</div></div></div>' +
             '<div class="accordion-body open" data-cat="' + safeKey + '">' +
             '<div class="divide-y divide-gray-100">';
 
@@ -223,6 +241,20 @@ function renderAccordion(items) {
         html += '</div></div></div>';
     });
     document.getElementById('accordion').innerHTML = html;
+}
+
+function onCatRename(input) {
+    var key = input.dataset.key;
+    var val = input.value.trim();
+    if (val) categoryEdits[key] = val;
+    else delete categoryEdits[key];
+}
+
+function onRangeEdit(input) {
+    var key = input.dataset.key;
+    var val = input.value.trim();
+    if (val) categoryRanges[key] = val;
+    else delete categoryRanges[key];
 }
 
 function toggleAccordion(cat) {
@@ -305,8 +337,17 @@ async function generatePriceList(mode) {
 
     var selectedItems = allItems.filter(function(item) { return selectedIds.has(itemId(item)); })
         .map(function(item) {
-            return { brand: item.brand, brandLabel: item.brandLabel, category: item.category,
-                     product: item.product, colourName: item.colourName, packSize: item.packSize, dpl: item.dpl };
+            var key = item.brand + '||' + item.category;
+            return {
+                brand:      item.brand,
+                brandLabel: item.brandLabel,
+                category:   categoryEdits[key] || item.category,
+                product:    item.product,
+                colourName: item.colourName,
+                packSize:   item.packSize,
+                dpl:        item.dpl,
+                range:      categoryRanges[key] || '',
+            };
         });
 
     if (!selectedItems.length) return;

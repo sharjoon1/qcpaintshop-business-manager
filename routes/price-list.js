@@ -104,6 +104,7 @@ router.get('/items', perm, async (req, res) => {
                     colourName: r.colourName || '',
                     packSize:   r.packSize || '',
                     dpl,
+                    range:      (r.range || '').trim(),
                 });
             }
         }
@@ -174,6 +175,7 @@ router.post('/generate', perm, async (req, res) => {
             colourName: item.colourName || '',
             packSize:   item.packSize || '',
             finalPrice: computeFinalPrice(item.dpl, markupPct),
+            range:      (item.range || '').trim(),
         }));
 
         const brandMap = new Map();
