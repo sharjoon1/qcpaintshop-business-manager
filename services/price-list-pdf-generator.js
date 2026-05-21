@@ -20,10 +20,10 @@ function groupRowsForPdf(rows, brandLabel) {
         finalPrice:  row.finalPrice || 0,
     }));
     items.sort((a, b) => {
-        const c = a.category.localeCompare(b.category);
+        const c = a.category.localeCompare(b.category, 'en');
         if (c !== 0) return c;
-        const n = a.productName.localeCompare(b.productName);
-        return n !== 0 ? n : a.packSize.localeCompare(b.packSize);
+        const n = a.productName.localeCompare(b.productName, 'en');
+        return n !== 0 ? n : a.packSize.localeCompare(b.packSize, 'en');
     });
     return { brandLabel, items };
 }
