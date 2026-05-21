@@ -99,6 +99,7 @@ const monitoringRoutes = require('./routes/monitoring');
 const photosRoutes = require('./routes/photos');
 const agreementsRoutes = require('./routes/agreements');
 const twoFARoutes = require('./routes/auth-2fa');
+const priceListRoutes = require('./routes/price-list');
 
 const app = express();
 app.set('trust proxy', 1); // Trust first proxy (nginx/aaPanel)
@@ -330,6 +331,7 @@ photosRoutes.setPool(pool);
 if (itemMasterRoutes.setPool) itemMasterRoutes.setPool(pool);
 agreementsRoutes.setPool(pool);
 twoFARoutes.setPool(pool);
+priceListRoutes.setPool(pool);
 const invoiceLineSync = require('./services/zoho-invoice-line-sync');
 invoiceLineSync.setPool(pool);
 const reorderCompute = require('./services/reorder-compute-service');
@@ -401,6 +403,7 @@ app.use('/api/photos', photosRoutes.router);
 app.use('/api/item-master', itemMasterRoutes.router);
 app.use('/api/agreements', agreementsRoutes.router);
 app.use('/api/2fa', twoFARoutes);
+app.use('/api/price-list', priceListRoutes.router);
 
 // Share page routes (serve HTML for public share links)
 app.get('/share/estimate/:token', (req, res) => {
