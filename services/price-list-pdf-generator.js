@@ -136,7 +136,7 @@ function generatePriceListPdf(brandGroups, { customerName, markupPercent, effect
                 }
                 doc.fontSize(9).fillColor('#374151').font('Regular');
                 let x = MARGIN + 4;
-                doc.text(item.productName,           x,     y + 4, { width: COL_PRODUCT  - 8, lineBreak: false }); x += COL_PRODUCT;
+                doc.text(item.productName,           x,     y + 4, { width: COL_PRODUCT  - 8, lineBreak: false, ellipsis: true }); x += COL_PRODUCT;
                 doc.text(item.category,              x + 4, y + 4, { width: COL_CATEGORY - 8, lineBreak: false }); x += COL_CATEGORY;
                 doc.text(item.colourName || '-',     x + 4, y + 4, { width: COL_COLOUR   - 8, lineBreak: false }); x += COL_COLOUR;
                 doc.text(item.packSize,              x + 4, y + 4, { width: COL_SIZE     - 8, lineBreak: false }); x += COL_SIZE;
