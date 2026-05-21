@@ -150,8 +150,8 @@ router.post('/generate', perm, async (req, res) => {
             if (!item.brand || !VALID_BRANDS.includes(item.brand)) {
                 return res.status(400).json({ success: false, message: 'Invalid brand in items' });
             }
-            if (typeof item.dpl !== 'number' || item.dpl < 0) {
-                return res.status(400).json({ success: false, message: 'items[].dpl must be a number >= 0' });
+            if (typeof item.dpl !== 'number' || item.dpl < 0 || item.dpl > 100000) {
+                return res.status(400).json({ success: false, message: 'items[].dpl must be a number between 0 and 100000' });
             }
         }
 
@@ -160,6 +160,10 @@ router.post('/generate', perm, async (req, res) => {
             const digits = String(whatsapp_number).replace(/\D/g, '');
             const normalized = digits.startsWith('91') && digits.length === 12 ? digits.slice(2) : digits;
             if (normalized.length === 10) waNumber = normalized;
+        }
+
+        if (effective_date && !/^\d{4}-\d{2}-\d{2}$/.test(effective_date)) {
+            effective_date = null;
         }
 
         const withPrice = items.map(item => ({
@@ -173,7 +177,7 @@ router.post('/generate', perm, async (req, res) => {
         const brandMap = new Map();
         for (let i = 0; i < items.length; i++) {
             const brand = items[i].brand;
-            const label = items[i].brandLabel || BRAND_LABELS[brand] || brand;
+            const label = BRAND_LABELS[brand] || brand;
             if (!brandMap.has(brand)) brandMap.set(brand, { label, rows: [] });
             brandMap.get(brand).rows.push(withPrice[i]);
         }
@@ -181,6 +185,10 @@ router.post('/generate', perm, async (req, res) => {
         const brandGroups = [];
         for (const [, { label, rows }] of brandMap) {
             brandGroups.push(groupRowsForPdf(rows, label));
+        }
+
+        if (brandGroups.length === 0) {
+            return res.status(400).json({ success: false, message: 'No items provided' });
         }
 
         const pdfBuffer = await generatePriceListPdf(brandGroups, {
