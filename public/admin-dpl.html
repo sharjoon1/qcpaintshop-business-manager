@@ -1659,6 +1659,7 @@
     function aiPackSizeInName(packSize, zohoName) {
         var sz = String(normalizeBirlaPackSize(packSize)||'').replace(/\s/g,'').toUpperCase();
         if (!sz) return true; // no pack size to check = don't filter
+        if (!/\d/.test(sz)) return true; // non-numeric (Per Unit, Per Tube, Per Sheet) — can't verify in name
         var nm = (zohoName||'').toUpperCase();
         // Direct compact match: "10L", "20L"
         if (nm.indexOf(sz) !== -1) return true;
