@@ -23,7 +23,7 @@ function groupRowsForPdf(rows, brandLabel) {
         const c = a.category.localeCompare(b.category, 'en');
         if (c !== 0) return c;
         const n = a.productName.localeCompare(b.productName, 'en');
-        return n !== 0 ? n : a.packSize.localeCompare(b.packSize, 'en');
+        return n !== 0 ? n : a.packSize.localeCompare(b.packSize, 'en', { numeric: true });
     });
     return { brandLabel, items };
 }
