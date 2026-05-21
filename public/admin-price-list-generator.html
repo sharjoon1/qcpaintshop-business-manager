@@ -3,328 +3,366 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="theme-color" content="#667eea">
-    <link rel="manifest" href="/manifest.json">
-    <link rel="icon" type="image/png" sizes="192x192" href="/icons/icon-192x192.png">
-    <title>Price List Generator - Quality Colours Manager</title>
+    <title>Price List Generator | QC Paint Shop</title>
     <link rel="stylesheet" href="/css/tailwind.css">
     <link rel="stylesheet" href="/css/design-system.css">
-    <link rel="stylesheet" href="/css/zoho-common.css">
-    <script src="/universal-nav-loader.js"></script>
     <script src="/js/auth-helper.js"></script>
-    <script>requireAdminOrRedirect();</script>
     <style>
-        body { background: #f9fafb; }
-        .spinner { animation: spin 1s linear infinite; }
-        @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
-        .toast { position: fixed; bottom: 20px; right: 20px; z-index: 9999; padding: 10px 20px;
-                 border-radius: 8px; font-size: 0.8rem; font-weight: 500; opacity: 0;
-                 transition: opacity 0.3s; pointer-events: none; }
-        .toast.show { opacity: 1; pointer-events: auto; }
-        .toast-success { background: #10b981; color: white; }
-        .toast-error   { background: #ef4444; color: white; }
+        .accordion-body { display: none; }
+        .accordion-body.open { display: block; }
+        .item-row.hidden { display: none; }
     </style>
 </head>
-<body data-page="zoho-price-list" class="bg-gray-50">
+<body class="bg-gray-50 min-h-screen">
+<div id="app" class="max-w-4xl mx-auto px-4 py-6">
 
-<div id="toast" class="toast"></div>
-
-<!-- Loading overlay -->
-<div id="loadingOverlay" class="fixed inset-0 bg-black bg-opacity-50 z-50 hidden items-center justify-center">
-    <div class="bg-white rounded-xl p-6 flex flex-col items-center gap-3 shadow-xl">
-        <svg class="spinner w-8 h-8 text-indigo-500" fill="none" viewBox="0 0 24 24">
-            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-        </svg>
-        <span class="text-sm font-medium text-gray-700">Generating price list…</span>
-        <span class="text-xs text-gray-400">This may take a few seconds for large lists</span>
+    <div class="flex items-center gap-3 mb-6">
+        <a href="/admin-dpl.html" class="text-gray-500 hover:text-gray-700 text-sm">← DPL</a>
+        <h1 class="text-2xl font-bold text-gray-900">Price List Generator</h1>
     </div>
+
+    <!-- Step 1: Config -->
+    <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-6 mb-6" id="step1">
+        <h2 class="text-base font-semibold text-gray-700 mb-4">Step 1 — Configure</h2>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Customer Name <span class="text-red-500">*</span></label>
+                <input id="customerName" type="text" maxlength="100" placeholder="e.g. Raj Constructions"
+                       class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500">
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">WhatsApp Number</label>
+                <div class="flex">
+                    <span class="inline-flex items-center px-3 border border-r-0 border-gray-300 rounded-l-lg bg-gray-50 text-gray-500 text-sm">+91</span>
+                    <input id="waNumber" type="tel" maxlength="10" placeholder="10-digit mobile"
+                           class="flex-1 border border-gray-300 rounded-r-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500">
+                </div>
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Markup % <span class="text-red-500">*</span></label>
+                <div class="flex items-center gap-3">
+                    <input id="markupPct" type="number" min="-99" max="200" value="10"
+                           class="w-28 border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
+                           oninput="updateMarkupPreview()">
+                    <span id="markupPreview" class="text-sm text-gray-500">DPL ₹500 → Final ₹649</span>
+                </div>
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Effective Date</label>
+                <input id="effectiveDate" type="date"
+                       class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500">
+            </div>
+        </div>
+
+        <div class="mt-4">
+            <label class="block text-sm font-medium text-gray-700 mb-2">Select Brands <span class="text-red-500">*</span></label>
+            <div id="brandCheckboxes" class="flex flex-wrap gap-3 text-sm text-gray-600">
+                <span class="text-gray-400 text-xs">Loading brands…</span>
+            </div>
+        </div>
+
+        <div class="mt-5">
+            <button id="loadBtn" onclick="loadItems()"
+                    class="bg-green-700 hover:bg-green-800 text-white font-medium text-sm px-5 py-2.5 rounded-lg transition-colors">
+                Load Products →
+            </button>
+            <span id="loadError" class="ml-3 text-red-500 text-sm hidden"></span>
+        </div>
+    </div>
+
+    <!-- Step 2: Product selection -->
+    <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-6 mb-6 hidden" id="step2">
+        <h2 class="text-base font-semibold text-gray-700 mb-4">Step 2 — Select Products</h2>
+
+        <div class="flex flex-col sm:flex-row gap-3 mb-4">
+            <input id="searchBox" type="text" placeholder="🔍 Search products…" oninput="filterItems(this.value)"
+                   class="flex-1 border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500">
+            <div class="flex gap-2">
+                <button onclick="selectAllItems(true)"  class="text-xs px-3 py-2 border border-gray-300 rounded-lg hover:bg-gray-50">Select All</button>
+                <button onclick="selectAllItems(false)" class="text-xs px-3 py-2 border border-gray-300 rounded-lg hover:bg-gray-50">Clear All</button>
+            </div>
+        </div>
+
+        <div id="accordion" class="space-y-2"></div>
+
+        <div class="mt-4 pt-4 border-t border-gray-100 text-sm text-gray-600" id="selectionFooter">
+            <span id="selectionCount">0 items selected</span>
+        </div>
+    </div>
+
+    <!-- Action buttons -->
+    <div class="flex gap-3 hidden" id="actionRow">
+        <button id="downloadBtn" onclick="generatePriceList('download')" disabled
+                class="flex-1 sm:flex-none bg-green-700 hover:bg-green-800 disabled:opacity-40 disabled:cursor-not-allowed text-white font-medium text-sm px-6 py-2.5 rounded-lg transition-colors">
+            ⬇ Download PDF
+        </button>
+        <button id="waBtn" onclick="generatePriceList('whatsapp')" disabled
+                class="flex-1 sm:flex-none bg-blue-600 hover:bg-blue-700 disabled:opacity-40 disabled:cursor-not-allowed text-white font-medium text-sm px-6 py-2.5 rounded-lg transition-colors">
+            📱 Send on WhatsApp
+        </button>
+    </div>
+
 </div>
 
-<div class="container mx-auto p-4 md:p-6 max-w-2xl">
-
-    <!-- Page Header -->
-    <div class="mb-5">
-        <h2 class="text-xl md:text-2xl font-bold text-gray-800">Price List Generator</h2>
-        <p class="text-xs text-gray-500 mt-1">Generate a branded PDF price list from saved brand DPL data</p>
-    </div>
-
-    <!-- Form Card -->
-    <div class="bg-white rounded-xl shadow-sm p-5 md:p-6 space-y-5">
-
-        <!-- Customer Name -->
-        <div>
-            <label class="block text-xs font-semibold text-gray-700 mb-1">
-                Customer Name <span class="text-red-500">*</span>
-            </label>
-            <input type="text" id="customerName" placeholder="e.g. Raj Constructions"
-                class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm
-                       focus:outline-none focus:ring-2 focus:ring-indigo-300 focus:border-indigo-400">
-        </div>
-
-        <!-- WhatsApp Number -->
-        <div>
-            <label class="block text-xs font-semibold text-gray-700 mb-1">
-                WhatsApp Number
-                <span class="text-gray-400 font-normal">(optional — include to send via WhatsApp)</span>
-            </label>
-            <div class="flex">
-                <span class="inline-flex items-center px-3 py-2 border border-r-0 border-gray-300
-                             rounded-l-lg bg-gray-50 text-sm text-gray-600 select-none">+91</span>
-                <input type="tel" id="waNumber" placeholder="9876543210" maxlength="10"
-                    class="flex-1 border border-gray-300 rounded-r-lg px-3 py-2 text-sm
-                           focus:outline-none focus:ring-2 focus:ring-indigo-300 focus:border-indigo-400"
-                    oninput="updateWaBtn()">
-            </div>
-        </div>
-
-        <!-- Brand Selection -->
-        <div>
-            <label class="block text-xs font-semibold text-gray-700 mb-2">
-                Select Brands <span class="text-red-500">*</span>
-            </label>
-            <div id="brandsContainer" class="flex flex-col gap-2 text-sm text-gray-500">
-                <span class="text-xs text-gray-400">Loading brands…</span>
-            </div>
-        </div>
-
-        <!-- Category Filter (shown after brands are selected) -->
-        <div id="categoriesSection" style="display:none">
-            <label class="block text-xs font-semibold text-gray-700 mb-2">Categories</label>
-            <div id="categoriesContainer" class="flex flex-wrap gap-2"></div>
-            <div class="mt-1.5 text-[10px] text-gray-400">All categories selected by default. Uncheck to exclude.</div>
-        </div>
-
-        <!-- Markup % -->
-        <div>
-            <label class="block text-xs font-semibold text-gray-700 mb-1">
-                Markup % <span class="text-red-500">*</span>
-            </label>
-            <div class="flex items-center gap-3">
-                <input type="number" id="markupPct" value="10" min="0" max="200" step="0.5"
-                    class="w-24 border border-gray-300 rounded-lg px-3 py-2 text-sm
-                           focus:outline-none focus:ring-2 focus:ring-indigo-300"
-                    oninput="updateMarkupPreview()">
-                <span class="text-xs text-gray-500">%</span>
-                <span id="markupPreview" class="text-xs text-emerald-600 font-medium">
-                    DPL ₹500 → Final ₹649
-                </span>
-            </div>
-        </div>
-
-        <!-- Effective Date -->
-        <div>
-            <label class="block text-xs font-semibold text-gray-700 mb-1">Effective Date</label>
-            <input type="date" id="effectiveDate"
-                class="border border-gray-300 rounded-lg px-3 py-2 text-sm
-                       focus:outline-none focus:ring-2 focus:ring-indigo-300">
-        </div>
-
-        <!-- Action Buttons -->
-        <div class="flex flex-col sm:flex-row gap-2 pt-1">
-            <button onclick="generatePriceList('download')"
-                class="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 bg-indigo-600
-                       hover:bg-indigo-700 active:bg-indigo-800 text-white text-sm font-semibold
-                       rounded-lg transition">
-                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                        d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0
-                           01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
-                </svg>
-                Download PDF
-            </button>
-            <button id="waSendBtn" onclick="generatePriceList('whatsapp')" disabled
-                class="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 bg-emerald-600
-                       hover:bg-emerald-700 active:bg-emerald-800 disabled:bg-gray-300
-                       disabled:cursor-not-allowed text-white text-sm font-semibold rounded-lg transition">
-                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                        d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0
-                           01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8
-                           9-8s9 3.582 9 8z"/>
-                </svg>
-                Send on WhatsApp
-            </button>
-        </div>
-
-    </div><!-- /Form Card -->
-
-</div><!-- /container -->
-
 <script>
-    var brandsData = [];
+var allItems    = [];
+var selectedIds = new Set();
 
-    function esc(s) {
-        return String(s == null ? '' : s)
-            .replace(/&/g, '&amp;')
-            .replace(/</g, '&lt;')
-            .replace(/>/g, '&gt;')
-            .replace(/"/g, '&quot;')
-            .replace(/'/g, '&#39;');
-    }
+function esc(s) {
+    return String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
 
-    function getToken() {
-        return localStorage.getItem('auth_token') || '';
-    }
+function itemId(item) {
+    return item.brand + '|' + item.product + '|' + item.colourName + '|' + item.packSize;
+}
 
-    function showToast(msg, type) {
-        var t = document.getElementById('toast');
-        t.textContent = msg;
-        t.className = 'toast show toast-' + (type || 'success');
-        setTimeout(function() { t.className = 'toast'; }, 3500);
-    }
+function updateMarkupPreview() {
+    const m = parseFloat(document.getElementById('markupPct').value);
+    if (!isFinite(m)) { document.getElementById('markupPreview').textContent = ''; return; }
+    const final = Math.ceil(500 * (1 + m / 100) * 1.18);
+    document.getElementById('markupPreview').textContent = 'DPL ₹500 → Final ₹' + final.toLocaleString('en-IN');
+}
 
-    function setLoading(on) {
-        var ov = document.getElementById('loadingOverlay');
-        ov.classList.toggle('hidden', !on);
-        ov.classList.toggle('flex', on);
-    }
-
-    function updateWaBtn() {
-        var val = document.getElementById('waNumber').value.replace(/\D/g, '');
-        document.getElementById('waSendBtn').disabled = (val.length !== 10);
-    }
-
-    function updateMarkupPreview() {
-        var pct = parseFloat(document.getElementById('markupPct').value) || 0;
-        var finalPrice = Math.ceil(500 * (1 + pct / 100) * 1.18);
-        document.getElementById('markupPreview').textContent =
-            'DPL ₹500 → Final ₹' + finalPrice.toLocaleString('en-IN');
-    }
-
-    function refreshCategories() {
-        var checked = Array.from(document.querySelectorAll('.brand-cb:checked')).map(function(cb) { return cb.value; });
-        var cats = new Set();
-        brandsData.filter(function(b) { return checked.indexOf(b.brand) !== -1; })
-                  .forEach(function(b) { (b.categories || []).forEach(function(c) { cats.add(c); }); });
-
-        var section = document.getElementById('categoriesSection');
-        var container = document.getElementById('categoriesContainer');
-
-        if (cats.size === 0) { section.style.display = 'none'; return; }
-        section.style.display = '';
-
-        var sorted = Array.from(cats).sort();
-        container.innerHTML = sorted.map(function(c) {
-            return '<label class="flex items-center gap-1.5 cursor-pointer bg-gray-50 border border-gray-200 rounded-lg px-2.5 py-1.5 hover:bg-indigo-50 hover:border-indigo-300 transition">'
-                + '<input type="checkbox" class="cat-cb accent-indigo-600" value="' + esc(c) + '" checked>'
-                + '<span class="text-xs text-gray-700">' + esc(c) + '</span>'
-                + '</label>';
-        }).join('');
-    }
-
-    async function loadBrands() {
-        try {
-            var resp = await fetch('/api/price-list/brands', {
-                headers: { 'Authorization': 'Bearer ' + getToken() }
-            });
-            var body = await resp.json();
-            if (!body.success) throw new Error(body.message || 'Failed to load brands');
-            brandsData = body.data || [];
-
-            var container = document.getElementById('brandsContainer');
-            if (!brandsData.length) {
-                container.innerHTML = '<p class="text-xs text-gray-500 bg-amber-50 border border-amber-200 rounded-lg p-3">'
-                    + 'No brands with saved DPL data found. '
-                    + '<a href="/admin-dpl.html" class="text-amber-700 underline">Upload DPL data first</a>.'
-                    + '</p>';
-                return;
-            }
-
-            container.innerHTML = brandsData.map(function(b) {
-                var updated = b.effective_date ? 'Updated ' + b.effective_date : 'No date';
-                return '<label class="flex items-center gap-3 cursor-pointer p-3 border border-gray-200 rounded-lg hover:bg-gray-50 hover:border-indigo-200 transition">'
-                    + '<input type="checkbox" class="brand-cb accent-indigo-600 w-4 h-4 shrink-0" value="' + esc(b.brand) + '" onchange="refreshCategories()">'
-                    + '<div>'
-                    + '<div class="text-sm font-semibold text-gray-800">' + esc(b.label) + '</div>'
-                    + '<div class="text-[10px] text-gray-400">' + esc(b.item_count) + ' items · ' + esc(updated) + '</div>'
-                    + '</div>'
-                    + '</label>';
-        }).join('');
-
-        } catch (e) {
-            document.getElementById('brandsContainer').innerHTML =
-                '<p class="text-xs text-red-500">Failed to load brands: ' + esc(e.message) + '</p>';
+async function loadBrands() {
+    try {
+        const r = await fetch('/api/price-list/brands', { headers: authHeaders() });
+        const d = await r.json();
+        const container = document.getElementById('brandCheckboxes');
+        if (!d.success || !d.data.length) {
+            container.innerHTML = '<span class="text-red-500 text-xs">No DPL data found. Please upload DPL files first.</span>';
+            return;
         }
+        container.innerHTML = d.data.map(b =>
+            '<label class="flex items-center gap-2 cursor-pointer">' +
+            '<input type="checkbox" value="' + esc(b.brand) + '" class="brand-cb rounded" checked>' +
+            '<span>' + esc(b.label) + '</span>' +
+            '<span class="text-gray-400 text-xs">(' + b.item_count + ')</span>' +
+            '</label>'
+        ).join('');
+    } catch (e) {
+        document.getElementById('brandCheckboxes').innerHTML = '<span class="text-red-500 text-xs">Failed to load brands.</span>';
+    }
+}
+
+async function loadItems() {
+    const errEl = document.getElementById('loadError');
+    errEl.classList.add('hidden');
+
+    const name = document.getElementById('customerName').value.trim();
+    if (!name) { errEl.textContent = 'Customer name is required.'; errEl.classList.remove('hidden'); return; }
+
+    const brands = Array.from(document.querySelectorAll('.brand-cb:checked')).map(function(c) { return c.value; });
+    if (!brands.length) { errEl.textContent = 'Select at least one brand.'; errEl.classList.remove('hidden'); return; }
+
+    const markup = parseFloat(document.getElementById('markupPct').value);
+    if (!isFinite(markup) || markup < -99 || markup > 200) {
+        errEl.textContent = 'Markup must be between -99 and 200.'; errEl.classList.remove('hidden'); return;
     }
 
-    async function generatePriceList(mode) {
-        var customerName = document.getElementById('customerName').value.trim();
-        if (!customerName) { showToast('Customer name is required', 'error'); return; }
+    document.getElementById('loadBtn').disabled = true;
+    document.getElementById('loadBtn').textContent = 'Loading…';
 
-        var selectedBrands = Array.from(document.querySelectorAll('.brand-cb:checked')).map(function(cb) { return cb.value; });
-        if (!selectedBrands.length) { showToast('Select at least one brand', 'error'); return; }
+    try {
+        const r = await fetch('/api/price-list/items?brands=' + encodeURIComponent(brands.join(',')), { headers: authHeaders() });
+        const d = await r.json();
+        if (!d.success) throw new Error(d.message || 'Failed');
+        allItems = d.data;
+        selectedIds = new Set(allItems.map(itemId));
+        renderAccordion(allItems);
+        document.getElementById('step2').classList.remove('hidden');
+        document.getElementById('actionRow').classList.remove('hidden');
+        refreshSelectionCount();
+    } catch (e) {
+        errEl.textContent = e.message; errEl.classList.remove('hidden');
+    } finally {
+        document.getElementById('loadBtn').disabled = false;
+        document.getElementById('loadBtn').textContent = 'Load Products →';
+    }
+}
 
-        var markupPct = parseFloat(document.getElementById('markupPct').value);
-        if (isNaN(markupPct) || markupPct < 0 || markupPct > 200) {
-            showToast('Markup % must be between 0 and 200', 'error'); return;
+function renderAccordion(items) {
+    var catMap = new Map();
+    items.forEach(function(item, idx) {
+        var key = item.brand + '||' + item.category;
+        if (!catMap.has(key)) catMap.set(key, { brandLabel: item.brandLabel, category: item.category, indices: [] });
+        catMap.get(key).indices.push(idx);
+    });
+
+    var html = '';
+    catMap.forEach(function(val, key) {
+        var catLabel = esc(val.brandLabel) + ' — ' + esc(val.category);
+        var safeKey  = esc(key);
+        html += '<div class="border border-gray-200 rounded-lg overflow-hidden">' +
+            '<div class="flex items-center justify-between bg-gray-50 px-4 py-3 cursor-pointer select-none" onclick="toggleAccordion(\'' + safeKey + '\')">' +
+            '<div class="flex items-center gap-2">' +
+            '<span class="text-sm font-medium text-gray-800">' + catLabel + '</span>' +
+            '<span class="text-xs text-gray-400 cat-count" data-cat="' + safeKey + '">(' + val.indices.length + ' / ' + val.indices.length + ')</span>' +
+            '</div>' +
+            '<div class="flex items-center gap-2">' +
+            '<button class="text-xs px-2 py-1 bg-white border border-gray-300 rounded hover:bg-gray-50" onclick="event.stopPropagation(); toggleCategory(\'' + safeKey + '\', true)">All</button>' +
+            '<button class="text-xs px-2 py-1 bg-white border border-gray-300 rounded hover:bg-gray-50" onclick="event.stopPropagation(); toggleCategory(\'' + safeKey + '\', false)">None</button>' +
+            '<span class="text-gray-400 text-xs accordion-chevron" data-cat="' + safeKey + '">▼</span>' +
+            '</div></div>' +
+            '<div class="accordion-body open" data-cat="' + safeKey + '">' +
+            '<div class="divide-y divide-gray-100">';
+
+        val.indices.forEach(function(idx) {
+            var item = items[idx];
+            var id   = itemId(item);
+            var chk  = selectedIds.has(id) ? ' checked' : '';
+            html += '<label class="item-row flex items-center gap-3 px-4 py-2 hover:bg-gray-50 cursor-pointer" data-idx="' + idx + '" data-cat="' + safeKey + '">' +
+                '<input type="checkbox" class="item-cb rounded" data-idx="' + idx + '"' + chk + ' onchange="onItemCheck(this)">' +
+                '<span class="flex-1 text-sm text-gray-700">' + esc(item.product) + '</span>' +
+                '<span class="text-xs text-gray-500 w-24 text-right">' + esc(item.colourName || '—') + '</span>' +
+                '<span class="text-xs text-gray-500 w-12 text-right">' + esc(item.packSize) + '</span>' +
+                '<span class="text-xs text-gray-400 w-20 text-right">DPL ₹' + Number(item.dpl).toLocaleString('en-IN') + '</span>' +
+                '</label>';
+        });
+
+        html += '</div></div></div>';
+    });
+    document.getElementById('accordion').innerHTML = html;
+}
+
+function toggleAccordion(cat) {
+    var body    = document.querySelector('.accordion-body[data-cat="' + CSS.escape(cat) + '"]');
+    var chevron = document.querySelector('.accordion-chevron[data-cat="' + CSS.escape(cat) + '"]');
+    if (!body) return;
+    body.classList.toggle('open');
+    if (chevron) chevron.textContent = body.classList.contains('open') ? '▼' : '▶';
+}
+
+function toggleCategory(cat, checked) {
+    document.querySelectorAll('.item-cb').forEach(function(cb) {
+        var row = cb.closest('.item-row');
+        if (row && row.dataset.cat === cat) {
+            cb.checked = checked;
+            var item = allItems[parseInt(cb.dataset.idx, 10)];
+            if (item) { if (checked) selectedIds.add(itemId(item)); else selectedIds.delete(itemId(item)); }
+        }
+    });
+    updateCatCount(cat);
+    refreshSelectionCount();
+}
+
+function selectAllItems(checked) {
+    document.querySelectorAll('.item-cb').forEach(function(cb) {
+        if (!cb.closest('.item-row').classList.contains('hidden')) {
+            cb.checked = checked;
+            var item = allItems[parseInt(cb.dataset.idx, 10)];
+            if (item) { if (checked) selectedIds.add(itemId(item)); else selectedIds.delete(itemId(item)); }
+        }
+    });
+    document.querySelectorAll('.accordion-body[data-cat]').forEach(function(b) { updateCatCount(b.dataset.cat); });
+    refreshSelectionCount();
+}
+
+function onItemCheck(cb) {
+    var item = allItems[parseInt(cb.dataset.idx, 10)];
+    if (!item) return;
+    if (cb.checked) selectedIds.add(itemId(item)); else selectedIds.delete(itemId(item));
+    var row = cb.closest('.item-row');
+    if (row) updateCatCount(row.dataset.cat);
+    refreshSelectionCount();
+}
+
+function updateCatCount(cat) {
+    var rows    = document.querySelectorAll('.item-row[data-cat="' + CSS.escape(cat) + '"]');
+    var checked = Array.from(rows).filter(function(r) { return r.querySelector('.item-cb') && r.querySelector('.item-cb').checked && !r.classList.contains('hidden'); }).length;
+    var total   = Array.from(rows).filter(function(r) { return !r.classList.contains('hidden'); }).length;
+    var el      = document.querySelector('.cat-count[data-cat="' + CSS.escape(cat) + '"]');
+    if (el) el.textContent = '(' + checked + ' / ' + total + ')';
+}
+
+function filterItems(query) {
+    var q = query.toLowerCase().trim();
+    document.querySelectorAll('.item-row').forEach(function(row) {
+        var idx  = parseInt(row.dataset.idx, 10);
+        var item = allItems[idx];
+        var match = !q || (item.product || '').toLowerCase().indexOf(q) !== -1 || (item.colourName || '').toLowerCase().indexOf(q) !== -1;
+        row.classList.toggle('hidden', !match);
+    });
+    document.querySelectorAll('.accordion-body[data-cat]').forEach(function(b) { updateCatCount(b.dataset.cat); });
+}
+
+function refreshSelectionCount() {
+    var count = selectedIds.size;
+    document.getElementById('selectionCount').textContent = count + ' item' + (count === 1 ? '' : 's') + ' selected';
+    document.getElementById('downloadBtn').disabled = count === 0;
+    updateWaBtn();
+}
+
+function updateWaBtn() {
+    var wa = document.getElementById('waNumber').value.replace(/\D/g, '');
+    document.getElementById('waBtn').disabled = !(wa.length === 10 && selectedIds.size > 0);
+}
+
+async function generatePriceList(mode) {
+    var customerName  = document.getElementById('customerName').value.trim();
+    var waNumber      = document.getElementById('waNumber').value.replace(/\D/g, '');
+    var markupPct     = parseFloat(document.getElementById('markupPct').value);
+    var effectiveDate = document.getElementById('effectiveDate').value || new Date().toISOString().slice(0, 10);
+
+    var selectedItems = allItems.filter(function(item) { return selectedIds.has(itemId(item)); })
+        .map(function(item) {
+            return { brand: item.brand, brandLabel: item.brandLabel, category: item.category,
+                     product: item.product, colourName: item.colourName, packSize: item.packSize, dpl: item.dpl };
+        });
+
+    if (!selectedItems.length) return;
+
+    var btn = mode === 'download' ? document.getElementById('downloadBtn') : document.getElementById('waBtn');
+    btn.disabled = true;
+    btn.textContent = mode === 'download' ? '⬇ Generating…' : '📱 Sending…';
+
+    try {
+        var payload = { customer_name: customerName, markup_percent: markupPct,
+                        effective_date: effectiveDate, items: selectedItems };
+        if (mode === 'whatsapp') payload.whatsapp_number = waNumber;
+
+        var r = await fetch('/api/price-list/generate', {
+            method: 'POST',
+            headers: Object.assign({ 'Content-Type': 'application/json' }, authHeaders()),
+            body: JSON.stringify(payload),
+        });
+
+        if (!r.ok) {
+            var d = await r.json().catch(function() { return {}; });
+            throw new Error(d.message || ('HTTP ' + r.status));
         }
 
-        var selectedCats = Array.from(document.querySelectorAll('.cat-cb:checked')).map(function(cb) { return cb.value; });
-        var effectiveDate = document.getElementById('effectiveDate').value;
-        var waNumber = document.getElementById('waNumber').value.replace(/\D/g, '');
-
-        var payload = {
-            customer_name: customerName,
-            brands: selectedBrands,
-            categories: selectedCats,
-            markup_percent: markupPct,
-            effective_date: effectiveDate,
-        };
-        if (mode === 'whatsapp' && waNumber.length === 10) {
-            payload.whatsapp_number = waNumber;
-        }
-
-        setLoading(true);
-        try {
-            var resp = await fetch('/api/price-list/generate', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': 'Bearer ' + getToken(),
-                },
-                body: JSON.stringify(payload),
-            });
-
-            if (!resp.ok) {
-                var ct = resp.headers.get('Content-Type') || '';
-                if (ct.includes('application/json')) {
-                    var errBody = await resp.json();
-                    throw new Error(errBody.message || 'Generation failed');
-                }
-                throw new Error('HTTP ' + resp.status);
-            }
-
-            var blob = await resp.blob();
-            var url = URL.createObjectURL(blob);
-            var a = document.createElement('a');
-            var safeName = customerName.replace(/[^a-zA-Z0-9 \-_]/g, '').replace(/ /g, '_');
-            a.href = url;
-            a.download = 'PriceList-' + safeName + '.pdf';
-            document.body.appendChild(a);
+        if (mode === 'download') {
+            var blob = await r.blob();
+            var url  = URL.createObjectURL(blob);
+            var a    = document.createElement('a');
+            a.href   = url;
+            a.download = 'PriceList-' + customerName.replace(/[^a-zA-Z0-9]/g, '_') + '-' + effectiveDate.replace(/-/g, '') + '.pdf';
             a.click();
-            document.body.removeChild(a);
             URL.revokeObjectURL(url);
-
-            var msg = mode === 'whatsapp'
-                ? 'PDF downloaded & sent to +91 ' + waNumber
-                : 'Price list downloaded';
-            showToast(msg, 'success');
-
-        } catch (e) {
-            showToast('Error: ' + e.message, 'error');
-        } finally {
-            setLoading(false);
+        } else {
+            alert('Price list sent on WhatsApp!');
         }
+    } catch (e) {
+        alert('Error: ' + e.message);
+    } finally {
+        btn.disabled = false;
+        btn.textContent = mode === 'download' ? '⬇ Download PDF' : '📱 Send on WhatsApp';
+        refreshSelectionCount();
     }
+}
 
-    // ── Init ──
-    var _d = new Date();
-    document.getElementById('effectiveDate').value =
-        _d.getFullYear() + '-' + String(_d.getMonth() + 1).padStart(2, '0') + '-' + String(_d.getDate()).padStart(2, '0');
+function authHeaders() {
+    var token = localStorage.getItem('auth_token');
+    return token ? { 'Authorization': 'Bearer ' + token } : {};
+}
+
+document.addEventListener('DOMContentLoaded', function() {
+    document.getElementById('effectiveDate').value = new Date().toISOString().slice(0, 10);
     updateMarkupPreview();
     loadBrands();
+    document.getElementById('waNumber').addEventListener('input', updateWaBtn);
+});
 </script>
-
 </body>
 </html>
