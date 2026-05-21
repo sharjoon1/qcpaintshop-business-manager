@@ -5,7 +5,7 @@ const COMPANY_NAME = 'Quality Colours';
 const COMPANY_DETAIL = 'Quality Colours, Chennai  |  +91 74188 31122';
 
 function computeFinalPrice(dpl, markupPercent) {
-    return Math.round(parseFloat(dpl) * (1 + parseFloat(markupPercent) / 100) * 1.18);
+    return Math.ceil(parseFloat(dpl) * (1 + parseFloat(markupPercent) / 100) * 1.18);
 }
 
 function groupRowsForPdf(rows, brandLabel) {

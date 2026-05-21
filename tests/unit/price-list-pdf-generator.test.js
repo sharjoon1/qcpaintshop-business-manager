@@ -9,9 +9,9 @@ describe('computeFinalPrice', () => {
         // 500 * 1.10 * 1.18 = 649.0 → ceil = 649
         expect(computeFinalPrice(500, 10)).toBe(649);
     });
-    test('DPL 1200, markup 15% → 1628', () => {
-        // 1200 * 1.15 * 1.18 = 1627.2 → ceil = 1628
-        expect(computeFinalPrice(1200, 15)).toBe(1628);
+    test('DPL 1200, markup 15% → 1629', () => {
+        // 1200 * 1.15 * 1.18 = 1628.4 → ceil = 1629
+        expect(computeFinalPrice(1200, 15)).toBe(1629);
     });
     test('DPL 250, markup 0% → 295', () => {
         // 250 * 1.00 * 1.18 = 295 → ceil = 295
@@ -22,6 +22,10 @@ describe('computeFinalPrice', () => {
     });
     test('handles zero DPL', () => {
         expect(computeFinalPrice(0, 10)).toBe(0);
+    });
+    test('rounds UP (ceil not round) — DPL 101, markup 0% → 120', () => {
+        // 101 * 1.00 * 1.18 = 119.18 → ceil = 120, round = 119
+        expect(computeFinalPrice(101, 0)).toBe(120);
     });
 });
 
