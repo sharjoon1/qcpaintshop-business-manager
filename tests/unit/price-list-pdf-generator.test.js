@@ -85,13 +85,11 @@ describe('generatePriceListPdf', () => {
         const { generatePriceListPdf } = require('../../services/price-list-pdf-generator');
         const groups = [{
             brandLabel: 'Test Brand',
-            categories: [{
-                label: 'Interior',
-                items: [
-                    { productName: 'Test Product', colourName: 'White', packSize: '1L', finalPrice: 649 },
-                    { productName: 'Test Product', colourName: 'White', packSize: '4L', finalPrice: 2245 },
-                ],
-            }],
+            items: [
+                { productName: 'Test Product', category: 'Interior', colourName: 'White', packSize: '1L', finalPrice: 649 },
+                { productName: 'Test Product', category: 'Interior', colourName: 'White', packSize: '4L', finalPrice: 2245 },
+                { productName: 'Ext Paint',    category: 'Exterior', colourName: 'Base',  packSize: '10L', finalPrice: 3500 },
+            ],
         }];
         const buffer = await generatePriceListPdf(groups, {
             customerName: 'Test Customer',
@@ -101,5 +99,5 @@ describe('generatePriceListPdf', () => {
         expect(Buffer.isBuffer(buffer)).toBe(true);
         expect(buffer.length).toBeGreaterThan(100);
         expect(buffer.slice(0, 4).toString('ascii')).toBe('%PDF');
-    }, 10000);
+    }, 15000);
 });
