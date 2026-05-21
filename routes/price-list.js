@@ -94,6 +94,8 @@ router.get('/items', perm, async (req, res) => {
             } catch (e) { continue; }
 
             for (const r of parsedRows) {
+                const dpl = parseFloat(r.dpl) || 0;
+                if (dpl <= 0) continue;
                 data.push({
                     brand,
                     brandLabel: BRAND_LABELS[brand],
@@ -101,7 +103,7 @@ router.get('/items', perm, async (req, res) => {
                     product:    r.product || '',
                     colourName: r.colourName || '',
                     packSize:   r.packSize || '',
-                    dpl:        parseFloat(r.dpl) || 0,
+                    dpl,
                 });
             }
         }
