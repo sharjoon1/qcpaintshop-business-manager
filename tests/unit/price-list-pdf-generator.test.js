@@ -80,3 +80,27 @@ describe('groupRowsForPdf', () => {
         expect(result.categories).toHaveLength(0);
     });
 });
+
+describe('generatePriceListPdf', () => {
+    test('returns a Buffer starting with PDF magic bytes', async () => {
+        const { generatePriceListPdf } = require('../../services/price-list-pdf-generator');
+        const groups = [{
+            brandLabel: 'Test Brand',
+            categories: [{
+                label: 'Interior',
+                items: [
+                    { productName: 'Test Product', colourName: 'White', packSize: '1L', finalPrice: 649 },
+                    { productName: 'Test Product', colourName: 'White', packSize: '4L', finalPrice: 2245 },
+                ],
+            }],
+        }];
+        const buffer = await generatePriceListPdf(groups, {
+            customerName: 'Test Customer',
+            markupPercent: 10,
+            effectiveDate: '2026-05-21',
+        });
+        expect(Buffer.isBuffer(buffer)).toBe(true);
+        expect(buffer.length).toBeGreaterThan(100);
+        expect(buffer.slice(0, 4).toString('ascii')).toBe('%PDF');
+    }, 10000);
+});
