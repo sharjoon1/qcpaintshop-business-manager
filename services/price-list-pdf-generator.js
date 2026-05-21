@@ -12,27 +12,20 @@ function computeFinalPrice(dpl, markupPercent) {
 }
 
 function groupRowsForPdf(rows, brandLabel) {
-    const catMap = new Map();
-    for (const row of rows) {
-        const cat = (row.category || 'Other').trim();
-        if (!catMap.has(cat)) catMap.set(cat, []);
-        catMap.get(cat).push({
-            productName: row.product || '',
-            colourName: row.colourName || '',
-            packSize: row.packSize || '',
-            finalPrice: row.finalPrice || 0,
-        });
-    }
-    const categories = [];
-    for (const [label, items] of catMap) {
-        items.sort((a, b) => {
-            const n = (a.productName || '').localeCompare(b.productName || '');
-            return n !== 0 ? n : (a.packSize || '').localeCompare(b.packSize || '');
-        });
-        categories.push({ label, items });
-    }
-    categories.sort((a, b) => a.label.localeCompare(b.label));
-    return { brandLabel, categories };
+    const items = rows.map(row => ({
+        productName: row.product || '',
+        category:    (row.category || 'Other').trim(),
+        colourName:  row.colourName || '',
+        packSize:    row.packSize || '',
+        finalPrice:  row.finalPrice || 0,
+    }));
+    items.sort((a, b) => {
+        const c = a.category.localeCompare(b.category);
+        if (c !== 0) return c;
+        const n = a.productName.localeCompare(b.productName);
+        return n !== 0 ? n : a.packSize.localeCompare(b.packSize);
+    });
+    return { brandLabel, items };
 }
 
 function formatDisplayDate(isoDate) {

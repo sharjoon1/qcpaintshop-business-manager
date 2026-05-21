@@ -41,43 +41,42 @@ describe('groupRowsForPdf', () => {
         expect(result.brandLabel).toBe('Birla Opus');
     });
 
-    test('groups rows into categories array', () => {
+    test('returns flat items array (no categories)', () => {
         const result = groupRowsForPdf(rows, 'Birla Opus');
-        expect(result.categories).toHaveLength(2);
+        expect(Array.isArray(result.items)).toBe(true);
+        expect(result.items).toHaveLength(3);
+        expect(result).not.toHaveProperty('categories');
     });
 
-    test('categories sorted alphabetically', () => {
+    test('items sorted: category asc, then productName, then packSize', () => {
         const result = groupRowsForPdf(rows, 'Birla Opus');
-        expect(result.categories[0].label).toBe('Exterior');
-        expect(result.categories[1].label).toBe('Interior');
+        expect(result.items[0].category).toBe('Exterior');
+        expect(result.items[1].category).toBe('Interior');
+        expect(result.items[2].category).toBe('Interior');
+        expect(result.items[1].packSize).toBe('1L');
+        expect(result.items[2].packSize).toBe('4L');
     });
 
-    test('items within category sorted by productName then packSize', () => {
+    test('item shape: productName, category, colourName, packSize, finalPrice', () => {
         const result = groupRowsForPdf(rows, 'Birla Opus');
-        const interior = result.categories.find(c => c.label === 'Interior');
-        expect(interior.items[0].packSize).toBe('1L');
-        expect(interior.items[1].packSize).toBe('4L');
-    });
-
-    test('item shape: productName, colourName, packSize, finalPrice', () => {
-        const result = groupRowsForPdf(rows, 'Birla Opus');
-        const item = result.categories[1].items[0]; // Interior, 1L
+        const item = result.items[1]; // Interior 1L
         expect(item).toMatchObject({
             productName: 'One Pure Elegance',
-            colourName: 'White',
-            packSize: '1L',
-            finalPrice: 649,
+            category:    'Interior',
+            colourName:  'White',
+            packSize:    '1L',
+            finalPrice:  649,
         });
     });
 
     test('rows without category default to "Other"', () => {
         const r = groupRowsForPdf([{ product: 'X', packSize: '1L', finalPrice: 100 }], 'Brand');
-        expect(r.categories[0].label).toBe('Other');
+        expect(r.items[0].category).toBe('Other');
     });
 
     test('handles empty rows array', () => {
         const result = groupRowsForPdf([], 'Brand');
-        expect(result.categories).toHaveLength(0);
+        expect(result.items).toHaveLength(0);
     });
 });
 
