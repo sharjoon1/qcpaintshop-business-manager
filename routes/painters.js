@@ -13,6 +13,7 @@ const { randomInt } = require('crypto');
 const { requirePermission, requireAuth } = require('../middleware/permissionMiddleware');
 const pointsEngine = require('../services/painter-points-engine');
 const zohoAPI = require('../services/zoho-api');
+const smsService = require('../services/sms-service');
 const { uploadProductImage, uploadOfferBanner, uploadTraining, uploadPainterAttendance, uploadProfile, uploadPainterVisualization } = require('../config/uploads');
 const sharp = require('sharp');
 const cardGenerator = require('../services/painter-card-generator');
@@ -286,25 +287,11 @@ router.post('/send-otp', otpLimiter, async (req, res) => {
 
         if (!isTestAccount) {
             // 1. SMS — always send (reliable)
-            if (process.env.SMS_USER && process.env.SMS_PASSWORD) {
-                const https = require('https');
-                const querystring = require('querystring');
-                // Must use DLT-registered template (same as customer OTP)
+            {
                 const smsText = `Your verification OTP for Quality Colours registration is ${otp}. Please enter this code at https://qcpaintshop.com/ to complete setup. - QUALITY COLOURS.`;
                 const cleanPhone = phone.replace(/\D/g, '');
-                const smsParams = querystring.stringify({
-                    user: process.env.SMS_USER,
-                    password: process.env.SMS_PASSWORD,
-                    senderid: process.env.SMS_SENDER_ID || 'QUALTQ',
-                    channel: 'Trans', DCS: '0', flashsms: '0',
-                    number: cleanPhone.startsWith('91') ? cleanPhone : '91' + cleanPhone,
-                    text: smsText, route: '4'
-                });
-                https.get(`https://retailsms.nettyfish.com/api/mt/SendSMS?${smsParams}`, (smsRes) => {
-                    let data = '';
-                    smsRes.on('data', chunk => { data += chunk; });
-                    smsRes.on('end', () => console.log(`[Painter OTP] SMS response for ${phone}:`, data));
-                }).on('error', (err) => console.error(`[Painter OTP] SMS error for ${phone}:`, err.message));
+                const number = cleanPhone.startsWith('91') ? cleanPhone : '91' + cleanPhone;
+                smsService.sendSms({ number, text: smsText, label: `Painter OTP ${phone}` });
             }
 
             // 2. WhatsApp — also try (if session available)

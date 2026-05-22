@@ -77,6 +77,7 @@ const errorHandlerMw = require('./middleware/errorHandler');
 const { globalLimiter, authLimiter, otpLimiter } = require('./middleware/rateLimiter');
 const customerAuthService = require('./services/customer-auth');
 const { requireCustomerAuth } = require('./middleware/customerAuth');
+const smsService = require('./services/sms-service');
 const systemHealthService = require('./services/system-health-service');
 const errorAnalysisService = require('./services/error-analysis-service');
 const aiEngineForErrors = require('./services/ai-engine');
@@ -1012,36 +1013,10 @@ app.post('/api/otp/send', otpLimiter, async (req, res) => {
         );
 
         // Send SMS via configured provider (DLT-registered templates)
-        if (process.env.SMS_USER && process.env.SMS_PASSWORD) {
-            const https = require('https');
-            const querystring = require('querystring');
-
+        {
             // DLT-registered template (single verified template for all OTP purposes)
             const message = `Your verification OTP for Quality Colours registration is ${otpCode}. Please enter this code at https://qcpaintshop.com/ to complete setup. - QUALITY COLOURS.`;
-
-            const params = querystring.stringify({
-                user: process.env.SMS_USER,
-                password: process.env.SMS_PASSWORD,
-                senderid: process.env.SMS_SENDER_ID || 'QUALTQ',
-                channel: 'Trans',
-                DCS: '0',
-                flashsms: '0',
-                number: '91' + mobile,
-                text: message,
-                route: '4'
-            });
-
-            const smsUrl = `https://retailsms.nettyfish.com/api/mt/SendSMS?${params}`;
-
-            https.get(smsUrl, (smsRes) => {
-                let data = '';
-                smsRes.on('data', chunk => { data += chunk; });
-                smsRes.on('end', () => {
-                    console.log('[SMS] Response:', data);
-                });
-            }).on('error', (err) => {
-                console.error('[SMS] Error:', err.message);
-            });
+            smsService.sendSms({ number: '91' + mobile, text: message, label: 'SMS' });
         }
 
         // For Staff Registration, also send OTP via email
@@ -1188,25 +1163,9 @@ app.post('/api/otp/resend', otpLimiter, async (req, res) => {
         );
 
         // Send SMS (DLT-registered templates)
-        if (process.env.SMS_USER && process.env.SMS_PASSWORD) {
-            const https = require('https');
-            const querystring = require('querystring');
-
-            // DLT-registered template (single verified template for all OTP purposes)
+        {
             const message = `Your verification OTP for Quality Colours registration is ${otpCode}. Please enter this code at https://qcpaintshop.com/ to complete setup. - QUALITY COLOURS.`;
-
-            const params = querystring.stringify({
-                user: process.env.SMS_USER,
-                password: process.env.SMS_PASSWORD,
-                senderid: process.env.SMS_SENDER_ID || 'QUALTQ',
-                channel: 'Trans', DCS: '0', flashsms: '0',
-                number: '91' + mobile, text: message, route: '4'
-            });
-            https.get(`https://retailsms.nettyfish.com/api/mt/SendSMS?${params}`, (smsRes) => {
-                let data = '';
-                smsRes.on('data', chunk => { data += chunk; });
-                smsRes.on('end', () => { console.log('[SMS] Resend response:', data); });
-            }).on('error', () => {});
+            smsService.sendSms({ number: '91' + mobile, text: message, label: 'SMS resend' });
         }
 
         // For Staff Registration, also resend OTP via email
@@ -3426,35 +3385,9 @@ app.post('/api/customer/auth/send-otp', otpLimiter, async (req, res) => {
         // Send OTP via SMS
         console.log(`[Customer OTP] Phone: ${phone}, OTP: ${otp}`);
 
-        if (process.env.SMS_USER && process.env.SMS_PASSWORD) {
-            const httpsModule = require('https');
-            const querystring = require('querystring');
-
+        {
             const message = `Your verification OTP for Quality Colours registration is ${otp}. Please enter this code at https://qcpaintshop.com/ to complete setup. - QUALITY COLOURS.`;
-
-            const params = querystring.stringify({
-                user: process.env.SMS_USER,
-                password: process.env.SMS_PASSWORD,
-                senderid: process.env.SMS_SENDER_ID || 'QUALTQ',
-                channel: 'Trans',
-                DCS: '0',
-                flashsms: '0',
-                number: '91' + phone,
-                text: message,
-                route: '4'
-            });
-
-            const smsUrl = `https://retailsms.nettyfish.com/api/mt/SendSMS?${params}`;
-
-            httpsModule.get(smsUrl, (smsRes) => {
-                let data = '';
-                smsRes.on('data', chunk => { data += chunk; });
-                smsRes.on('end', () => {
-                    console.log('[Customer SMS] Response:', data);
-                });
-            }).on('error', (err) => {
-                console.error('[Customer SMS] Error:', err.message);
-            });
+            smsService.sendSms({ number: '91' + phone, text: message, label: 'Customer SMS' });
         }
 
         res.json({ success: true, message: 'OTP sent successfully' });

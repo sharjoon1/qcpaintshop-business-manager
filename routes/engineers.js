@@ -13,6 +13,7 @@
 const express = require('express');
 const router = express.Router();
 const crypto = require('crypto');
+const smsService = require('../services/sms-service');
 const { requirePermission } = require('../middleware/permissionMiddleware');
 const { otpLimiter } = require('../middleware/rateLimiter');
 const notificationService = require('../services/notification-service');
@@ -153,20 +154,10 @@ router.post('/send-otp', otpLimiter, async (req, res) => {
 
     if (!isTestAccount) {
       // SMS (DLT-registered template; same wording as customer/painter OTP)
-      if (process.env.SMS_USER && process.env.SMS_PASSWORD) {
-        const https = require('https');
-        const querystring = require('querystring');
+      {
         const smsText = `Your verification OTP for Quality Colours registration is ${otp}. Please enter this code at https://qcpaintshop.com/ to complete setup. - QUALITY COLOURS.`;
         const number = phone.startsWith('91') ? phone : '91' + phone;
-        const smsParams = querystring.stringify({
-          user: process.env.SMS_USER, password: process.env.SMS_PASSWORD,
-          senderid: process.env.SMS_SENDER_ID || 'QUALTQ',
-          channel: 'Trans', DCS: '0', flashsms: '0',
-          number, text: smsText, route: '4'
-        });
-        https.get(`https://retailsms.nettyfish.com/api/mt/SendSMS?${smsParams}`, (r) => {
-          let d = ''; r.on('data', c => d += c); r.on('end', () => console.log(`[Engineer OTP] SMS resp ${phone}: ${d}`));
-        }).on('error', (e) => console.error('[Engineer OTP] SMS error:', e.message));
+        smsService.sendSms({ number, text: smsText, label: `Engineer OTP ${phone}` });
       }
       // WhatsApp secondary
       if (sessionManager) {
