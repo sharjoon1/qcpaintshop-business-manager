@@ -995,6 +995,13 @@ router.get('/monthly/:id/pdf', async (req, res) => {
         const salary = await getSalaryForPdf(req.params.id);
         if (!salary) return res.status(404).json({ success: false, message: 'Salary record not found' });
 
+        // Ownership/role gate: staff can download their own slip; admin/manager/accountant can download any.
+        const PRIVILEGED = new Set(['admin', 'manager', 'accountant']);
+        const isOwner = Number(user.user_id) === Number(salary.user_id);
+        if (!isOwner && !PRIVILEGED.has(user.role)) {
+            return res.status(403).json({ success: false, message: 'Forbidden' });
+        }
+
         const branding = await getBranding();
         const filename = `Salary-${salary.staff_name}-${salary.salary_month}.pdf`;
         res.setHeader('Content-Type', 'application/pdf');

@@ -579,6 +579,16 @@ router.get('/registrations/:id/offer-letter', async (req, res) => {
             return res.status(404).json({ success: false, message: 'Offer letter not found' });
         }
 
+        // Ownership/role gate: the staff member whose offer letter this is can
+        // download it; admin/manager/hr can download any.
+        const PRIVILEGED = new Set(['admin', 'manager', 'hr']);
+        const reg = regs[0];
+        const requesterUser = sessions[0];
+        const isOwner = reg.created_user_id && Number(reg.created_user_id) === Number(requesterUser.user_id);
+        if (!isOwner && !PRIVILEGED.has(requesterUser.role)) {
+            return res.status(403).json({ success: false, message: 'Forbidden' });
+        }
+
         const filePath = path.join(__dirname, '..', 'public', regs[0].offer_letter_url);
         if (!fs.existsSync(filePath)) {
             return res.status(404).json({ success: false, message: 'Offer letter file not found' });
