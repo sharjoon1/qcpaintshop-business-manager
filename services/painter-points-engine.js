@@ -155,14 +155,23 @@ async function getLedger(painterId, pointPool, limit = 50, offset = 0) {
 // ═══════════════════════════════════════════
 
 async function processInvoice(painterId, invoice, billingType, createdBy) {
-    // Check if already processed
-    const [existing] = await pool.query(
-        'SELECT id FROM painter_invoices_processed WHERE invoice_id = ?',
-        [invoice.invoice_id]
+    // Atomically claim this invoice via INSERT IGNORE against the
+    // UNIQUE (painter_id, invoice_id, attribution_type) constraint. If
+    // another worker already inserted, affectedRows is 0 and we bail
+    // out — preventing the previous read-then-insert race where two
+    // concurrent calls both passed the SELECT, both ran addPoints, and
+    // double-awarded points before the late INSERT collision.
+    const [claimResult] = await pool.query(
+        `INSERT IGNORE INTO painter_invoices_processed
+           (painter_id, invoice_id, invoice_number, invoice_date, invoice_total, billing_type, regular_points, annual_points, referral_points)
+         VALUES (?, ?, ?, ?, ?, ?, 0, 0, 0)`,
+        [painterId, invoice.invoice_id, invoice.invoice_number || null, invoice.date || null,
+         parseFloat(invoice.total) || 0, billingType]
     );
-    if (existing.length > 0) {
+    if (claimResult.affectedRows === 0) {
         return { success: false, message: 'Invoice already processed', alreadyProcessed: true };
     }
+    const claimedRowId = claimResult.insertId;
 
     // Get product point rates
     const [rates] = await pool.query('SELECT * FROM painter_product_point_rates WHERE is_active = 1');
@@ -283,12 +292,13 @@ async function processInvoice(painterId, invoice, billingType, createdBy) {
         );
     }
 
-    // Record processed invoice
+    // Update the claim row with the computed point totals. The row was
+    // INSERTed at the top of this function with zeros as a placeholder.
     await pool.query(
-        `INSERT INTO painter_invoices_processed (painter_id, invoice_id, invoice_number, invoice_date, invoice_total, billing_type, regular_points, annual_points, referral_points)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-        [painterId, invoice.invoice_id, invoice.invoice_number || null, invoice.date || null,
-         parseFloat(invoice.total) || 0, billingType, totalRegularPoints, totalAnnualPoints, totalReferralPoints]
+        `UPDATE painter_invoices_processed
+            SET regular_points = ?, annual_points = ?, referral_points = ?
+          WHERE id = ?`,
+        [totalRegularPoints, totalAnnualPoints, totalReferralPoints, claimedRowId]
     );
 
     return {
