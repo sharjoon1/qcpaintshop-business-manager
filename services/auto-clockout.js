@@ -601,15 +601,35 @@ function start() {
         registry.register('auto-clockout-force', { name: 'Force Clock-out', service: 'auto-clockout', schedule: '59 21 * * *', description: '10 PM force clock-out all staff' });
     }
 
+    // Wrap each periodic task so the interval can't re-enter on top of a
+    // still-running prior tick (e.g. when a slow DB makes the cycle exceed
+    // the 5-minute interval). Without this, the same row could be picked
+    // up twice and double-notify via FCM.
+    const guardReentry = (fn, label) => {
+        let running = false;
+        return async (...args) => {
+            if (running) {
+                console.warn(`[Auto-clockout] skip ${label}: previous tick still running`);
+                return;
+            }
+            running = true;
+            try { return await fn(...args); }
+            finally { running = false; }
+        };
+    };
+
+    const guardedOt = guardReentry(checkOvertimePrompts, 'checkOvertimePrompts');
+    const guardedGeo = guardReentry(checkGeoWarnings, 'checkGeoWarnings');
+
     // Check overtime prompts every 5 minutes
-    checkOvertimePrompts();
-    otInterval = setInterval(checkOvertimePrompts, 5 * 60 * 1000);
-    console.log('[Auto-clockout] Overtime check started (every 5 min)');
+    guardedOt();
+    otInterval = setInterval(guardedOt, 5 * 60 * 1000);
+    console.log('[Auto-clockout] Overtime check started (every 5 min, reentrancy-guarded)');
 
     // Check geo-fence warnings every 5 minutes (server-side enforcement)
-    checkGeoWarnings();
-    geoInterval = setInterval(checkGeoWarnings, 5 * 60 * 1000);
-    console.log('[Auto-clockout] Geo-fence enforcement started (every 5 min)');
+    guardedGeo();
+    geoInterval = setInterval(guardedGeo, 5 * 60 * 1000);
+    console.log('[Auto-clockout] Geo-fence enforcement started (every 5 min, reentrancy-guarded)');
 
     // Force clock-out at 10 PM IST (21:59 to run just before reports at 22:00)
     cron.schedule('59 21 * * *', async () => {
