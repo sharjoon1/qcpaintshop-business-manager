@@ -152,17 +152,21 @@ function generatePriceListPdf(brandGroups, { customerName, markupPercent, effect
                     doc.rect(MARGIN, y, PAGE_W, ROW_H).fill('#f9fafb');
                 }
                 const textY = y + Math.floor((ROW_H - 9) / 2);
+                // height: 12 forces single-line + activates ellipsis truncation
+                // (PDFKit ignores `ellipsis` unless `height` is also set, and
+                // wraps width-overflow regardless of `lineBreak: false`).
+                const CELL_H = 12;
                 doc.fontSize(9).fillColor('#374151').font('Regular');
                 let x = MARGIN + 4;
-                doc.text(item.productName,           x,     textY, { width: COL_PRODUCT  - 8, lineBreak: false, ellipsis: true }); x += COL_PRODUCT;
+                doc.text(item.productName,           x,     textY, { width: COL_PRODUCT  - 8, height: CELL_H, lineBreak: false, ellipsis: true }); x += COL_PRODUCT;
                 if (hasRange) {
-                    doc.text(item.range || '-',      x + 4, textY, { width: COL_RANGE    - 8, lineBreak: false, ellipsis: true }); x += COL_RANGE;
+                    doc.text(item.range || '-',      x + 4, textY, { width: COL_RANGE    - 8, height: CELL_H, lineBreak: false, ellipsis: true }); x += COL_RANGE;
                 }
-                doc.text(item.category,              x + 4, textY, { width: COL_CATEGORY - 8, lineBreak: false, ellipsis: true }); x += COL_CATEGORY;
-                doc.text(item.colourName || '-',     x + 4, textY, { width: COL_COLOUR   - 8, lineBreak: false, ellipsis: true }); x += COL_COLOUR;
-                doc.text(item.packSize,              x + 4, textY, { width: COL_SIZE     - 8, lineBreak: false }); x += COL_SIZE;
+                doc.text(item.category,              x + 4, textY, { width: COL_CATEGORY - 8, height: CELL_H, lineBreak: false, ellipsis: true }); x += COL_CATEGORY;
+                doc.text(item.colourName || '-',     x + 4, textY, { width: COL_COLOUR   - 8, height: CELL_H, lineBreak: false, ellipsis: true }); x += COL_COLOUR;
+                doc.text(item.packSize,              x + 4, textY, { width: COL_SIZE     - 8, height: CELL_H, lineBreak: false }); x += COL_SIZE;
                 doc.fontSize(9).fillColor('#059669').font('Bold')
-                   .text(formatINR(item.finalPrice), x,     textY, { width: COL_PRICE    - 4, align: 'right', lineBreak: false });
+                   .text(formatINR(item.finalPrice), x,     textY, { width: COL_PRICE    - 4, height: CELL_H, align: 'right', lineBreak: false });
                 doc.moveTo(MARGIN, y + ROW_H).lineTo(MARGIN + PAGE_W, y + ROW_H).strokeColor('#f1f5f9').lineWidth(0.3).stroke();
                 y += ROW_H;
             }
@@ -172,13 +176,19 @@ function generatePriceListPdf(brandGroups, { customerName, markupPercent, effect
         const totalPages = doc.bufferedPageRange().count;
         for (let i = 0; i < totalPages; i++) {
             doc.switchToPage(i);
+            // PDFKit auto-adds a page when text near page bottom would advance
+            // the cursor past page.maxY() (= page.height - margins.bottom).
+            // Shrink margins.bottom for the footer draw so it stays on this page.
+            const origBottomMargin = doc.page.margins.bottom;
+            doc.page.margins.bottom = 5;
             const fy = PAGE_H - 30;
             doc.moveTo(MARGIN, fy - 10).lineTo(MARGIN + PAGE_W, fy - 10).strokeColor('#d1d5db').lineWidth(0.5).stroke();
             doc.fontSize(7.5).fillColor('#9ca3af').font('Regular');
             doc.text('Prices inclusive of 18% GST  |  Valid as of ' + displayDate,
-                     MARGIN, fy - 4, { width: 320, lineBreak: false });
+                     MARGIN, fy - 4, { width: 320, height: 12, lineBreak: false });
             doc.text('Page ' + (i + 1) + ' of ' + totalPages,
-                     MARGIN, fy - 4, { width: PAGE_W, align: 'right', lineBreak: false });
+                     MARGIN, fy - 4, { width: PAGE_W, height: 12, align: 'right', lineBreak: false });
+            doc.page.margins.bottom = origBottomMargin;
         }
 
         doc.flushPages();
