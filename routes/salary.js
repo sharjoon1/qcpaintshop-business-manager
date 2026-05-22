@@ -1036,32 +1036,33 @@ router.post('/monthly/:id/send-whatsapp', requireAuth, requirePermission('salary
 
         // Generate PDF to temp file
         const tmpFile = path.join(os.tmpdir(), `salary-${salary.id}-${Date.now()}.pdf`);
-        const writeStream = fs.createWriteStream(tmpFile);
+        try {
+            const writeStream = fs.createWriteStream(tmpFile);
 
-        await new Promise((resolve, reject) => {
-            writeStream.on('finish', resolve);
-            writeStream.on('error', reject);
-            generateSalarySlipPDF({ salary, branding }, writeStream);
-        });
+            await new Promise((resolve, reject) => {
+                writeStream.on('finish', resolve);
+                writeStream.on('error', reject);
+                generateSalarySlipPDF({ salary, branding }, writeStream);
+            });
 
-        // Send via WhatsApp
-        const filename = `Salary-${salary.staff_name}-${salary.salary_month}.pdf`;
-        const caption = `Salary Slip - ${salary.salary_month}\nName: ${salary.staff_name}\nNet Salary: ₹${parseFloat(salary.net_salary || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}`;
+            // Send via WhatsApp
+            const filename = `Salary-${salary.staff_name}-${salary.salary_month}.pdf`;
+            const caption = `Salary Slip - ${salary.salary_month}\nName: ${salary.staff_name}\nNet Salary: ₹${parseFloat(salary.net_salary || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}`;
 
-        const result = await sessionManager.sendMedia(
-            salary.branch_id || 0,
-            salary.staff_phone,
-            { type: 'document', mediaPath: tmpFile, filename, caption },
-            { source: 'salary_slip', sent_by: req.user.id }
-        );
+            const result = await sessionManager.sendMedia(
+                salary.branch_id || 0,
+                salary.staff_phone,
+                { type: 'document', mediaPath: tmpFile, filename, caption },
+                { source: 'salary_slip', sent_by: req.user.id }
+            );
 
-        // Clean up temp file
-        fs.unlink(tmpFile, () => {});
-
-        if (result) {
-            res.json({ success: true, message: 'Salary slip sent via WhatsApp' });
-        } else {
-            res.status(400).json({ success: false, message: 'WhatsApp session not connected' });
+            if (result) {
+                res.json({ success: true, message: 'Salary slip sent via WhatsApp' });
+            } else {
+                res.status(400).json({ success: false, message: 'WhatsApp session not connected' });
+            }
+        } finally {
+            fs.unlink(tmpFile, () => {});
         }
     } catch (error) {
         console.error('WhatsApp salary send error:', error);
@@ -1100,26 +1101,28 @@ router.post('/bulk/send-whatsapp', requireAuth, requirePermission('salary', 'man
 
                 // Generate PDF to temp file
                 const tmpFile = path.join(os.tmpdir(), `salary-${salary.id}-${Date.now()}.pdf`);
-                const writeStream = fs.createWriteStream(tmpFile);
-                await new Promise((resolve, reject) => {
-                    writeStream.on('finish', resolve);
-                    writeStream.on('error', reject);
-                    generateSalarySlipPDF({ salary, branding }, writeStream);
-                });
+                try {
+                    const writeStream = fs.createWriteStream(tmpFile);
+                    await new Promise((resolve, reject) => {
+                        writeStream.on('finish', resolve);
+                        writeStream.on('error', reject);
+                        generateSalarySlipPDF({ salary, branding }, writeStream);
+                    });
 
-                const filename = `Salary-${salary.staff_name}-${salary.salary_month}.pdf`;
-                const caption = `Salary Slip - ${salary.salary_month}\nName: ${salary.staff_name}\nNet Salary: ₹${parseFloat(salary.net_salary || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}`;
+                    const filename = `Salary-${salary.staff_name}-${salary.salary_month}.pdf`;
+                    const caption = `Salary Slip - ${salary.salary_month}\nName: ${salary.staff_name}\nNet Salary: ₹${parseFloat(salary.net_salary || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}`;
 
-                const sent = await sessionManager.sendMedia(
-                    salary.branch_id || 0,
-                    salary.staff_phone,
-                    { type: 'document', mediaPath: tmpFile, filename, caption },
-                    { source: 'salary_slip_bulk', sent_by: req.user.id }
-                );
+                    const sent = await sessionManager.sendMedia(
+                        salary.branch_id || 0,
+                        salary.staff_phone,
+                        { type: 'document', mediaPath: tmpFile, filename, caption },
+                        { source: 'salary_slip_bulk', sent_by: req.user.id }
+                    );
 
-                fs.unlink(tmpFile, () => {});
-
-                results.push({ id: salaryId, name: salary.staff_name, success: !!sent, reason: sent ? null : 'WhatsApp session not connected' });
+                    results.push({ id: salaryId, name: salary.staff_name, success: !!sent, reason: sent ? null : 'WhatsApp session not connected' });
+                } finally {
+                    fs.unlink(tmpFile, () => {});
+                }
             } catch (err) {
                 results.push({ id: salaryId, success: false, reason: err.message });
             }
