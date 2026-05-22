@@ -5,6 +5,7 @@
  */
 
 const aiEngine = require('./ai-engine');
+const { sanitizeForPrompt } = require('./ai-prompt-utils');
 
 let pool = null;
 function setPool(p) { pool = p; }
@@ -227,21 +228,6 @@ async function scoreAllLeads() {
         );
         throw error;
     }
-}
-
-// Neutralize control characters, code-fence sequences and unicode line
-// separators in user-controlled strings before embedding them in an LLM
-// prompt. Does NOT prevent prompt injection on its own; the system prompt
-// + delimiters + output validation are the real gates. This just removes
-// the obvious tools an attacker would use to "exit" a fenced block.
-function sanitizeForPrompt(s, maxLen = 200) {
-    if (s == null) return '';
-    return String(s)
-        .replace(/[\u0000-\u001F\u007F]/g, ' ')   // C0 controls + DEL
-        .replace(/```/g, "'''")                     // neutralize code fences
-        .replace(/[\u2028\u2029]/g, ' ')           // line/paragraph separators
-        .trim()
-        .slice(0, maxLen);
 }
 
 function buildLeadPrompt(leads) {
