@@ -151,7 +151,10 @@ function registerCron({ pool, zohoApi, pntrImportService, backfillService, paint
         try { await painterZohoSyncService.retryQueue({ pool, zohoApi }); }
         catch (e) { console.error('[pntr-marketing] retry queue failed', e.message); }
     }, { timezone: 'Asia/Kolkata' });
-    cron.schedule('30 3 * * *', async () => {
+    // 03:45 IST — moved off 03:30 because data-retention-service runs its
+    // nightly purge at 03:30 and both jobs hit the DB heavily; running
+    // them in series gives the retention DELETEs a clean window.
+    cron.schedule('45 3 * * *', async () => {
         try { await backfillService.runDailyIncremental({ pool }); }
         catch (e) { console.error('[pntr-marketing] backfill daily failed', e.message); }
     }, { timezone: 'Asia/Kolkata' });
