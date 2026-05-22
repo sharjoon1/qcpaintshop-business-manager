@@ -2,6 +2,7 @@
 'use strict';
 
 const express = require('express');
+const crypto = require('crypto');
 const router = express.Router();
 const multer = require('multer');
 const sharp = require('sharp');
@@ -63,7 +64,7 @@ router.post('/upload-image', requirePermission('painters', 'manage'), upload.sin
     try {
         if (!req.file) return res.status(400).json({ success: false, message: 'No file uploaded' });
 
-        const filename = `notif_${Date.now()}_${Math.round(Math.random() * 1e9)}.jpg`;
+        const filename = `notif_${Date.now()}_${crypto.randomBytes(8).toString('hex')}.jpg`;
         const outPath = path.join(UPLOAD_DIR, filename);
 
         await sharp(req.file.buffer)

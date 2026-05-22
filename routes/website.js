@@ -4,6 +4,7 @@
  */
 
 const express = require('express');
+const crypto = require('crypto');
 const router = express.Router();
 const multer = require('multer');
 const sharp = require('sharp');
@@ -18,7 +19,7 @@ function setPool(dbPool) { pool = dbPool; }
 const websiteStorage = multer.diskStorage({
     destination: (req, file, cb) => cb(null, 'public/uploads/website/'),
     filename: (req, file, cb) => {
-        const uniqueName = Date.now() + '-' + Math.round(Math.random() * 1E9);
+        const uniqueName = Date.now() + '-' + crypto.randomBytes(8).toString('hex');
         cb(null, 'web-' + uniqueName + path.extname(file.originalname));
     }
 });
@@ -329,7 +330,7 @@ router.post('/upload', requirePermission('settings', 'manage'), uploadWebsite.si
 
         // Compress with sharp
         const inputPath = req.file.path;
-        const outputFilename = 'web-' + Date.now() + '-' + Math.round(Math.random() * 1E9) + '.jpg';
+        const outputFilename = 'web-' + Date.now() + '-' + crypto.randomBytes(8).toString('hex') + '.jpg';
         const outputPath = path.join('public/uploads/website/', outputFilename);
 
         await sharp(inputPath)

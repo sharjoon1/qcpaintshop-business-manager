@@ -4,6 +4,7 @@
  */
 
 const express = require('express');
+const crypto = require('crypto');
 const router = express.Router();
 const bcrypt = require('bcrypt');
 const multer = require('multer');
@@ -25,7 +26,7 @@ function setPool(dbPool) {
 const aadharStorage = multer.diskStorage({
     destination: (req, file, cb) => cb(null, 'public/uploads/aadhar/'),
     filename: (req, file, cb) => {
-        const uniqueName = Date.now() + '-' + Math.round(Math.random() * 1E9);
+        const uniqueName = Date.now() + '-' + crypto.randomBytes(8).toString('hex');
         cb(null, 'aadhar-' + uniqueName + path.extname(file.originalname));
     }
 });

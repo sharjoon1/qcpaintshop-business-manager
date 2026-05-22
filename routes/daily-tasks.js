@@ -5,6 +5,7 @@
  */
 
 const express = require('express');
+const crypto = require('crypto');
 const router = express.Router();
 const multer = require('multer');
 const path = require('path');
@@ -28,7 +29,7 @@ const storage = multer.diskStorage({
         cb(null, dir);
     },
     filename: (req, file, cb) => {
-        const uniqueName = `${req.user.id}_${Date.now()}_${Math.round(Math.random() * 1E9)}`;
+        const uniqueName = `${req.user.id}_${Date.now()}_${crypto.randomBytes(8).toString('hex')}`;
         cb(null, uniqueName + path.extname(file.originalname));
     }
 });
