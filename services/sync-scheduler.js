@@ -22,6 +22,7 @@ const invoiceLineSync = require('./zoho-invoice-line-sync');
 const reorderCompute = require('./reorder-compute-service');
 const reorderReport = require('./reorder-report-service');
 
+const { isClusterPrimary } = require('./cluster-guard');
 let pool;
 let syncJob = null;           // Interval-based sync cron task
 let dailyReportJob = null;    // Daily report generation cron task
@@ -425,6 +426,11 @@ function intervalToCron(minutes) {
  * Start the scheduler
  */
 async function start() {
+
+    if (!isClusterPrimary()) {
+        console.log('[sync-scheduler] skipping cron registration — not PM2 cluster primary');
+        return;
+    }
     if (isRunning) {
         console.log('[Scheduler] Already running, call restart() to update');
         return;

@@ -20,6 +20,7 @@ const cron = require('node-cron');
 const https = require('https');
 const http = require('http');
 
+const { isClusterPrimary } = require('./cluster-guard');
 let pool;
 let sessionManager; // whatsapp-session-manager instance (optional)
 let processorJob = null;
@@ -431,6 +432,11 @@ async function queueOverdueReminders() {
  * Start the WhatsApp processor
  */
 function start() {
+
+    if (!isClusterPrimary()) {
+        console.log('[WhatsApp] skipping cron registration — not PM2 cluster primary');
+        return;
+    }
     if (isRunning) return;
 
     // Register automation

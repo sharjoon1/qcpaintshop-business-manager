@@ -13,6 +13,7 @@ const aiMarketing = require('./ai-marketing');
 const contextBuilder = require('./ai-context-builder');
 const staffTaskGenerator = require('./staff-task-generator');
 
+const { isClusterPrimary } = require('./cluster-guard');
 let pool = null;
 let sessionManager = null;
 let io = null;
@@ -231,6 +232,11 @@ async function runDailySnapshot() {
 // ─── Start / Stop ──────────────────────────────────────────────
 
 function start() {
+
+    if (!isClusterPrimary()) {
+        console.log('[ai-scheduler] skipping cron registration — not PM2 cluster primary');
+        return;
+    }
     // Register automations
     if (registry) {
         registry.register('ai-zoho-daily', { name: 'AI Zoho Daily', service: 'ai-scheduler', schedule: '9:00 PM IST', description: 'Daily Zoho business analysis' });

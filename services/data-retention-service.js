@@ -14,6 +14,7 @@
 
 const cron = require('node-cron');
 
+const { isClusterPrimary } = require('./cluster-guard');
 let pool = null;
 let registry = null;
 let job = null;
@@ -71,6 +72,11 @@ async function runRetentionPurge() {
 }
 
 function start() {
+
+    if (!isClusterPrimary()) {
+        console.log('[data-retention] skipping cron registration — not PM2 cluster primary');
+        return;
+    }
     if (registry) {
         registry.register('data-retention-purge', {
             name: 'Data Retention Purge',

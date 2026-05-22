@@ -19,6 +19,7 @@ const painterBackfillService = require('./painter-points-backfill-service');
 const attendanceService = require('./painter-attendance-service');
 const zohoApi = require('./zoho-api');
 
+const { isClusterPrimary } = require('./cluster-guard');
 let pool = null;
 let registry = null;
 const jobs = {};
@@ -282,6 +283,11 @@ async function runForfeitAndPurge() {
 // ─── Scheduler Start/Stop ────────────────────────────────────
 
 function start() {
+
+    if (!isClusterPrimary()) {
+        console.log('[painter-scheduler] skipping cron registration — not PM2 cluster primary');
+        return;
+    }
     // Register automations
     if (registry) {
         registry.register('painter-monthly-slabs', { name: 'Monthly Slab Eval', service: 'painter-scheduler', schedule: '0 6 1 * *', description: 'Monthly painter value slab evaluation' });

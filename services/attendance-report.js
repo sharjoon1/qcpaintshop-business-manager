@@ -11,6 +11,7 @@ const fs = require('fs');
 const path = require('path');
 const notificationService = require('./notification-service');
 
+const { isClusterPrimary } = require('./cluster-guard');
 let pool;
 let io;
 let whatsappSessionManager;
@@ -1137,6 +1138,11 @@ async function sendLeadAlerts(date) {
  * Start the cron jobs
  */
 function start() {
+
+    if (!isClusterPrimary()) {
+        console.log('[attendance-report] skipping cron registration — not PM2 cluster primary');
+        return;
+    }
     if (registry) {
         registry.register('attendance-daily-report', { name: 'Attendance Reports', service: 'attendance-report', schedule: '5 22 * * *', description: 'Daily attendance reports to staff + admin PDF at 10:05 PM' });
         registry.register('activity-daily-report', { name: 'Activity Reports', service: 'attendance-report', schedule: '5 22 * * *', description: 'Daily activity report to admin at 10:05 PM' });

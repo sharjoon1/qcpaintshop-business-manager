@@ -7,6 +7,7 @@
 const cron = require('node-cron');
 const notificationService = require('./notification-service');
 
+const { isClusterPrimary } = require('./cluster-guard');
 let pool = null;
 let registry = null;
 let io = null;
@@ -165,6 +166,11 @@ async function runAutoAssign() {
 // ─── Scheduler Start/Stop ────────────────────────────────────
 
 function start() {
+
+    if (!isClusterPrimary()) {
+        console.log('[lead-auto-assign] skipping cron registration — not PM2 cluster primary');
+        return;
+    }
     if (registry) {
         registry.register('lead-auto-assign', {
             name: 'Lead Auto-Assign',

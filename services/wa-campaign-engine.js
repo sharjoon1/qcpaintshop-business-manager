@@ -17,6 +17,8 @@
  *   wa_campaign_started, wa_campaign_failed
  */
 
+const { isClusterPrimary } = require('./cluster-guard');
+
 let pool;
 let io;
 let sessionManager;
@@ -192,6 +194,10 @@ function resolveMessage(template, lead) {
 // ========================================
 
 async function start() {
+    if (!isClusterPrimary()) {
+        console.log('[WA Campaign Engine] skipping cron registration — not PM2 cluster primary');
+        return;
+    }
     if (running) return;
     running = true;
     console.log('[WA Campaign Engine] Started');

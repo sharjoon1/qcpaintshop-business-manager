@@ -12,6 +12,7 @@
 const cron = require('node-cron');
 const notificationService = require('./notification-service');
 
+const { isClusterPrimary } = require('./cluster-guard');
 let pool;
 let io;
 let registry = null;
@@ -594,6 +595,11 @@ let geoInterval = null;
  * Start the overtime and auto clock-out schedulers
  */
 function start() {
+
+    if (!isClusterPrimary()) {
+        console.log('[Auto-clockout] skipping cron registration — not PM2 cluster primary');
+        return;
+    }
     // Register automations
     if (registry) {
         registry.register('auto-clockout-ot-check', { name: 'OT Prompt Check', service: 'auto-clockout', schedule: 'Every 5 min', description: 'Check for overtime prompts' });

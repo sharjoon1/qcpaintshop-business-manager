@@ -5,6 +5,7 @@
 
 const os = require('os');
 
+const { isClusterPrimary } = require('./cluster-guard');
 let pool = null;
 let io = null;
 let whatsappSessionManager = null;
@@ -442,6 +443,11 @@ function getMetricsHistory() {
 let lagInterval = null;
 
 function start() {
+
+    if (!isClusterPrimary()) {
+        console.log('[production-monitor] skipping cron registration — not PM2 cluster primary');
+        return;
+    }
     if (monitorInterval) return;
 
     // Event loop lag timer
