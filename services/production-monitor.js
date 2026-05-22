@@ -44,6 +44,7 @@ const state = {
     healingActions: [],              // { action, timestamp, result }
     alertsSent: {},                  // { key: lastAlertTimestamp }
     consecutiveDbFailures: 0,
+    slowApiConsecutiveCycles: 0,     // Cycles in a row where p95 > slowApiThresholdMs
     lastDbPoolTestFailureAt: 0,
     lastDbPoolTestSuccessAt: 0,
     circuitBreaker: {                // Zoho API circuit breaker
@@ -356,10 +357,17 @@ async function runCheck() {
                 `Event loop lag: ${eventLoop.lagMs}ms. Server may be unresponsive.`);
         }
 
-        // Slow API responses
+        // Slow API responses — require 3 consecutive cycles above threshold
+        // (≈15 min on the default 5-min cadence) before alerting. Otherwise
+        // a single slow upload or one-off DB query trips the alarm.
         if (responseTime && responseTime.p95 > 5000) {
-            await sendAlert('slow_api', 'high', 'Slow API Responses',
-                `P95 response time: ${responseTime.p95}ms, P99: ${responseTime.p99}ms. Slow endpoints: ${(responseTime.slowest || []).map(s => s.path).join(', ')}`);
+            state.slowApiConsecutiveCycles++;
+            if (state.slowApiConsecutiveCycles >= 3) {
+                await sendAlert('slow_api', 'high', 'Slow API Responses',
+                    `Sustained slow API for ${state.slowApiConsecutiveCycles} cycles. P95: ${responseTime.p95}ms, P99: ${responseTime.p99}ms. Slow endpoints: ${(responseTime.slowest || []).map(s => s.path).join(', ')}`);
+            }
+        } else {
+            state.slowApiConsecutiveCycles = 0;
         }
 
         // Periodic stale session cleanup (every 10th check = ~10 min)
