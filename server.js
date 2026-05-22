@@ -218,8 +218,9 @@ app.use('/api', globalLimiter);
 // Response time tracking
 app.use(responseTracker.middleware);
 
-app.use(express.static('public'));
-app.use('/uploads', express.static('uploads'));
+// (Static mounts moved below — they now sit after pool/auth init so that
+// the PII-upload gate at /uploads/aadhar and /uploads/documents can use
+// the DB pool to verify the requester's session.)
 
 // Applink referral short URL: https://act.qcpaintshop.com/r/{code}
 // On Android (painter app installed + verified assetlinks), this opens the app's
@@ -236,6 +237,36 @@ app.get('/r/:code', (req, res) => {
 
 const { createPool } = require('./config/database');
 const pool = createPool();
+
+// ── PII upload gate (must sit BEFORE express.static so it intercepts) ──
+// /uploads/aadhar and /uploads/documents hold Aadhar scans and offer
+// letter PDFs. Block direct URL access; only privileged admin/manager/hr
+// roles can read these files via the static path. The dedicated API
+// routes (e.g. GET /api/staff/registrations/:id/offer-letter) handle
+// owner-can-read-their-own logic separately.
+const PII_PRIVILEGED_ROLES = new Set(['admin', 'manager', 'hr']);
+app.use(['/uploads/aadhar', '/uploads/documents'], async (req, res, next) => {
+    try {
+        const token = req.headers.authorization?.replace('Bearer ', '') || req.query.token;
+        if (!token) return res.status(401).send('Unauthorized');
+        const [sessions] = await pool.query(
+            `SELECT u.role FROM user_sessions s JOIN users u ON s.user_id = u.id
+             WHERE s.token_hash = LOWER(SHA2(?, 256)) AND s.expires_at > NOW() AND u.status = 'active'`,
+            [token]
+        );
+        if (sessions.length === 0) return res.status(401).send('Unauthorized');
+        if (!PII_PRIVILEGED_ROLES.has(sessions[0].role)) {
+            return res.status(403).send('Forbidden');
+        }
+        next();
+    } catch (err) {
+        console.error('[pii-gate]', err);
+        res.status(500).send('Server error');
+    }
+});
+
+app.use(express.static('public'));
+app.use('/uploads', express.static('uploads'));
 
 // Initialize shared pool for middleware and all route modules
 initPool(pool);
