@@ -11,7 +11,7 @@
     <link rel="apple-touch-icon" href="/icons/icon-192x192.png">
     <title>Estimate Details - Quality Colours</title>
     <script>
-    if (localStorage.getItem('customer_logged_in') !== 'true') {
+    if (!localStorage.getItem('customer_token')) {
         window.location.href = '/customer-login.html';
     }
     </script>

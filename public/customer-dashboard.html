@@ -311,7 +311,7 @@
 
         function handleAuthFailure(response) {
             if (response.status === 401) {
-                ['customer_token', 'customer_logged_in', 'customer_phone', 'customer_name', 'customer_id']
+                ['customer_token', 'customer_phone', 'customer_name', 'customer_id']
                     .forEach(k => localStorage.removeItem(k));
                 window.location.href = '/customer-login.html';
                 return true;
@@ -513,7 +513,6 @@
     function customerLogout() {
         localStorage.removeItem('customer_phone');
         localStorage.removeItem('customer_name');
-        localStorage.removeItem('customer_logged_in');
         localStorage.removeItem('customer_token');
         localStorage.removeItem('customer_id');
         window.location.href = '/customer-login.html';

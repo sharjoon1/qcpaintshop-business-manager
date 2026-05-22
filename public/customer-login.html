@@ -193,7 +193,6 @@ async function verifyOTP() {
         if (result.success) {
             localStorage.setItem('customer_phone', customerPhone);
             localStorage.setItem('customer_name', result.data.name || 'Customer');
-            localStorage.setItem('customer_logged_in', 'true');
             localStorage.setItem('customer_token', result.data.token || '');
             localStorage.setItem('customer_id', result.data.customer_id || '');
             window.location.href = 'customer-dashboard.html';
@@ -253,7 +252,7 @@ function hideError(id) {
 }
 
 // Auto-redirect if already logged in
-if (localStorage.getItem('customer_logged_in') === 'true') {
+if (localStorage.getItem('customer_token')) {
     window.location.href = 'customer-dashboard.html';
 }
 </script>
