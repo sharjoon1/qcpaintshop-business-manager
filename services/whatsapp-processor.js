@@ -135,10 +135,22 @@ async function processQueue() {
             return;
         }
 
-        // Fetch pending messages that are due
+        // Release stale claims from crashed/restarted workers — a row left
+        // in {status=pending, sending_claimed_at=X} for more than 15 minutes
+        // is treated as abandoned and made re-claimable.
+        await pool.query(`
+            UPDATE whatsapp_followups
+               SET sending_claimed_at = NULL
+             WHERE status = 'pending'
+               AND sending_claimed_at IS NOT NULL
+               AND sending_claimed_at < (NOW() - INTERVAL 15 MINUTE)
+        `);
+
+        // Fetch pending messages that are due AND not already claimed
         const [messages] = await pool.query(`
             SELECT * FROM whatsapp_followups
             WHERE status = 'pending'
+            AND sending_claimed_at IS NULL
             AND (scheduled_at IS NULL OR scheduled_at <= NOW())
             AND retry_count < ?
             ORDER BY created_at ASC
@@ -154,11 +166,19 @@ async function processQueue() {
 
         for (const msg of messages) {
             try {
-                // Mark as in-progress
-                await pool.query(
-                    `UPDATE whatsapp_followups SET status = 'pending', retry_count = retry_count WHERE id = ?`,
+                // Atomically reserve this row so a concurrent worker (or this
+                // same worker after a restart mid-send) can't double-send. If
+                // affectedRows is 0 we lost the race or the row state changed —
+                // skip it.
+                const [claim] = await pool.query(
+                    `UPDATE whatsapp_followups
+                        SET sending_claimed_at = NOW()
+                      WHERE id = ? AND status = 'pending' AND sending_claimed_at IS NULL`,
                     [msg.id]
                 );
+                if (claim.affectedRows === 0) {
+                    continue;
+                }
 
                 // Build message body (apply template if needed)
                 let body = msg.message_body;
@@ -220,9 +240,11 @@ async function processQueue() {
                     throw new Error('No available sending method (branch session disconnected and no HTTP API)');
                 }
 
-                // Mark as sent
+                // Mark as sent (clear the claim too — it's done)
                 await pool.query(
-                    `UPDATE whatsapp_followups SET status = 'sent', sent_at = NOW(), error_message = NULL WHERE id = ?`,
+                    `UPDATE whatsapp_followups
+                        SET status = 'sent', sent_at = NOW(), error_message = NULL, sending_claimed_at = NULL
+                      WHERE id = ?`,
                     [msg.id]
                 );
 
@@ -241,8 +263,11 @@ async function processQueue() {
                 const newRetry = (msg.retry_count || 0) + 1;
                 const newStatus = newRetry >= MAX_RETRIES ? 'failed' : 'pending';
 
+                // Release the claim so the row is re-fetchable on the next cycle.
                 await pool.query(
-                    `UPDATE whatsapp_followups SET status = ?, retry_count = ?, error_message = ? WHERE id = ?`,
+                    `UPDATE whatsapp_followups
+                        SET status = ?, retry_count = ?, error_message = ?, sending_claimed_at = NULL
+                      WHERE id = ?`,
                     [newStatus, newRetry, sendError.message, msg.id]
                 );
 
