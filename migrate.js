@@ -136,6 +136,24 @@ async function runMigrations(pool) {
         console.log(`Running: ${file} ...`);
 
         try {
+            // Pre-check the source BEFORE require(): self-contained scripts
+            // run side effects on require and typically call process.exit(),
+            // which would kill the runner. Refuse to load these — they need
+            // --mark-existing instead.
+            const src = fs.readFileSync(filePath, 'utf8');
+            const exportsUp = /\b(?:module\.exports\s*=|exports\.up\s*=)/.test(src);
+            const hasExit   = /\bprocess\.exit\s*\(/.test(src);
+            if (!exportsUp && hasExit) {
+                console.error(`  REFUSING to run ${file}:`);
+                console.error(`    Self-contained script (calls process.exit, no exports.up).`);
+                console.error(`    require()-ing it would run side effects AND kill this runner.`);
+                console.error(`    If already applied manually, mark it as applied:`);
+                console.error(`      node migrate.js --mark-existing\n`);
+                failed++;
+                console.error('Stopping migration runner due to convention violation.');
+                break;
+            }
+
             // Require the migration module
             const migration = require(filePath);
 
@@ -146,12 +164,11 @@ async function runMigrations(pool) {
                 // Pattern 2: module.exports = async function(pool)
                 await migration(pool);
             } else {
-                // Self-contained script that was already required (side effects ran)
-                // But these typically call process.exit(), so they won't reach here
-                // For safety, we still mark them
-                console.log(`  Warning: ${file} has no up() export. If it is a self-contained script,`);
-                console.log(`  use --mark-existing to mark it as applied without re-running.`);
-                console.log(`  Skipping.\n`);
+                // No exports at all and no process.exit either — refuse
+                // rather than silently skip; the file is malformed.
+                console.error(`  REFUSING to run ${file}:`);
+                console.error(`    No up() export and no module.exports = function.`);
+                console.error('    Either add `exports.up = async (pool) => {...}` or mark as applied.\n');
                 failed++;
                 continue;
             }
