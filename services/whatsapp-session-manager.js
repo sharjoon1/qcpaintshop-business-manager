@@ -14,6 +14,8 @@
 
 const path = require('path');
 const fs = require('fs');
+const fsp = require('fs').promises;
+const crypto = require('crypto');
 
 // whatsapp-web.js is an optional dependency — server runs without it
 let Client, LocalAuth, MessageMedia;
@@ -228,12 +230,18 @@ async function connectBranch(branchId, userId) {
                         mediaMime = media.mimetype;
                         mediaFilename = media.filename || `${Date.now()}.${getExtFromMime(media.mimetype)}`;
 
-                        // Save to uploads/whatsapp/
+                        // Save to uploads/whatsapp/. The writeFile + mkdir
+                        // were previously sync — for a multi-MB attachment
+                        // that blocked the socket event loop for tens of ms,
+                        // stalling every other in-flight session. Both calls
+                        // are now async, and the filename suffix is CSPRNG
+                        // instead of Math.random.
                         const uploadsDir = path.join(process.cwd(), 'uploads', 'whatsapp');
-                        if (!fs.existsSync(uploadsDir)) fs.mkdirSync(uploadsDir, { recursive: true });
-                        const safeName = `${Date.now()}-${Math.random().toString(36).substring(2, 8)}-${mediaFilename.replace(/[^a-zA-Z0-9._-]/g, '_')}`;
+                        await fsp.mkdir(uploadsDir, { recursive: true });
+                        const rand = crypto.randomBytes(4).toString('hex');
+                        const safeName = `${Date.now()}-${rand}-${mediaFilename.replace(/[^a-zA-Z0-9._-]/g, '_')}`;
                         const filePath = path.join(uploadsDir, safeName);
-                        fs.writeFileSync(filePath, Buffer.from(media.data, 'base64'));
+                        await fsp.writeFile(filePath, Buffer.from(media.data, 'base64'));
                         mediaUrl = `/uploads/whatsapp/${safeName}`;
                     }
                 } else if (msg.type === 'sticker') {
