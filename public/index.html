@@ -96,10 +96,16 @@
     .qc-nav-signin-menu a:hover { background: var(--qc-cream); color: var(--qc-green); }
     .qc-nav-signin-menu a .arrow { font-size: 12px; color: var(--qc-gold); }
 
+    /* Portal button (shown when already logged in) */
+    .qc-nav-portal-btn { font-family: var(--sans); font-size: 12px; font-weight: 600; letter-spacing: 1px; text-transform: uppercase; padding: 10px 16px; background: var(--qc-gold); color: var(--qc-ink); transition: background 0.2s, opacity 0.2s; white-space: nowrap; }
+    .qc-nav-portal-btn:hover { background: #c8932e; color: var(--qc-ink); }
+    .qc-nav.is-solid .qc-nav-portal-btn { background: var(--qc-gold); }
+
     @media (max-width: 860px) {
       .qc-nav-links { display: none; }
       .qc-nav-cta { display: none; }
       .qc-nav-signin-wrap { display: none; }
+      .qc-nav-portal-btn { display: none; }
       .qc-nav-mobile-btn { display: inline-flex; }
     }
 
@@ -638,6 +644,66 @@
         io2.observe(mapEl);
       } else {
         init();
+      }
+    })();
+
+    // === Session-aware nav: replace "Sign in" with portal link if already logged in ===
+    (function () {
+      // Detect active session — priority: staff > painter > customer > engineer
+      var session = null;
+
+      var authToken = localStorage.getItem('auth_token');
+      if (authToken) {
+        try {
+          var u = JSON.parse(localStorage.getItem('user') || 'null');
+          var role = (u && u.role) ? String(u.role).toLowerCase() : '';
+          var adminRoles = ['admin', 'administrator', 'super_admin', 'manager', 'branch_manager'];
+          var staffRoles = ['staff', 'salesperson', 'sales'];
+          var label, href;
+          if (adminRoles.includes(role)) {
+            label = 'Go to Dashboard'; href = '/dashboard.html';
+          } else if (staffRoles.includes(role)) {
+            label = 'Go to Staff Portal'; href = '/staff/dashboard.html';
+          } else {
+            label = 'Go to Dashboard'; href = '/dashboard.html';
+          }
+          session = { label: label, href: href, role: role || 'staff' };
+        } catch (e) {}
+      }
+
+      if (!session && localStorage.getItem('painter_token')) {
+        session = { label: 'Go to Painter App', href: '/painter-dashboard.html', role: 'painter' };
+      }
+      if (!session && localStorage.getItem('customer_token')) {
+        session = { label: 'Go to My Account', href: '/customer-dashboard.html', role: 'customer' };
+      }
+      if (!session && localStorage.getItem('engineer_token')) {
+        session = { label: 'Go to Engineer Portal', href: '/engineer-dashboard.html', role: 'engineer' };
+      }
+
+      if (!session) return; // not logged in — show default Sign in UI
+
+      // ── Desktop nav: swap sign-in wrap with a portal button ──
+      var signinWrap = document.getElementById('qcSigninWrap');
+      if (signinWrap) {
+        var portalBtn = document.createElement('a');
+        portalBtn.href = session.href;
+        portalBtn.className = 'qc-nav-portal-btn';
+        portalBtn.textContent = session.label + ' →';
+        signinWrap.parentNode.replaceChild(portalBtn, signinWrap);
+      }
+
+      // ── Mobile nav: swap the sign-in portal section with a single entry ──
+      var mobileSheet = document.getElementById('qcNavMobile');
+      if (mobileSheet) {
+        var portalLabel = mobileSheet.querySelector('.qc-nav-mobile-portal-label');
+        if (portalLabel) portalLabel.remove();
+        mobileSheet.querySelectorAll('.qc-nav-mobile-portal').forEach(function (a) { a.remove(); });
+        var mobileLink = document.createElement('a');
+        mobileLink.href = session.href;
+        mobileLink.className = 'qc-nav-mobile-portal';
+        mobileLink.textContent = session.label + ' →';
+        mobileSheet.appendChild(mobileLink);
       }
     })();
 
