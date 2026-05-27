@@ -2637,6 +2637,19 @@
         var rows = aiData.items || [];
         var cardCont = document.getElementById('aiCardContainer');
 
+        // Zoho-uncovered mode renders a different dataset (zohoItems minus matched).
+        if (aiViewMode === 'zoho-uncovered') {
+            if (cardCont) cardCont.innerHTML = '';
+            renderZohoUncoveredTable();
+            return;
+        }
+        // Zoho-all mode: all Zoho items, each showing its matched PDF row.
+        if (aiViewMode === 'zoho-all') {
+            if (cardCont) cardCont.innerHTML = '';
+            renderZohoAllTable();
+            return;
+        }
+
         if (aiIsMobileLayout()) {
             document.getElementById('aiMatchBody').innerHTML = '';
             if (cardCont) cardCont.innerHTML = renderAiCards(rows, search, catF);
@@ -2644,17 +2657,6 @@
             return;
         }
         if (cardCont) cardCont.innerHTML = '';
-
-        // Zoho-uncovered mode renders a different dataset (zohoItems minus matched).
-        if (aiViewMode === 'zoho-uncovered') {
-            renderZohoUncoveredTable();
-            return;
-        }
-        // Zoho-all mode: all Zoho items, each showing its matched PDF row.
-        if (aiViewMode === 'zoho-all') {
-            renderZohoAllTable();
-            return;
-        }
 
         var html = '';
         var visible = 0;
