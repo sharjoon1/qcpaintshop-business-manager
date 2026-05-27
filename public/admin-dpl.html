@@ -1583,6 +1583,10 @@
             document.getElementById('aiStatUnmatched').textContent = (d.totalExtracted||0) - totalM;
         }
         aiApplyLayout();
+        // Default to All Zoho Items view after matching completes
+        aiViewMode = 'zoho-all';
+        var _selVM = document.getElementById('aiViewMode');
+        if (_selVM) _selVM.value = 'zoho-all';
         renderAiTable();
 
         // Refresh the "Zoho uncovered (NN)" dropdown option label so the count is accurate.
