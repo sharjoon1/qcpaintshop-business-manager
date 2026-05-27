@@ -2154,7 +2154,7 @@
                 }
                 html += '</div>';
             } else {
-                html += '<div style="font-family:monospace;font-size:11px;color:#9ca3af;margin:0 0 7px 22px">' + esc(z.sku || '&#8212;') + '</div>';
+                html += '<div style="font-family:monospace;font-size:11px;color:#9ca3af;margin:0 0 7px 22px">' + (z.sku ? esc(z.sku) : '&#8212;') + '</div>';
             }
 
             // ── Price row (matched only) ─────────────────────────────────────────
