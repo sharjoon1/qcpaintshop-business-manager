@@ -2196,10 +2196,15 @@
             html += '<div style="margin-left:22px">';
             if (hasMatch) {
                 var isPushed = pdf._alreadyPushed;
-                // Display pane
+                // Display pane — DPL match shown prominently on card face
+                var dplMatchLabel = esc((pdf.product || '') + (pdf.packSize ? ' \xb7 ' + pdf.packSize : ''));
                 html += '<div id="zohoAllMatchDisplay-' + zid + '" style="margin-bottom:4px">'
-                      + '<div style="font-size:10px;color:#64748b;word-break:break-word;margin-bottom:4px">'
-                      + esc((pdf.product || '') + (pdf.packSize ? ' \xb7 ' + pdf.packSize : '')) + '</div>'
+                      // Prominent DPL match block
+                      + '<div style="background:#f0f9ff;border:1px solid #bae6fd;border-radius:6px;padding:7px 9px;margin-bottom:7px">'
+                      + '<div style="font-size:9px;font-weight:700;color:#0369a1;text-transform:uppercase;letter-spacing:.5px;margin-bottom:3px">&#128196; DPL Match</div>'
+                      + '<div style="font-size:12px;font-weight:600;color:#0c4a6e;word-break:break-word;line-height:1.4">' + dplMatchLabel + '</div>'
+                      + '</div>'
+                      // Action row
                       + '<div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">';
                 if (isPushed) {
                     html += '<span style="background:#d1fae5;color:#065f46;border:1px solid #6ee7b7;border-radius:3px;font-size:9px;font-weight:700;padding:1px 5px">&#10003; Pushed</span>';
