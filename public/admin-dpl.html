@@ -2212,24 +2212,21 @@
                 html += '<button onclick="zohoAllShowPicker(\'' + zid + '\',' + pdfIdx + ')"'
                       + ' style="font-size:10px;padding:3px 10px;border:1px solid #d1d5db;border-radius:4px;background:#fff;color:#374151;cursor:pointer">Change Match</button>'
                       + '</div></div>'; // end display pane
-                // Picker pane (hidden by default)
+                // Picker pane (hidden by default) — mobile uses custom tap-list instead of native <select>
                 html += '<div id="zohoAllPicker-' + zid + '" style="display:none">'
-                      + '<input type="text" placeholder="&#128269; Search..." autocomplete="off"'
-                      + ' oninput="zohoAllFilterPicker(\'' + zid + '\', this.value, true)"'
-                      + ' onkeyup="zohoAllFilterPicker(\'' + zid + '\', this.value, true)"'
-                      + ' style="width:100%;font-size:14px;padding:8px 10px;border:1px solid #d1d5db;border-radius:4px;margin-bottom:4px;box-sizing:border-box">'
-                      + '<select id="zohoAllSel-' + zid + '" onchange="zohoAllAssignPdf(\'' + zid + '\', this.value)"'
-                      + ' style="width:100%;font-size:11px;padding:5px 7px;border:1px solid #4338ca;border-radius:4px;background:#fff;color:#374151;margin-bottom:4px"></select>'
+                      + '<input type="text" id="zohoAllSearch-' + zid + '" placeholder="&#128269; Search..." autocomplete="off"'
+                      + ' oninput="zohoAllMobileListFilter(\'' + zid + '\', this.value, true)"'
+                      + ' style="width:100%;font-size:14px;padding:8px 10px;border:1px solid #d1d5db;border-radius:4px;margin-bottom:6px;box-sizing:border-box">'
+                      + '<div id="zohoAllResList-' + zid + '" style="max-height:200px;overflow-y:auto;border:1px solid #e2e8f0;border-radius:6px;background:#fff;margin-bottom:6px"></div>'
                       + '<button onclick="zohoAllHidePicker(\'' + zid + '\')"'
-                      + ' style="font-size:10px;padding:3px 10px;border:1px solid #e5e7eb;border-radius:4px;background:#f8fafc;color:#64748b;cursor:pointer">Cancel</button>'
+                      + ' style="font-size:12px;padding:6px 14px;border:1px solid #e5e7eb;border-radius:4px;background:#f8fafc;color:#64748b;cursor:pointer">Cancel</button>'
                       + '</div>'; // end picker pane
             } else {
-                html += '<input type="text" placeholder="&#128269; Search product..." onfocus="zohoAllInitPicker(\'' + zid + '\')"'
-                      + ' oninput="zohoAllFilterPicker(\'' + zid + '\', this.value, false)"'
-                      + ' style="width:100%;font-size:11px;padding:4px 7px;border:1px solid #fcd34d;border-radius:4px;margin-bottom:4px;box-sizing:border-box;background:#fffbeb">'
-                      + '<select id="zohoAllSel-' + zid + '" onchange="zohoAllAssignPdf(\'' + zid + '\', this.value)"'
-                      + ' style="width:100%;font-size:11px;padding:5px 7px;border:1px solid #f59e0b;border-radius:4px;background:#fff;color:#374151">'
-                      + '<option value="">&#8212; assign DPL row &#8212;</option></select>';
+                html += '<input type="text" id="zohoAllSearch-' + zid + '" placeholder="&#128269; Search product..." autocomplete="off"'
+                      + ' onfocus="zohoAllMobileListInit(\'' + zid + '\', false)"'
+                      + ' oninput="zohoAllMobileListFilter(\'' + zid + '\', this.value, false)"'
+                      + ' style="width:100%;font-size:14px;padding:8px 10px;border:1px solid #fcd34d;border-radius:4px;margin-bottom:6px;box-sizing:border-box;background:#fffbeb">'
+                      + '<div id="zohoAllResList-' + zid + '" style="max-height:200px;overflow-y:auto;border:1px solid #f59e0b;border-radius:6px;background:#fff;margin-bottom:4px"></div>';
             }
             html += '</div>'; // end actions
             html += '</div>'; // end card
@@ -2540,6 +2537,34 @@
         sel.innerHTML = opts;
     }
 
+    // Mobile: render all PDF rows as tappable list items inside zohoAllResList-{zid}.
+    function zohoAllMobileListInit(zid, includeAll) {
+        zohoAllMobileListFilter(zid, '', includeAll);
+    }
+
+    function zohoAllMobileListFilter(zid, query, includeAll) {
+        var listEl = document.getElementById('zohoAllResList-' + zid);
+        if (!listEl || !aiData) return;
+        var q = query.trim().toLowerCase();
+        var pdfRows = aiData.items || [];
+        var rows = '';
+        var count = 0;
+        pdfRows.forEach(function(r, idx) {
+            if (!includeAll && r._matchedZohoId) return; // unmatched picker: skip already-matched rows
+            var label = (r.product || '') + (r.packSize ? ' \xb7 ' + r.packSize : '') + (r.dpl ? '  ₹' + r.dpl : '');
+            if (q && label.toLowerCase().indexOf(q) === -1) return;
+            count++;
+            rows += '<div onclick="zohoAllAssignPdf(\'' + zid + '\',' + idx + ')"'
+                  + ' style="padding:10px 12px;border-bottom:1px solid #f1f5f9;font-size:13px;color:#1e293b;cursor:pointer;line-height:1.4;-webkit-tap-highlight-color:rgba(0,0,0,0.08)">'
+                  + esc(label) + '</div>';
+        });
+        if (!count) {
+            rows = '<div style="padding:14px;text-align:center;font-size:12px;color:#94a3b8">'
+                 + (q ? 'No items match &ldquo;' + esc(q) + '&rdquo;' : 'No items available') + '</div>';
+        }
+        listEl.innerHTML = rows;
+    }
+
     // Open the picker for an already-matched Zoho row. Loads all PDF options lazily.
     function zohoAllShowPicker(zid, currentPdfIdx) {
         var displayEl = document.getElementById('zohoAllMatchDisplay-' + zid);
@@ -2547,8 +2572,14 @@
         var selEl     = document.getElementById('zohoAllSel-' + zid);
         if (displayEl) displayEl.style.display = 'none';
         if (pickerEl)  pickerEl.style.display  = 'block';
-        // Defer heavy option injection so the picker UI is responsive immediately
-        // (on mobile, injecting 300+ <option> nodes blocks touch events).
+        if (aiIsMobileLayout()) {
+            // Mobile: use custom tap-list — clear search, then populate the list
+            var searchEl = document.getElementById('zohoAllSearch-' + zid);
+            if (searchEl) searchEl.value = '';
+            setTimeout(function() { zohoAllMobileListInit(zid, true); }, 0);
+            return;
+        }
+        // Desktop: inject options into native <select>
         setTimeout(function() {
             if (!selEl || !aiData) return;
             var pdfRows = aiData.items || [];
