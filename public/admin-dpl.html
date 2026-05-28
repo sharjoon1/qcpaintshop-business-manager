@@ -2212,21 +2212,23 @@
                 html += '<button onclick="zohoAllShowPicker(\'' + zid + '\',' + pdfIdx + ')"'
                       + ' style="font-size:10px;padding:3px 10px;border:1px solid #d1d5db;border-radius:4px;background:#fff;color:#374151;cursor:pointer">Change Match</button>'
                       + '</div></div>'; // end display pane
-                // Picker pane (hidden by default) — mobile uses custom tap-list instead of native <select>
-                html += '<div id="zohoAllPicker-' + zid + '" style="display:none">'
-                      + '<input type="text" id="zohoAllSearch-' + zid + '" placeholder="&#128269; Search..." autocomplete="off"'
+                // Picker pane — full-screen fixed overlay so keyboard never dismisses while typing
+                html += '<div id="zohoAllPicker-' + zid + '" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;z-index:9999;background:#fff;flex-direction:column">'
+                      + '<div style="padding:10px 12px;border-bottom:1px solid #e2e8f0;display:flex;align-items:center;gap:8px;flex-shrink:0;background:#fff">'
+                      + '<button onclick="zohoAllHidePicker(\'' + zid + '\')" style="padding:7px 12px;border:1px solid #e2e8f0;border-radius:6px;background:#f8fafc;font-size:13px;color:#374151;cursor:pointer;flex-shrink:0">&#8592; Back</button>'
+                      + '<input type="search" id="zohoAllSearch-' + zid + '" placeholder="&#128269; Search DPL items..." autocomplete="off" inputmode="search"'
                       + ' oninput="zohoAllMobileListFilter(\'' + zid + '\', this.value, true)"'
-                      + ' style="width:100%;font-size:14px;padding:8px 10px;border:1px solid #d1d5db;border-radius:4px;margin-bottom:6px;box-sizing:border-box">'
-                      + '<div id="zohoAllResList-' + zid + '" style="max-height:200px;overflow-y:auto;border:1px solid #e2e8f0;border-radius:6px;background:#fff;margin-bottom:6px"></div>'
-                      + '<button onclick="zohoAllHidePicker(\'' + zid + '\')"'
-                      + ' style="font-size:12px;padding:6px 14px;border:1px solid #e5e7eb;border-radius:4px;background:#f8fafc;color:#64748b;cursor:pointer">Cancel</button>'
-                      + '</div>'; // end picker pane
+                      + ' style="flex:1;font-size:15px;padding:8px 10px;border:1px solid #d1d5db;border-radius:6px;min-width:0;box-sizing:border-box">'
+                      + '</div>'
+                      + '<div id="zohoAllResList-' + zid + '" style="flex:1;overflow-y:auto"></div>'
+                      + '</div>'; // end picker overlay
             } else {
-                html += '<input type="text" id="zohoAllSearch-' + zid + '" placeholder="&#128269; Search product..." autocomplete="off"'
-                      + ' onfocus="zohoAllMobileListInit(\'' + zid + '\', false)"'
+                // Unmatched: inline search — no onfocus flood, only show results when user types
+                html += '<input type="search" id="zohoAllSearch-' + zid + '" placeholder="&#128269; Type to search DPL items..." autocomplete="off" inputmode="search"'
                       + ' oninput="zohoAllMobileListFilter(\'' + zid + '\', this.value, false)"'
                       + ' style="width:100%;font-size:14px;padding:8px 10px;border:1px solid #fcd34d;border-radius:4px;margin-bottom:6px;box-sizing:border-box;background:#fffbeb">'
-                      + '<div id="zohoAllResList-' + zid + '" style="max-height:200px;overflow-y:auto;border:1px solid #f59e0b;border-radius:6px;background:#fff;margin-bottom:4px"></div>';
+                      + '<div id="zohoAllResList-' + zid + '" style="max-height:200px;overflow-y:auto;border:1px solid #f59e0b;border-radius:6px;background:#fff;margin-bottom:4px">'
+                      + '<div style="padding:12px;text-align:center;font-size:12px;color:#94a3b8">Type above to search</div></div>';
             }
             html += '</div>'; // end actions
             html += '</div>'; // end card
@@ -2542,25 +2544,42 @@
         zohoAllMobileListFilter(zid, '', includeAll);
     }
 
+    var _zohoMobileListTimer = {};
     function zohoAllMobileListFilter(zid, query, includeAll) {
+        // Debounce 200 ms so DOM updates don't fire on every keystroke — prevents keyboard dismiss on Android
+        clearTimeout(_zohoMobileListTimer[zid]);
+        _zohoMobileListTimer[zid] = setTimeout(function() {
+            _zohoMobileListRender(zid, query, includeAll);
+        }, 200);
+    }
+
+    function _zohoMobileListRender(zid, query, includeAll) {
         var listEl = document.getElementById('zohoAllResList-' + zid);
         if (!listEl || !aiData) return;
         var q = query.trim().toLowerCase();
+        if (!q) {
+            // No query yet — show hint instead of flooding 300+ items
+            listEl.innerHTML = '<div style="padding:14px;text-align:center;font-size:12px;color:#94a3b8">Type to search…</div>';
+            return;
+        }
         var pdfRows = aiData.items || [];
         var rows = '';
         var count = 0;
+        var MAX = 50;
         pdfRows.forEach(function(r, idx) {
-            if (!includeAll && r._matchedZohoId) return; // unmatched picker: skip already-matched rows
+            if (!includeAll && r._matchedZohoId) return;
             var label = (r.product || '') + (r.packSize ? ' \xb7 ' + r.packSize : '') + (r.dpl ? '  ₹' + r.dpl : '');
-            if (q && label.toLowerCase().indexOf(q) === -1) return;
+            if (label.toLowerCase().indexOf(q) === -1) return;
             count++;
+            if (count > MAX) return; // render max 50 results
             rows += '<div onclick="zohoAllAssignPdf(\'' + zid + '\',' + idx + ')"'
-                  + ' style="padding:10px 12px;border-bottom:1px solid #f1f5f9;font-size:13px;color:#1e293b;cursor:pointer;line-height:1.4;-webkit-tap-highlight-color:rgba(0,0,0,0.08)">'
+                  + ' style="padding:12px 14px;border-bottom:1px solid #f1f5f9;font-size:14px;color:#1e293b;cursor:pointer;line-height:1.4;-webkit-tap-highlight-color:rgba(0,0,0,0.08)">'
                   + esc(label) + '</div>';
         });
-        if (!count) {
-            rows = '<div style="padding:14px;text-align:center;font-size:12px;color:#94a3b8">'
-                 + (q ? 'No items match &ldquo;' + esc(q) + '&rdquo;' : 'No items available') + '</div>';
+        if (count === 0) {
+            rows = '<div style="padding:14px;text-align:center;font-size:12px;color:#94a3b8">No items match &ldquo;' + esc(q) + '&rdquo;</div>';
+        } else if (count > MAX) {
+            rows += '<div style="padding:10px;text-align:center;font-size:11px;color:#94a3b8">Showing 50 of ' + count + ' — type more to narrow</div>';
         }
         listEl.innerHTML = rows;
     }
@@ -2571,14 +2590,17 @@
         var pickerEl  = document.getElementById('zohoAllPicker-' + zid);
         var selEl     = document.getElementById('zohoAllSel-' + zid);
         if (displayEl) displayEl.style.display = 'none';
-        if (pickerEl)  pickerEl.style.display  = 'block';
         if (aiIsMobileLayout()) {
-            // Mobile: use custom tap-list — clear search, then populate the list
+            // Mobile: open full-screen fixed overlay (display:flex for column layout)
+            if (pickerEl) pickerEl.style.display = 'flex';
             var searchEl = document.getElementById('zohoAllSearch-' + zid);
-            if (searchEl) searchEl.value = '';
-            setTimeout(function() { zohoAllMobileListInit(zid, true); }, 0);
+            if (searchEl) { searchEl.value = ''; setTimeout(function() { searchEl.focus(); }, 50); }
+            // Show hint — no items until user types (prevents keyboard dismiss from big DOM insert)
+            var listEl = document.getElementById('zohoAllResList-' + zid);
+            if (listEl) listEl.innerHTML = '<div style="padding:14px;text-align:center;font-size:12px;color:#94a3b8">Type to search…</div>';
             return;
         }
+        if (pickerEl)  pickerEl.style.display  = 'block';
         // Desktop: inject options into native <select>
         setTimeout(function() {
             if (!selEl || !aiData) return;
