@@ -2212,19 +2212,12 @@
                 html += '<button onclick="zohoAllShowPicker(\'' + zid + '\',' + pdfIdx + ')"'
                       + ' style="font-size:10px;padding:3px 10px;border:1px solid #d1d5db;border-radius:4px;background:#fff;color:#374151;cursor:pointer">Change Match</button>'
                       + '</div></div>'; // end display pane
-                // Picker pane — full-screen fixed overlay so keyboard never dismisses while typing
-                html += '<div id="zohoAllPicker-' + zid + '" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;z-index:9999;background:#fff;flex-direction:column">'
-                      + '<div style="padding:10px 12px;border-bottom:1px solid #e2e8f0;display:flex;align-items:center;gap:8px;flex-shrink:0;background:#fff">'
-                      + '<button onclick="zohoAllHidePicker(\'' + zid + '\')" style="padding:7px 12px;border:1px solid #e2e8f0;border-radius:6px;background:#f8fafc;font-size:13px;color:#374151;cursor:pointer;flex-shrink:0">&#8592; Back</button>'
-                      + '<input type="search" id="zohoAllSearch-' + zid + '" placeholder="&#128269; Search DPL items..." autocomplete="off" inputmode="search"'
-                      + ' oninput="zohoAllMobileListFilter(\'' + zid + '\', this.value, true)"'
-                      + ' style="flex:1;font-size:15px;padding:8px 10px;border:1px solid #d1d5db;border-radius:6px;min-width:0;box-sizing:border-box">'
-                      + '</div>'
-                      + '<div id="zohoAllResList-' + zid + '" style="flex:1;overflow-y:auto"></div>'
-                      + '</div>'; // end picker overlay
+                // Picker overlay is created dynamically on document.body by zohoAllShowPicker() —
+                // no HTML injected into the card here, avoids position:fixed CSS-containment issues.
             } else {
-                // Unmatched: inline search — no onfocus flood, only show results when user types
-                html += '<input type="search" id="zohoAllSearch-' + zid + '" placeholder="&#128269; Type to search DPL items..." autocomplete="off" inputmode="search"'
+                // Unmatched: inline search — type:text (not search) avoids Android submit-key dismiss
+                html += '<input type="text" id="zohoAllSearch-' + zid + '" placeholder="&#128269; Type to search DPL items..."'
+                      + ' autocomplete="off"'
                       + ' oninput="zohoAllMobileListFilter(\'' + zid + '\', this.value, false)"'
                       + ' style="width:100%;font-size:14px;padding:8px 10px;border:1px solid #fcd34d;border-radius:4px;margin-bottom:6px;box-sizing:border-box;background:#fffbeb">'
                       + '<div id="zohoAllResList-' + zid + '" style="max-height:200px;overflow-y:auto;border:1px solid #f59e0b;border-radius:6px;background:#fff;margin-bottom:4px">'
@@ -2539,16 +2532,18 @@
         sel.innerHTML = opts;
     }
 
-    // Mobile: render all PDF rows as tappable list items inside zohoAllResList-{zid}.
-    function zohoAllMobileListInit(zid, includeAll) {
-        zohoAllMobileListFilter(zid, '', includeAll);
-    }
+    // ── Mobile Change-Match overlay ────────────────────────────────────────────
+    // Appended directly to document.body so position:fixed is always viewport-
+    // anchored (not affected by CSS transform / contain on card ancestors).
+    // All DOM mutations use createElement/DocumentFragment — never innerHTML
+    // during an active search — avoiding Chrome Android's innerHTML-blurs-input bug.
 
-    var _zohoMobileListTimer = {};
+    var _zohoMobileTimer = {};
+
+    // Called by oninput on the unmatched inline search input (non-overlay path).
     function zohoAllMobileListFilter(zid, query, includeAll) {
-        // Debounce 200 ms so DOM updates don't fire on every keystroke — prevents keyboard dismiss on Android
-        clearTimeout(_zohoMobileListTimer[zid]);
-        _zohoMobileListTimer[zid] = setTimeout(function() {
+        clearTimeout(_zohoMobileTimer[zid]);
+        _zohoMobileTimer[zid] = setTimeout(function() {
             _zohoMobileListRender(zid, query, includeAll);
         }, 200);
     }
@@ -2557,51 +2552,70 @@
         var listEl = document.getElementById('zohoAllResList-' + zid);
         if (!listEl || !aiData) return;
         var q = query.trim().toLowerCase();
+
+        // Clear with removeChild loop — setting innerHTML='' can blur focused inputs in Chrome Android
+        while (listEl.firstChild) listEl.removeChild(listEl.firstChild);
+
         if (!q) {
-            // No query yet — show hint instead of flooding 300+ items
-            listEl.innerHTML = '<div style="padding:14px;text-align:center;font-size:12px;color:#94a3b8">Type to search…</div>';
+            var hint = document.createElement('div');
+            hint.style.cssText = 'padding:14px;text-align:center;font-size:12px;color:#94a3b8';
+            hint.textContent = 'Type to search…';
+            listEl.appendChild(hint);
             return;
         }
+
         var pdfRows = aiData.items || [];
-        var rows = '';
-        var count = 0;
+        var frag = document.createDocumentFragment();
+        var matched = 0;
+        var rendered = 0;
         var MAX = 50;
+
         pdfRows.forEach(function(r, idx) {
             if (!includeAll && r._matchedZohoId) return;
             var label = (r.product || '') + (r.packSize ? ' \xb7 ' + r.packSize : '') + (r.dpl ? '  ₹' + r.dpl : '');
             if (label.toLowerCase().indexOf(q) === -1) return;
-            count++;
-            if (count > MAX) return; // render max 50 results
-            rows += '<div onclick="zohoAllAssignPdf(\'' + zid + '\',' + idx + ')"'
-                  + ' style="padding:12px 14px;border-bottom:1px solid #f1f5f9;font-size:14px;color:#1e293b;cursor:pointer;line-height:1.4;-webkit-tap-highlight-color:rgba(0,0,0,0.08)">'
-                  + esc(label) + '</div>';
+            matched++;
+            if (rendered >= MAX) return;
+            rendered++;
+            var item = document.createElement('div');
+            item.style.cssText = 'padding:12px 14px;border-bottom:1px solid #f1f5f9;font-size:14px;color:#1e293b;cursor:pointer;line-height:1.4;-webkit-tap-highlight-color:rgba(0,0,0,0.08)';
+            item.textContent = label;
+            (function(z, i) {
+                item.addEventListener('click', function() { zohoAllAssignPdf(z, i); });
+            })(zid, idx);
+            frag.appendChild(item);
         });
-        if (count === 0) {
-            rows = '<div style="padding:14px;text-align:center;font-size:12px;color:#94a3b8">No items match &ldquo;' + esc(q) + '&rdquo;</div>';
-        } else if (count > MAX) {
-            rows += '<div style="padding:10px;text-align:center;font-size:11px;color:#94a3b8">Showing 50 of ' + count + ' — type more to narrow</div>';
-        }
-        listEl.innerHTML = rows;
-    }
 
-    // Open the picker for an already-matched Zoho row. Loads all PDF options lazily.
-    function zohoAllShowPicker(zid, currentPdfIdx) {
-        var displayEl = document.getElementById('zohoAllMatchDisplay-' + zid);
-        var pickerEl  = document.getElementById('zohoAllPicker-' + zid);
-        var selEl     = document.getElementById('zohoAllSel-' + zid);
-        if (displayEl) displayEl.style.display = 'none';
-        if (aiIsMobileLayout()) {
-            // Mobile: open full-screen fixed overlay (display:flex for column layout)
-            if (pickerEl) pickerEl.style.display = 'flex';
-            var searchEl = document.getElementById('zohoAllSearch-' + zid);
-            if (searchEl) { searchEl.value = ''; setTimeout(function() { searchEl.focus(); }, 50); }
-            // Show hint — no items until user types (prevents keyboard dismiss from big DOM insert)
-            var listEl = document.getElementById('zohoAllResList-' + zid);
-            if (listEl) listEl.innerHTML = '<div style="padding:14px;text-align:center;font-size:12px;color:#94a3b8">Type to search…</div>';
+        if (matched === 0) {
+            var noMatch = document.createElement('div');
+            noMatch.style.cssText = 'padding:14px;text-align:center;font-size:12px;color:#94a3b8';
+            noMatch.textContent = 'No results for “' + q + '”';
+            listEl.appendChild(noMatch);
             return;
         }
-        if (pickerEl)  pickerEl.style.display  = 'block';
-        // Desktop: inject options into native <select>
+        listEl.appendChild(frag);
+        if (matched > MAX) {
+            var more = document.createElement('div');
+            more.style.cssText = 'padding:10px;text-align:center;font-size:11px;color:#94a3b8';
+            more.textContent = 'Showing 50 of ' + matched + ' — type more to narrow';
+            listEl.appendChild(more);
+        }
+    }
+
+    // Open the picker for an already-matched Zoho row.
+    function zohoAllShowPicker(zid, currentPdfIdx) {
+        var displayEl = document.getElementById('zohoAllMatchDisplay-' + zid);
+        if (displayEl) displayEl.style.display = 'none';
+
+        if (aiIsMobileLayout()) {
+            _zohoAllOpenMobileOverlay(zid, currentPdfIdx);
+            return;
+        }
+
+        // Desktop: show in-table picker pane + inject select options lazily
+        var pickerEl = document.getElementById('zohoAllPicker-' + zid);
+        var selEl    = document.getElementById('zohoAllSel-' + zid);
+        if (pickerEl) pickerEl.style.display = 'block';
         setTimeout(function() {
             if (!selEl || !aiData) return;
             var pdfRows = aiData.items || [];
@@ -2614,12 +2628,74 @@
         }, 0);
     }
 
+    function _zohoAllOpenMobileOverlay(zid, currentPdfIdx) {
+        // Remove any stale overlay first
+        var old = document.getElementById('zohoAllPickerOverlay');
+        if (old && old.parentNode) old.parentNode.removeChild(old);
+
+        // Build overlay entirely with DOM API — no innerHTML
+        var overlay = document.createElement('div');
+        overlay.id = 'zohoAllPickerOverlay';
+        overlay.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;z-index:99999;background:#fff;display:flex;flex-direction:column;-webkit-overflow-scrolling:touch';
+
+        // ── Header ────────────────────────────────────────────────
+        var header = document.createElement('div');
+        header.style.cssText = 'padding:10px 12px;border-bottom:1px solid #e2e8f0;display:flex;align-items:center;gap:8px;flex-shrink:0;background:#fff';
+
+        var backBtn = document.createElement('button');
+        backBtn.style.cssText = 'padding:7px 12px;border:1px solid #e2e8f0;border-radius:6px;background:#f8fafc;font-size:13px;color:#374151;cursor:pointer;flex-shrink:0';
+        backBtn.textContent = '← Back';
+        backBtn.addEventListener('click', function() { zohoAllHidePicker(zid); });
+
+        var searchInput = document.createElement('input');
+        searchInput.type = 'text';         // NOT "search" — avoids Android submit-key keyboard dismiss
+        searchInput.placeholder = 'Search DPL items…';
+        searchInput.autocomplete = 'off';
+        searchInput.style.cssText = 'flex:1;font-size:15px;padding:8px 10px;border:1px solid #d1d5db;border-radius:6px;min-width:0;box-sizing:border-box;-webkit-appearance:none;appearance:none';
+
+        // ── Results list ──────────────────────────────────────────
+        var resultsList = document.createElement('div');
+        resultsList.id = 'zohoAllResList-' + zid;
+        resultsList.style.cssText = 'flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch';
+
+        var hint = document.createElement('div');
+        hint.style.cssText = 'padding:14px;text-align:center;font-size:12px;color:#94a3b8';
+        hint.textContent = 'Type to search…';
+        resultsList.appendChild(hint);
+
+        header.appendChild(backBtn);
+        header.appendChild(searchInput);
+        overlay.appendChild(header);
+        overlay.appendChild(resultsList);
+        document.body.appendChild(overlay);
+
+        // Wire search with debounce — 200ms so DOM never mutates mid-keystroke
+        var timer = null;
+        searchInput.addEventListener('input', function() {
+            var val = this.value;
+            clearTimeout(timer);
+            timer = setTimeout(function() {
+                _zohoMobileListRender(zid, val, true);
+            }, 200);
+        });
+
+        // Focus after two animation frames (element must be laid out first)
+        requestAnimationFrame(function() {
+            requestAnimationFrame(function() { searchInput.focus(); });
+        });
+    }
+
     // Close the picker and restore the display pane.
     function zohoAllHidePicker(zid) {
+        // Mobile: remove body overlay
+        var overlay = document.getElementById('zohoAllPickerOverlay');
+        if (overlay && overlay.parentNode) overlay.parentNode.removeChild(overlay);
+        // Desktop: hide in-table picker pane
+        var pickerEl = document.getElementById('zohoAllPicker-' + zid);
+        if (pickerEl) pickerEl.style.display = 'none';
+        // Restore card display pane
         var displayEl = document.getElementById('zohoAllMatchDisplay-' + zid);
-        var pickerEl  = document.getElementById('zohoAllPicker-' + zid);
         if (displayEl) displayEl.style.display = 'block';
-        if (pickerEl)  pickerEl.style.display  = 'none';
     }
 
     // Assign (or re-assign) a PDF row to a Zoho item from the zoho-all view.
