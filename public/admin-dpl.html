@@ -2618,13 +2618,13 @@
     // Select / deselect all matched rows without rebuilding the table.
     function zohoAllToggleAll(checked) {
         var pdfRows = (aiData && aiData.items) || [];
-        // Only toggle rows whose checkbox is currently rendered (i.e. visible under current filter)
+        // Always update _selected on ALL matched rows (not just visible ones),
+        // so "Unselect All" truly clears every brand/filter — then sync DOM.
         pdfRows.forEach(function(r, idx) {
             if (!r._matchedZohoId) return;
-            var cb = document.getElementById('zohoAllCb-' + idx);
-            if (!cb) return; // filtered out — skip
             r._selected = checked;
-            cb.checked = checked;
+            var cb = document.getElementById('zohoAllCb-' + idx);
+            if (cb) cb.checked = checked; // update DOM only if checkbox is rendered
         });
         zohoAllUpdateBtn();
     }
