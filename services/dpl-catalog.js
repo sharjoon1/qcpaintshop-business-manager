@@ -118,4 +118,59 @@ function linkEntryToZoho(entry, zohoItems) {
     return { zoho_item_id: null, link_status: 'needs_creating', link_confidence: 0, link_reason: 'no-match' };
 }
 
-module.exports = { setPool, slug, normalizeSizeTier, extractSizeFromZohoName, buildMatchKey, linkEntryToZoho };
+// Split the tabular parser's merged "Name - Shade" product field.
+function splitProductBase(product) {
+    const s = String(product || '');
+    const idx = s.lastIndexOf(' - ');
+    if (idx === -1) return { product_name: s.trim(), base_name: '' };
+    return { product_name: s.slice(0, idx).trim(), base_name: s.slice(idx + 3).trim() };
+}
+
+function buildCatalogFromDpl(brand, parsedRows, zohoItems) {
+    const out = [];
+    for (const row of (parsedRows || [])) {
+        const { product_name, base_name } = splitProductBase(row.product);
+        const size_tier = normalizeSizeTier(row.packSize);
+        const dpl = parseFloat(row.dpl) || 0;
+        const entry = {
+            brand,
+            category: row.category || null,
+            product_code: row.baseCode || '',
+            product_name,
+            base_name,
+            size_tier,
+            dpl_size_label: row.packSize || null,
+            current_dpl: dpl || null,
+            current_rate: dpl > 0 ? Math.ceil(dpl * 1.18 * 1.10) : null,
+            zoho_item_id: null,
+            canonical_name: null,
+            canonical_sku: null,
+            canonical_description: null,
+            link_status: 'needs_creating',
+            link_confidence: 0,
+            link_reason: 'no-match',
+        };
+        entry.match_key = buildMatchKey(entry);
+
+        Object.assign(entry, linkEntryToZoho(entry, zohoItems));
+
+        // Canonical name/sku/desc for LINKED entries (reuse the proven Birla proposer).
+        if (entry.zoho_item_id) {
+            const zi = (zohoItems || []).find(z => z.zoho_item_id === entry.zoho_item_id);
+            if (zi) {
+                const pf = computeProposedFields(
+                    { product: row.product, packSize: row.packSize, dpl, category: row.category },
+                    { sku: zi.sku || zi.zoho_sku || '', description: zi.description || '', category: zi.category || zi.zoho_category_name || '' },
+                    'birlaopus'
+                );
+                entry.canonical_name = pf.proposed_name || null;
+                entry.canonical_sku = pf.proposed_sku || null;
+                entry.canonical_description = pf.proposed_description || null;
+            }
+        }
+        out.push(entry);
+    }
+    return out;
+}
+
+module.exports = { setPool, slug, normalizeSizeTier, extractSizeFromZohoName, buildMatchKey, linkEntryToZoho, buildCatalogFromDpl };

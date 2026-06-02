@@ -102,6 +102,39 @@ describe('linkEntryToZoho', () => {
     });
 });
 
+describe('buildCatalogFromDpl', () => {
+    const zoho = [
+        { zoho_item_id: 'Z1', name: 'EP01 PEWH One Pure Elegance White 1 L', sku: 'PEWH01', description: '', category: 'Interior Luxury' },
+        { zoho_item_id: 'Z2', name: 'EP01 PEB2 One Pure Elegance Base 2 1 L', sku: 'PEB201', description: '', category: 'Interior Luxury' },
+    ];
+    const rows = [
+        { product: 'One Pure Elegance - White', packSize: '1L', dpl: 490, category: 'Interior Luxury', brand: 'Birla Opus', baseCode: '941001' },
+        { product: 'One Pure Elegance - Base 2', packSize: '900ml', dpl: 520, category: 'Interior Luxury', brand: 'Birla Opus', baseCode: '941001' },
+    ];
+
+    test('one entry per row with tier, match_key, current price, link', () => {
+        const entries = catalog.buildCatalogFromDpl('birlaopus', rows, zoho);
+        expect(entries).toHaveLength(2);
+        const white = entries.find(e => e.base_name === 'White');
+        expect(white.size_tier).toBe('1L');
+        expect(white.dpl_size_label).toBe('1L');
+        expect(white.current_dpl).toBe(490);
+        expect(white.current_rate).toBe(Math.ceil(490 * 1.18 * 1.10));
+        expect(white.match_key).toBe('birlaopus|941001|white|1l');
+        expect(white.zoho_item_id).toBe('Z1');
+        expect(white.link_status).toBe('confirmed');
+    });
+
+    test('a DPL 900ml base normalizes to tier 1L and links to the Zoho 1L item', () => {
+        const entries = catalog.buildCatalogFromDpl('birlaopus', rows, zoho);
+        const base2 = entries.find(e => e.base_name === 'Base 2');
+        expect(base2.size_tier).toBe('1L');
+        expect(base2.dpl_size_label).toBe('900ml');
+        expect(base2.zoho_item_id).toBe('Z2');
+        expect(base2.link_status).toBe('confirmed');
+    });
+});
+
 describe('migrate-dpl-catalog', () => {
     test('exports up() and creates the table idempotently', async () => {
         const mig = require('../../migrations/migrate-dpl-catalog');
