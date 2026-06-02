@@ -4,6 +4,8 @@ const express = require('express');
 const router = express.Router();
 const { requirePermission, requireAuth } = require('../middleware/permissionMiddleware');
 const { requireCustomerAuth } = require('../middleware/customerAuth');
+const { samePhone } = require('../services/phone-match');
+const { getBranding } = require('../services/branding');
 const { idempotent, setPool: setIdempotencyPool } = require('../middleware/idempotency');
 const audit = require('../services/audit-log');
 
@@ -887,8 +889,7 @@ router.get('/customer/:id', requireCustomerAuth, async (req, res) => {
         }
 
         // Ownership check: the estimate's customer phone must match the session phone.
-        const norm = (p) => String(p || '').replace(/\D/g, '').slice(-10);
-        if (!req.customer || norm(estimate[0].customer_phone) !== norm(req.customer.phone)) {
+        if (!req.customer || !samePhone(estimate[0].customer_phone, req.customer.phone)) {
             return res.status(403).json({ error: 'Not authorized for this estimate' });
         }
 
