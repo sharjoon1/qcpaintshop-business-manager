@@ -3,12 +3,39 @@
 const express = require('express');
 const router = express.Router();
 const { requirePermission, requireAuth } = require('../middleware/permissionMiddleware');
+const { requireCustomerAuth } = require('../middleware/customerAuth');
 const { idempotent, setPool: setIdempotencyPool } = require('../middleware/idempotency');
 const audit = require('../services/audit-log');
 
 let pool;
 
 function setPool(p) { pool = p; setIdempotencyPool(p); }
+
+// ========================================
+// BRANCH ISOLATION HELPER
+// Admins/managers see every estimate. Branch-scoped staff may access an
+// estimate only if it is unassigned (legacy/global, branch_id IS NULL) or
+// belongs to their own branch. NULL is allowed so existing estimates (which
+// are created with branch_id = NULL) remain accessible to all staff.
+// ========================================
+function estimateBranchAllowed(req, estimateBranchId) {
+    if (!req.user) return false;
+    const role = req.user.role;
+    if (['admin', 'manager', 'super_admin'].includes(role)) return true;
+    if (estimateBranchId === null || estimateBranchId === undefined) return true;
+    return Number(estimateBranchId) === Number(req.user.branch_id);
+}
+
+// Branch filter for list queries: returns the branch_id a non-admin is scoped
+// to, or null for admins/managers (who see all branches unless they filter).
+function estimateListBranch(req) {
+    if (!req.user) return null;
+    const role = req.user.role;
+    if (['admin', 'manager', 'super_admin'].includes(role)) {
+        return req.query.branch_id ? Number(req.query.branch_id) : null;
+    }
+    return req.user.branch_id || null;
+}
 
 // In-memory cache for filter-options (5 min TTL)
 let _filterCache = null;
@@ -177,12 +204,15 @@ function processItems(items) {
 // ========================================
 router.get('/', requirePermission('estimates', 'view'), async (req, res) => {
     try {
-        const { status, search, branch_id } = req.query;
+        const { status, search } = req.query;
         let query = 'SELECT * FROM estimates WHERE 1=1';
         const params = [];
 
+        // Branch isolation: non-admins see only their own branch + unassigned (NULL) estimates.
+        const branchId = estimateListBranch(req);
+        if (branchId) { query += ' AND (branch_id = ? OR branch_id IS NULL)'; params.push(branchId); }
+
         if (status) { query += ' AND status = ?'; params.push(status); }
-        if (branch_id) { query += ' AND branch_id = ?'; params.push(branch_id); }
         if (search) {
             query += ' AND (estimate_number LIKE ? OR customer_name LIKE ? OR customer_phone LIKE ?)';
             params.push(`%${search}%`, `%${search}%`, `%${search}%`);
@@ -337,10 +367,13 @@ router.get('/search-products', requireAuth, async (req, res) => {
 router.get('/:id/upi-qr', requireAuth, async (req, res) => {
     try {
         const [estimates] = await pool.query(
-            'SELECT id, estimate_number, grand_total FROM estimates WHERE id = ?',
+            'SELECT id, estimate_number, grand_total, branch_id FROM estimates WHERE id = ?',
             [req.params.id]
         );
         if (!estimates.length) return res.status(404).json({ error: 'Estimate not found' });
+        if (!estimateBranchAllowed(req, estimates[0].branch_id)) {
+            return res.status(403).json({ error: 'Not authorized for this estimate' });
+        }
 
         const est = estimates[0];
         const amount = parseFloat(est.grand_total) || 0;
@@ -374,10 +407,13 @@ router.post('/:id/send-whatsapp', requireAuth, async (req, res) => {
 
         // Get estimate details
         const [estimates] = await pool.query(
-            'SELECT id, estimate_number, customer_name, grand_total FROM estimates WHERE id = ?',
+            'SELECT id, estimate_number, customer_name, grand_total, branch_id FROM estimates WHERE id = ?',
             [req.params.id]
         );
         if (!estimates.length) return res.status(404).json({ success: false, message: 'Estimate not found' });
+        if (!estimateBranchAllowed(req, estimates[0].branch_id)) {
+            return res.status(403).json({ success: false, message: 'Not authorized for this estimate' });
+        }
         const est = estimates[0];
 
         // Generate PDF by fetching from internal endpoint
@@ -467,10 +503,13 @@ router.post('/:id/send-receipt', requireAuth, async (req, res) => {
         if (!phone) return res.status(400).json({ success: false, message: 'Phone number required' });
 
         const [estimates] = await pool.query(
-            'SELECT id, estimate_number, customer_name, grand_total, payment_amount, payment_method, payment_reference, payment_status FROM estimates WHERE id = ?',
+            'SELECT id, estimate_number, customer_name, grand_total, payment_amount, payment_method, payment_reference, payment_status, branch_id FROM estimates WHERE id = ?',
             [req.params.id]
         );
         if (!estimates.length) return res.status(404).json({ success: false, message: 'Estimate not found' });
+        if (!estimateBranchAllowed(req, estimates[0].branch_id)) {
+            return res.status(403).json({ success: false, message: 'Not authorized for this estimate' });
+        }
         const est = estimates[0];
 
         const fs = require('fs');
@@ -524,12 +563,16 @@ router.post('/:id/send-receipt', requireAuth, async (req, res) => {
 // ========================================
 // UPDATE PAYMENT REFERENCE
 // ========================================
-router.post('/:id/update-payment-ref', requireAuth, async (req, res) => {
+router.post('/:id/update-payment-ref', requirePermission('billing', 'payment'), async (req, res) => {
     try {
         const { payment_reference } = req.body;
+        const [est] = await pool.query('SELECT billing_invoice_id, branch_id FROM estimates WHERE id = ?', [req.params.id]);
+        if (!est.length) return res.status(404).json({ success: false, message: 'Estimate not found' });
+        if (!estimateBranchAllowed(req, est[0].branch_id)) {
+            return res.status(403).json({ success: false, message: 'Not authorized for this estimate' });
+        }
         await pool.query('UPDATE estimates SET payment_reference = ? WHERE id = ?', [payment_reference || null, req.params.id]);
         // Also update the billing invoice payment if exists
-        const [est] = await pool.query('SELECT billing_invoice_id FROM estimates WHERE id = ?', [req.params.id]);
         if (est[0] && est[0].billing_invoice_id) {
             await pool.query('UPDATE billing_payments SET payment_reference = ? WHERE invoice_id = ? ORDER BY id DESC LIMIT 1',
                 [payment_reference || null, est[0].billing_invoice_id]);
@@ -547,72 +590,99 @@ router.post('/:id/update-payment-ref', requireAuth, async (req, res) => {
 router.post('/:id/record-payment', requirePermission('billing', 'payment'), idempotent('estimate.record-payment'), async (req, res) => {
     try {
         const { amount, payment_method, payment_reference, send_whatsapp, phone } = req.body;
-        if (!amount || amount <= 0) return res.status(400).json({ success: false, message: 'Valid amount required' });
+        const amountNum = parseFloat(amount);
+        if (!Number.isFinite(amountNum) || amountNum <= 0) return res.status(400).json({ success: false, message: 'Valid amount required' });
         if (!payment_method) return res.status(400).json({ success: false, message: 'Payment method required' });
 
-        const [estimates] = await pool.query('SELECT * FROM estimates WHERE id = ?', [req.params.id]);
-        if (!estimates.length) return res.status(404).json({ success: false, message: 'Estimate not found' });
-        const est = estimates[0];
-        const grandTotal = parseFloat(est.grand_total) || 0;
-        const prevPaid = parseFloat(est.payment_amount) || 0;
-        const balance = Math.max(0, grandTotal - prevPaid);
+        // All financial writes run in a single transaction with a row lock on the
+        // estimate, so concurrent payments cannot read a stale paid-amount and a
+        // partial failure cannot leave the estimate/invoice/payment rows inconsistent.
+        let est, grandTotal, prevPaid, balance, newTotalPaid, balanceDue, paymentStatus, invoiceId;
+        const conn = await pool.getConnection();
+        try {
+            await conn.beginTransaction();
 
-        // Prevent overpayment
-        if (parseFloat(amount) > balance + 0.01) {
-            return res.status(400).json({ success: false, message: `Amount ₹${amount} exceeds balance ₹${balance.toFixed(2)}` });
-        }
-        if (balance <= 0.01) {
-            return res.status(400).json({ success: false, message: 'Estimate is already fully paid' });
-        }
-
-        const newTotalPaid = prevPaid + parseFloat(amount);
-        const balanceDue = Math.max(0, grandTotal - newTotalPaid);
-        const paymentStatus = balanceDue <= 0.01 ? 'paid' : (newTotalPaid > 0 ? 'partial' : 'unpaid');
-
-        // Update estimate payment fields
-        await pool.query(`
-            UPDATE estimates SET payment_amount = ?, payment_status = ?, payment_method = ?,
-                payment_reference = ?, payment_recorded_by = ?, payment_recorded_at = NOW()
-            WHERE id = ?
-        `, [newTotalPaid, paymentStatus, payment_method, payment_reference || null, req.user.id, req.params.id]);
-
-        // Auto-create billing invoice if not exists
-        let invoiceId = est.billing_invoice_id;
-        if (!invoiceId) {
-            const [items] = await pool.query('SELECT * FROM estimate_items WHERE estimate_id = ? AND deleted_at IS NULL', [req.params.id]);
-            const [[{ cnt }]] = await pool.query("SELECT COUNT(*) as cnt FROM billing_invoices WHERE DATE(created_at) = CURDATE()");
-            const invoiceNumber = `BI-${new Date().toISOString().slice(0,10).replace(/-/g,'')}-${String(Number(cnt) + 1).padStart(3,'0')}`;
-
-            const [invResult] = await pool.query(`
-                INSERT INTO billing_invoices (invoice_number, source, customer_name, customer_phone, customer_address,
-                    subtotal, discount_amount, grand_total, amount_paid, balance_due, payment_status, estimate_id, branch_id, created_by)
-                VALUES (?, 'estimate', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            `, [invoiceNumber, est.customer_name, est.customer_phone, est.customer_address,
-                parseFloat(est.subtotal) || grandTotal, parseFloat(est.total_discount) || 0, grandTotal,
-                newTotalPaid, balanceDue, paymentStatus, req.params.id, est.branch_id || 1, req.user.id]);
-            invoiceId = invResult.insertId;
-
-            for (const item of items) {
-                if (item.item_type === 'labor') continue;
-                await pool.query(`
-                    INSERT INTO billing_invoice_items (invoice_id, item_name, quantity, unit_price, line_total)
-                    VALUES (?, ?, ?, ?, ?)
-                `, [invoiceId, item.item_name, item.quantity, item.unit_price || item.final_price, item.line_total]);
+            const [estimates] = await conn.query('SELECT * FROM estimates WHERE id = ? FOR UPDATE', [req.params.id]);
+            if (!estimates.length) {
+                await conn.rollback();
+                return res.status(404).json({ success: false, message: 'Estimate not found' });
+            }
+            est = estimates[0];
+            if (!estimateBranchAllowed(req, est.branch_id)) {
+                await conn.rollback();
+                return res.status(403).json({ success: false, message: 'Not authorized for this estimate' });
             }
 
-            await pool.query('UPDATE estimates SET billing_invoice_id = ?, status = ? WHERE id = ?',
-                [invoiceId, 'converted', req.params.id]);
-        } else {
-            await pool.query('UPDATE billing_invoices SET amount_paid = ?, balance_due = ?, payment_status = ? WHERE id = ?',
-                [newTotalPaid, balanceDue, paymentStatus, invoiceId]);
-        }
+            grandTotal = parseFloat(est.grand_total) || 0;
+            prevPaid = parseFloat(est.payment_amount) || 0;
+            balance = Math.max(0, grandTotal - prevPaid);
 
-        // Record in billing_payments
-        await pool.query(`
-            INSERT INTO billing_payments (invoice_id, amount, payment_method, payment_reference, received_by, notes)
-            VALUES (?, ?, ?, ?, ?, ?)
-        `, [invoiceId, amount, payment_method, payment_reference || null, req.user.id,
-            `Payment for Estimate #${est.estimate_number}`]);
+            // Prevent overpayment
+            if (amountNum > balance + 0.01) {
+                await conn.rollback();
+                return res.status(400).json({ success: false, message: `Amount ₹${amountNum} exceeds balance ₹${balance.toFixed(2)}` });
+            }
+            if (balance <= 0.01) {
+                await conn.rollback();
+                return res.status(400).json({ success: false, message: 'Estimate is already fully paid' });
+            }
+
+            newTotalPaid = prevPaid + amountNum;
+            balanceDue = Math.max(0, grandTotal - newTotalPaid);
+            paymentStatus = balanceDue <= 0.01 ? 'paid' : (newTotalPaid > 0 ? 'partial' : 'unpaid');
+
+            // Update estimate payment fields
+            await conn.query(`
+                UPDATE estimates SET payment_amount = ?, payment_status = ?, payment_method = ?,
+                    payment_reference = ?, payment_recorded_by = ?, payment_recorded_at = NOW()
+                WHERE id = ?
+            `, [newTotalPaid, paymentStatus, payment_method, payment_reference || null, req.user.id, req.params.id]);
+
+            // Auto-create billing invoice if not exists
+            invoiceId = est.billing_invoice_id;
+            if (!invoiceId) {
+                const [items] = await conn.query('SELECT * FROM estimate_items WHERE estimate_id = ? AND deleted_at IS NULL', [req.params.id]);
+                const [[{ cnt }]] = await conn.query("SELECT COUNT(*) as cnt FROM billing_invoices WHERE DATE(created_at) = CURDATE()");
+                const invoiceNumber = `BI-${new Date().toISOString().slice(0,10).replace(/-/g,'')}-${String(Number(cnt) + 1).padStart(3,'0')}`;
+
+                const [invResult] = await conn.query(`
+                    INSERT INTO billing_invoices (invoice_number, source, customer_name, customer_phone, customer_address,
+                        subtotal, discount_amount, grand_total, amount_paid, balance_due, payment_status, estimate_id, branch_id, created_by)
+                    VALUES (?, 'estimate', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                `, [invoiceNumber, est.customer_name, est.customer_phone, est.customer_address,
+                    parseFloat(est.subtotal) || grandTotal, parseFloat(est.total_discount) || 0, grandTotal,
+                    newTotalPaid, balanceDue, paymentStatus, req.params.id, est.branch_id || 1, req.user.id]);
+                invoiceId = invResult.insertId;
+
+                for (const item of items) {
+                    if (item.item_type === 'labor') continue;
+                    await conn.query(`
+                        INSERT INTO billing_invoice_items (invoice_id, item_name, quantity, unit_price, line_total)
+                        VALUES (?, ?, ?, ?, ?)
+                    `, [invoiceId, item.item_name, item.quantity, item.unit_price || item.final_price, item.line_total]);
+                }
+
+                await conn.query('UPDATE estimates SET billing_invoice_id = ?, status = ? WHERE id = ?',
+                    [invoiceId, 'converted', req.params.id]);
+            } else {
+                await conn.query('UPDATE billing_invoices SET amount_paid = ?, balance_due = ?, payment_status = ? WHERE id = ?',
+                    [newTotalPaid, balanceDue, paymentStatus, invoiceId]);
+            }
+
+            // Record in billing_payments
+            await conn.query(`
+                INSERT INTO billing_payments (invoice_id, amount, payment_method, payment_reference, received_by, notes)
+                VALUES (?, ?, ?, ?, ?, ?)
+            `, [invoiceId, amountNum, payment_method, payment_reference || null, req.user.id,
+                `Payment for Estimate #${est.estimate_number}`]);
+
+            await conn.commit();
+        } catch (txErr) {
+            await conn.rollback();
+            throw txErr;
+        } finally {
+            conn.release();
+        }
 
         await audit.record(req, {
             action: 'estimate.payment.record',
@@ -654,7 +724,7 @@ router.post('/:id/record-payment', requirePermission('billing', 'payment'), idem
                     fs.writeFileSync(receiptPath, pdfBuffer);
 
                     const sessionManager = require('../services/whatsapp-session-manager');
-                    const paidAmt = parseFloat(amount).toLocaleString('en-IN');
+                    const paidAmt = amountNum.toLocaleString('en-IN');
                     const caption = `Dear ${est.customer_name || 'Customer'},\n\n✅ *Payment Received!*\n\nEstimate: *#${est.estimate_number}*\nAmount Paid: *₹${paidAmt}*\nTotal: *₹${grandTotal.toLocaleString('en-IN')}*\nBalance: *₹${balanceDue.toLocaleString('en-IN')}*\nMethod: ${payment_method.toUpperCase()}${payment_reference ? '\nRef: ' + payment_reference : ''}\n\nThank you!\n_Quality Colours_`;
 
                     try {
@@ -689,6 +759,9 @@ router.post('/:id/create-po', requirePermission('billing', 'edit'), async (req, 
         const [estimates] = await pool.query('SELECT * FROM estimates WHERE id = ?', [req.params.id]);
         if (!estimates.length) return res.status(404).json({ success: false, message: 'Estimate not found' });
         const est = estimates[0];
+        if (!estimateBranchAllowed(req, est.branch_id)) {
+            return res.status(403).json({ success: false, message: 'Not authorized for this estimate' });
+        }
 
         const [items] = await pool.query("SELECT * FROM estimate_items WHERE estimate_id = ? AND item_type = 'product' AND deleted_at IS NULL", [req.params.id]);
         if (!items.length) return res.status(400).json({ success: false, message: 'No product items in estimate' });
@@ -780,6 +853,11 @@ router.post('/:id/create-po', requirePermission('billing', 'edit'), async (req, 
 // ========================================
 router.get('/:id/purchase-orders', requireAuth, async (req, res) => {
     try {
+        const [estRow] = await pool.query('SELECT branch_id FROM estimates WHERE id = ?', [req.params.id]);
+        if (!estRow.length) return res.status(404).json({ success: false, message: 'Estimate not found' });
+        if (!estimateBranchAllowed(req, estRow[0].branch_id)) {
+            return res.status(403).json({ success: false, message: 'Not authorized for this estimate' });
+        }
         const [pos] = await pool.query(
             `SELECT po.*, v.vendor_name, v.phone as vendor_phone
              FROM vendor_purchase_orders po
@@ -795,6 +873,41 @@ router.get('/:id/purchase-orders', requireAuth, async (req, res) => {
 });
 
 // ========================================
+// GET ESTIMATE FOR AUTHENTICATED CUSTOMER (read-only, phone-scoped)
+// Customer-facing pages authenticate with a customer_token (requireCustomerAuth),
+// which the staff `estimates.view` permission gate rejects. This endpoint lets a
+// logged-in customer fetch ONLY their own estimate (matched by phone).
+// Declared before '/:id' — the literal 'customer' prefix keeps it distinct.
+// ========================================
+router.get('/customer/:id', requireCustomerAuth, async (req, res) => {
+    try {
+        const [estimate] = await pool.query('SELECT * FROM estimates WHERE id = ?', [req.params.id]);
+        if (estimate.length === 0) {
+            return res.status(404).json({ error: 'Estimate not found' });
+        }
+
+        // Ownership check: the estimate's customer phone must match the session phone.
+        const norm = (p) => String(p || '').replace(/\D/g, '').slice(-10);
+        if (!req.customer || norm(estimate[0].customer_phone) !== norm(req.customer.phone)) {
+            return res.status(403).json({ error: 'Not authorized for this estimate' });
+        }
+
+        const [items] = await pool.query(`
+            SELECT ei.*, p.name as product_name, p.product_type as product_type
+            FROM estimate_items ei
+            LEFT JOIN products p ON ei.product_id = p.id
+            WHERE ei.estimate_id = ? AND ei.deleted_at IS NULL
+            ORDER BY ei.display_order, ei.id
+        `, [req.params.id]);
+
+        res.json({ ...estimate[0], items });
+    } catch (err) {
+        console.error('Get customer estimate error:', err);
+        res.status(500).json({ error: 'Failed to load estimate' });
+    }
+});
+
+// ========================================
 // GET SINGLE ESTIMATE
 // ========================================
 router.get('/:id', requirePermission('estimates', 'view'), async (req, res) => {
@@ -802,6 +915,9 @@ router.get('/:id', requirePermission('estimates', 'view'), async (req, res) => {
         const [estimate] = await pool.query('SELECT * FROM estimates WHERE id = ?', [req.params.id]);
         if (estimate.length === 0) {
             return res.status(404).json({ error: 'Estimate not found' });
+        }
+        if (!estimateBranchAllowed(req, estimate[0].branch_id)) {
+            return res.status(403).json({ error: 'Not authorized for this estimate' });
         }
 
         const [items] = await pool.query(`
@@ -823,6 +939,11 @@ router.get('/:id', requirePermission('estimates', 'view'), async (req, res) => {
 // ========================================
 router.get('/:id/items', requirePermission('estimates', 'view'), async (req, res) => {
     try {
+        const [estRow] = await pool.query('SELECT branch_id FROM estimates WHERE id = ?', [req.params.id]);
+        if (!estRow.length) return res.status(404).json({ error: 'Estimate not found' });
+        if (!estimateBranchAllowed(req, estRow[0].branch_id)) {
+            return res.status(403).json({ error: 'Not authorized for this estimate' });
+        }
         const [items] = await pool.query(
             'SELECT * FROM estimate_items WHERE estimate_id = ? AND deleted_at IS NULL ORDER BY display_order',
             [req.params.id]
@@ -844,51 +965,64 @@ router.post('/', requirePermission('estimates', 'add'), idempotent('estimate.cre
             notes, admin_notes, status, branch_id, items
         } = req.body;
 
-        // Generate estimate number
-        const datePrefix = new Date().toISOString().split('T')[0].replace(/-/g, '');
-        const [lastEstimate] = await pool.query(
-            'SELECT estimate_number FROM estimates WHERE estimate_number LIKE ? ORDER BY id DESC LIMIT 1 FOR UPDATE',
-            [`EST${datePrefix}%`]
-        );
-
-        let estimateNumber;
-        if (lastEstimate.length > 0) {
-            const lastNum = parseInt(lastEstimate[0].estimate_number.slice(-4));
-            estimateNumber = `EST${datePrefix}${String(lastNum + 1).padStart(4, '0')}`;
-        } else {
-            estimateNumber = `EST${datePrefix}0001`;
-        }
-
         // Calculate item pricing
         const processedItems = processItems(items);
         const totals = calculateEstimateTotals(processedItems);
 
-        // Insert estimate
-        const [result] = await pool.query(
-            `INSERT INTO estimates (
-                estimate_number, customer_name, customer_phone, customer_address,
-                estimate_date, valid_until, branch_id,
-                subtotal, gst_amount, grand_total,
-                total_markup, total_discount, total_labor,
-                show_gst_breakdown, column_visibility, show_description_only,
-                notes, admin_notes, status, created_by
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-            [
-                estimateNumber, customer_name, customer_phone, customer_address,
-                estimate_date, valid_until || null, branch_id || null,
-                totals.subtotal, totals.gst_amount, totals.grand_total,
-                totals.total_markup, totals.total_discount, totals.total_labor,
-                show_gst_breakdown ? 1 : 0, column_visibility || null, show_description_only ? 1 : 0,
-                notes || null, admin_notes || null, status || 'draft',
-                req.user ? req.user.id : 1
-            ]
-        );
+        // Number generation + both inserts run in one transaction so the FOR UPDATE
+        // lock actually holds (preventing duplicate numbers under concurrency) and an
+        // item-insert failure cannot leave an orphan estimate header behind.
+        const datePrefix = new Date().toISOString().split('T')[0].replace(/-/g, '');
+        let estimateNumber, estimateId;
+        const conn = await pool.getConnection();
+        try {
+            await conn.beginTransaction();
 
-        const estimateId = result.insertId;
+            const [lastEstimate] = await conn.query(
+                'SELECT estimate_number FROM estimates WHERE estimate_number LIKE ? ORDER BY id DESC LIMIT 1 FOR UPDATE',
+                [`EST${datePrefix}%`]
+            );
 
-        // Insert items
-        if (processedItems.length > 0) {
-            await pool.query(ITEM_INSERT_SQL, [buildItemValues(estimateId, processedItems)]);
+            if (lastEstimate.length > 0) {
+                const lastNum = parseInt(lastEstimate[0].estimate_number.slice(-4));
+                estimateNumber = `EST${datePrefix}${String(lastNum + 1).padStart(4, '0')}`;
+            } else {
+                estimateNumber = `EST${datePrefix}0001`;
+            }
+
+            const [result] = await conn.query(
+                `INSERT INTO estimates (
+                    estimate_number, customer_name, customer_phone, customer_address,
+                    estimate_date, valid_until, branch_id,
+                    subtotal, gst_amount, grand_total,
+                    total_markup, total_discount, total_labor,
+                    show_gst_breakdown, column_visibility, show_description_only,
+                    notes, admin_notes, status, created_by
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+                [
+                    estimateNumber, customer_name, customer_phone, customer_address,
+                    estimate_date, valid_until || null, branch_id || null,
+                    totals.subtotal, totals.gst_amount, totals.grand_total,
+                    totals.total_markup, totals.total_discount, totals.total_labor,
+                    show_gst_breakdown ? 1 : 0, column_visibility || null, show_description_only ? 1 : 0,
+                    notes || null, admin_notes || null, status || 'draft',
+                    req.user ? req.user.id : 1
+                ]
+            );
+
+            estimateId = result.insertId;
+
+            // Insert items
+            if (processedItems.length > 0) {
+                await conn.query(ITEM_INSERT_SQL, [buildItemValues(estimateId, processedItems)]);
+            }
+
+            await conn.commit();
+        } catch (txErr) {
+            await conn.rollback();
+            throw txErr;
+        } finally {
+            conn.release();
         }
 
         await audit.record(req, {
@@ -926,6 +1060,15 @@ router.put('/:id', requirePermission('estimates', 'edit'), async (req, res) => {
         // Capture before snapshot (header + items) for audit trail
         const [beforeRows] = await pool.query('SELECT * FROM estimates WHERE id = ?', [estimateId]);
         if (!beforeRows.length) return res.status(404).json({ error: 'Estimate not found' });
+        if (!estimateBranchAllowed(req, beforeRows[0].branch_id)) {
+            return res.status(403).json({ error: 'Not authorized for this estimate' });
+        }
+        // Lock guard: once an estimate has been converted or had any payment recorded
+        // (billing_invoice_id set), editing its items/totals would desync it from the
+        // invoice and recorded payments. Block the edit.
+        if (beforeRows[0].status === 'converted' || beforeRows[0].billing_invoice_id) {
+            return res.status(409).json({ error: 'This estimate has been converted/paid and can no longer be edited' });
+        }
         const [beforeItems] = await pool.query(
             'SELECT * FROM estimate_items WHERE estimate_id = ? AND deleted_at IS NULL ORDER BY id',
             [estimateId]
@@ -935,31 +1078,45 @@ router.put('/:id', requirePermission('estimates', 'edit'), async (req, res) => {
         const processedItems = processItems(items);
         const totals = calculateEstimateTotals(processedItems);
 
-        await pool.query(
-            `UPDATE estimates SET
-                customer_name = ?, customer_phone = ?, customer_address = ?,
-                estimate_date = ?, valid_until = ?, branch_id = ?,
-                subtotal = ?, gst_amount = ?, grand_total = ?,
-                total_markup = ?, total_discount = ?, total_labor = ?,
-                show_gst_breakdown = ?, column_visibility = ?, show_description_only = ?,
-                notes = ?, admin_notes = ?,
-                last_updated_at = NOW()
-            WHERE id = ?`,
-            [
-                customer_name, customer_phone, customer_address || null,
-                estimate_date, valid_until || null, branch_id || null,
-                totals.subtotal, totals.gst_amount, totals.grand_total,
-                totals.total_markup, totals.total_discount, totals.total_labor,
-                show_gst_breakdown ? 1 : 0, column_visibility || null, show_description_only ? 1 : 0,
-                notes || null, admin_notes || null, estimateId
-            ]
-        );
+        // Header update + item replace run in one transaction so a failed re-insert
+        // cannot leave the estimate with all its items soft-deleted (data loss).
+        const conn = await pool.getConnection();
+        try {
+            await conn.beginTransaction();
 
-        // Soft-delete existing items (history preserved for U18 audit trail)
-        await pool.query('UPDATE estimate_items SET deleted_at = NOW() WHERE estimate_id = ? AND deleted_at IS NULL', [estimateId]);
+            await conn.query(
+                `UPDATE estimates SET
+                    customer_name = ?, customer_phone = ?, customer_address = ?,
+                    estimate_date = ?, valid_until = ?, branch_id = ?,
+                    subtotal = ?, gst_amount = ?, grand_total = ?,
+                    total_markup = ?, total_discount = ?, total_labor = ?,
+                    show_gst_breakdown = ?, column_visibility = ?, show_description_only = ?,
+                    notes = ?, admin_notes = ?,
+                    last_updated_at = NOW()
+                WHERE id = ?`,
+                [
+                    customer_name, customer_phone, customer_address || null,
+                    estimate_date, valid_until || null, branch_id || null,
+                    totals.subtotal, totals.gst_amount, totals.grand_total,
+                    totals.total_markup, totals.total_discount, totals.total_labor,
+                    show_gst_breakdown ? 1 : 0, column_visibility || null, show_description_only ? 1 : 0,
+                    notes || null, admin_notes || null, estimateId
+                ]
+            );
 
-        if (processedItems.length > 0) {
-            await pool.query(ITEM_INSERT_SQL, [buildItemValues(estimateId, processedItems)]);
+            // Soft-delete existing items (history preserved for U18 audit trail)
+            await conn.query('UPDATE estimate_items SET deleted_at = NOW() WHERE estimate_id = ? AND deleted_at IS NULL', [estimateId]);
+
+            if (processedItems.length > 0) {
+                await conn.query(ITEM_INSERT_SQL, [buildItemValues(estimateId, processedItems)]);
+            }
+
+            await conn.commit();
+        } catch (txErr) {
+            await conn.rollback();
+            throw txErr;
+        } finally {
+            conn.release();
         }
 
         await audit.record(req, {
@@ -991,9 +1148,27 @@ router.delete('/:id', requirePermission('estimates', 'delete'), async (req, res)
         const estimateId = req.params.id;
         const [estimate] = await pool.query('SELECT * FROM estimates WHERE id = ?', [estimateId]);
         if (estimate.length === 0) return res.status(404).json({ error: 'Estimate not found' });
+        if (!estimateBranchAllowed(req, estimate[0].branch_id)) {
+            return res.status(403).json({ error: 'Not authorized for this estimate' });
+        }
+        // Don't hard-delete an estimate that has a linked invoice/payments — it would
+        // orphan those financial records (dangling estimate_id FK).
+        if (estimate[0].billing_invoice_id || estimate[0].status === 'converted') {
+            return res.status(409).json({ error: 'This estimate has been converted/paid and cannot be deleted' });
+        }
 
-        await pool.query('DELETE FROM estimate_items WHERE estimate_id = ?', [estimateId]);
-        await pool.query('DELETE FROM estimates WHERE id = ?', [estimateId]);
+        const conn = await pool.getConnection();
+        try {
+            await conn.beginTransaction();
+            await conn.query('DELETE FROM estimate_items WHERE estimate_id = ?', [estimateId]);
+            await conn.query('DELETE FROM estimates WHERE id = ?', [estimateId]);
+            await conn.commit();
+        } catch (txErr) {
+            await conn.rollback();
+            throw txErr;
+        } finally {
+            conn.release();
+        }
 
         await audit.record(req, {
             action: 'estimate.delete',
@@ -1017,8 +1192,17 @@ router.patch('/:id/status', requirePermission('estimates', 'edit'), async (req, 
         const { status, reason, notes } = req.body;
         const estimateId = req.params.id;
 
-        const [current] = await pool.query('SELECT status FROM estimates WHERE id = ?', [estimateId]);
+        // Validate status against the known workflow set (reject arbitrary/garbage values)
+        const ALLOWED_STATUSES = ['draft', 'sent', 'pending_approval', 'approved', 'rejected', 'converted', 'expired'];
+        if (!status || !ALLOWED_STATUSES.includes(status)) {
+            return res.status(400).json({ error: 'Invalid status value' });
+        }
+
+        const [current] = await pool.query('SELECT status, branch_id FROM estimates WHERE id = ?', [estimateId]);
         if (current.length === 0) return res.status(404).json({ error: 'Estimate not found' });
+        if (!estimateBranchAllowed(req, current[0].branch_id)) {
+            return res.status(403).json({ error: 'Not authorized for this estimate' });
+        }
 
         const oldStatus = current[0].status;
 
@@ -1035,7 +1219,7 @@ router.patch('/:id/status', requirePermission('estimates', 'edit'), async (req, 
 
         await pool.query(
             'INSERT INTO estimate_status_history (estimate_id, old_status, new_status, changed_by_user_id, reason, notes) VALUES (?, ?, ?, ?, ?, ?)',
-            [estimateId, oldStatus, status, req.user.id, reason, notes]
+            [estimateId, oldStatus, status, req.user.id, reason || null, notes || null]
         );
 
         await audit.record(req, {

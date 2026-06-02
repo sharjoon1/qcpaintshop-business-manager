@@ -214,6 +214,10 @@
 
         function r10(n) { return Math.ceil(n / 10) * 10; }
         function fmtINR(n) { return '\u20B9' + parseFloat(n || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
+        function esc(v) {
+            if (v === null || v === undefined) return '';
+            return String(v).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+        }
 
         function toggleColumn(col) { cv[col] = !cv[col]; renderItems(); updateButtonStates(); }
         function toggleSummary() {
@@ -314,13 +318,13 @@
             let rows = products.map((item, i) => {
                 const showDescOnly = item.show_description_only != null ? !!item.show_description_only : globalDescOnly;
                 const name = showDescOnly && item.custom_description ? item.custom_description : (item.item_description || item.product_name || item.item_name || '');
-                const descLine = (!showDescOnly && item.custom_description) ? `<div class="text-xs text-gray-400 mt-0.5" style="white-space:pre-line">${item.custom_description}</div>` : '';
+                const descLine = (!showDescOnly && item.custom_description) ? `<div class="text-xs text-gray-400 mt-0.5" style="white-space:pre-line">${esc(item.custom_description)}</div>` : '';
 
                 let r = `<td class="px-3 py-2 text-center">${i + 1}</td>`;
-                r += `<td class="px-3 py-2"><div class="font-semibold" style="white-space:pre-line">${name}</div>${descLine}</td>`;
+                r += `<td class="px-3 py-2"><div class="font-semibold" style="white-space:pre-line">${esc(name)}</div>${descLine}</td>`;
                 if (cv.qty) r += `<td class="px-3 py-2 text-right">${parseFloat(item.quantity || 0).toFixed(2)}</td>`;
                 if (cv.area) r += `<td class="px-3 py-2 text-right">${item.area ? parseFloat(item.area).toFixed(0) + ' sqft' : '-'}</td>`;
-                if (cv.mix) r += `<td class="px-3 py-2 text-xs text-gray-500">${item.mix_info || '-'}</td>`;
+                if (cv.mix) r += `<td class="px-3 py-2 text-xs text-gray-500">${esc(item.mix_info || '-')}</td>`;
                 if (cv.price) r += `<td class="px-3 py-2 text-right">${item.hide_price ? '' : fmtINR(r10(parseFloat(item.base_price || item.unit_price) || 0))}</td>`;
                 if (cv.markup) {
                     if (!item.hide_price && item.markup_type && parseFloat(item.markup_amount) > 0) {
@@ -335,7 +339,7 @@
                     } else r += '<td class="px-3 py-2 text-right">-</td>';
                 }
                 if (cv.final) r += `<td class="px-3 py-2 text-right font-semibold">${item.hide_price ? '' : fmtINR(r10(parseFloat(item.final_price || item.unit_price) || 0))}</td>`;
-                if (cv.breakdown) r += `<td class="px-3 py-2">${item.breakdown_cost || '-'}</td>`;
+                if (cv.breakdown) r += `<td class="px-3 py-2">${esc(item.breakdown_cost || '-')}</td>`;
                 if (cv.color) r += `<td class="px-3 py-2 text-right">${fmtINR(item.color_cost || 0)}</td>`;
                 if (cv.total) r += `<td class="px-3 py-2 text-right font-bold">${fmtINR(r10(parseFloat(item.line_total) || 0))}</td>`;
                 return `<tr class="print:text-xs">${r}</tr>`;
@@ -345,7 +349,7 @@
                 rows += `<tr class="bg-gray-100"><td colspan="${colCount}" class="px-3 py-2 font-bold text-sm border-t-2">Labor Charges</td></tr>`;
                 labor.forEach((l, i) => {
                     let r = `<td class="px-3 py-2 text-center">${products.length + i + 1}</td>`;
-                    r += `<td class="px-3 py-2 font-semibold">${l.labor_description || l.item_name || 'Labor'}</td>`;
+                    r += `<td class="px-3 py-2 font-semibold">${esc(l.labor_description || l.item_name || 'Labor')}</td>`;
                     const midCols = [cv.qty, cv.area, cv.mix, cv.price, cv.markup, cv.discount, cv.final, cv.breakdown, cv.color].filter(Boolean).length;
                     for (let c = 0; c < midCols; c++) r += '<td></td>';
                     if (cv.total) r += `<td class="px-3 py-2 text-right font-bold">${fmtINR(r10(parseFloat(l.line_total || l.base_price) || 0))}</td>`;

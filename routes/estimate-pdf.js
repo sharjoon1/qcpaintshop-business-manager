@@ -36,12 +36,21 @@ async function authenticateRequest(req) {
     const token = req.headers.authorization?.replace('Bearer ', '') || req.query.token;
     if (!token) return null;
     const [sessions] = await pool.query(
-        `SELECT s.*, u.id as user_id, u.username, u.role, u.full_name
+        `SELECT s.*, u.id as user_id, u.username, u.role, u.full_name, u.branch_id
          FROM user_sessions s JOIN users u ON s.user_id = u.id
          WHERE s.token_hash = LOWER(SHA2(?, 256)) AND s.expires_at > NOW() AND u.status = 'active'`,
         [token]
     );
     return sessions.length > 0 ? sessions[0] : null;
+}
+
+// Branch isolation (mirror of routes/estimates.js): admins/managers see all;
+// branch staff may access only unassigned (NULL) or their own branch's estimate.
+function pdfBranchAllowed(user, estimateBranchId) {
+    if (!user) return false;
+    if (['admin', 'manager', 'super_admin'].includes(user.role)) return true;
+    if (estimateBranchId === null || estimateBranchId === undefined) return true;
+    return Number(estimateBranchId) === Number(user.branch_id);
 }
 
 // GET /api/estimates/:id/pdf
@@ -53,10 +62,13 @@ router.get('/:id/pdf', async (req, res) => {
             return res.status(401).json({ success: false, message: 'Authentication required' });
         }
 
-        // Verify estimate exists
-        const [estimates] = await pool.query('SELECT estimate_number FROM estimates WHERE id = ?', [req.params.id]);
+        // Verify estimate exists + enforce branch isolation
+        const [estimates] = await pool.query('SELECT estimate_number, branch_id FROM estimates WHERE id = ?', [req.params.id]);
         if (estimates.length === 0) {
             return res.status(404).json({ success: false, message: 'Estimate not found' });
+        }
+        if (!pdfBranchAllowed(user, estimates[0].branch_id)) {
+            return res.status(403).json({ success: false, message: 'Not authorized for this estimate' });
         }
 
         const token = req.headers.authorization?.replace('Bearer ', '') || req.query.token;

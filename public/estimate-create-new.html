@@ -8,6 +8,7 @@
     <link rel="icon" type="image/png" sizes="192x192" href="/icons/icon-192x192.png">
     <title>Create Estimate - Quality Colors</title>
     <script src="/js/auth-helper.js"></script>
+    <script src="/js/idempotency-fetch.js"></script>
     <script>checkAuthOrRedirect();</script>
     <link rel="stylesheet" href="/css/tailwind.css">
     <script src="/universal-nav-loader.js"></script>
@@ -624,6 +625,10 @@ const RECENT_CUSTOMERS_KEY = 'est_recent_customers';
 let isEditMode = false;
 let editEstimateId = null;
 let editEstimateNumber = null;
+let originalEstimateDate = null;
+let originalValidUntil = null;
+// One idempotency key per create-page load (regenerated only on a fresh page load)
+let estimateCreateIdemKey = (typeof window !== 'undefined' && window.qcIdempotencyKey) ? window.qcIdempotencyKey() : null;
 
 // ════════════════════════════════════════
 // HELPERS
@@ -1293,7 +1298,6 @@ function pushEstimateItem(item) {
     });
     renderEstimateItems();
     updateTotals();
-    if (window.innerWidth < 768) closeDrawer();
 }
 
 // ════════════════════════════════════════
@@ -1714,7 +1718,13 @@ async function saveEstimate() {
         customer_name: selectedCustomer.name,
         customer_phone: selectedCustomer.phone || '',
         customer_address: selectedCustomer.address || '',
-        estimate_date: new Date().toISOString().split('T')[0],
+        // On edit, keep the estimate's original date/validity; only new estimates get today's date
+        estimate_date: (isEditMode && originalEstimateDate)
+            ? String(originalEstimateDate).split('T')[0]
+            : new Date().toISOString().split('T')[0],
+        valid_until: (isEditMode && originalValidUntil)
+            ? String(originalValidUntil).split('T')[0]
+            : null,
         show_gst_breakdown: 0,
         column_visibility: null,
         show_description_only: 0,
@@ -1768,9 +1778,15 @@ async function saveEstimate() {
     try {
         var method = isEditMode ? 'PUT' : 'POST';
         var url = isEditMode ? '/api/estimates/' + editEstimateId : '/api/estimates';
+        var headers = { 'Content-Type': 'application/json' };
+        // Idempotency-Key on create prevents a double-tap/retry from producing two
+        // estimates. One key per page load; a fresh create page = a fresh key.
+        if (!isEditMode && window.qcWithIdempotency && estimateCreateIdemKey) {
+            headers = window.qcWithIdempotency(estimateCreateIdemKey, headers);
+        }
         var res = await apiRequest(url, {
             method: method,
-            headers: { 'Content-Type': 'application/json' },
+            headers: headers,
             body: JSON.stringify(payload)
         });
         var data = await res.json();
@@ -1846,6 +1862,9 @@ async function loadEstimate(id) {
         isEditMode = true;
         editEstimateId = id;
         editEstimateNumber = est.estimate_number;
+        // Preserve the original document date/validity instead of resetting to today on save
+        originalEstimateDate = est.estimate_date || null;
+        originalValidUntil = est.valid_until || null;
 
         // Populate customer
         selectedCustomer = {

@@ -708,22 +708,22 @@
                 const displayName = showDescOnly && item.custom_description
                     ? item.custom_description
                     : (item.item_description || item.product_name || item.item_name || '');
-                const descLine = (!showDescOnly && item.custom_description) ? `<div style="font-size:10px; color:var(--text-light); margin-top:2px; white-space:pre-line;">${item.custom_description}</div>` : '';
+                const descLine = (!showDescOnly && item.custom_description) ? `<div style="font-size:10px; color:var(--text-light); margin-top:2px; white-space:pre-line;">${esc(item.custom_description)}</div>` : '';
 
                 let r = `<td style="text-align:center; color: var(--text-light); font-weight: 600;">${i + 1}</td>`;
 
                 if (colVis.show_image) {
                     r += `<td>${item.image_url
-                        ? `<img src="${item.image_url}" class="img-thumb" onerror="this.parentElement.innerHTML='${placeholderSvg.replace(/'/g, "\\'")}';">`
+                        ? `<img src="${esc(item.image_url)}" class="img-thumb" onerror="this.parentElement.innerHTML='${placeholderSvg.replace(/'/g, "\\'")}';">`
                         : placeholderSvg}</td>`;
                 }
 
-                r += `<td><div style="font-weight: 600; white-space:pre-line;">${displayName}</div>${descLine}</td>`;
+                r += `<td><div style="font-weight: 600; white-space:pre-line;">${esc(displayName)}</div>${descLine}</td>`;
 
-                if (colVis.show_pack_size) r += `<td>${item.pack_size || extractPackSize(item.mix_info)}</td>`;
+                if (colVis.show_pack_size) r += `<td>${esc(item.pack_size || extractPackSize(item.mix_info))}</td>`;
                 if (colVis.show_qty) r += `<td style="text-align:right;">${parseFloat(item.quantity || 0).toFixed(2)}</td>`;
                 if (colVis.show_area) r += `<td style="text-align:right;">${item.area ? parseFloat(item.area).toFixed(0) : '-'}</td>`;
-                if (colVis.show_mix) r += `<td style="color: var(--text-light); font-size: 11px;">${item.mix_info || '-'}</td>`;
+                if (colVis.show_mix) r += `<td style="color: var(--text-light); font-size: 11px;">${esc(item.mix_info || '-')}</td>`;
                 if (colVis.show_price) r += `<td style="text-align:right;">${item.hide_price ? '' : formatINR(roundUp10(parseFloat(item.base_price || item.unit_price) || 0))}</td>`;
                 if (colVis.show_markup) {
                     if (!item.hide_price && item.markup_type && parseFloat(item.markup_amount) > 0) {
@@ -747,7 +747,7 @@
                     const lt = parseFloat(item.line_total) || 0;
                     r += `<td style="text-align:right;">${area > 0 ? formatINR(lt / area) : '-'}</td>`;
                 }
-                if (colVis.show_breakdown) r += `<td style="color: var(--text-light);">${item.breakdown_cost || '-'}</td>`;
+                if (colVis.show_breakdown) r += `<td style="color: var(--text-light);">${esc(item.breakdown_cost || '-')}</td>`;
                 if (colVis.show_color) r += `<td style="text-align:right;">${formatINR(item.color_cost || 0)}</td>`;
                 if (colVis.show_total) r += `<td style="text-align:right; font-weight: 700; color: var(--text-dark);">${formatINR(roundUp10(parseFloat(item.line_total) || 0))}</td>`;
 
@@ -760,7 +760,7 @@
                 laborItemsList.forEach((l, i) => {
                     let r = `<td style="text-align:center; color: var(--text-light);">${productItems.length + i + 1}</td>`;
                     if (colVis.show_image) r += '<td></td>';
-                    r += `<td style="font-weight:600;">${l.labor_description || l.item_name || 'Labor'}</td>`;
+                    r += `<td style="font-weight:600;">${esc(l.labor_description || l.item_name || 'Labor')}</td>`;
                     // Fill remaining columns with empty cells except total
                     const middleCols = [colVis.show_pack_size, colVis.show_qty, colVis.show_area, colVis.show_mix, colVis.show_price, colVis.show_markup, colVis.show_discount, colVis.show_final_price, colVis.show_price_sqft, colVis.show_breakdown, colVis.show_color].filter(Boolean).length;
                     for (let c = 0; c < middleCols; c++) r += '<td></td>';
@@ -777,6 +777,11 @@
 
         // Round up to nearest 10
         function roundUp10(n) { return Math.ceil(n / 10) * 10; }
+
+        function esc(v) {
+            if (v === null || v === undefined) return '';
+            return String(v).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+        }
 
         function updatePrintSummary(products, labor) {
             // Recalculate from items with rounding

@@ -13,6 +13,17 @@ function logout() {
     window.location.href = '/login.html';
 }
 
+// HTML-escape user-controlled values before inserting into innerHTML (XSS guard)
+function esc(value) {
+    if (value === null || value === undefined) return '';
+    return String(value)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+}
+
 // Helper function for authenticated requests
 function getAuthHeaders() {
     const token = localStorage.getItem('auth_token');
@@ -120,9 +131,9 @@ function applyFilter() {
     
     // Filter by search term
     if (searchTerm) {
-        filteredEstimates = filteredEstimates.filter(e => 
-            e.estimate_number.toLowerCase().includes(searchTerm) ||
-            e.customer_name.toLowerCase().includes(searchTerm) ||
+        filteredEstimates = filteredEstimates.filter(e =>
+            (e.estimate_number && e.estimate_number.toLowerCase().includes(searchTerm)) ||
+            (e.customer_name && e.customer_name.toLowerCase().includes(searchTerm)) ||
             (e.customer_phone && e.customer_phone.includes(searchTerm))
         );
     }
@@ -191,17 +202,17 @@ function renderDesktopTable() {
     tbody.innerHTML = filteredEstimates.map(est => `
         <tr class="hover:bg-gray-50 cursor-pointer" onclick="viewEstimate('${est.id}')">
             <td class="px-6 py-4 whitespace-nowrap">
-                <div class="text-sm font-medium text-gray-900">#${est.estimate_number}</div>
+                <div class="text-sm font-medium text-gray-900">#${esc(est.estimate_number)}</div>
             </td>
             <td class="px-6 py-4 whitespace-nowrap">
-                <div class="text-sm font-medium text-gray-900">${est.customer_name}</div>
-                <div class="text-sm text-gray-500">${est.customer_address || ''}</div>
+                <div class="text-sm font-medium text-gray-900">${esc(est.customer_name)}</div>
+                <div class="text-sm text-gray-500">${esc(est.customer_address || '')}</div>
             </td>
             <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                ${est.customer_phone || '-'}
+                ${esc(est.customer_phone || '-')}
             </td>
             <td class="px-6 py-4 whitespace-nowrap">
-                <div class="text-sm font-bold text-gray-900">₹${parseFloat(est.grand_total).toLocaleString('en-IN')}</div>
+                <div class="text-sm font-bold text-gray-900">₹${(parseFloat(est.grand_total) || 0).toLocaleString('en-IN')}</div>
             </td>
             <td class="px-6 py-4 whitespace-nowrap">
                 ${getStatusBadge(est.status)}
@@ -240,7 +251,7 @@ function renderMobileCards() {
         <div class="bg-white rounded-xl shadow-lg p-4 hover:shadow-xl transition cursor-pointer" onclick="viewEstimate('${est.id}')">
             <div class="flex items-start justify-between mb-3">
                 <div>
-                    <div class="text-lg font-bold text-gray-900">#${est.estimate_number}</div>
+                    <div class="text-lg font-bold text-gray-900">#${esc(est.estimate_number)}</div>
                     <div class="text-sm text-gray-500">${formatDate(est.estimate_date)}</div>
                 </div>
                 ${getStatusBadge(est.status)}
@@ -251,7 +262,7 @@ function renderMobileCards() {
                     <svg class="w-4 h-4 mr-2 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path>
                     </svg>
-                    <span class="font-medium text-gray-900">${est.customer_name}</span>
+                    <span class="font-medium text-gray-900">${esc(est.customer_name)}</span>
                 </div>
                 
                 ${est.customer_phone ? `
@@ -259,7 +270,7 @@ function renderMobileCards() {
                     <svg class="w-4 h-4 mr-2 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z"></path>
                     </svg>
-                    <span class="text-gray-600">${est.customer_phone}</span>
+                    <span class="text-gray-600">${esc(est.customer_phone)}</span>
                 </div>
                 ` : ''}
                 
@@ -267,7 +278,7 @@ function renderMobileCards() {
                     <svg class="w-4 h-4 mr-2 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
                     </svg>
-                    <span class="font-bold text-gray-900">₹${parseFloat(est.grand_total).toLocaleString('en-IN')}</span>
+                    <span class="font-bold text-gray-900">₹${(parseFloat(est.grand_total) || 0).toLocaleString('en-IN')}</span>
                 </div>
             </div>
             
@@ -302,11 +313,13 @@ function getStatusBadge(status) {
 
 // Format date
 function formatDate(dateString) {
+    if (!dateString) return '-';
     const date = new Date(dateString);
-    return date.toLocaleDateString('en-IN', { 
-        year: 'numeric', 
-        month: 'short', 
-        day: 'numeric' 
+    if (isNaN(date.getTime())) return '-';
+    return date.toLocaleDateString('en-IN', {
+        year: 'numeric',
+        month: 'short',
+        day: 'numeric'
     });
 }
 
@@ -504,9 +517,12 @@ function assignToStaff(id) {
     alert('👤 Assign to staff - Coming in Phase 2!');
 }
 
+let _duplicating = false;
 async function duplicateEstimate(id) {
+    if (_duplicating) return; // guard against double-fire creating two copies
     if (!confirm('📋 Create a copy of this estimate?')) return;
-    
+    _duplicating = true;
+
     try {
         // Load the original estimate
         const response = await fetch(`/api/estimates/${id}`, { headers: getAuthHeaders() });
@@ -545,12 +561,17 @@ async function duplicateEstimate(id) {
             }))
         };
         
+        // Idempotency-Key so a retry of this exact duplicate can't create two copies
+        let headers = getAuthHeaders();
+        if (window.qcWithIdempotency && window.qcIdempotencyKey) {
+            headers = window.qcWithIdempotency(window.qcIdempotencyKey(), headers);
+        }
         const createResponse = await fetch('/api/estimates', {
             method: 'POST',
-            headers: getAuthHeaders(),
+            headers: headers,
             body: JSON.stringify(newEstimate)
         });
-        
+
         if (createResponse.ok) {
             const result = await createResponse.json();
             alert(`✅ Duplicate created: ${result.estimate_number}`);
@@ -561,6 +582,8 @@ async function duplicateEstimate(id) {
     } catch (error) {
         console.error('Error duplicating estimate:', error);
         alert('❌ Error duplicating estimate');
+    } finally {
+        _duplicating = false;
     }
 }
 
