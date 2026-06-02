@@ -925,7 +925,7 @@ router.get('/customer/:id/pdf', requireCustomerAuth, async (req, res) => {
         const [items] = await pool.query(
             `SELECT ei.*, p.name as product_name FROM estimate_items ei
              LEFT JOIN products p ON ei.product_id = p.id
-             WHERE ei.estimate_id = ? AND ei.deleted_at IS NULL ORDER BY ei.display_order`,
+             WHERE ei.estimate_id = ? AND ei.deleted_at IS NULL ORDER BY ei.display_order, ei.id`,
             [req.params.id]
         );
 
@@ -933,7 +933,7 @@ router.get('/customer/:id/pdf', requireCustomerAuth, async (req, res) => {
 
         let colVis = { show_qty: true, show_mix: true, show_price: true, show_breakdown: true, show_color: true, show_total: true };
         if (estimate.column_visibility) {
-            try { colVis = { ...colVis, ...JSON.parse(estimate.column_visibility) }; } catch (e) {}
+            try { colVis = { ...colVis, ...JSON.parse(estimate.column_visibility) }; } catch {}
         }
 
         const { generateEstimatePDF } = require('./estimate-pdf-generator');
