@@ -3,9 +3,6 @@
 const express = require('express');
 const router = express.Router();
 const { requirePermission, requireAuth } = require('../middleware/permissionMiddleware');
-const { requireCustomerAuth } = require('../middleware/customerAuth');
-const { samePhone } = require('../services/phone-match');
-const { getBranding } = require('../services/branding');
 const { idempotent, setPool: setIdempotencyPool } = require('../middleware/idempotency');
 const audit = require('../services/audit-log');
 
@@ -871,76 +868,6 @@ router.get('/:id/purchase-orders', requireAuth, async (req, res) => {
     } catch (err) {
         console.error('Get estimate POs error:', err);
         res.status(500).json({ success: false, message: 'Failed to fetch POs' });
-    }
-});
-
-// ========================================
-// GET ESTIMATE FOR AUTHENTICATED CUSTOMER (read-only, phone-scoped)
-// Customer-facing pages authenticate with a customer_token (requireCustomerAuth),
-// which the staff `estimates.view` permission gate rejects. This endpoint lets a
-// logged-in customer fetch ONLY their own estimate (matched by phone).
-// Declared before '/:id' — the literal 'customer' prefix keeps it distinct.
-// ========================================
-router.get('/customer/:id', requireCustomerAuth, async (req, res) => {
-    try {
-        const [estimate] = await pool.query('SELECT * FROM estimates WHERE id = ?', [req.params.id]);
-        if (estimate.length === 0) {
-            return res.status(404).json({ error: 'Estimate not found' });
-        }
-
-        // Ownership check: the estimate's customer phone must match the session phone.
-        if (!req.customer || !samePhone(estimate[0].customer_phone, req.customer.phone)) {
-            return res.status(403).json({ error: 'Not authorized for this estimate' });
-        }
-
-        const [items] = await pool.query(`
-            SELECT ei.*, p.name as product_name, p.product_type as product_type
-            FROM estimate_items ei
-            LEFT JOIN products p ON ei.product_id = p.id
-            WHERE ei.estimate_id = ? AND ei.deleted_at IS NULL
-            ORDER BY ei.display_order, ei.id
-        `, [req.params.id]);
-
-        res.json({ ...estimate[0], items });
-    } catch (err) {
-        console.error('Get customer estimate error:', err);
-        res.status(500).json({ error: 'Failed to load estimate' });
-    }
-});
-
-// ========================================
-// GET ESTIMATE PDF FOR AUTHENTICATED CUSTOMER (phone-scoped)
-// Reuses the PDFKit generator (same as the public share PDF) so customers can
-// fetch/share their own estimate PDF without a staff token.
-// ========================================
-router.get('/customer/:id/pdf', requireCustomerAuth, async (req, res) => {
-    try {
-        const [estimates] = await pool.query('SELECT * FROM estimates WHERE id = ?', [req.params.id]);
-        if (!estimates.length) return res.status(404).json({ error: 'Estimate not found' });
-        const estimate = estimates[0];
-        if (!req.customer || !samePhone(estimate.customer_phone, req.customer.phone)) {
-            return res.status(403).json({ error: 'Not authorized for this estimate' });
-        }
-
-        const [items] = await pool.query(
-            `SELECT ei.*, p.name as product_name FROM estimate_items ei
-             LEFT JOIN products p ON ei.product_id = p.id
-             WHERE ei.estimate_id = ? AND ei.deleted_at IS NULL ORDER BY ei.display_order, ei.id`,
-            [req.params.id]
-        );
-
-        const branding = await getBranding(pool);
-
-        let colVis = { show_qty: true, show_mix: true, show_price: true, show_breakdown: true, show_color: true, show_total: true };
-        if (estimate.column_visibility) {
-            try { colVis = { ...colVis, ...JSON.parse(estimate.column_visibility) }; } catch {}
-        }
-
-        const { generateEstimatePDF } = require('./estimate-pdf-generator');
-        generateEstimatePDF(res, estimate, items, branding, colVis);
-    } catch (err) {
-        console.error('Customer estimate PDF error:', err);
-        if (!res.headersSent) res.status(500).json({ error: 'Failed to generate PDF' });
     }
 });
 

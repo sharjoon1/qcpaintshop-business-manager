@@ -3550,6 +3550,40 @@ app.get('/api/customer/me/estimates/:id', requireCustomerAuth, async (req, res) 
     }
 });
 
+// Customer portal — PDF of the authenticated customer's own estimate.
+// Same ownership match as GET /api/customer/me/estimates/:id, then reuse the
+// shared PDFKit generator (same one the public share PDF uses).
+app.get('/api/customer/me/estimates/:id/pdf', requireCustomerAuth, async (req, res) => {
+    try {
+        const [rows] = await pool.query(
+            `SELECT e.* FROM estimates e
+             LEFT JOIN customers c ON e.customer_id = c.id
+             WHERE e.id = ? AND (c.phone = ? OR e.customer_phone = ?)
+             LIMIT 1`,
+            [req.params.id, req.customer.phone, req.customer.phone]
+        );
+        if (!rows.length) return res.status(404).json({ success: false, message: 'Not found' });
+        const estimate = rows[0];
+        const [items] = await pool.query(
+            `SELECT ei.*, p.name as product_name FROM estimate_items ei
+             LEFT JOIN products p ON ei.product_id = p.id
+             WHERE ei.estimate_id = ? AND ei.deleted_at IS NULL ORDER BY ei.display_order, ei.id`,
+            [req.params.id]
+        );
+        const { getBranding } = require('./services/branding');
+        const branding = await getBranding(pool);
+        let colVis = { show_qty: true, show_mix: true, show_price: true, show_breakdown: true, show_color: true, show_total: true };
+        if (estimate.column_visibility) {
+            try { colVis = { ...colVis, ...JSON.parse(estimate.column_visibility) }; } catch {}
+        }
+        const { generateEstimatePDF } = require('./routes/estimate-pdf-generator');
+        generateEstimatePDF(res, estimate, items, branding, colVis);
+    } catch (error) {
+        console.error('Customer estimate PDF error:', error);
+        if (!res.headersSent) res.status(500).json({ success: false, message: 'Failed to generate PDF' });
+    }
+});
+
 // Customer portal — Zoho invoices for the authenticated customer.
 // Match path: req.customer.phone → zoho_customers_map.zoho_phone →
 // zoho_contact_id → zoho_invoices.zoho_customer_id. Matches against the
