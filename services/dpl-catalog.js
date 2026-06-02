@@ -205,4 +205,49 @@ function applyDplPrices(brand, parsedRows, existingCatalog) {
     return { updated, newNeedsLinking, noDplThisTime };
 }
 
-module.exports = { setPool, slug, normalizeSizeTier, extractSizeFromZohoName, buildMatchKey, linkEntryToZoho, buildCatalogFromDpl, applyDplPrices };
+// ── DB layer ────────────────────────────────────────────────────
+
+const _COLS = [
+    'brand', 'match_key', 'category', 'product_code', 'product_name', 'base_name',
+    'size_tier', 'dpl_size_label', 'zoho_item_id', 'canonical_name', 'canonical_sku',
+    'canonical_description', 'current_dpl', 'current_rate', 'link_status',
+    'link_confidence', 'link_reason', 'updated_by',
+];
+
+async function upsertEntries(entries, updatedBy) {
+    for (const e of (entries || [])) {
+        const row = { ...e, updated_by: updatedBy || null };
+        const values = _COLS.map(c => (row[c] === undefined ? null : row[c]));
+        const placeholders = _COLS.map(() => '?').join(', ');
+        // On conflict (same match_key) update everything except the identity columns.
+        const updates = _COLS.filter(c => c !== 'brand' && c !== 'match_key')
+            .map(c => `${c} = VALUES(${c})`).join(', ');
+        await pool.query(
+            `INSERT INTO dpl_catalog (${_COLS.join(', ')}) VALUES (${placeholders})
+             ON DUPLICATE KEY UPDATE ${updates}`,
+            values
+        );
+    }
+}
+
+async function getCatalog(brand) {
+    const [rows] = await pool.query(
+        `SELECT * FROM dpl_catalog WHERE brand = ? ORDER BY category, product_name, base_name, size_tier`,
+        [brand]
+    );
+    return rows;
+}
+
+async function confirmLink(id, zohoItemId, updatedBy) {
+    await pool.query(
+        `UPDATE dpl_catalog SET zoho_item_id = ?, link_status = 'confirmed', link_confidence = 100,
+            link_reason = 'user-confirmed', updated_by = ? WHERE id = ?`,
+        [zohoItemId, updatedBy || null, id]
+    );
+}
+
+module.exports = {
+    setPool, slug, normalizeSizeTier, extractSizeFromZohoName, buildMatchKey,
+    linkEntryToZoho, buildCatalogFromDpl, applyDplPrices,
+    upsertEntries, getCatalog, confirmLink,
+};

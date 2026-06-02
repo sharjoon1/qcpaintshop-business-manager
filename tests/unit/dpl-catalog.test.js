@@ -160,6 +160,39 @@ describe('applyDplPrices', () => {
     });
 });
 
+describe('dpl-catalog DB layer', () => {
+    test('upsertEntries issues an INSERT ... ON DUPLICATE KEY per entry', async () => {
+        const calls = [];
+        catalog.setPool({ query: async (sql, params) => { calls.push({ sql, params }); return [{ affectedRows: 1 }]; } });
+        await catalog.upsertEntries([
+            { brand: 'birlaopus', match_key: 'birlaopus|941001|white|1l', category: 'Interior Luxury', product_code: '941001', product_name: 'One Pure Elegance', base_name: 'White', size_tier: '1L', dpl_size_label: '1L', zoho_item_id: 'Z1', canonical_name: 'X', canonical_sku: 'PEWH01', canonical_description: 'D', current_dpl: 490, current_rate: 636, link_status: 'confirmed', link_confidence: 90, link_reason: 'product+base+tier' },
+        ], 'tester');
+        expect(calls.length).toBe(1);
+        expect(/INSERT INTO dpl_catalog/i.test(calls[0].sql)).toBe(true);
+        expect(/ON DUPLICATE KEY UPDATE/i.test(calls[0].sql)).toBe(true);
+        expect(calls[0].params).toContain('birlaopus|941001|white|1l');
+    });
+
+    test('getCatalog selects by brand', async () => {
+        let captured;
+        catalog.setPool({ query: async (sql, params) => { captured = { sql, params }; return [[{ id: 1 }]]; } });
+        const rows = await catalog.getCatalog('birlaopus');
+        expect(rows).toEqual([{ id: 1 }]);
+        expect(/FROM dpl_catalog WHERE brand = \?/i.test(captured.sql)).toBe(true);
+        expect(captured.params).toEqual(['birlaopus']);
+    });
+
+    test('confirmLink pins zoho_item_id and sets status confirmed', async () => {
+        let captured;
+        catalog.setPool({ query: async (sql, params) => { captured = { sql, params }; return [{ affectedRows: 1 }]; } });
+        await catalog.confirmLink(7, 'Z9', 'tester');
+        expect(/UPDATE dpl_catalog SET/i.test(captured.sql)).toBe(true);
+        expect(/zoho_item_id = \?/i.test(captured.sql)).toBe(true);
+        expect(/link_status = 'confirmed'/i.test(captured.sql)).toBe(true);
+        expect(captured.params).toEqual(['Z9', 'tester', 7]);
+    });
+});
+
 describe('migrate-dpl-catalog', () => {
     test('exports up() and creates the table idempotently', async () => {
         const mig = require('../../migrations/migrate-dpl-catalog');
