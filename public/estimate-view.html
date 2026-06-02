@@ -456,7 +456,7 @@
                     try {
                         const r = await apiRequest('/api/share/whatsapp', {
                             method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
+                            headers: { ...getAuthHeaders() },
                             body: JSON.stringify({ resource_type: 'estimate', resource_id: estimateId })
                         });
                         const res = await r.json();
