@@ -52,4 +52,11 @@ function extractSizeFromZohoName(name, sku) {
     return last[2].toLowerCase() === 'ml' ? (last[1] + 'ml') : (last[1] + 'L');
 }
 
-module.exports = { setPool, slug, normalizeSizeTier, extractSizeFromZohoName };
+function buildMatchKey({ brand, product_code, product_name, base_name, size_tier }) {
+    const code = (product_code && String(product_code).trim())
+        ? String(product_code).trim().toLowerCase()
+        : slug(product_name);
+    return [slug(brand), code, slug(base_name), slug(size_tier)].join('|');
+}
+
+module.exports = { setPool, slug, normalizeSizeTier, extractSizeFromZohoName, buildMatchKey };
