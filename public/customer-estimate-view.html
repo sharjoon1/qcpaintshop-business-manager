@@ -35,6 +35,9 @@
                 Back
             </button>
             <div class="flex gap-2">
+                <button onclick="shareCustomerPdf()" class="bg-white/20 hover:bg-white/30 px-3 py-1.5 rounded-lg text-sm font-medium transition">
+                    📲 Share
+                </button>
                 <button onclick="downloadCustomerPDF()" class="bg-white/20 hover:bg-white/30 px-3 py-1.5 rounded-lg text-sm font-medium transition">
                     PDF
                 </button>
@@ -117,6 +120,7 @@
         </div>
     </div>
 
+<script src="/js/share-pdf.js"></script>
 <script>
 const params = new URLSearchParams(window.location.search);
 const estimateId = params.get('id');
@@ -173,6 +177,19 @@ function downloadCustomerPDF() {
     // The server PDF endpoint is staff-gated; customers print the page to PDF
     // via the browser (the page has @media print styles for a clean output).
     window.print();
+}
+
+function shareCustomerPdf() {
+    const token = localStorage.getItem('customer_token');
+    if (!token) { window.location.href = '/customer-login.html'; return; }
+    const num = document.getElementById('estNumber').textContent || estimateId;
+    qcSharePdf({
+        pdfUrl: '/api/estimates/customer/' + estimateId + '/pdf',
+        headers: { 'Authorization': 'Bearer ' + token },
+        filename: 'Estimate-' + num + '.pdf',
+        shareTitle: 'Estimate ' + num,
+        shareText: 'Estimate ' + num + ' from Quality Colours'
+    });
 }
 
 function esc(str) { return (str || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
