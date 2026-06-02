@@ -359,6 +359,7 @@ function showActions(id) {
         { label: '✏️ Edit Estimate', action: 'editEstimate' },
         { label: '📱 Share via WhatsApp', action: 'shareWhatsApp' },
         { label: '📄 Download PDF', action: 'downloadPDF' },
+        { label: '📲 Share PDF', action: 'sharePdf' },
         { label: '📧 Send to Customer', action: 'sendEstimate' },
         { label: '✅ Mark as Approved', action: 'approveEstimate', show: estimate.status !== 'approved' },
         { label: '📨 Mark as Sent', action: 'markAsSent', show: estimate.status === 'draft' },
@@ -405,6 +406,9 @@ function handleAction(actionName) {
             break;
         case 'downloadPDF':
             downloadPDF(id);
+            break;
+        case 'sharePdf':
+            sharePdf(id);
             break;
         case 'approveEstimate':
             changeStatus(id, 'approved');
@@ -479,6 +483,31 @@ function downloadPDF(id) {
             alert('Failed to download PDF');
         });
     }
+}
+
+function sharePdf(id) {
+    const token = localStorage.getItem('auth_token');
+    const est = allEstimates.find(e => e.id == id);
+    const num = est && est.estimate_number ? est.estimate_number : id;
+    qcSharePdf({
+        pdfUrl: `/api/estimates/${id}/pdf`,
+        headers: { 'Authorization': `Bearer ${token}` },
+        filename: `Estimate-${num}.pdf`,
+        shareTitle: `Estimate ${num}`,
+        shareText: `Estimate ${num} from Quality Colours`,
+        getFallbackUrl: async function () {
+            try {
+                const r = await fetch('/api/share/whatsapp', {
+                    method: 'POST',
+                    headers: getAuthHeaders(),
+                    body: JSON.stringify({ resource_type: 'estimate', resource_id: id })
+                });
+                const res = await r.json();
+                if (res.success && res.data && res.data.whatsapp_url) return res.data.whatsapp_url;
+            } catch (e) { /* ignore */ }
+            return null;
+        }
+    });
 }
 
 async function changeStatus(id, newStatus) {
