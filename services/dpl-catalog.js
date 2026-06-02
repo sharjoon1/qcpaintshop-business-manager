@@ -59,61 +59,91 @@ function buildMatchKey({ brand, product_code, product_name, base_name, size_tier
     return [slug(brand), code, slug(base_name), slug(size_tier)].join('|');
 }
 
-// Tokenize a string into lowercase alphanumeric word tokens.
+// ── SKU reconstruction (the real Birla Zoho match key) ───────────
+// Real Zoho Birla item NAMES carry no base/shade; the base is encoded in the
+// SKU as {ProductShort}{Base}{SizeCode}: PE9901 = One Pure Elegance White 1L
+// (PE+99+01), PE101 = Pastel/Base1 (PE+1+01). The DPL `baseCode` field
+// ("PE White", "PE 1") encodes ProductShort+Base and equals the Zoho SKU minus
+// its size-code — that is the deterministic match (validated on real data:
+// 245 clean matches, 0 ambiguous).
+
+// Per-tier Zoho SKU size-code suffix.
+const SIZE_CODE = { '1L': '01', '4L': '04', '10L': '10', '20L': '20' };
+
+// Colour-word → Zoho base segment (numeric bases pass through; words need a map).
+// Extend as new special bases surface; unmapped ones fall to review.
+const BASE_WORD_CODE = { white: '99' };
+
+// DPL baseCode ("PE White" / "PE 1") → SKU stem ("pe99" / "pe1").
+function dplBaseStem(baseCode) {
+    const bc = String(baseCode == null ? '' : baseCode).trim().toLowerCase();
+    if (!bc) return '';
+    const m = bc.match(/^([a-z]+)\s+(.+)$/);
+    if (!m) return bc.replace(/[^a-z0-9]+/g, '');
+    let base = m[2].replace(/\s+/g, '');
+    base = BASE_WORD_CODE[base] || base;
+    return m[1] + base.replace(/[^a-z0-9]+/g, '');
+}
+
+// Zoho item → { stem, tier } when its SKU ends with the expected size-code for
+// its tier (a cleanly structured Birla SKU); else null.
+function zohoSkuStem(zi) {
+    const name = zi.name || zi.zoho_item_name || '';
+    const sku = String(zi.sku || zi.zoho_sku || '').toLowerCase();
+    const tier = normalizeSizeTier(extractSizeFromZohoName(name, sku));
+    const sc = SIZE_CODE[tier];
+    if (!sc || !sku.endsWith(sc)) return null;
+    return { stem: sku.slice(0, -sc.length), tier };
+}
+
+// Tokenize a string into lowercase alphanumeric word tokens (for the name fallback).
 function tokenize(s) {
     return String(s == null ? '' : s).toLowerCase().match(/[a-z0-9]+/g) || [];
 }
-
-// True when every needle token is present as a WHOLE token in the set.
-// Whole-token (not substring) matching: 'base 2' does NOT match 'base 20'.
 function hasAllTokens(tokenSet, needleTokens) {
     return needleTokens.length > 0 && needleTokens.every(t => tokenSet.has(t));
 }
 
-// Build a token-set + size-tier probe for a Zoho item.
-function zohoProbe(zi) {
-    const name = zi.name || zi.zoho_item_name || '';
-    const sku = zi.sku || zi.zoho_sku || '';
-    return {
-        zi,
-        tokens: new Set(tokenize(name + ' ' + sku)),
-        sizeTier: normalizeSizeTier(extractSizeFromZohoName(name, sku)),
-    };
-}
-
-// Link one catalog entry to exactly one Zoho item — DETERMINISTIC, whole-token, no fuzzy abbrev.
-//   S1 exact canonical SKU (100)
-//   S2 all product tokens + all base tokens present in the Zoho name AND size-tier equal (90, confirmed)
-//   S3 all product tokens present + size-tier equal, base ignored (70, review)
+// Link one catalog entry to exactly one Zoho item.
+//   S0 exact canonical SKU (100, confirmed) — re-match of a pinned entry
+//   S1 SKU reconstruction: dplBaseStem(base_code) + size-code == Zoho SKU stem (95, confirmed)
+//   S2 name product-token + tier fallback (≤70, REVIEW only — names lack base, can't confirm)
 //   else needs_creating.
-// NOTE: entry.size_tier MUST already be a canonical tier (use normalizeSizeTier before calling).
-// Size is compared by TIER, so a DPL 900ml entry (tier 1L) links to a Zoho 1L item.
+// NOTE: entry.size_tier MUST already be a canonical tier. Size is matched by TIER,
+// so a DPL off-size base (e.g. White 3.6L → tier 4L) links to the Zoho 4L SKU.
 function linkEntryToZoho(entry, zohoItems) {
     const items = zohoItems || [];
 
-    // S1
+    // S0: exact canonical SKU
     if (entry.canonical_sku) {
         const want = String(entry.canonical_sku).toUpperCase();
         const hit = items.find(z => String(z.sku || z.zoho_sku || '').toUpperCase() === want);
         if (hit) return { zoho_item_id: hit.zoho_item_id, link_status: 'confirmed', link_confidence: 100, link_reason: 'exact-sku' };
     }
 
+    // S1: SKU reconstruction (PRIMARY — deterministic)
+    const stem = dplBaseStem(entry.base_code);
+    if (stem && SIZE_CODE[entry.size_tier]) {
+        const hits = items.filter(z => {
+            const s = zohoSkuStem(z);
+            return s && s.stem === stem && s.tier === entry.size_tier;
+        });
+        if (hits.length === 1) return { zoho_item_id: hits[0].zoho_item_id, link_status: 'confirmed', link_confidence: 95, link_reason: 'sku-reconstruct' };
+        if (hits.length > 1) return { zoho_item_id: null, link_status: 'review', link_confidence: 55, link_reason: 'ambiguous-sku' };
+    }
+
+    // S2: name product+tier fallback → REVIEW (names carry no base; cannot confirm a base)
     const eProd = tokenize(entry.product_name);
-    const eBase = tokenize(entry.base_name);
-    const eTier = entry.size_tier;
-    const probes = items.map(zohoProbe);
-
-    const prodTierMatch = p => hasAllTokens(p.tokens, eProd) && p.sizeTier === eTier;
-
-    // S2: product + base + tier
-    const s2 = probes.filter(p => prodTierMatch(p) && (eBase.length === 0 ? true : hasAllTokens(p.tokens, eBase)));
-    if (s2.length === 1) return { zoho_item_id: s2[0].zi.zoho_item_id, link_status: 'confirmed', link_confidence: 90, link_reason: 'product+base+tier' };
-    if (s2.length > 1) return { zoho_item_id: null, link_status: 'review', link_confidence: 60, link_reason: 'ambiguous-product+base+tier' };
-
-    // S3: product + tier (any base) — softer, needs review
-    const s3 = probes.filter(prodTierMatch);
-    if (s3.length === 1) return { zoho_item_id: s3[0].zi.zoho_item_id, link_status: 'review', link_confidence: 70, link_reason: 'product+tier-only' };
-    if (s3.length > 1) return { zoho_item_id: null, link_status: 'review', link_confidence: 50, link_reason: 'ambiguous-product+tier' };
+    if (eProd.length) {
+        const probes = items.map(z => {
+            const name = z.name || z.zoho_item_name || '';
+            const sku = z.sku || z.zoho_sku || '';
+            return { zi: z, tokens: new Set(tokenize(name + ' ' + sku)), tier: normalizeSizeTier(extractSizeFromZohoName(name, sku)) };
+        });
+        const s2 = probes.filter(p => hasAllTokens(p.tokens, eProd) && p.tier === entry.size_tier);
+        if (s2.length === 1) return { zoho_item_id: s2[0].zi.zoho_item_id, link_status: 'review', link_confidence: 70, link_reason: 'product+tier-only' };
+        if (s2.length > 1) return { zoho_item_id: null, link_status: 'review', link_confidence: 50, link_reason: 'ambiguous-product+tier' };
+    }
 
     return { zoho_item_id: null, link_status: 'needs_creating', link_confidence: 0, link_reason: 'no-match' };
 }
@@ -126,22 +156,39 @@ function splitProductBase(product) {
     return { product_name: s.slice(0, idx).trim(), base_name: s.slice(idx + 3).trim() };
 }
 
+// Normalize a parsed DPL row into the consistent fields the catalog uses.
+// Prefers the CSV-parser shape (productCode/colourCode/colourName/baseCode);
+// falls back to the tabular shape (baseCode = 6-digit code, product = "Name - Shade").
+function normalizeRow(row) {
+    const split = splitProductBase(row.product);
+    const dpl = parseFloat(row.dpl) || 0;
+    return {
+        product_code: String(row.productCode || row.baseCode || '').trim(),
+        product_name: row.productName || split.product_name,
+        base_name: row.colourName || split.base_name,
+        base_code: row.baseCode || '',          // "PE White" — SKU-stem source (CSV shape)
+        size_tier: normalizeSizeTier(row.packSize),
+        dpl_size_label: row.packSize || null,
+        dpl,
+        category: row.category || null,
+    };
+}
+
 function buildCatalogFromDpl(brand, parsedRows, zohoItems) {
     const out = [];
     for (const row of (parsedRows || [])) {
-        const { product_name, base_name } = splitProductBase(row.product);
-        const size_tier = normalizeSizeTier(row.packSize);
-        const dpl = parseFloat(row.dpl) || 0;
+        const n = normalizeRow(row);
         const entry = {
             brand,
-            category: row.category || null,
-            product_code: row.baseCode || '',
-            product_name,
-            base_name,
-            size_tier,
-            dpl_size_label: row.packSize || null,
-            current_dpl: dpl || null,
-            current_rate: dpl > 0 ? Math.ceil(dpl * 1.18 * 1.10) : null,
+            category: n.category,
+            product_code: n.product_code,
+            product_name: n.product_name,
+            base_name: n.base_name,
+            base_code: n.base_code,
+            size_tier: n.size_tier,
+            dpl_size_label: n.dpl_size_label,
+            current_dpl: n.dpl || null,
+            current_rate: n.dpl > 0 ? Math.ceil(n.dpl * 1.18 * 1.10) : null,
             zoho_item_id: null,
             canonical_name: null,
             canonical_sku: null,
@@ -159,7 +206,7 @@ function buildCatalogFromDpl(brand, parsedRows, zohoItems) {
             const zi = (zohoItems || []).find(z => z.zoho_item_id === entry.zoho_item_id);
             if (zi) {
                 const pf = computeProposedFields(
-                    { product: row.product, packSize: row.packSize, dpl, category: row.category },
+                    { product: row.product, packSize: row.packSize, dpl: n.dpl, category: n.category },
                     { sku: zi.sku || zi.zoho_sku || '', description: zi.description || '', category: zi.category || zi.zoho_category_name || '' },
                     'birlaopus'
                 );
@@ -182,11 +229,9 @@ function applyDplPrices(brand, parsedRows, existingCatalog) {
     const newNeedsLinking = [];
 
     for (const row of (parsedRows || [])) {
-        const { product_name, base_name } = splitProductBase(row.product);
-        const size_tier = normalizeSizeTier(row.packSize);
-        const match_key = buildMatchKey({ brand, product_code: row.baseCode || '', product_name, base_name, size_tier });
-        const dpl = parseFloat(row.dpl) || 0;
-        const new_rate = dpl > 0 ? Math.ceil(dpl * 1.18 * 1.10) : null;
+        const n = normalizeRow(row);
+        const match_key = buildMatchKey({ brand, product_code: n.product_code, product_name: n.product_name, base_name: n.base_name, size_tier: n.size_tier });
+        const new_rate = n.dpl > 0 ? Math.ceil(n.dpl * 1.18 * 1.10) : null;
 
         const existing = byKey.get(match_key);
         if (existing) {
@@ -194,10 +239,10 @@ function applyDplPrices(brand, parsedRows, existingCatalog) {
             updated.push({
                 id: existing.id, match_key, zoho_item_id: existing.zoho_item_id,
                 old_dpl: existing.current_dpl != null ? parseFloat(existing.current_dpl) : null,
-                new_dpl: dpl, new_rate,
+                new_dpl: n.dpl, new_rate,
             });
         } else {
-            newNeedsLinking.push({ match_key, product_name, base_name, size_tier, dpl_size_label: row.packSize, new_dpl: dpl, new_rate });
+            newNeedsLinking.push({ match_key, product_name: n.product_name, base_name: n.base_name, size_tier: n.size_tier, dpl_size_label: n.dpl_size_label, new_dpl: n.dpl, new_rate });
         }
     }
 
@@ -248,6 +293,6 @@ async function confirmLink(id, zohoItemId, updatedBy) {
 
 module.exports = {
     setPool, slug, normalizeSizeTier, extractSizeFromZohoName, buildMatchKey,
-    linkEntryToZoho, buildCatalogFromDpl, applyDplPrices,
+    dplBaseStem, zohoSkuStem, linkEntryToZoho, buildCatalogFromDpl, applyDplPrices,
     upsertEntries, getCatalog, confirmLink,
 };
