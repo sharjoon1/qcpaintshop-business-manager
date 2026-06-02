@@ -44,6 +44,7 @@ const reorderCompute = require('../services/reorder-compute-service');
 const reorderReport = require('../services/reorder-report-service');
 const vendorItemMapper = require('../services/vendor-item-mapper');
 const brandDplService = require('../services/brand-dpl-service');
+const dplCatalogService = require('../services/dpl-catalog');
 const pathMod = require('path');
 const fsMod = require('fs');
 
@@ -104,6 +105,71 @@ function assertSupportedBrand(brand, res) {
     return true;
 }
 
+// ========================================
+// DPL CATALOG (deterministic item-master mediator) — build / read / confirm-link
+// ========================================
+
+// Build (or rebuild) the brand catalog from its saved DPL + the active Zoho items.
+router.post('/items/dpl-catalog/:brand/build', requirePermission('zoho', 'manage'), async (req, res) => {
+    try {
+        const brand = String(req.params.brand || '').toLowerCase();
+        if (!assertSupportedBrand(brand, res)) return;
+
+        const parsedRows = await brandDplService.getForMatch(brand);
+        if (!parsedRows || !parsedRows.length) {
+            return res.status(404).json({ success: false, message: 'No saved DPL for this brand. Save a DPL first.' });
+        }
+
+        const [zohoItems] = await pool.query(
+            `SELECT zoho_item_id, zoho_item_name AS name, zoho_sku AS sku, zoho_rate AS rate,
+                    zoho_cf_dpl AS cf_dpl, zoho_brand AS brand, zoho_category_name AS category,
+                    zoho_description AS description
+             FROM zoho_items_map WHERE zoho_status = 'active'`
+        );
+
+        const entries = dplCatalogService.buildCatalogFromDpl(brand, parsedRows, zohoItems);
+        const updatedBy = req.user ? (req.user.username || String(req.user.id)) : null;
+        await dplCatalogService.upsertEntries(entries, updatedBy);
+
+        const summary = { total: entries.length, confirmed: 0, review: 0, needs_creating: 0 };
+        entries.forEach(e => { summary[e.link_status] = (summary[e.link_status] || 0) + 1; });
+
+        res.json({ success: true, data: summary });
+    } catch (err) {
+        console.error('DPL catalog build error:', err);
+        res.status(500).json({ success: false, message: err.message });
+    }
+});
+
+// Read the brand catalog (all entries, grouped client-side for the review UI).
+router.get('/items/dpl-catalog/:brand', requirePermission('zoho', 'manage'), async (req, res) => {
+    try {
+        const brand = String(req.params.brand || '').toLowerCase();
+        if (!assertSupportedBrand(brand, res)) return;
+        const entries = await dplCatalogService.getCatalog(brand);
+        res.json({ success: true, data: entries });
+    } catch (err) {
+        console.error('DPL catalog get error:', err);
+        res.status(500).json({ success: false, message: err.message });
+    }
+});
+
+// Pin a catalog entry to a specific Zoho item (user-confirmed link).
+router.post('/items/dpl-catalog/entry/:id/confirm-link', requirePermission('zoho', 'manage'), async (req, res) => {
+    try {
+        const id = parseInt(req.params.id, 10);
+        if (!Number.isFinite(id)) return res.status(400).json({ success: false, message: 'Invalid entry id' });
+        const zohoItemId = req.body && req.body.zoho_item_id;
+        if (!zohoItemId) return res.status(400).json({ success: false, message: 'zoho_item_id required' });
+        const updatedBy = req.user ? (req.user.username || String(req.user.id)) : null;
+        await dplCatalogService.confirmLink(id, String(zohoItemId), updatedBy);
+        res.json({ success: true });
+    } catch (err) {
+        console.error('DPL catalog confirm-link error:', err);
+        res.status(500).json({ success: false, message: err.message });
+    }
+});
+
 // Module-scoped flag to prevent concurrent invoice-line back-fills
 let invoiceBackfillState = { running: false, startedAt: null };
 
@@ -156,6 +222,7 @@ function setPool(dbPool) {
     zohoAPI.setPool(dbPool);
     purchaseSuggestion.setPool(dbPool);
     brandDplService.setPool(dbPool);
+    dplCatalogService.setPool(dbPool);
 
     // Ensure Zoho permissions have proper display names (auto-fix for existing databases)
     ensureZohoPermissions(dbPool).catch(err => {
