@@ -1,3 +1,38 @@
+const catalog = require('../../services/dpl-catalog');
+
+describe('slug', () => {
+    test('lowercases and strips non-alphanumerics', () => {
+        expect(catalog.slug('One Pure Elegance')).toBe('onepureelegance');
+        expect(catalog.slug('Base 2')).toBe('base2');
+        expect(catalog.slug(null)).toBe('');
+    });
+});
+
+describe('normalizeSizeTier', () => {
+    const cases = [
+        ['200ml', '200ml'], ['200 ML', '200ml'],
+        ['900ml', '1L'], ['0.9L', '1L'], ['1L', '1L'],
+        ['3.6L', '4L'], ['4L', '4L'],
+        ['9L', '10L'], ['10L', '10L'],
+        ['18L', '20L'], ['20L', '20L'],
+        ['25kg', '25kg'],
+    ];
+    test.each(cases)('normalizeSizeTier(%s) === %s', (input, expected) => {
+        expect(catalog.normalizeSizeTier(input)).toBe(expected);
+    });
+});
+
+describe('extractSizeFromZohoName', () => {
+    test('takes the last size-with-unit, ignoring leading category codes', () => {
+        expect(catalog.extractSizeFromZohoName('EP01 PEWH One Pure Elegance White 1 L', 'PEWH01')).toBe('1L');
+        expect(catalog.extractSizeFromZohoName('PE BASE2 ONE PURE ELEGANCE BASE 2 BIRLA OPUS 4L', 'PEBASE2-4L')).toBe('4L');
+        expect(catalog.extractSizeFromZohoName('... 200ml', 'X-200ML')).toBe('200ml');
+    });
+    test('returns empty string when no size present', () => {
+        expect(catalog.extractSizeFromZohoName('Some Colorant Tint', 'CLT')).toBe('');
+    });
+});
+
 describe('migrate-dpl-catalog', () => {
     test('exports up() and creates the table idempotently', async () => {
         const mig = require('../../migrations/migrate-dpl-catalog');
