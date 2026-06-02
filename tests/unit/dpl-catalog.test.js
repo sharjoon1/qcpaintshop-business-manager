@@ -56,6 +56,36 @@ describe('buildMatchKey', () => {
     });
 });
 
+describe('linkEntryToZoho', () => {
+    const zoho = [
+        { zoho_item_id: 'Z1', name: 'EP01 PEWH One Pure Elegance White 1 L', sku: 'PEWH01' },
+        { zoho_item_id: 'Z2', name: 'EP01 PEB2 One Pure Elegance Base 2 1 L', sku: 'PEB201' },
+        { zoho_item_id: 'Z3', name: 'EP04 PEWH One Pure Elegance White 4 L', sku: 'PEWH04' },
+    ];
+    test('S1 exact canonical SKU wins', () => {
+        const r = catalog.linkEntryToZoho({ product_name: 'One Pure Elegance', base_name: 'White', size_tier: '1L', canonical_sku: 'PEWH01' }, zoho);
+        expect(r.zoho_item_id).toBe('Z1');
+        expect(r.link_reason).toBe('exact-sku');
+        expect(r.link_confidence).toBe(100);
+    });
+    test('S2 product+base+size-tier links a DPL 900ml base to the Zoho 1L item', () => {
+        const entry = { product_name: 'One Pure Elegance', base_name: 'Base 2', size_tier: catalog.normalizeSizeTier('900ml') };
+        const r = catalog.linkEntryToZoho(entry, zoho);
+        expect(r.zoho_item_id).toBe('Z2');
+        expect(r.link_reason).toBe('product+base+tier');
+        expect(r.link_status).toBe('confirmed');
+    });
+    test('White 1L links to Z1, not the 4L Z3', () => {
+        const r = catalog.linkEntryToZoho({ product_name: 'One Pure Elegance', base_name: 'White', size_tier: '1L' }, zoho);
+        expect(r.zoho_item_id).toBe('Z1');
+    });
+    test('no product match → needs_creating', () => {
+        const r = catalog.linkEntryToZoho({ product_name: 'Nonexistent Product', base_name: 'White', size_tier: '20L' }, zoho);
+        expect(r.zoho_item_id).toBe(null);
+        expect(r.link_status).toBe('needs_creating');
+    });
+});
+
 describe('migrate-dpl-catalog', () => {
     test('exports up() and creates the table idempotently', async () => {
         const mig = require('../../migrations/migrate-dpl-catalog');

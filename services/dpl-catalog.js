@@ -59,4 +59,52 @@ function buildMatchKey({ brand, product_code, product_name, base_name, size_tier
     return [slug(brand), code, slug(base_name), slug(size_tier)].join('|');
 }
 
-module.exports = { setPool, slug, normalizeSizeTier, extractSizeFromZohoName, buildMatchKey };
+// Build a (productMatch, baseMatch, sizeTier) probe for a Zoho item.
+function zohoProbe(zi) {
+    const name = zi.name || zi.zoho_item_name || '';
+    const sku = zi.sku || zi.zoho_sku || '';
+    return {
+        zi,
+        nameSlug: slug(name + ' ' + sku),
+        sizeTier: normalizeSizeTier(extractSizeFromZohoName(name, sku)),
+    };
+}
+
+// Link one catalog entry to exactly one Zoho item — DETERMINISTIC, no fuzzy abbrev.
+//   S1 exact canonical SKU (100)
+//   S2 product-name + base contained in the Zoho name AND size-tier equal (90, confirmed)
+//   S3 product-name contained + size-tier equal, base ignored (70, review)
+//   else needs_creating.
+// Size is always compared by TIER, so a DPL 900ml entry (tier 1L) links to a Zoho 1L item.
+function linkEntryToZoho(entry, zohoItems) {
+    const items = zohoItems || [];
+
+    // S1
+    if (entry.canonical_sku) {
+        const want = String(entry.canonical_sku).toUpperCase();
+        const hit = items.find(z => String(z.sku || z.zoho_sku || '').toUpperCase() === want);
+        if (hit) return { zoho_item_id: hit.zoho_item_id, link_status: 'confirmed', link_confidence: 100, link_reason: 'exact-sku' };
+    }
+
+    const eProd = slug(entry.product_name);
+    const eBase = slug(entry.base_name);
+    const eTier = entry.size_tier;
+    const probes = items.map(zohoProbe);
+
+    // S2: product + base + tier
+    const s2 = probes.filter(p =>
+        eProd && p.nameSlug.includes(eProd) && p.sizeTier === eTier &&
+        (eBase === '' ? true : p.nameSlug.includes(eBase))
+    );
+    if (s2.length === 1) return { zoho_item_id: s2[0].zi.zoho_item_id, link_status: 'confirmed', link_confidence: 90, link_reason: 'product+base+tier' };
+    if (s2.length > 1) return { zoho_item_id: null, link_status: 'review', link_confidence: 60, link_reason: 'ambiguous-product+base+tier' };
+
+    // S3: product + tier (any base) — softer, needs review
+    const s3 = probes.filter(p => eProd && p.nameSlug.includes(eProd) && p.sizeTier === eTier);
+    if (s3.length === 1) return { zoho_item_id: s3[0].zi.zoho_item_id, link_status: 'review', link_confidence: 70, link_reason: 'product+tier-only' };
+    if (s3.length > 1) return { zoho_item_id: null, link_status: 'review', link_confidence: 50, link_reason: 'ambiguous-product+tier' };
+
+    return { zoho_item_id: null, link_status: 'needs_creating', link_confidence: 0, link_reason: 'no-match' };
+}
+
+module.exports = { setPool, slug, normalizeSizeTier, extractSizeFromZohoName, buildMatchKey, linkEntryToZoho };
