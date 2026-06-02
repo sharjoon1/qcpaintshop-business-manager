@@ -909,6 +909,42 @@ router.get('/customer/:id', requireCustomerAuth, async (req, res) => {
 });
 
 // ========================================
+// GET ESTIMATE PDF FOR AUTHENTICATED CUSTOMER (phone-scoped)
+// Reuses the PDFKit generator (same as the public share PDF) so customers can
+// fetch/share their own estimate PDF without a staff token.
+// ========================================
+router.get('/customer/:id/pdf', requireCustomerAuth, async (req, res) => {
+    try {
+        const [estimates] = await pool.query('SELECT * FROM estimates WHERE id = ?', [req.params.id]);
+        if (!estimates.length) return res.status(404).json({ error: 'Estimate not found' });
+        const estimate = estimates[0];
+        if (!req.customer || !samePhone(estimate.customer_phone, req.customer.phone)) {
+            return res.status(403).json({ error: 'Not authorized for this estimate' });
+        }
+
+        const [items] = await pool.query(
+            `SELECT ei.*, p.name as product_name FROM estimate_items ei
+             LEFT JOIN products p ON ei.product_id = p.id
+             WHERE ei.estimate_id = ? AND ei.deleted_at IS NULL ORDER BY ei.display_order`,
+            [req.params.id]
+        );
+
+        const branding = await getBranding(pool);
+
+        let colVis = { show_qty: true, show_mix: true, show_price: true, show_breakdown: true, show_color: true, show_total: true };
+        if (estimate.column_visibility) {
+            try { colVis = { ...colVis, ...JSON.parse(estimate.column_visibility) }; } catch (e) {}
+        }
+
+        const { generateEstimatePDF } = require('./estimate-pdf-generator');
+        generateEstimatePDF(res, estimate, items, branding, colVis);
+    } catch (err) {
+        console.error('Customer estimate PDF error:', err);
+        if (!res.headersSent) res.status(500).json({ error: 'Failed to generate PDF' });
+    }
+});
+
+// ========================================
 // GET SINGLE ESTIMATE
 // ========================================
 router.get('/:id', requirePermission('estimates', 'view'), async (req, res) => {
