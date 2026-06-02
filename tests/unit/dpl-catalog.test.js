@@ -20,6 +20,9 @@ describe('normalizeSizeTier', () => {
     test.each(cases)('normalizeSizeTier(%s) === %s', (input, expected) => {
         expect(catalog.normalizeSizeTier(input)).toBe(expected);
     });
+    test('bare number without a unit is returned verbatim (not promoted to litres)', () => {
+        expect(catalog.normalizeSizeTier('20')).toBe('20');
+    });
 });
 
 describe('extractSizeFromZohoName', () => {
@@ -30,6 +33,9 @@ describe('extractSizeFromZohoName', () => {
     });
     test('returns empty string when no size present', () => {
         expect(catalog.extractSizeFromZohoName('Some Colorant Tint', 'CLT')).toBe('');
+    });
+    test('does NOT match a size embedded in a code with no separator', () => {
+        expect(catalog.extractSizeFromZohoName('BIRLA OPUS BASE4L WHITE', '')).toBe('');
     });
 });
 

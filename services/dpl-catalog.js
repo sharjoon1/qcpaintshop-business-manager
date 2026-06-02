@@ -28,16 +28,9 @@ function normalizeSizeTier(label) {
     const lt = s.match(/^(\d+(?:\.\d+)?)(l|lt|ltr|litres?|liters?)$/);
     if (lt) {
         const n = parseFloat(lt[1]);
-        if (n >= 0.8 && n <= 1.05) return '1L';
-        if (n > 3.0 && n < 4.5) return '4L';
-        if (n > 8.0 && n < 11.0) return '10L';
-        if (n > 16.0 && n <= 20.0) return '20L';
-        return n + 'L';
-    }
-    // bare number (no unit suffix) — treat as litres
-    const bare = s.match(/^(\d+(?:\.\d+)?)$/);
-    if (bare) {
-        const n = parseFloat(bare[1]);
+        // Tier ranges target the documented Birla round sizes + their off-sizes
+        // (1L↔0.9L, 4L↔3.6L, 10L↔9L, 20L↔18L). Sizes outside these (e.g. 3.0L, 2L,
+        // 5L, 15L) intentionally stay verbatim — they are distinct packs.
         if (n >= 0.8 && n <= 1.05) return '1L';
         if (n > 3.0 && n < 4.5) return '4L';
         if (n > 8.0 && n < 11.0) return '10L';
@@ -52,7 +45,7 @@ function normalizeSizeTier(label) {
 // category code like "EP01" is never mistaken for a size.
 function extractSizeFromZohoName(name, sku) {
     const text = String(name || '') + ' ' + String(sku || '');
-    const re = /(\d+(?:\.\d+)?)\s*(ml|ltr|lt|l)\b/gi;
+    const re = /\b(\d+(?:\.\d+)?)\s*(ml|ltr|lt|l)\b/gi;
     let m, last = null;
     while ((m = re.exec(text))) last = m;
     if (!last) return '';
