@@ -84,6 +84,22 @@ describe('linkEntryToZoho', () => {
         expect(r.zoho_item_id).toBe(null);
         expect(r.link_status).toBe('needs_creating');
     });
+
+    test('Base 2 confirms to the Base 2 item, NOT Base 20 (token boundary)', () => {
+        const z = [
+            { zoho_item_id: 'ZB2', name: 'EP01 PEB2 One Pure Elegance Base 2 1 L', sku: 'PEB201' },
+            { zoho_item_id: 'ZB20', name: 'EP01 PEB20 One Pure Elegance Base 20 1 L', sku: 'PEB2001' },
+        ];
+        const r = catalog.linkEntryToZoho({ product_name: 'One Pure Elegance', base_name: 'Base 2', size_tier: '1L' }, z);
+        expect(r.zoho_item_id).toBe('ZB2');
+        expect(r.link_status).toBe('confirmed');
+    });
+
+    test('Base 2 against ONLY a Base 20 item does NOT wrongly confirm (falls to review)', () => {
+        const z = [{ zoho_item_id: 'ZB20', name: 'EP01 PEB20 One Pure Elegance Base 20 1 L', sku: 'PEB2001' }];
+        const r = catalog.linkEntryToZoho({ product_name: 'One Pure Elegance', base_name: 'Base 2', size_tier: '1L' }, z);
+        expect(r.link_status).not.toBe('confirmed');
+    });
 });
 
 describe('migrate-dpl-catalog', () => {

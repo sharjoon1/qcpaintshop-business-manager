@@ -59,23 +59,35 @@ function buildMatchKey({ brand, product_code, product_name, base_name, size_tier
     return [slug(brand), code, slug(base_name), slug(size_tier)].join('|');
 }
 
-// Build a (productMatch, baseMatch, sizeTier) probe for a Zoho item.
+// Tokenize a string into lowercase alphanumeric word tokens.
+function tokenize(s) {
+    return String(s == null ? '' : s).toLowerCase().match(/[a-z0-9]+/g) || [];
+}
+
+// True when every needle token is present as a WHOLE token in the set.
+// Whole-token (not substring) matching: 'base 2' does NOT match 'base 20'.
+function hasAllTokens(tokenSet, needleTokens) {
+    return needleTokens.length > 0 && needleTokens.every(t => tokenSet.has(t));
+}
+
+// Build a token-set + size-tier probe for a Zoho item.
 function zohoProbe(zi) {
     const name = zi.name || zi.zoho_item_name || '';
     const sku = zi.sku || zi.zoho_sku || '';
     return {
         zi,
-        nameSlug: slug(name + ' ' + sku),
+        tokens: new Set(tokenize(name + ' ' + sku)),
         sizeTier: normalizeSizeTier(extractSizeFromZohoName(name, sku)),
     };
 }
 
-// Link one catalog entry to exactly one Zoho item — DETERMINISTIC, no fuzzy abbrev.
+// Link one catalog entry to exactly one Zoho item — DETERMINISTIC, whole-token, no fuzzy abbrev.
 //   S1 exact canonical SKU (100)
-//   S2 product-name + base contained in the Zoho name AND size-tier equal (90, confirmed)
-//   S3 product-name contained + size-tier equal, base ignored (70, review)
+//   S2 all product tokens + all base tokens present in the Zoho name AND size-tier equal (90, confirmed)
+//   S3 all product tokens present + size-tier equal, base ignored (70, review)
 //   else needs_creating.
-// Size is always compared by TIER, so a DPL 900ml entry (tier 1L) links to a Zoho 1L item.
+// NOTE: entry.size_tier MUST already be a canonical tier (use normalizeSizeTier before calling).
+// Size is compared by TIER, so a DPL 900ml entry (tier 1L) links to a Zoho 1L item.
 function linkEntryToZoho(entry, zohoItems) {
     const items = zohoItems || [];
 
@@ -86,21 +98,20 @@ function linkEntryToZoho(entry, zohoItems) {
         if (hit) return { zoho_item_id: hit.zoho_item_id, link_status: 'confirmed', link_confidence: 100, link_reason: 'exact-sku' };
     }
 
-    const eProd = slug(entry.product_name);
-    const eBase = slug(entry.base_name);
+    const eProd = tokenize(entry.product_name);
+    const eBase = tokenize(entry.base_name);
     const eTier = entry.size_tier;
     const probes = items.map(zohoProbe);
 
+    const prodTierMatch = p => hasAllTokens(p.tokens, eProd) && p.sizeTier === eTier;
+
     // S2: product + base + tier
-    const s2 = probes.filter(p =>
-        eProd && p.nameSlug.includes(eProd) && p.sizeTier === eTier &&
-        (eBase === '' ? true : p.nameSlug.includes(eBase))
-    );
+    const s2 = probes.filter(p => prodTierMatch(p) && (eBase.length === 0 ? true : hasAllTokens(p.tokens, eBase)));
     if (s2.length === 1) return { zoho_item_id: s2[0].zi.zoho_item_id, link_status: 'confirmed', link_confidence: 90, link_reason: 'product+base+tier' };
     if (s2.length > 1) return { zoho_item_id: null, link_status: 'review', link_confidence: 60, link_reason: 'ambiguous-product+base+tier' };
 
     // S3: product + tier (any base) — softer, needs review
-    const s3 = probes.filter(p => eProd && p.nameSlug.includes(eProd) && p.sizeTier === eTier);
+    const s3 = probes.filter(prodTierMatch);
     if (s3.length === 1) return { zoho_item_id: s3[0].zi.zoho_item_id, link_status: 'review', link_confidence: 70, link_reason: 'product+tier-only' };
     if (s3.length > 1) return { zoho_item_id: null, link_status: 'review', link_confidence: 50, link_reason: 'ambiguous-product+tier' };
 
