@@ -173,4 +173,36 @@ function buildCatalogFromDpl(brand, parsedRows, zohoItems) {
     return out;
 }
 
-module.exports = { setPool, slug, normalizeSizeTier, extractSizeFromZohoName, buildMatchKey, linkEntryToZoho, buildCatalogFromDpl };
+// Re-key incoming DPL rows to the existing catalog and compute the price delta.
+// No fuzzy matching — entries are already pinned. Returns three buckets.
+function applyDplPrices(brand, parsedRows, existingCatalog) {
+    const byKey = new Map((existingCatalog || []).map(e => [e.match_key, e]));
+    const seen = new Set();
+    const updated = [];
+    const newNeedsLinking = [];
+
+    for (const row of (parsedRows || [])) {
+        const { product_name, base_name } = splitProductBase(row.product);
+        const size_tier = normalizeSizeTier(row.packSize);
+        const match_key = buildMatchKey({ brand, product_code: row.baseCode || '', product_name, base_name, size_tier });
+        const dpl = parseFloat(row.dpl) || 0;
+        const new_rate = dpl > 0 ? Math.ceil(dpl * 1.18 * 1.10) : null;
+
+        const existing = byKey.get(match_key);
+        if (existing) {
+            seen.add(match_key);
+            updated.push({
+                id: existing.id, match_key, zoho_item_id: existing.zoho_item_id,
+                old_dpl: existing.current_dpl != null ? parseFloat(existing.current_dpl) : null,
+                new_dpl: dpl, new_rate,
+            });
+        } else {
+            newNeedsLinking.push({ match_key, product_name, base_name, size_tier, dpl_size_label: row.packSize, new_dpl: dpl, new_rate });
+        }
+    }
+
+    const noDplThisTime = (existingCatalog || []).filter(e => !seen.has(e.match_key));
+    return { updated, newNeedsLinking, noDplThisTime };
+}
+
+module.exports = { setPool, slug, normalizeSizeTier, extractSizeFromZohoName, buildMatchKey, linkEntryToZoho, buildCatalogFromDpl, applyDplPrices };

@@ -135,6 +135,31 @@ describe('buildCatalogFromDpl', () => {
     });
 });
 
+describe('applyDplPrices', () => {
+    const existing = [
+        { id: 1, match_key: 'birlaopus|941001|white|1l', zoho_item_id: 'Z1', current_dpl: 490 },
+        { id: 2, match_key: 'birlaopus|941001|base2|1l', zoho_item_id: 'Z2', current_dpl: 520 },
+    ];
+    const rows = [
+        { product: 'One Pure Elegance - White', packSize: '1L', dpl: 510, baseCode: '941001' },
+        { product: 'One Pure Elegance - Base 3', packSize: '4L', dpl: 1800, baseCode: '941001' },
+    ];
+
+    test('updates matched entries, flags new ones, lists untouched', () => {
+        const res = catalog.applyDplPrices('birlaopus', rows, existing);
+        expect(res.updated).toHaveLength(1);
+        expect(res.updated[0].match_key).toBe('birlaopus|941001|white|1l');
+        expect(res.updated[0].new_dpl).toBe(510);
+        expect(res.updated[0].new_rate).toBe(Math.ceil(510 * 1.18 * 1.10));
+        expect(res.updated[0].old_dpl).toBe(490);
+
+        expect(res.newNeedsLinking).toHaveLength(1);
+        expect(res.newNeedsLinking[0].match_key).toBe('birlaopus|941001|base3|4l');
+
+        expect(res.noDplThisTime.map(e => e.match_key)).toContain('birlaopus|941001|base2|1l');
+    });
+});
+
 describe('migrate-dpl-catalog', () => {
     test('exports up() and creates the table idempotently', async () => {
         const mig = require('../../migrations/migrate-dpl-catalog');
