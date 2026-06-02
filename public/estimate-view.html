@@ -11,6 +11,7 @@
     <link rel="apple-touch-icon" href="/icons/icon-192x192.png">
     <title>View Estimate - Quality Colours</title>
     <script src="/js/auth-helper.js"></script>
+    <script src="/js/share-pdf.js"></script>
     <script>checkAuthOrRedirect();</script>
     <link rel="stylesheet" href="/css/tailwind.css">
     <style>
@@ -94,6 +95,9 @@
                     title="Create Purchase Order">📦 PO</button>
                 <button onclick="shareViaWhatsApp()" class="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 text-sm" title="Share via WhatsApp">
                     📱 WhatsApp
+                </button>
+                <button onclick="sharePdfPhone()" class="bg-emerald-600 text-white px-4 py-2 rounded-lg hover:bg-emerald-700 text-sm" title="Share PDF via phone WhatsApp">
+                    📲 Share PDF
                 </button>
                 <button onclick="downloadPDF()" class="bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700 text-sm" title="Download PDF">
                     📄 PDF
@@ -437,6 +441,44 @@
                 console.error('WhatsApp share error:', err);
                 alert('Failed to share. Please try again.');
             }
+        }
+
+        async function sharePdfPhone() {
+            const token = localStorage.getItem('auth_token');
+            const num = (estimateData && estimateData.estimate_number) ? estimateData.estimate_number : estimateId;
+            qcSharePdf({
+                pdfUrl: '/api/estimates/' + estimateId + '/pdf',
+                headers: { 'Authorization': 'Bearer ' + token },
+                filename: 'Estimate-' + num + '.pdf',
+                shareTitle: 'Estimate ' + num,
+                shareText: 'Estimate ' + num + ' from Quality Colours',
+                getFallbackUrl: async function () {
+                    try {
+                        const r = await apiRequest('/api/share/whatsapp', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ resource_type: 'estimate', resource_id: estimateId })
+                        });
+                        const res = await r.json();
+                        if (res.success && res.data && res.data.whatsapp_url) return res.data.whatsapp_url;
+                    } catch (e) { /* ignore */ }
+                    return null;
+                }
+            });
+        }
+
+        function poActionSharePdf() {
+            closePoActionsModal();
+            const po = existingPO;
+            if (!po) return;
+            const token = localStorage.getItem('auth_token');
+            qcSharePdf({
+                pdfUrl: '/api/estimates/' + estimateId + '/pdf?po=' + encodeURIComponent(po.po_number) + '&hide_payment=1',
+                headers: { 'Authorization': 'Bearer ' + token },
+                filename: 'PO-' + po.po_number + '.pdf',
+                shareTitle: 'PO ' + po.po_number,
+                shareText: 'Purchase Order ' + po.po_number + ' from Quality Colours'
+            });
         }
 
         function downloadPDF() {
@@ -874,6 +916,9 @@
                 <div id="poActionsInfo" class="bg-gray-50 rounded-lg p-3"></div>
                 <button onclick="poActionEdit()" class="w-full bg-blue-600 text-white py-3 rounded-xl text-sm font-semibold hover:bg-blue-700 flex items-center justify-center gap-2">
                     ✏️ Edit Purchase Order
+                </button>
+                <button onclick="poActionSharePdf()" class="w-full bg-emerald-600 text-white py-3 rounded-xl text-sm font-semibold hover:bg-emerald-700 flex items-center justify-center gap-2">
+                    📲 Share PO PDF
                 </button>
                 <button onclick="poActionResend()" class="w-full bg-green-600 text-white py-3 rounded-xl text-sm font-semibold hover:bg-green-700 flex items-center justify-center gap-2">
                     📱 Resend via WhatsApp
