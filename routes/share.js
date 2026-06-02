@@ -5,6 +5,7 @@ const PDFDocument = require('pdfkit');
 const path = require('path');
 const fs = require('fs');
 const { requireAuth } = require('../middleware/permissionMiddleware');
+const { getBranding } = require('../services/branding');
 
 let pool;
 function setPool(dbPool) { pool = dbPool; }
@@ -13,18 +14,6 @@ function setPool(dbPool) { pool = dbPool; }
 function formatINR(num) {
     const n = parseFloat(num) || 0;
     return n.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-}
-
-// Helper: get branding settings
-async function getBranding() {
-    try {
-        const [settings] = await pool.query(
-            "SELECT setting_key, setting_value FROM settings WHERE setting_key IN ('business_name','business_logo','business_phone','business_email','business_address','business_gst')"
-        );
-        const obj = {};
-        settings.forEach(s => { obj[s.setting_key] = s.setting_value; });
-        return obj;
-    } catch { return {}; }
 }
 
 // ========================================
@@ -114,7 +103,7 @@ router.post('/whatsapp', requireAuth, async (req, res) => {
         const shareUrl = `${baseUrl}/share/${resource_type}/${token}`;
 
         // Build WhatsApp message
-        const branding = await getBranding();
+        const branding = await getBranding(pool);
         const bizName = branding.business_name || 'Quality Colours';
 
         // Build UPI payment link for estimates
@@ -191,7 +180,7 @@ router.get('/public/:token', async (req, res) => {
             data = requests[0];
         }
 
-        const branding = await getBranding();
+        const branding = await getBranding(pool);
 
         res.json({
             success: true,
@@ -266,7 +255,7 @@ router.get('/public/:token/pdf', async (req, res) => {
             [shareToken.resource_id]
         );
 
-        const branding = await getBranding();
+        const branding = await getBranding(pool);
 
         // Parse column visibility
         let colVis = { show_qty: true, show_mix: true, show_price: true, show_breakdown: true, show_color: true, show_total: true };
