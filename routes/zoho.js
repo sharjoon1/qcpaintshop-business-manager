@@ -219,8 +219,9 @@ router.post('/items/dpl-catalog/:brand/push', requirePermission('zoho', 'manage'
         const byId = new Map(all.map(e => [e.id, e]));
         const chosen = ids.map(id => byId.get(id)).filter(Boolean);
 
-        const pushable = chosen.filter(e => e.link_status === 'confirmed' && e.zoho_item_id && e.current_dpl != null);
-        const skipped = chosen.filter(e => !(e.link_status === 'confirmed' && e.zoho_item_id && e.current_dpl != null))
+        const hasDpl = e => e.current_dpl != null && Number(e.current_dpl) > 0;
+        const pushable = chosen.filter(e => e.link_status === 'confirmed' && e.zoho_item_id && hasDpl(e));
+        const skipped = chosen.filter(e => !(e.link_status === 'confirmed' && e.zoho_item_id && hasDpl(e)))
             .map(e => ({ id: e.id, reason: !e.zoho_item_id ? 'not linked' : e.link_status !== 'confirmed' ? 'not confirmed' : 'no DPL price' }));
         if (!pushable.length) {
             return res.status(400).json({ success: false, message: 'No pushable confirmed entries with a DPL price in the selection.', skipped });
