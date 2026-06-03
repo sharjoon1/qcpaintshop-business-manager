@@ -17,4 +17,7 @@ describe('dpl-catalog endpoints registered on zoho router', () => {
     test('POST /items/dpl-catalog/:brand/push', () => {
         expect(has('post', '/items/dpl-catalog/:brand/push')).toBe(true);
     });
+    test('PUT /items/dpl-catalog/entry/:id', () => {
+        expect(has('put', '/items/dpl-catalog/entry/:id')).toBe(true);
+    });
 });

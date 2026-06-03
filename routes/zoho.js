@@ -141,13 +141,58 @@ router.post('/items/dpl-catalog/:brand/build', requirePermission('zoho', 'manage
     }
 });
 
-// Read the brand catalog (all entries, grouped client-side for the review UI).
+// Read the brand catalog, enriched with linked Zoho values (old DPL/rate/name/sku/
+// description) + a sku_conflict flag (canonical_sku held by a DIFFERENT active item).
 router.get('/items/dpl-catalog/:brand', requirePermission('zoho', 'manage'), async (req, res) => {
     try {
         const brand = String(req.params.brand || '').toLowerCase();
         if (!assertSupportedBrand(brand, res)) return;
         const entries = await dplCatalogService.getCatalog(brand);
-        res.json({ success: true, data: entries });
+
+        const linkedIds = [...new Set(entries.filter(e => e.zoho_item_id).map(e => String(e.zoho_item_id)))];
+        const zById = new Map();
+        if (linkedIds.length) {
+            const [zrows] = await pool.query(
+                `SELECT zoho_item_id, zoho_item_name, zoho_sku, zoho_cf_dpl, zoho_rate, zoho_description
+                 FROM zoho_items_map WHERE zoho_item_id IN (${linkedIds.map(() => '?').join(',')})`,
+                linkedIds
+            );
+            zrows.forEach(z => zById.set(String(z.zoho_item_id), z));
+        }
+
+        const skus = [...new Set(entries.filter(e => e.canonical_sku).map(e => String(e.canonical_sku).toUpperCase()))];
+        const skuHolders = new Map();
+        if (skus.length) {
+            const [hrows] = await pool.query(
+                `SELECT zoho_item_id, zoho_item_name, UPPER(zoho_sku) AS sku
+                 FROM zoho_items_map WHERE zoho_status='active' AND UPPER(zoho_sku) IN (${skus.map(() => '?').join(',')})`,
+                skus
+            );
+            hrows.forEach(h => {
+                if (!skuHolders.has(h.sku)) skuHolders.set(h.sku, []);
+                skuHolders.get(h.sku).push({ id: String(h.zoho_item_id), name: h.zoho_item_name });
+            });
+        }
+
+        const decorated = entries.map(e => {
+            const z = e.zoho_item_id ? zById.get(String(e.zoho_item_id)) : null;
+            let sku_conflict = null;
+            if (e.canonical_sku) {
+                const holders = skuHolders.get(String(e.canonical_sku).toUpperCase()) || [];
+                const other = holders.find(h => h.id !== String(e.zoho_item_id));
+                if (other) sku_conflict = other.name;
+            }
+            return Object.assign({}, e, {
+                old_dpl: z && z.zoho_cf_dpl != null ? z.zoho_cf_dpl : null,
+                old_rate: z && z.zoho_rate != null ? z.zoho_rate : null,
+                zoho_name: z ? z.zoho_item_name : null,
+                zoho_sku: z ? z.zoho_sku : null,
+                zoho_description: z ? z.zoho_description : null,
+                sku_conflict,
+            });
+        });
+
+        res.json({ success: true, data: decorated });
     } catch (err) {
         console.error('DPL catalog get error:', err);
         res.status(500).json({ success: false, message: err.message });
@@ -166,6 +211,26 @@ router.post('/items/dpl-catalog/entry/:id/confirm-link', requirePermission('zoho
         res.json({ success: true });
     } catch (err) {
         console.error('DPL catalog confirm-link error:', err);
+        res.status(500).json({ success: false, message: err.message });
+    }
+});
+
+// Edit user-correctable canonical fields (name / sku / description) on an entry.
+router.put('/items/dpl-catalog/entry/:id', requirePermission('zoho', 'manage'), async (req, res) => {
+    try {
+        const id = parseInt(req.params.id, 10);
+        if (!Number.isFinite(id)) return res.status(400).json({ success: false, message: 'Invalid entry id' });
+        const body = req.body || {};
+        const fields = {};
+        ['canonical_name', 'canonical_sku', 'canonical_description'].forEach(k => {
+            if (body[k] !== undefined) fields[k] = body[k];
+        });
+        const updatedBy = req.user ? (req.user.username || String(req.user.id)) : null;
+        const ok = await dplCatalogService.updateCanonicalFields(id, fields, updatedBy);
+        if (!ok) return res.status(400).json({ success: false, message: 'No editable fields provided' });
+        res.json({ success: true });
+    } catch (err) {
+        console.error('DPL catalog edit error:', err);
         res.status(500).json({ success: false, message: err.message });
     }
 });
@@ -227,8 +292,38 @@ router.post('/items/dpl-catalog/:brand/push', requirePermission('zoho', 'manage'
             return res.status(400).json({ success: false, message: 'No pushable confirmed entries with a DPL price in the selection.', skipped });
         }
 
+        // Exclude entries whose canonical SKU is held by a DIFFERENT active Zoho item.
+        // Zoho rejects duplicate SKUs; skip these with a clear reason (so one bad item
+        // does not fail the whole batch). The user edits the SKU and re-pushes.
+        const conflictSkus = [...new Set(pushable.filter(e => e.canonical_sku).map(e => String(e.canonical_sku).toUpperCase()))];
+        const holderBySku = new Map();
+        if (conflictSkus.length) {
+            const [hrows] = await pool.query(
+                `SELECT zoho_item_id, zoho_item_name, UPPER(zoho_sku) AS sku
+                 FROM zoho_items_map WHERE zoho_status='active' AND UPPER(zoho_sku) IN (${conflictSkus.map(() => '?').join(',')})`,
+                conflictSkus
+            );
+            hrows.forEach(h => {
+                if (!holderBySku.has(h.sku)) holderBySku.set(h.sku, []);
+                holderBySku.get(h.sku).push({ id: String(h.zoho_item_id), name: h.zoho_item_name });
+            });
+        }
+        const conflictFree = [];
+        for (const e of pushable) {
+            const holders = e.canonical_sku ? (holderBySku.get(String(e.canonical_sku).toUpperCase()) || []) : [];
+            const other = holders.find(h => h.id !== String(e.zoho_item_id));
+            if (other) {
+                skipped.push({ id: e.id, reason: `SKU '${e.canonical_sku}' already used by '${other.name}'` });
+            } else {
+                conflictFree.push(e);
+            }
+        }
+        if (!conflictFree.length) {
+            return res.status(400).json({ success: false, message: 'Nothing to push — all selected items have SKU conflicts. Edit the SKUs and retry.', skipped });
+        }
+
         // Current Zoho values for diffing + price-history old values.
-        const zids = [...new Set(pushable.map(e => String(e.zoho_item_id)))];
+        const zids = [...new Set(conflictFree.map(e => String(e.zoho_item_id)))];
         const [zrows] = await pool.query(
             `SELECT zoho_item_id, zoho_item_name AS name, zoho_sku AS sku, zoho_description AS description,
                     zoho_category_name AS category, zoho_cf_dpl AS cf_dpl, zoho_purchase_rate AS purchase_rate,
@@ -239,7 +334,7 @@ router.post('/items/dpl-catalog/:brand/push', requirePermission('zoho', 'manage'
         const zById = new Map(zrows.map(z => [String(z.zoho_item_id), z]));
 
         const items = [];
-        for (const e of pushable) {
+        for (const e of conflictFree) {
             const zc = zById.get(String(e.zoho_item_id)) || {};
             const changes = dplCatalogService.buildPushChanges(e, zc);
             if (!changes) continue;
