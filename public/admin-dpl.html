@@ -1248,6 +1248,13 @@
         var btn = document.getElementById('pushZohoBtn');
         if (countEl) countEl.textContent = ids.length;
         if (btn) btn.disabled = ids.length === 0;
+        var hd = document.getElementById('catHeadCheck');
+        if (hd) {
+            var visible = document.querySelectorAll('.cat-push-check');
+            var checkedBoxes = document.querySelectorAll('.cat-push-check:checked');
+            hd.checked = visible.length > 0 && checkedBoxes.length === visible.length;
+            hd.indeterminate = checkedBoxes.length > 0 && checkedBoxes.length < visible.length;
+        }
     }
     function onCatCheck(id, checked) {
         if (checked) catPushSelected[id] = true; else delete catPushSelected[id];
