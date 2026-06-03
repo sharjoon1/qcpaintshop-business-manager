@@ -2847,177 +2847,170 @@ router.post('/items/bulk-update', requirePermission('zoho', 'bulk_update'), asyn
     }
 });
 
+// Shared core of the per-item bulk edit: validates, enforces SKU uniqueness
+// (batch + local-mirror cross-check), creates the bulk job + job items, and
+// optimistically updates the local zoho_items_map (SKU excluded — written only
+// after Zoho confirms, in the bulk-job worker). Throws an Error tagged with
+// { httpStatus, code, payload } for the caller to translate to a response.
+async function createBulkEditJob(items, user) {
+    if (!items || !Array.isArray(items) || items.length === 0) {
+        throw Object.assign(new Error('items array is required'), { httpStatus: 400 });
+    }
+    for (const item of items) {
+        if (!item.zoho_item_id || !item.changes || Object.keys(item.changes).length === 0) {
+            throw Object.assign(new Error('Each item must have zoho_item_id and non-empty changes'), { httpStatus: 400 });
+        }
+    }
+
+    // Reject batches that would push the same SKU to multiple distinct
+    // Zoho items — Zoho enforces SKU uniqueness, so the first item wins
+    // and the rest fail with "error 1001: SKU already exists", and the
+    // partial failure leaves the local mirror in a corrupted state.
+    //
+    // We also reject when a SKU in the batch is already held by a
+    // DIFFERENT active item in our local mirror (the classic
+    // OPCL01-WHITE vs OPCL01-ORANGE situation): the only thing that
+    // would happen on Zoho is a rejection anyway, and we'd rather the
+    // user fix it now than discover it 6 minutes into a 200-item job.
+    {
+        const skuToItems = new Map();
+        for (const it of items) {
+            const sku = it.changes && it.changes.sku ? String(it.changes.sku).trim() : '';
+            if (!sku) continue;
+            const key = sku.toUpperCase();
+            if (!skuToItems.has(key)) skuToItems.set(key, []);
+            skuToItems.get(key).push({ zoho_item_id: it.zoho_item_id, item_name: it.item_name || '', sku });
+        }
+        const batchDupes = [];
+        for (const [_, list] of skuToItems) { if (list.length > 1) batchDupes.push(list); }
+        if (batchDupes.length) {
+            throw Object.assign(new Error('Batch contains multiple items being pushed with the same SKU. Zoho enforces SKU uniqueness, so this would fail. Edit the SKUs to make them unique.'),
+                { httpStatus: 400, code: 'DUPLICATE_SKUS_IN_BATCH', payload: { duplicates: batchDupes } });
+        }
+        // Cross-check against the local mirror for SKUs already held by
+        // ANOTHER active item that is NOT in this batch.
+        const skuList = Array.from(skuToItems.keys());
+        if (skuList.length) {
+            const [held] = await pool.query(
+                `SELECT zoho_item_id, zoho_sku, zoho_item_name
+                   FROM zoho_items_map
+                  WHERE zoho_status = 'active'
+                    AND UPPER(zoho_sku) IN (${skuList.map(() => '?').join(',')})`,
+                skuList
+            );
+            const conflicts = [];
+            for (const row of held) {
+                const rowSku = String(row.zoho_sku || '').toUpperCase();
+                const batchEntries = skuToItems.get(rowSku) || [];
+                for (const be of batchEntries) {
+                    if (be.zoho_item_id !== row.zoho_item_id) {
+                        conflicts.push({
+                            batch_item: be,
+                            already_held_by: { zoho_item_id: row.zoho_item_id, item_name: row.zoho_item_name }
+                        });
+                    }
+                }
+            }
+            if (conflicts.length) {
+                throw Object.assign(new Error('One or more SKUs in the batch are already held by a different active item in Zoho. Push would fail with "SKU already exists". Edit to use unique SKUs.'),
+                    { httpStatus: 400, code: 'SKU_HELD_BY_OTHER_ITEM', payload: { conflicts } });
+            }
+        }
+    }
+
+    // Create bulk job
+    const [jobResult] = await pool.query(`
+        INSERT INTO zoho_bulk_jobs (job_type, filter_criteria, update_fields, total_items, created_by)
+        VALUES ('item_update', ?, ?, ?, ?)
+    `, [
+        JSON.stringify({ mode: 'per_item_edit', item_count: items.length }),
+        JSON.stringify({ mode: 'per_item' }),
+        items.length,
+        user.id
+    ]);
+    const jobId = jobResult.insertId;
+
+    // Create individual job items with per-item payloads
+    // If item_name is missing, look it up from zoho_items_map
+    const itemsWithoutName = items.filter(i => !i.item_name);
+    const nameLookup = {};
+    if (itemsWithoutName.length > 0) {
+        const ids = itemsWithoutName.map(i => i.zoho_item_id);
+        const [nameRows] = await pool.query(
+            `SELECT zoho_item_id, zoho_item_name FROM zoho_items_map WHERE zoho_item_id IN (${ids.map(() => '?').join(',')})`,
+            ids
+        );
+        nameRows.forEach(r => { nameLookup[r.zoho_item_id] = r.zoho_item_name; });
+    }
+
+    for (const item of items) {
+        const itemName = item.item_name || nameLookup[item.zoho_item_id] || '';
+        await pool.query(`
+            INSERT INTO zoho_bulk_job_items (job_id, zoho_item_id, item_name, payload)
+            VALUES (?, ?, ?, ?)
+        `, [jobId, item.zoho_item_id, itemName, JSON.stringify(item.changes)]);
+    }
+
+    // Also update local zoho_items_map so edits persist before Zoho sync.
+    // NOTE: `sku` is deliberately excluded here — Zoho enforces SKU
+    // uniqueness, so an optimistic local SKU write can leave us with two
+    // active items sharing the same SKU when Zoho rejects the second push
+    // ("error 1001: SKU already exists"). On the next admin-dpl run, the
+    // proposer reads the corrupted SKU and proposes another colliding
+    // push. The SKU write now lives in services/zoho-api.js inside the
+    // bulk-job worker, fired only after Zoho confirms the row.
+    const FIELD_MAP = {
+        name: 'zoho_item_name', /* sku intentionally NOT here — see comment above */
+        rate: 'zoho_rate',
+        purchase_rate: 'zoho_purchase_rate', cf_dpl: 'zoho_cf_dpl',
+        label_rate: 'zoho_label_rate',
+        unit: 'zoho_unit', hsn_or_sac: 'zoho_hsn_or_sac',
+        tax_percentage: 'zoho_tax_percentage', brand: 'zoho_brand',
+        category_name: 'zoho_category_name', category: 'zoho_category_name',
+        manufacturer: 'zoho_manufacturer',
+        reorder_level: 'zoho_reorder_level', description: 'zoho_description',
+        cf_product_name: 'zoho_cf_product_name', status: 'zoho_status'
+    };
+    for (const item of items) {
+        const sets = [];
+        const vals = [];
+        for (const [key, val] of Object.entries(item.changes)) {
+            const dbCol = FIELD_MAP[key];
+            if (dbCol) {
+                sets.push(`${dbCol} = ?`);
+                vals.push(val);
+            }
+        }
+        if (Object.prototype.hasOwnProperty.call(item.changes, 'cf_dpl')) {
+            sets.push('dpl_updated_at = NOW()');
+        }
+        if (sets.length > 0) {
+            vals.push(item.zoho_item_id);
+            await pool.query(`UPDATE zoho_items_map SET ${sets.join(', ')} WHERE zoho_item_id = ?`, vals);
+        }
+        // Sync rate change → pack_sizes.base_price so admin-products.html stays in sync
+        if (Object.prototype.hasOwnProperty.call(item.changes, 'rate')) {
+            await pool.query(
+                'UPDATE pack_sizes SET base_price = ? WHERE zoho_item_id = ? AND is_active = 1',
+                [item.changes.rate, item.zoho_item_id]
+            );
+        }
+    }
+
+    return { job_id: jobId, total_items: items.length };
+}
+
 /**
  * POST /api/zoho/items/bulk-edit - Create bulk job with per-item unique payloads
  * Unlike bulk-update (same fields for all items), this accepts individual changes per item.
  */
 router.post('/items/bulk-edit', requirePermission('zoho', 'manage'), async (req, res) => {
     try {
-        const { items } = req.body;
-        if (!items || !Array.isArray(items) || items.length === 0) {
-            return res.status(400).json({ success: false, message: 'items array is required' });
-        }
-
-        // Validate each item has zoho_item_id and changes
-        for (const item of items) {
-            if (!item.zoho_item_id || !item.changes || Object.keys(item.changes).length === 0) {
-                return res.status(400).json({ success: false, message: 'Each item must have zoho_item_id and non-empty changes' });
-            }
-        }
-
-        // Reject batches that would push the same SKU to multiple distinct
-        // Zoho items — Zoho enforces SKU uniqueness, so the first item wins
-        // and the rest fail with "error 1001: SKU already exists", and the
-        // partial failure leaves the local mirror in a corrupted state.
-        //
-        // We also reject when a SKU in the batch is already held by a
-        // DIFFERENT active item in our local mirror (the classic
-        // OPCL01-WHITE vs OPCL01-ORANGE situation): the only thing that
-        // would happen on Zoho is a rejection anyway, and we'd rather the
-        // user fix it now than discover it 6 minutes into a 200-item job.
-        {
-            const skuToItems = new Map();
-            for (const it of items) {
-                const sku = it.changes && it.changes.sku ? String(it.changes.sku).trim() : '';
-                if (!sku) continue;
-                const key = sku.toUpperCase();
-                if (!skuToItems.has(key)) skuToItems.set(key, []);
-                skuToItems.get(key).push({ zoho_item_id: it.zoho_item_id, item_name: it.item_name || '', sku });
-            }
-            const batchDupes = [];
-            for (const [_, list] of skuToItems) {
-                if (list.length > 1) batchDupes.push(list);
-            }
-            if (batchDupes.length) {
-                return res.status(400).json({
-                    success: false,
-                    code: 'DUPLICATE_SKUS_IN_BATCH',
-                    message: 'Batch contains multiple items being pushed with the same SKU. Zoho enforces SKU uniqueness, so this would fail. Edit the SKUs to make them unique.',
-                    duplicates: batchDupes
-                });
-            }
-            // Cross-check against the local mirror for SKUs already held by
-            // ANOTHER active item that is NOT in this batch.
-            const skuList = Array.from(skuToItems.keys());
-            if (skuList.length) {
-                const batchIds = items.map(i => i.zoho_item_id);
-                const [held] = await pool.query(
-                    `SELECT zoho_item_id, zoho_sku, zoho_item_name
-                       FROM zoho_items_map
-                      WHERE zoho_status = 'active'
-                        AND UPPER(zoho_sku) IN (${skuList.map(() => '?').join(',')})`,
-                    skuList
-                );
-                const conflicts = [];
-                for (const row of held) {
-                    const rowSku = String(row.zoho_sku || '').toUpperCase();
-                    const batchEntries = skuToItems.get(rowSku) || [];
-                    for (const be of batchEntries) {
-                        if (be.zoho_item_id !== row.zoho_item_id) {
-                            conflicts.push({
-                                batch_item: be,
-                                already_held_by: { zoho_item_id: row.zoho_item_id, item_name: row.zoho_item_name }
-                            });
-                        }
-                    }
-                }
-                if (conflicts.length) {
-                    return res.status(400).json({
-                        success: false,
-                        code: 'SKU_HELD_BY_OTHER_ITEM',
-                        message: 'One or more SKUs in the batch are already held by a different active item in Zoho. Push would fail with "SKU already exists". Edit to use unique SKUs.',
-                        conflicts
-                    });
-                }
-            }
-        }
-
-        // Create bulk job
-        const [jobResult] = await pool.query(`
-            INSERT INTO zoho_bulk_jobs (job_type, filter_criteria, update_fields, total_items, created_by)
-            VALUES ('item_update', ?, ?, ?, ?)
-        `, [
-            JSON.stringify({ mode: 'per_item_edit', item_count: items.length }),
-            JSON.stringify({ mode: 'per_item' }),
-            items.length,
-            req.user.id
-        ]);
-        const jobId = jobResult.insertId;
-
-        // Create individual job items with per-item payloads
-        // If item_name is missing, look it up from zoho_items_map
-        const itemsWithoutName = items.filter(i => !i.item_name);
-        const nameLookup = {};
-        if (itemsWithoutName.length > 0) {
-            const ids = itemsWithoutName.map(i => i.zoho_item_id);
-            const [nameRows] = await pool.query(
-                `SELECT zoho_item_id, zoho_item_name FROM zoho_items_map WHERE zoho_item_id IN (${ids.map(() => '?').join(',')})`,
-                ids
-            );
-            nameRows.forEach(r => { nameLookup[r.zoho_item_id] = r.zoho_item_name; });
-        }
-
-        for (const item of items) {
-            const itemName = item.item_name || nameLookup[item.zoho_item_id] || '';
-            await pool.query(`
-                INSERT INTO zoho_bulk_job_items (job_id, zoho_item_id, item_name, payload)
-                VALUES (?, ?, ?, ?)
-            `, [jobId, item.zoho_item_id, itemName, JSON.stringify(item.changes)]);
-        }
-
-        // Also update local zoho_items_map so edits persist before Zoho sync.
-        // NOTE: `sku` is deliberately excluded here — Zoho enforces SKU
-        // uniqueness, so an optimistic local SKU write can leave us with two
-        // active items sharing the same SKU when Zoho rejects the second push
-        // ("error 1001: SKU already exists"). On the next admin-dpl run, the
-        // proposer reads the corrupted SKU and proposes another colliding
-        // push. The SKU write now lives in services/zoho-api.js inside the
-        // bulk-job worker, fired only after Zoho confirms the row.
-        const FIELD_MAP = {
-            name: 'zoho_item_name', /* sku intentionally NOT here — see comment above */
-            rate: 'zoho_rate',
-            purchase_rate: 'zoho_purchase_rate', cf_dpl: 'zoho_cf_dpl',
-            label_rate: 'zoho_label_rate',
-            unit: 'zoho_unit', hsn_or_sac: 'zoho_hsn_or_sac',
-            tax_percentage: 'zoho_tax_percentage', brand: 'zoho_brand',
-            category_name: 'zoho_category_name', category: 'zoho_category_name',
-            manufacturer: 'zoho_manufacturer',
-            reorder_level: 'zoho_reorder_level', description: 'zoho_description',
-            cf_product_name: 'zoho_cf_product_name', status: 'zoho_status'
-        };
-        for (const item of items) {
-            const sets = [];
-            const vals = [];
-            for (const [key, val] of Object.entries(item.changes)) {
-                const dbCol = FIELD_MAP[key];
-                if (dbCol) {
-                    sets.push(`${dbCol} = ?`);
-                    vals.push(val);
-                }
-            }
-            if (Object.prototype.hasOwnProperty.call(item.changes, 'cf_dpl')) {
-                sets.push('dpl_updated_at = NOW()');
-            }
-            if (sets.length > 0) {
-                vals.push(item.zoho_item_id);
-                await pool.query(`UPDATE zoho_items_map SET ${sets.join(', ')} WHERE zoho_item_id = ?`, vals);
-            }
-            // Sync rate change → pack_sizes.base_price so admin-products.html stays in sync
-            if (Object.prototype.hasOwnProperty.call(item.changes, 'rate')) {
-                await pool.query(
-                    'UPDATE pack_sizes SET base_price = ? WHERE zoho_item_id = ? AND is_active = 1',
-                    [item.changes.rate, item.zoho_item_id]
-                );
-            }
-        }
-
-        res.json({
-            success: true,
-            data: { job_id: jobId, total_items: items.length },
-            message: `Bulk edit job created with ${items.length} items`
-        });
+        const result = await createBulkEditJob(req.body.items, req.user);
+        res.json({ success: true, data: result, message: `Bulk edit job created with ${result.total_items} items` });
     } catch (error) {
-        res.status(500).json({ success: false, message: error.message });
+        const status = error.httpStatus || 500;
+        res.status(status).json(Object.assign({ success: false, message: error.message }, error.code ? { code: error.code } : {}, error.payload || {}));
     }
 });
 
