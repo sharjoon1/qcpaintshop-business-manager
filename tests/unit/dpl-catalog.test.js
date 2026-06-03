@@ -288,6 +288,35 @@ describe('dpl-catalog DB layer', () => {
     });
 });
 
+describe('updateCanonicalFields', () => {
+    test('updates only provided canonical fields with map-order params', async () => {
+        const calls = [];
+        catalog.setPool({ query: async (sql, params) => { calls.push({ sql, params }); return [{}]; } });
+        const ok = await catalog.updateCanonicalFields(
+            5, { canonical_name: 'N', canonical_sku: 'ABC', canonical_description: 'D' }, 'admin');
+        expect(ok).toBe(true);
+        expect(calls).toHaveLength(1);
+        expect(calls[0].sql).toMatch(/UPDATE dpl_catalog SET canonical_name = \?, canonical_sku = \?, canonical_description = \?, updated_by = \? WHERE id = \?/);
+        expect(calls[0].params).toEqual(['N', 'ABC', 'D', 'admin', 5]);
+    });
+
+    test('writes only the keys provided', async () => {
+        const calls = [];
+        catalog.setPool({ query: async (sql, params) => { calls.push({ sql, params }); return [{}]; } });
+        await catalog.updateCanonicalFields(7, { canonical_sku: 'XYZ' }, 'u');
+        expect(calls[0].sql).toMatch(/SET canonical_sku = \?, updated_by = \? WHERE id = \?/);
+        expect(calls[0].params).toEqual(['XYZ', 'u', 7]);
+    });
+
+    test('returns false and issues no query when no fields provided', async () => {
+        const calls = [];
+        catalog.setPool({ query: async (sql, params) => { calls.push({ sql, params }); return [{}]; } });
+        const ok = await catalog.updateCanonicalFields(9, {}, 'u');
+        expect(ok).toBe(false);
+        expect(calls).toHaveLength(0);
+    });
+});
+
 describe('migrate-dpl-catalog', () => {
     test('exports up() and creates the table idempotently', async () => {
         const mig = require('../../migrations/migrate-dpl-catalog');

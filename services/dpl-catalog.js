@@ -319,6 +319,27 @@ async function confirmLink(id, zohoItemId, updatedBy) {
     );
 }
 
+// Update user-editable canonical fields on an entry. Only keys present in `fields`
+// are written (undefined keys untouched); a provided value is trimmed; '' clears it.
+// Returns false (no query) when nothing was provided.
+async function updateCanonicalFields(id, fields, updatedBy) {
+    const editable = ['canonical_name', 'canonical_sku', 'canonical_description'];
+    const sets = [];
+    const vals = [];
+    for (const key of editable) {
+        if (fields && fields[key] !== undefined) {
+            sets.push(`${key} = ?`);
+            vals.push(fields[key] === null ? null : String(fields[key]).trim());
+        }
+    }
+    if (!sets.length) return false;
+    sets.push('updated_by = ?');
+    vals.push(updatedBy || null);
+    vals.push(id);
+    await pool.query(`UPDATE dpl_catalog SET ${sets.join(', ')} WHERE id = ?`, vals);
+    return true;
+}
+
 // Persist freshly-applied DPL prices onto matched catalog rows (local only).
 async function updateAppliedPrices(rows, updatedBy) {
     for (const r of (rows || [])) {
@@ -332,5 +353,5 @@ async function updateAppliedPrices(rows, updatedBy) {
 module.exports = {
     setPool, slug, normalizeSizeTier, extractSizeFromZohoName, buildMatchKey,
     dplBaseStem, zohoSkuStem, linkEntryToZoho, buildCatalogFromDpl, applyDplPrices,
-    buildPushChanges, upsertEntries, getCatalog, confirmLink, updateAppliedPrices,
+    buildPushChanges, upsertEntries, getCatalog, confirmLink, updateAppliedPrices, updateCanonicalFields,
 };
