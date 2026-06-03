@@ -1659,7 +1659,7 @@
         var resultsEl = document.getElementById('catPickerResults');
         resultsEl.innerHTML = '<div class="text-gray-400 text-xs py-3 text-center">Searching...</div>';
         try {
-            var resp = await fetch('/api/zoho/items?limit=40&search=' + encodeURIComponent(q), { headers: { 'Authorization': 'Bearer ' + getToken() } });
+            var resp = await fetch('/api/zoho/items?limit=40&brand=BIRLA&search=' + encodeURIComponent(q), { headers: { 'Authorization': 'Bearer ' + getToken() } });
             var body = await resp.json();
             var items = (body && Array.isArray(body.data)) ? body.data : [];
             if (!items.length) { resultsEl.innerHTML = '<div class="text-gray-400 text-xs py-3 text-center">No items found</div>'; return; }
