@@ -1274,6 +1274,11 @@
     // (a pushable row's checkbox exists in BOTH the table and the card list).
     function setRowCheckedDom(id, checked) {
         document.querySelectorAll('.cat-push-check[data-id="' + id + '"]').forEach(function(cb){ cb.checked = checked; });
+        document.querySelectorAll('.cat-card[data-id="' + id + '"]').forEach(function(card){
+            card.classList.toggle('bg-emerald-50', checked);
+            card.classList.toggle('border-emerald-200', checked);
+            card.classList.toggle('bg-white', !checked);
+        });
     }
 
     function refreshPushButton() {
@@ -1451,9 +1456,9 @@
 
         function statusBadge(e) {
             return e.link_status === 'confirmed'
-                ? '<span class="px-1.5 py-0.5 rounded bg-green-100 text-green-700">✅ ' + (e.link_confidence || '') + '</span>'
+                ? '<span class="px-1.5 py-0.5 rounded bg-green-100 text-green-700">✅ ' + esc(String(e.link_confidence || '')) + '</span>'
                 : e.link_status === 'review'
-                ? '<span class="px-1.5 py-0.5 rounded bg-amber-100 text-amber-700" title="' + esc(e.link_reason || '') + '">⚠ ' + (e.link_confidence || '') + '</span>'
+                ? '<span class="px-1.5 py-0.5 rounded bg-amber-100 text-amber-700" title="' + esc(e.link_reason || '') + '">⚠ ' + esc(String(e.link_confidence || '')) + '</span>'
                 : '<span class="px-1.5 py-0.5 rounded bg-rose-100 text-rose-700">🆕</span>';
         }
         function linkedHtml(e) {
@@ -1498,7 +1503,7 @@
                 var price = (e.current_dpl != null ? '₹' + esc(String(e.current_dpl)) : '-') +
                     (e.current_rate != null ? ' <span class="text-gray-400">→ ₹' + esc(String(e.current_rate)) + '</span>' : '');
                 var sizeLine = esc(e.size_tier || '') + (e.dpl_size_label && e.dpl_size_label !== e.size_tier ? ' (' + esc(e.dpl_size_label) + ')' : '');
-                return '<div class="border rounded-lg p-3 flex gap-3 ' + (catPushSelected[e.id] ? 'bg-emerald-50 border-emerald-200' : 'bg-white') + '">' +
+                return '<div class="cat-card border rounded-lg p-3 flex gap-3 ' + (catPushSelected[e.id] ? 'bg-emerald-50 border-emerald-200' : 'bg-white') + '" data-id="' + e.id + '">' +
                     cb +
                     '<div class="flex-1 min-w-0">' +
                         '<div class="flex items-start justify-between gap-2">' +
