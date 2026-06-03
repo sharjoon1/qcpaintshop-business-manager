@@ -170,6 +170,112 @@ router.post('/items/dpl-catalog/entry/:id/confirm-link', requirePermission('zoho
     }
 });
 
+// Re-key the latest saved DPL onto the pinned catalog → price diff. Persists the
+// new current_dpl/current_rate locally (no Zoho write). Returns three buckets.
+router.post('/items/dpl-catalog/:brand/apply-prices', requirePermission('zoho', 'manage'), async (req, res) => {
+    try {
+        const brand = String(req.params.brand || '').toLowerCase();
+        if (!assertSupportedBrand(brand, res)) return;
+
+        const parsedRows = await brandDplService.getForMatch(brand);
+        if (!parsedRows || !parsedRows.length) {
+            return res.status(404).json({ success: false, message: 'No saved DPL for this brand. Save a DPL first.' });
+        }
+        const existing = await dplCatalogService.getCatalog(brand);
+        if (!existing.length) {
+            return res.status(409).json({ success: false, message: 'Catalog is empty. Build the catalog first.' });
+        }
+
+        const diff = dplCatalogService.applyDplPrices(brand, parsedRows, existing);
+        const updatedBy = req.user ? (req.user.username || String(req.user.id)) : null;
+        await dplCatalogService.updateAppliedPrices(diff.updated, updatedBy);
+
+        res.json({ success: true, data: {
+            updated: diff.updated,
+            new_needs_linking: diff.newNeedsLinking,
+            no_dpl_this_time: diff.noDplThisTime.map(e => ({
+                match_key: e.match_key, product_name: e.product_name,
+                base_name: e.base_name, size_tier: e.size_tier,
+            })),
+            summary: { updated: diff.updated.length, new: diff.newNeedsLinking.length, untouched: diff.noDplThisTime.length },
+        } });
+    } catch (err) {
+        console.error('DPL catalog apply-prices error:', err);
+        res.status(500).json({ success: false, message: err.message });
+    }
+});
+
+// Push selected confirmed catalog entries to Zoho via the bulk-edit job path.
+// Body: { ids: [catalogEntryId, ...] }. Only confirmed entries with a zoho_item_id
+// and a current_dpl are pushed; the rest are reported as skipped.
+router.post('/items/dpl-catalog/:brand/push', requirePermission('zoho', 'manage'), async (req, res) => {
+    try {
+        const brand = String(req.params.brand || '').toLowerCase();
+        if (!assertSupportedBrand(brand, res)) return;
+        const ids = Array.isArray(req.body && req.body.ids) ? req.body.ids.map(n => parseInt(n, 10)).filter(Number.isFinite) : [];
+        if (!ids.length) return res.status(400).json({ success: false, message: 'ids array required' });
+
+        const all = await dplCatalogService.getCatalog(brand);
+        const byId = new Map(all.map(e => [e.id, e]));
+        const chosen = ids.map(id => byId.get(id)).filter(Boolean);
+
+        const pushable = chosen.filter(e => e.link_status === 'confirmed' && e.zoho_item_id && e.current_dpl != null);
+        const skipped = chosen.filter(e => !(e.link_status === 'confirmed' && e.zoho_item_id && e.current_dpl != null))
+            .map(e => ({ id: e.id, reason: !e.zoho_item_id ? 'not linked' : e.link_status !== 'confirmed' ? 'not confirmed' : 'no DPL price' }));
+        if (!pushable.length) {
+            return res.status(400).json({ success: false, message: 'No pushable confirmed entries with a DPL price in the selection.', skipped });
+        }
+
+        // Current Zoho values for diffing + price-history old values.
+        const zids = [...new Set(pushable.map(e => String(e.zoho_item_id)))];
+        const [zrows] = await pool.query(
+            `SELECT zoho_item_id, zoho_item_name AS name, zoho_sku AS sku, zoho_description AS description,
+                    zoho_category_name AS category, zoho_cf_dpl AS cf_dpl, zoho_purchase_rate AS purchase_rate,
+                    zoho_rate AS rate
+             FROM zoho_items_map WHERE zoho_item_id IN (${zids.map(() => '?').join(',')})`,
+            zids
+        );
+        const zById = new Map(zrows.map(z => [String(z.zoho_item_id), z]));
+
+        const items = [];
+        for (const e of pushable) {
+            const zc = zById.get(String(e.zoho_item_id)) || {};
+            const changes = dplCatalogService.buildPushChanges(e, zc);
+            if (!changes) continue;
+            items.push({ zoho_item_id: e.zoho_item_id, item_name: zc.name || e.canonical_name || '', changes, _entry: e, _zc: zc });
+        }
+        if (!items.length) return res.status(400).json({ success: false, message: 'Nothing to push after diffing.', skipped });
+
+        const jobItems = items.map(({ _entry, _zc, ...keep }) => keep);
+        const result = await createBulkEditJob(jobItems, req.user);
+
+        // Log price history (best-effort; mirrors routes/item-master.js /dpl-apply).
+        for (const it of items) {
+            try {
+                await pool.query(
+                    `INSERT INTO dpl_price_history (zoho_item_id, version_id, old_dpl, new_dpl, old_purchase_rate, new_purchase_rate, old_sales_rate, new_sales_rate, changed_by)
+                     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+                    [
+                        it.zoho_item_id, null,
+                        it._zc.cf_dpl || 0, it.changes.cf_dpl,
+                        it._zc.purchase_rate || 0, it.changes.purchase_rate,
+                        it._zc.rate || 0, it.changes.rate,
+                        req.user ? req.user.id : null,
+                    ]
+                );
+            } catch (histErr) {
+                console.error('DPL catalog push: price-history log failed (non-fatal):', histErr.message);
+            }
+        }
+
+        res.json({ success: true, data: { job_id: result.job_id, pushed: result.total_items, skipped } });
+    } catch (err) {
+        const status = err.httpStatus || 500;
+        console.error('DPL catalog push error:', err);
+        res.status(status).json(Object.assign({ success: false, message: err.message }, err.code ? { code: err.code } : {}, err.payload || {}));
+    }
+});
+
 // Module-scoped flag to prevent concurrent invoice-line back-fills
 let invoiceBackfillState = { running: false, startedAt: null };
 
