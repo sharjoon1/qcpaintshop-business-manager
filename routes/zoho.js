@@ -5969,7 +5969,7 @@ router.post('/items/dpl-parse-csv', requirePermission('zoho', 'manage'), uploadP
         }
 
         const csvString = req.file.buffer.toString('utf8');
-        const parsedRows = priceListParser.parseBirlaOpusCsv(req.file.buffer, effectiveDate);
+        const parsedRows = priceListParser.parseBirlaOpusCsvAuto(req.file.buffer, effectiveDate);
         if (parsedRows.length === 0) {
             return res.status(400).json({ success: false, message: 'No data rows found in CSV — check file format' });
         }
