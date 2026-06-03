@@ -327,7 +327,7 @@
                         <span class="px-2 py-1 rounded bg-amber-100 text-amber-700">⚠ Review: <b id="catReview">0</b></span>
                         <span class="px-2 py-1 rounded bg-rose-100 text-rose-700">🆕 Needs creating: <b id="catNeeds">0</b></span>
                     </div>
-                    <div class="flex gap-1">
+                    <div class="flex flex-wrap gap-1">
                         <button onclick="setCatalogFilter('all')" id="catFilterAll" class="cat-filter px-2 py-1 rounded text-[11px] font-semibold bg-indigo-600 text-white">All</button>
                         <button onclick="setCatalogFilter('review')" id="catFilterReview" class="cat-filter px-2 py-1 rounded text-[11px] font-semibold bg-gray-100 text-gray-600">Review</button>
                         <button onclick="setCatalogFilter('needs_creating')" id="catFilterNeeds" class="cat-filter px-2 py-1 rounded text-[11px] font-semibold bg-gray-100 text-gray-600">Needs creating</button>
@@ -342,7 +342,7 @@
                     </div>
                 </div>
                 <div class="flex flex-wrap items-center gap-2 mb-2">
-                    <input type="text" id="catSearch" oninput="setCatalogSearch(this.value)" placeholder="🔍 Search product / base / SKU / Zoho item…" class="flex-1 min-w-[180px] px-3 py-1.5 border rounded text-[11px] outline-none focus:border-indigo-500">
+                    <input type="text" id="catSearch" oninput="setCatalogSearch(this.value)" aria-label="Search catalog" placeholder="🔍 Search product / base / SKU / Zoho item…" class="flex-1 min-w-[180px] px-3 py-1.5 border rounded text-[11px] outline-none focus:border-indigo-500">
                     <span class="text-[11px] text-gray-500 whitespace-nowrap">Showing <b id="catShowing">0 of 0</b></span>
                     <button onclick="setCatalogFilter('pushable')" id="catPushableHint" class="hidden text-[11px] text-emerald-700 bg-emerald-50 border border-emerald-200 rounded px-2 py-1 font-semibold whitespace-nowrap"></button>
                 </div>
