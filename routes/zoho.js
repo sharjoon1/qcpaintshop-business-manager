@@ -105,6 +105,18 @@ function assertSupportedBrand(brand, res) {
     return true;
 }
 
+// Per-brand SQL scope (a WHERE fragment, literal patterns only — no params) for
+// catalog candidate Zoho items. Tolerant: the brand column OR the item name carries
+// the brand, so blank-brand items whose NAME says the brand are still candidates.
+// Unknown brand → '' (no scope). assertSupportedBrand already gates to birlaopus.
+const CATALOG_ZOHO_SCOPE = {
+    birlaopus: "(UPPER(COALESCE(zoho_brand,'')) LIKE '%BIRLA%' OR UPPER(zoho_item_name) LIKE '%BIRLA OPUS%')",
+};
+function catalogZohoScopeSql(brand) {
+    const s = CATALOG_ZOHO_SCOPE[String(brand || '').toLowerCase()];
+    return s ? ` AND ${s}` : '';
+}
+
 // ========================================
 // DPL CATALOG (deterministic item-master mediator) — build / read / confirm-link
 // ========================================
@@ -124,7 +136,7 @@ router.post('/items/dpl-catalog/:brand/build', requirePermission('zoho', 'manage
             `SELECT zoho_item_id, zoho_item_name AS name, zoho_sku AS sku, zoho_rate AS rate,
                     zoho_cf_dpl AS cf_dpl, zoho_brand AS brand, zoho_category_name AS category,
                     zoho_description AS description
-             FROM zoho_items_map WHERE zoho_status = 'active'`
+             FROM zoho_items_map WHERE zoho_status = 'active'${catalogZohoScopeSql(brand)}`
         );
 
         const entries = dplCatalogService.buildCatalogFromDpl(brand, parsedRows, zohoItems);
@@ -6432,5 +6444,6 @@ router.get('/salesorders/:id', requirePermission('zoho', 'view'), async (req, re
 
 module.exports = {
     router,
-    setPool
+    setPool,
+    catalogZohoScopeSql
 };
