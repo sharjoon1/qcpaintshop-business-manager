@@ -549,7 +549,7 @@ router.post('/dpl-apply', requireAuth, validate(dplApplySchema), async (req, res
 
             // Log to price history
             await pool.query(
-                `INSERT INTO dpl_price_history (zoho_item_id, version_id, old_dpl, new_dpl, old_purchase_rate, new_purchase_rate, old_sales_rate, new_sales_rate, changed_by)
+                `INSERT INTO dpl_price_history (zoho_item_id, dpl_version_id, old_dpl, new_dpl, old_purchase_rate, new_purchase_rate, old_sales_rate, new_sales_rate, changed_by)
                  VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
                 [
                     item.zoho_item_id,
@@ -635,11 +635,11 @@ router.get('/price-history', requireAuth, validateQuery(priceHistoryQuerySchema)
             params.push(brand);
         }
         if (from_date) {
-            where.push('dph.created_at >= ?');
+            where.push('dph.changed_at >= ?');
             params.push(from_date);
         }
         if (to_date) {
-            where.push('dph.created_at <= ?');
+            where.push('dph.changed_at <= ?');
             params.push(to_date + ' 23:59:59');
         }
         if (search) {
@@ -653,19 +653,18 @@ router.get('/price-history', requireAuth, validateQuery(priceHistoryQuerySchema)
             `SELECT COUNT(*) as total
              FROM dpl_price_history dph
              JOIN zoho_items_map zim ON dph.zoho_item_id = zim.zoho_item_id
-             LEFT JOIN dpl_versions dv ON dph.version_id = dv.id
+             LEFT JOIN dpl_versions dv ON dph.dpl_version_id = dv.id
              WHERE ${whereClause}`,
             params
         );
 
         const [rows] = await pool.query(
             `SELECT dph.*, zim.zoho_item_name, zim.zoho_sku, zim.zoho_brand,
-                    dv.brand AS version_brand, dv.effective_date AS version_date, dv.notes AS version_notes
-             FROM dpl_price_history dph
+                    dv.brand AS version_brand, dv.effective_date AS version_date             FROM dpl_price_history dph
              JOIN zoho_items_map zim ON dph.zoho_item_id = zim.zoho_item_id
-             LEFT JOIN dpl_versions dv ON dph.version_id = dv.id
+             LEFT JOIN dpl_versions dv ON dph.dpl_version_id = dv.id
              WHERE ${whereClause}
-             ORDER BY dph.created_at DESC
+             ORDER BY dph.changed_at DESC
              LIMIT ? OFFSET ?`,
             [...params, limit, offset]
         );
@@ -692,11 +691,10 @@ router.get('/price-history', requireAuth, validateQuery(priceHistoryQuerySchema)
 router.get('/price-history/:itemId', requireAuth, async (req, res) => {
     try {
         const [rows] = await pool.query(
-            `SELECT dph.*, dv.brand AS version_brand, dv.effective_date AS version_date, dv.notes AS version_notes
-             FROM dpl_price_history dph
-             LEFT JOIN dpl_versions dv ON dph.version_id = dv.id
+            `SELECT dph.*, dv.brand AS version_brand, dv.effective_date AS version_date             FROM dpl_price_history dph
+             LEFT JOIN dpl_versions dv ON dph.dpl_version_id = dv.id
              WHERE dph.zoho_item_id = ?
-             ORDER BY dph.created_at DESC`,
+             ORDER BY dph.changed_at DESC`,
             [req.params.itemId]
         );
         res.json({ success: true, data: rows });
