@@ -1462,6 +1462,97 @@ function splitCsvLine(line) {
     return cols;
 }
 
+// Normalize a long-CSV Unit ("200 ML", "1L", "1KG") to a canonical Birla size
+// column name. Tries trimmed, no-space, and no-space-uppercase; falls back to
+// the trimmed value verbatim (never drops the row on an unrecognized unit).
+function normalizeBirlaUnit(u) {
+    const t = String(u == null ? '' : u).trim();
+    for (const cand of [t, t.replace(/\s+/g, ''), t.replace(/\s+/g, '').toUpperCase()]) {
+        if (BIRLA_OPUS_SIZE_SET.has(cand)) return cand;
+    }
+    return t;
+}
+
+// Parse the LONG / tall Birla Opus CSV (one row per product+base+size):
+//   Category,SubCategory,Product,ProductCode,BaseCode,BaseName,ProdBaseCode,Unit,Price_excl_GST
+// Emits the SAME row shape as parseBirlaOpusCsv so downstream save/match/catalog
+// is identical. ProdBaseCode ("PE White") is the catalog's SKU-stem source.
+function parseBirlaOpusCsvLong(csvBuffer, effectiveDate) {
+    if (!Buffer.isBuffer(csvBuffer) || csvBuffer.length === 0) return [];
+
+    let text = csvBuffer.toString('utf8');
+    if (text.charCodeAt(0) === 0xFEFF) text = text.slice(1);
+
+    const lines = text.split(/\r?\n/);
+    if (lines.length < 2) return [];
+
+    const headerCols = splitCsvLine(lines[0]).map(h => h.trim());
+    const colIndex = {};
+    headerCols.forEach((h, i) => { colIndex[h] = i; });
+
+    const required = ['Category', 'SubCategory', 'Product', 'ProductCode', 'ProdBaseCode', 'Unit', 'Price_excl_GST'];
+    for (const r of required) { if (colIndex[r] == null) return []; }
+
+    const results = [];
+    for (let li = 1; li < lines.length; li++) {
+        const line = lines[li];
+        if (!line.trim()) continue;
+        const cols = splitCsvLine(line);
+
+        const category    = (cols[colIndex['Category']]       || '').trim();
+        const segment     = (cols[colIndex['SubCategory']]    || '').trim();
+        const productName = (cols[colIndex['Product']]        || '').trim();
+        const productCode = (cols[colIndex['ProductCode']]    || '').trim();
+        const baseCode    = (cols[colIndex['ProdBaseCode']]   || '').trim();
+        const colourCode  = colIndex['BaseCode'] != null ? (cols[colIndex['BaseCode']] || '').trim() : '';
+        const colourName  = colIndex['BaseName'] != null ? (cols[colIndex['BaseName']] || '').trim() : '';
+        const unitRaw     = (cols[colIndex['Unit']]           || '').trim();
+        const priceRaw    = (cols[colIndex['Price_excl_GST']] || '').trim().replace(/,/g, '');
+
+        if (!productName || !baseCode) continue;
+        if (!/^\d+(\.\d+)?$/.test(priceRaw)) continue;
+        const dpl = parseFloat(priceRaw);
+        if (!isFinite(dpl) || dpl <= 0) continue;
+
+        const packSize = normalizeBirlaUnit(unitRaw);
+
+        results.push({
+            product:              colourName ? `${productName} - ${colourName}` : productName,
+            packSize,
+            dpl,
+            brand:                'Birla Opus',
+            category,
+            segment,
+            baseCode,
+            productCode,
+            colourCode,
+            colourName,
+            productName,
+            _proposedName:        buildProperBirlaItemName({ baseCode, productName, colourName, size: packSize }),
+            _proposedZohoSku:     buildProperBirlaZohoSku({ baseCode, size: packSize }),
+            _proposedDescription: buildProperBirlaDescription(
+                { productName, colourCode, colourName, size: packSize, productCode, category, segment, dpl },
+                effectiveDate
+            ),
+        });
+    }
+
+    return results;
+}
+
+// Sniff the header and dispatch to the long or wide Birla Opus CSV parser.
+function parseBirlaOpusCsvAuto(csvBuffer, effectiveDate) {
+    if (!Buffer.isBuffer(csvBuffer) || csvBuffer.length === 0) return [];
+    let text = csvBuffer.toString('utf8');
+    if (text.charCodeAt(0) === 0xFEFF) text = text.slice(1);
+    const firstLine = text.split(/\r?\n/, 1)[0] || '';
+    const headers = new Set(splitCsvLine(firstLine).map(h => h.trim()));
+    if (headers.has('Unit') && headers.has('Price_excl_GST')) {
+        return parseBirlaOpusCsvLong(csvBuffer, effectiveDate);
+    }
+    return parseBirlaOpusCsv(csvBuffer, effectiveDate);
+}
+
 // ============ MATCH WITH ZOHO ITEMS ============
 function matchWithZohoItems(parsedItems, zohoItems) {
     const matched = [];
@@ -1992,4 +2083,6 @@ module.exports = {
     buildProperBirlaDescription,
     // CSV parser
     parseBirlaOpusCsv,
+    parseBirlaOpusCsvLong,
+    parseBirlaOpusCsvAuto,
 };
