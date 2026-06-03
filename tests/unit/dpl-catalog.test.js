@@ -367,6 +367,35 @@ describe('confirmLink recompute', () => {
     });
 });
 
+describe('linkEntryToZoho — colorant map', () => {
+    const opclbl = { zoho_item_id: 'Z1', sku: 'OPCLBL', name: 'OPCLBL COLORANT BIRLA OPUS 01 L' };
+
+    test('maps a colorant productCode to its exact Zoho SKU (confirmed)', () => {
+        const r = catalog.linkEntryToZoho(
+            { product_code: '970002', size_tier: '1L', product_name: 'Colorant', base_name: 'Black' },
+            [opclbl, { zoho_item_id: 'Z2', sku: 'OPCLWT', name: 'OPCLWT WHITE BIRLA OPUS 01 L' }]);
+        expect(r.link_status).toBe('confirmed');
+        expect(r.link_reason).toBe('colorant-map');
+        expect(r.zoho_item_id).toBe('Z1');
+        expect(r.link_confidence).toBe(95);
+    });
+
+    test('does NOT match when the tier differs (200ml colorant, only 1L OPCL item)', () => {
+        const r = catalog.linkEntryToZoho(
+            { product_code: '970002', size_tier: '200ml', product_name: 'Colorant', base_name: 'Black' },
+            [opclbl]);
+        expect(r.link_reason).not.toBe('colorant-map');
+        expect(r.link_status).toBe('needs_creating');
+    });
+
+    test('non-colorant productCode is unaffected (falls through)', () => {
+        const r = catalog.linkEntryToZoho(
+            { product_code: '941001', size_tier: '1L', product_name: 'X', base_name: 'Y' },
+            [opclbl]);
+        expect(r.link_reason).not.toBe('colorant-map');
+    });
+});
+
 describe('migrate-dpl-catalog', () => {
     test('exports up() and creates the table idempotently', async () => {
         const mig = require('../../migrations/migrate-dpl-catalog');

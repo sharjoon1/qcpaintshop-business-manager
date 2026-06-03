@@ -74,6 +74,17 @@ const SIZE_CODE = { '1L': '01', '4L': '04', '10L': '10', '20L': '20' };
 // Extend as new special bases surface; unmapped ones fall to review.
 const BASE_WORD_CODE = { white: '99' };
 
+// DPL productCode → exact Zoho SKU, for product families the name/SKU-stem linkers
+// can't match (Birla water colorants: Zoho names lack the colour word and the DPL
+// base abbreviations don't map to the Zoho suffix). Verified against prod. Solvent
+// colorants (970025+) have no OPCL items and are intentionally absent.
+const PRODUCT_CODE_SKU = {
+    '970001': 'OPCLWT', '970002': 'OPCLBL', '970003': 'OPCLBLU', '970004': 'OPCLOR',
+    '970005': 'OPCLMG', '970006': 'OPCLGR', '970007': 'OPCLVI', '970008': 'OPCLINY',
+    '970009': 'OPCLINR', '970010': 'OPCLRO', '970011': 'OPCLYO', '970012': 'OPCLEXY',
+    '970013': 'OPCLEXR', '970014': 'OPCLEXHR', '970015': 'OPCLEXHDY', '970016': 'OPCLSWT',
+};
+
 // DPL baseCode ("PE White" / "PE 1") → SKU stem ("pe99" / "pe1").
 function dplBaseStem(baseCode) {
     const bc = String(baseCode == null ? '' : baseCode).trim().toLowerCase();
@@ -113,6 +124,21 @@ function hasAllTokens(tokenSet, needleTokens) {
 // so a DPL off-size base (e.g. White 3.6L → tier 4L) links to the Zoho 4L SKU.
 function linkEntryToZoho(entry, zohoItems) {
     const items = zohoItems || [];
+
+    // SM: explicit productCode→SKU map (curated families the other strategies can't
+    // match — e.g. colorants). Exact SKU + tier-checked, so a different-size entry
+    // won't grab the only (1L) mapped item.
+    const mapSku = entry.product_code && PRODUCT_CODE_SKU[String(entry.product_code).trim()];
+    if (mapSku) {
+        const want = String(mapSku).toUpperCase();
+        const hit = items.find(z => {
+            const sku = String(z.sku || z.zoho_sku || '').toUpperCase();
+            if (sku !== want) return false;
+            const tier = normalizeSizeTier(extractSizeFromZohoName(z.name || z.zoho_item_name || '', sku));
+            return tier === entry.size_tier;
+        });
+        if (hit) return { zoho_item_id: hit.zoho_item_id, link_status: 'confirmed', link_confidence: 95, link_reason: 'colorant-map' };
+    }
 
     // S0: exact canonical SKU
     if (entry.canonical_sku) {
