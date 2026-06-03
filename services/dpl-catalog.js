@@ -311,7 +311,44 @@ async function getCatalog(brand) {
     return rows;
 }
 
+// Recompute canonical name/sku/description for an entry from its CURRENTLY linked
+// Zoho item (re-runs the Birla proposer). proposed_sku = the linked item's own SKU,
+// so canonical_sku tracks the link and push never renames it. Fields may be null.
+function reconcileCanonical(entry, zohoItem) {
+    const e = entry || {};
+    const z = zohoItem || {};
+    const product = e.base_name ? `${e.product_name || ''} - ${e.base_name}` : (e.product_name || '');
+    const pf = computeProposedFields(
+        { product, packSize: e.dpl_size_label || e.size_tier || '', dpl: parseFloat(e.current_dpl) || 0, category: e.category || '' },
+        { sku: z.zoho_sku || z.sku || '', description: z.zoho_description || z.description || '', category: z.zoho_category_name || z.category || '' },
+        'birlaopus'
+    );
+    return {
+        canonical_name: pf.proposed_name || null,
+        canonical_sku: pf.proposed_sku || null,
+        canonical_description: pf.proposed_description || null,
+    };
+}
+
 async function confirmLink(id, zohoItemId, updatedBy) {
+    // Recompute the canonical fields against the newly linked item so the SKU/name
+    // never drift from a previous link (the cause of duplicate-SKU push failures).
+    const [erows] = await pool.query('SELECT * FROM dpl_catalog WHERE id = ?', [id]);
+    const [zrows] = await pool.query(
+        'SELECT zoho_sku, zoho_description, zoho_category_name FROM zoho_items_map WHERE zoho_item_id = ?',
+        [zohoItemId]
+    );
+    if (erows.length && zrows.length) {
+        const c = reconcileCanonical(erows[0], zrows[0]);
+        await pool.query(
+            `UPDATE dpl_catalog SET zoho_item_id = ?, link_status = 'confirmed', link_confidence = 100,
+                link_reason = 'user-confirmed', canonical_name = ?, canonical_sku = ?, canonical_description = ?,
+                updated_by = ? WHERE id = ?`,
+            [zohoItemId, c.canonical_name, c.canonical_sku, c.canonical_description, updatedBy || null, id]
+        );
+        return;
+    }
+    // Fallback: entry or Zoho item not found — original link-only update.
     await pool.query(
         `UPDATE dpl_catalog SET zoho_item_id = ?, link_status = 'confirmed', link_confidence = 100,
             link_reason = 'user-confirmed', updated_by = ? WHERE id = ?`,
@@ -353,5 +390,6 @@ async function updateAppliedPrices(rows, updatedBy) {
 module.exports = {
     setPool, slug, normalizeSizeTier, extractSizeFromZohoName, buildMatchKey,
     dplBaseStem, zohoSkuStem, linkEntryToZoho, buildCatalogFromDpl, applyDplPrices,
-    buildPushChanges, upsertEntries, getCatalog, confirmLink, updateAppliedPrices, updateCanonicalFields,
+    buildPushChanges, upsertEntries, getCatalog, reconcileCanonical, confirmLink,
+    updateAppliedPrices, updateCanonicalFields,
 };

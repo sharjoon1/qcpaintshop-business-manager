@@ -317,6 +317,56 @@ describe('updateCanonicalFields', () => {
     });
 });
 
+describe('reconcileCanonical', () => {
+    test('canonical_sku becomes the linked item sku; name carries it', () => {
+        const c = catalog.reconcileCanonical(
+            { product_name: 'Colorant', base_name: 'Black', size_tier: '1L', dpl_size_label: '1L', current_dpl: 394, category: 'Interior' },
+            { zoho_sku: 'OPCLBL', zoho_description: 'BLACK COLORANT', zoho_category_name: 'Interior' });
+        expect(c.canonical_sku).toBe('OPCLBL');
+        expect(c.canonical_name).toContain('OPCLBL');
+        expect(typeof c.canonical_description).toBe('string');
+    });
+
+    test('returns null canonical_sku when the linked item has no sku', () => {
+        const c = catalog.reconcileCanonical(
+            { product_name: 'X', base_name: '', size_tier: '1L', dpl_size_label: '1L', current_dpl: 100, category: '' },
+            { zoho_sku: '' });
+        expect(c.canonical_sku).toBeNull();
+    });
+});
+
+describe('confirmLink recompute', () => {
+    test('recomputes canonical fields from the newly linked item', async () => {
+        const calls = [];
+        catalog.setPool({ query: async (sql, params) => {
+            calls.push({ sql, params });
+            if (/FROM dpl_catalog WHERE id/.test(sql)) return [[{ id: 1, product_name: 'Colorant', base_name: 'Black', size_tier: '1L', dpl_size_label: '1L', current_dpl: 394, category: 'Interior' }]];
+            if (/FROM zoho_items_map/.test(sql)) return [[{ zoho_sku: 'OPCLBL', zoho_description: 'd', zoho_category_name: 'Interior' }]];
+            return [{}];
+        } });
+        await catalog.confirmLink(1, 'ZID', 'admin');
+        const upd = calls.find(c => /UPDATE dpl_catalog SET zoho_item_id/.test(c.sql));
+        expect(upd).toBeTruthy();
+        expect(upd.sql).toMatch(/canonical_sku = \?/);
+        expect(upd.params[0]).toBe('ZID');       // zoho_item_id
+        expect(upd.params[2]).toBe('OPCLBL');     // canonical_sku
+        expect(upd.params[5]).toBe(1);            // id
+    });
+
+    test('falls back to link-only update when entry not found', async () => {
+        const calls = [];
+        catalog.setPool({ query: async (sql) => {
+            calls.push({ sql });
+            if (/FROM dpl_catalog WHERE id/.test(sql)) return [[]];
+            if (/FROM zoho_items_map/.test(sql)) return [[]];
+            return [{}];
+        } });
+        await catalog.confirmLink(2, 'ZID', 'u');
+        const upd = calls.find(c => /UPDATE dpl_catalog SET zoho_item_id/.test(c.sql));
+        expect(upd.sql).not.toMatch(/canonical_sku/);
+    });
+});
+
 describe('migrate-dpl-catalog', () => {
     test('exports up() and creates the table idempotently', async () => {
         const mig = require('../../migrations/migrate-dpl-catalog');
