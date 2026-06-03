@@ -1241,41 +1241,75 @@
     var catZohoNameCache = {};
 
     var catPushSelected = {}; // { entryId: true }
+    var catalogSearch = '';
+    var catalogSearchTimer = null;
+
+    // Single source of truth for "can this row be pushed to Zoho?"
+    function isPushable(e) {
+        return e.link_status === 'confirmed' && e.zoho_item_id && e.current_dpl != null && Number(e.current_dpl) > 0;
+    }
+
+    // Rows visible after the active status/pushable filter AND the text search.
+    function visibleCatalogRows() {
+        var q = catalogSearch.trim().toLowerCase();
+        return catalogEntries.filter(function(e){
+            if (catalogFilter === 'pushable') { if (!isPushable(e)) return false; }
+            else if (catalogFilter !== 'all' && e.link_status !== catalogFilter) return false;
+            if (q) {
+                var hay = ((e.product_name || '') + ' ' + (e.base_name || '') + ' ' +
+                           (e.canonical_sku || '') + ' ' + zohoNameFor(e.zoho_item_id, e)).toLowerCase();
+                if (hay.indexOf(q) === -1) return false;
+            }
+            return true;
+        });
+    }
+
+    function setCatalogSearch(v) {
+        catalogSearch = v || '';
+        clearTimeout(catalogSearchTimer);
+        catalogSearchTimer = setTimeout(renderCatalog, 200);
+    }
+
+    // Mirror a selection change to every DOM copy of that row's checkbox
+    // (a pushable row's checkbox exists in BOTH the table and the card list).
+    function setRowCheckedDom(id, checked) {
+        document.querySelectorAll('.cat-push-check[data-id="' + id + '"]').forEach(function(cb){ cb.checked = checked; });
+    }
 
     function refreshPushButton() {
-        var ids = Object.keys(catPushSelected).filter(function(k){ return catPushSelected[k]; });
+        var selectedIds = Object.keys(catPushSelected).filter(function(k){ return catPushSelected[k]; });
         var countEl = document.getElementById('pushCount');
         var btn = document.getElementById('pushZohoBtn');
-        if (countEl) countEl.textContent = ids.length;
-        if (btn) btn.disabled = ids.length === 0;
+        if (countEl) countEl.textContent = selectedIds.length;
+        if (btn) btn.disabled = selectedIds.length === 0;
         var hd = document.getElementById('catHeadCheck');
         if (hd) {
-            var visible = document.querySelectorAll('.cat-push-check');
-            var checkedBoxes = document.querySelectorAll('.cat-push-check:checked');
-            hd.checked = visible.length > 0 && checkedBoxes.length === visible.length;
-            hd.indeterminate = checkedBoxes.length > 0 && checkedBoxes.length < visible.length;
+            var visPush = visibleCatalogRows().filter(isPushable);
+            var sel = visPush.filter(function(e){ return catPushSelected[e.id]; }).length;
+            hd.checked = visPush.length > 0 && sel === visPush.length;
+            hd.indeterminate = sel > 0 && sel < visPush.length;
         }
     }
     function onCatCheck(id, checked) {
         if (checked) catPushSelected[id] = true; else delete catPushSelected[id];
+        setRowCheckedDom(id, checked);
         refreshPushButton();
     }
     function toggleHeadCheck(el) {
-        document.querySelectorAll('.cat-push-check').forEach(function(cb){
-            cb.checked = el.checked;
-            onCatCheck(parseInt(cb.getAttribute('data-id'), 10), el.checked);
+        visibleCatalogRows().filter(isPushable).forEach(function(e){
+            if (el.checked) catPushSelected[e.id] = true; else delete catPushSelected[e.id];
+            setRowCheckedDom(e.id, el.checked);
         });
+        refreshPushButton();
     }
+    // Select/deselect all currently-VISIBLE pushable rows (respects filter + search).
     function toggleSelectAllConfirmed() {
-        var anyUnselected = catalogEntries.some(function(e){
-            return e.link_status === 'confirmed' && e.zoho_item_id && e.current_dpl != null && Number(e.current_dpl) > 0 && !catPushSelected[e.id];
+        var pushRows = visibleCatalogRows().filter(isPushable);
+        var anyUnselected = pushRows.some(function(e){ return !catPushSelected[e.id]; });
+        pushRows.forEach(function(e){
+            if (anyUnselected) catPushSelected[e.id] = true; else delete catPushSelected[e.id];
+            setRowCheckedDom(e.id, anyUnselected);
         });
-        catalogEntries.forEach(function(e){
-            if (e.link_status === 'confirmed' && e.zoho_item_id && e.current_dpl != null && Number(e.current_dpl) > 0) {
-                if (anyUnselected) catPushSelected[e.id] = true; else delete catPushSelected[e.id];
-            }
-        });
-        renderCatalog();
         refreshPushButton();
     }
 
@@ -1368,7 +1402,7 @@
     function setCatalogFilter(f) {
         catalogFilter = f;
         document.querySelectorAll('.cat-filter').forEach(function(b){ b.className = 'cat-filter px-2 py-1 rounded text-[11px] font-semibold bg-gray-100 text-gray-600'; });
-        var map = { all: 'catFilterAll', review: 'catFilterReview', needs_creating: 'catFilterNeeds', confirmed: 'catFilterConfirmed' };
+        var map = { all: 'catFilterAll', review: 'catFilterReview', needs_creating: 'catFilterNeeds', confirmed: 'catFilterConfirmed', pushable: 'catFilterPushable' };
         var active = document.getElementById(map[f]);
         if (active) active.className = 'cat-filter px-2 py-1 rounded text-[11px] font-semibold bg-indigo-600 text-white';
         renderCatalog();
@@ -1381,6 +1415,7 @@
 
     function renderCatalog() {
         var tbody = document.getElementById('catalogTableBody');
+        var cards = document.getElementById('catalogCards');
         var counts = { confirmed: 0, review: 0, needs_creating: 0 };
         catalogEntries.forEach(function(e){ counts[e.link_status] = (counts[e.link_status] || 0) + 1; });
         document.getElementById('catTotal').textContent = catalogEntries.length;
@@ -1388,19 +1423,43 @@
         document.getElementById('catReview').textContent = counts.review;
         document.getElementById('catNeeds').textContent = counts.needs_creating;
 
-        var rows = catalogEntries.filter(function(e){ return catalogFilter === 'all' || e.link_status === catalogFilter; });
-        if (!rows.length) { tbody.innerHTML = ''; document.getElementById('catalogEmpty').classList.remove('hidden'); refreshPushButton(); return; }
-        document.getElementById('catalogEmpty').classList.add('hidden');
+        var rows = visibleCatalogRows();
 
-        tbody.innerHTML = rows.map(function(e){
-            var statusBadge = e.link_status === 'confirmed'
+        var showEl = document.getElementById('catShowing');
+        if (showEl) showEl.textContent = rows.length + ' of ' + catalogEntries.length;
+
+        var pushableTotal = catalogEntries.filter(isPushable).length;
+        var hintEl = document.getElementById('catPushableHint');
+        if (hintEl) {
+            if (pushableTotal > 0 && catalogFilter !== 'pushable') {
+                hintEl.textContent = '☑ ' + pushableTotal + ' pushable';
+                hintEl.classList.remove('hidden');
+            } else {
+                hintEl.classList.add('hidden');
+            }
+        }
+
+        var emptyEl = document.getElementById('catalogEmpty');
+        if (!rows.length) {
+            if (tbody) tbody.innerHTML = '';
+            if (cards) cards.innerHTML = '';
+            if (emptyEl) emptyEl.classList.remove('hidden');
+            refreshPushButton();
+            return;
+        }
+        if (emptyEl) emptyEl.classList.add('hidden');
+
+        function statusBadge(e) {
+            return e.link_status === 'confirmed'
                 ? '<span class="px-1.5 py-0.5 rounded bg-green-100 text-green-700">✅ ' + (e.link_confidence || '') + '</span>'
                 : e.link_status === 'review'
                 ? '<span class="px-1.5 py-0.5 rounded bg-amber-100 text-amber-700" title="' + esc(e.link_reason || '') + '">⚠ ' + (e.link_confidence || '') + '</span>'
                 : '<span class="px-1.5 py-0.5 rounded bg-rose-100 text-rose-700">🆕</span>';
-            var linked = e.zoho_item_id
-                ? esc(zohoNameFor(e.zoho_item_id, e))
-                : '<span class="text-gray-400">— not linked —</span>';
+        }
+        function linkedHtml(e) {
+            return e.zoho_item_id ? esc(zohoNameFor(e.zoho_item_id, e)) : '<span class="text-gray-400">— not linked —</span>';
+        }
+        function actionHtml(e) {
             var action = '';
             if (e.link_status !== 'confirmed') {
                 if (e.zoho_item_id) action += '<button onclick="confirmCatalogEntry(' + e.id + ', \'' + esc(String(e.zoho_item_id)) + '\')" class="px-2 py-1 rounded bg-green-600 text-white text-[10px] font-bold mr-1">✓ Confirm</button>';
@@ -1408,23 +1467,54 @@
             } else {
                 action += '<button onclick="openCatPicker(' + e.id + ')" class="px-2 py-1 rounded border text-gray-500 text-[10px]">change</button>';
             }
-            var canPush = (e.link_status === 'confirmed' && e.zoho_item_id && e.current_dpl != null && Number(e.current_dpl) > 0);
-            var checkbox = canPush
-                ? '<input type="checkbox" class="cat-push-check" data-id="' + e.id + '" ' + (catPushSelected[e.id] ? 'checked' : '') + ' onclick="onCatCheck(' + e.id + ', this.checked)">'
-                : '';
-            var priceCell = (e.current_dpl != null ? '₹' + esc(String(e.current_dpl)) : '-') +
-                (e.current_rate != null ? '<div class="text-[10px] text-gray-400">→ ₹' + esc(String(e.current_rate)) + '</div>' : '');
-            return '<tr class="border-t">' +
-                '<td class="px-2 py-1.5 text-center">' + checkbox + '</td>' +
-                '<td class="px-2 py-1.5"><div class="font-semibold text-gray-800">' + esc(e.product_name || '') + '</div><div class="text-gray-500">' + esc(e.base_name || '') + '</div></td>' +
-                '<td class="px-2 py-1.5">' + esc(e.size_tier || '') + (e.dpl_size_label && e.dpl_size_label !== e.size_tier ? ' <span class="text-gray-400">(' + esc(e.dpl_size_label) + ')</span>' : '') + '</td>' +
-                '<td class="px-2 py-1.5 text-right">' + priceCell + '</td>' +
-                '<td class="px-2 py-1.5 font-mono">' + esc(e.canonical_sku || '-') + '</td>' +
-                '<td class="px-2 py-1.5">' + linked + '</td>' +
-                '<td class="px-2 py-1.5 text-center">' + statusBadge + '</td>' +
-                '<td class="px-2 py-1.5 text-center whitespace-nowrap">' + action + '</td>' +
-                '</tr>';
-        }).join('');
+            return action;
+        }
+
+        if (tbody) {
+            tbody.innerHTML = rows.map(function(e){
+                var checkbox = isPushable(e)
+                    ? '<input type="checkbox" class="cat-push-check" data-id="' + e.id + '" ' + (catPushSelected[e.id] ? 'checked' : '') + ' onclick="onCatCheck(' + e.id + ', this.checked)">'
+                    : '';
+                var priceCell = (e.current_dpl != null ? '₹' + esc(String(e.current_dpl)) : '-') +
+                    (e.current_rate != null ? '<div class="text-[10px] text-gray-400">→ ₹' + esc(String(e.current_rate)) + '</div>' : '');
+                return '<tr class="border-t">' +
+                    '<td class="px-2 py-1.5 text-center">' + checkbox + '</td>' +
+                    '<td class="px-2 py-1.5"><div class="font-semibold text-gray-800">' + esc(e.product_name || '') + '</div><div class="text-gray-500">' + esc(e.base_name || '') + '</div></td>' +
+                    '<td class="px-2 py-1.5">' + esc(e.size_tier || '') + (e.dpl_size_label && e.dpl_size_label !== e.size_tier ? ' <span class="text-gray-400">(' + esc(e.dpl_size_label) + ')</span>' : '') + '</td>' +
+                    '<td class="px-2 py-1.5 text-right">' + priceCell + '</td>' +
+                    '<td class="px-2 py-1.5 font-mono">' + esc(e.canonical_sku || '-') + '</td>' +
+                    '<td class="px-2 py-1.5">' + linkedHtml(e) + '</td>' +
+                    '<td class="px-2 py-1.5 text-center">' + statusBadge(e) + '</td>' +
+                    '<td class="px-2 py-1.5 text-center whitespace-nowrap">' + actionHtml(e) + '</td>' +
+                    '</tr>';
+            }).join('');
+        }
+
+        if (cards) {
+            cards.innerHTML = rows.map(function(e){
+                var cb = isPushable(e)
+                    ? '<input type="checkbox" class="cat-push-check w-5 h-5 mt-0.5 shrink-0" data-id="' + e.id + '" ' + (catPushSelected[e.id] ? 'checked' : '') + ' onclick="onCatCheck(' + e.id + ', this.checked)">'
+                    : '<span class="w-5 shrink-0"></span>';
+                var price = (e.current_dpl != null ? '₹' + esc(String(e.current_dpl)) : '-') +
+                    (e.current_rate != null ? ' <span class="text-gray-400">→ ₹' + esc(String(e.current_rate)) + '</span>' : '');
+                var sizeLine = esc(e.size_tier || '') + (e.dpl_size_label && e.dpl_size_label !== e.size_tier ? ' (' + esc(e.dpl_size_label) + ')' : '');
+                return '<div class="border rounded-lg p-3 flex gap-3 ' + (catPushSelected[e.id] ? 'bg-emerald-50 border-emerald-200' : 'bg-white') + '">' +
+                    cb +
+                    '<div class="flex-1 min-w-0">' +
+                        '<div class="flex items-start justify-between gap-2">' +
+                            '<div class="min-w-0"><div class="font-semibold text-gray-800 truncate">' + esc(e.product_name || '') + '</div>' +
+                            '<div class="text-gray-500 text-[11px]">' + esc(e.base_name || '') + ' · ' + sizeLine + '</div></div>' +
+                            statusBadge(e) +
+                        '</div>' +
+                        '<div class="text-[12px] text-gray-700 mt-1">' + price + '</div>' +
+                        '<div class="text-[10px] text-gray-400 font-mono mt-0.5">' + esc(e.canonical_sku || '-') + '</div>' +
+                        '<div class="text-[11px] text-gray-600 mt-0.5 truncate">' + linkedHtml(e) + '</div>' +
+                        '<div class="mt-2 flex flex-wrap gap-1">' + actionHtml(e) + '</div>' +
+                    '</div>' +
+                '</div>';
+            }).join('');
+        }
+
         refreshPushButton();
     }
 
