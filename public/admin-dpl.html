@@ -381,6 +381,38 @@
                 </div>
             </div>
 
+            <!-- Catalog entry detail + edit sheet -->
+            <div id="catEditModal" class="fixed inset-0 bg-black/40 items-center justify-center z-50" style="display:none">
+                <div class="bg-white rounded-xl shadow-2xl w-full max-w-lg mx-4 max-h-[85vh] flex flex-col">
+                    <div class="p-3 border-b flex items-center justify-between">
+                        <div class="font-bold text-sm" id="catEditTitle">Edit catalog item</div>
+                        <button onclick="closeCatEdit()" class="text-gray-400 hover:text-gray-700 text-xl leading-none">&times;</button>
+                    </div>
+                    <div class="p-3 overflow-y-auto space-y-3 text-xs">
+                        <div id="catEditMeta" class="text-gray-500"></div>
+                        <div id="catEditPrices" class="flex flex-wrap items-center gap-2 text-[12px]"></div>
+                        <div id="catEditLinked" class="text-[11px] text-gray-600"></div>
+                        <div>
+                            <label class="block text-[11px] text-gray-500 mb-0.5">Name</label>
+                            <input type="text" id="catEditName" class="w-full px-3 py-2 border rounded text-xs outline-none focus:border-indigo-500">
+                        </div>
+                        <div>
+                            <label class="block text-[11px] text-gray-500 mb-0.5">SKU</label>
+                            <input type="text" id="catEditSku" oninput="catEditCheckSku()" class="w-full px-3 py-2 border rounded text-xs font-mono outline-none focus:border-indigo-500">
+                            <div id="catEditSkuWarn" class="hidden text-[11px] text-rose-600 mt-1"></div>
+                        </div>
+                        <div>
+                            <label class="block text-[11px] text-gray-500 mb-0.5">Description</label>
+                            <textarea id="catEditDesc" rows="3" class="w-full px-3 py-2 border rounded text-xs outline-none focus:border-indigo-500 resize-y"></textarea>
+                        </div>
+                    </div>
+                    <div class="p-3 border-t flex justify-end gap-2">
+                        <button onclick="closeCatEdit()" class="px-3 py-2 rounded border text-gray-600 text-xs">Cancel</button>
+                        <button onclick="saveCatEdit()" id="catEditSaveBtn" class="px-4 py-2 rounded bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold disabled:opacity-50">💾 Save</button>
+                    </div>
+                </div>
+            </div>
+
             <!-- Auto-Propose (No PDF) — Step 0 / alternate path -->
             <div class="mt-4 border-t pt-4">
                 <div class="bg-emerald-50 border border-emerald-200 rounded-lg p-3 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
@@ -1480,6 +1512,7 @@
             } else {
                 action += '<button onclick="openCatPicker(' + e.id + ')" class="px-2 py-1 rounded border text-gray-500 text-[10px]">change</button>';
             }
+            action += '<button onclick="openCatEdit(' + e.id + ')" class="px-2 py-1 rounded border border-amber-300 text-amber-700 text-[10px] font-bold ml-1">✏ Edit</button>';
             return action;
         }
 
@@ -1488,14 +1521,16 @@
                 var checkbox = isPushable(e)
                     ? '<input type="checkbox" class="cat-push-check" data-id="' + e.id + '" ' + (catPushSelected[e.id] ? 'checked' : '') + ' onclick="onCatCheck(' + e.id + ', this.checked)">'
                     : '';
-                var priceCell = (e.current_dpl != null ? '₹' + esc(String(e.current_dpl)) : '-') +
+                var priceCell = (e.old_dpl != null ? '<span class="text-gray-400">₹' + esc(String(e.old_dpl)) + ' → </span>' : '') +
+                    (e.current_dpl != null ? '₹' + esc(String(e.current_dpl)) : '-') +
                     (e.current_rate != null ? '<div class="text-[10px] text-gray-400">→ ₹' + esc(String(e.current_rate)) + '</div>' : '');
+                var skuCell = '<span class="' + (e.sku_conflict ? 'text-rose-600' : '') + '">' + esc(e.canonical_sku || '-') + (e.sku_conflict ? ' <span title="' + esc(e.sku_conflict) + '">⚠</span>' : '') + '</span>';
                 return '<tr class="border-t">' +
                     '<td class="px-2 py-1.5 text-center">' + checkbox + '</td>' +
-                    '<td class="px-2 py-1.5"><div class="font-semibold text-gray-800">' + esc(e.product_name || '') + '</div><div class="text-gray-500">' + esc(e.base_name || '') + '</div></td>' +
+                    '<td class="px-2 py-1.5 cursor-pointer" onclick="openCatEdit(' + e.id + ')"><div class="font-semibold text-gray-800">' + esc(e.product_name || '') + '</div><div class="text-gray-500">' + esc(e.base_name || '') + '</div></td>' +
                     '<td class="px-2 py-1.5">' + esc(e.size_tier || '') + (e.dpl_size_label && e.dpl_size_label !== e.size_tier ? ' <span class="text-gray-400">(' + esc(e.dpl_size_label) + ')</span>' : '') + '</td>' +
                     '<td class="px-2 py-1.5 text-right">' + priceCell + '</td>' +
-                    '<td class="px-2 py-1.5 font-mono">' + esc(e.canonical_sku || '-') + '</td>' +
+                    '<td class="px-2 py-1.5 font-mono">' + skuCell + '</td>' +
                     '<td class="px-2 py-1.5">' + linkedHtml(e) + '</td>' +
                     '<td class="px-2 py-1.5 text-center">' + statusBadge(e) + '</td>' +
                     '<td class="px-2 py-1.5 text-center whitespace-nowrap">' + actionHtml(e) + '</td>' +
@@ -1508,19 +1543,21 @@
                 var cb = isPushable(e)
                     ? '<input type="checkbox" class="cat-push-check w-5 h-5 mt-0.5 shrink-0" data-id="' + e.id + '" ' + (catPushSelected[e.id] ? 'checked' : '') + ' onclick="onCatCheck(' + e.id + ', this.checked)">'
                     : '<span class="w-5 shrink-0"></span>';
-                var price = (e.current_dpl != null ? '₹' + esc(String(e.current_dpl)) : '-') +
+                var price = (e.old_dpl != null ? '<span class="text-gray-400">₹' + esc(String(e.old_dpl)) + ' → </span>' : '') +
+                    (e.current_dpl != null ? '₹' + esc(String(e.current_dpl)) : '-') +
                     (e.current_rate != null ? ' <span class="text-gray-400">→ ₹' + esc(String(e.current_rate)) + '</span>' : '');
                 var sizeLine = esc(e.size_tier || '') + (e.dpl_size_label && e.dpl_size_label !== e.size_tier ? ' (' + esc(e.dpl_size_label) + ')' : '');
+                var skuLine = '<div class="text-[10px] font-mono mt-0.5 ' + (e.sku_conflict ? 'text-rose-600' : 'text-gray-400') + '">' + esc(e.canonical_sku || '-') + (e.sku_conflict ? ' ⚠ dup' : '') + '</div>';
                 return '<div class="cat-card border rounded-lg p-3 flex gap-3 ' + (catPushSelected[e.id] ? 'bg-emerald-50 border-emerald-200' : 'bg-white') + '" data-id="' + e.id + '">' +
                     cb +
                     '<div class="flex-1 min-w-0">' +
                         '<div class="flex items-start justify-between gap-2">' +
-                            '<div class="min-w-0"><div class="font-semibold text-gray-800 truncate">' + esc(e.product_name || '') + '</div>' +
+                            '<div class="min-w-0 cursor-pointer" onclick="openCatEdit(' + e.id + ')"><div class="font-semibold text-gray-800 truncate">' + esc(e.product_name || '') + '</div>' +
                             '<div class="text-gray-500 text-[11px]">' + esc(e.base_name || '') + ' · ' + sizeLine + '</div></div>' +
                             statusBadge(e) +
                         '</div>' +
                         '<div class="text-[12px] text-gray-700 mt-1">' + price + '</div>' +
-                        '<div class="text-[10px] text-gray-400 font-mono mt-0.5">' + esc(e.canonical_sku || '-') + '</div>' +
+                        skuLine +
                         '<div class="text-[11px] text-gray-600 mt-0.5 truncate">' + linkedHtml(e) + '</div>' +
                         '<div class="mt-2 flex flex-wrap gap-1">' + actionHtml(e) + '</div>' +
                     '</div>' +
@@ -1556,6 +1593,66 @@
         catPickerSearch();
     }
     function closeCatPicker() { document.getElementById('catPickerModal').style.display = 'none'; catPickerEntryId = null; }
+
+    var catEditEntryId = null;
+    function openCatEdit(entryId) {
+        var e = catalogEntries.find(function(x){ return x.id === entryId; });
+        if (!e) return;
+        catEditEntryId = entryId;
+        document.getElementById('catEditTitle').textContent = (e.product_name || '') + ' ' + (e.base_name || '');
+        document.getElementById('catEditMeta').textContent = (e.product_name || '') + ' · ' + (e.base_name || '') + ' · ' + (e.size_tier || '');
+        var oldDpl = e.old_dpl != null ? '₹' + e.old_dpl : '—';
+        var newDpl = e.current_dpl != null ? '₹' + e.current_dpl : '—';
+        var rate = e.current_rate != null ? '₹' + e.current_rate : '—';
+        document.getElementById('catEditPrices').innerHTML =
+            '<span class="text-gray-400">Old DPL ' + esc(oldDpl) + '</span><span>→ New DPL <b>' + esc(newDpl) + '</b></span><span>→ Sell <b>' + esc(rate) + '</b></span>';
+        document.getElementById('catEditLinked').innerHTML = e.zoho_item_id
+            ? ('Linked: ' + esc(e.zoho_name || e.canonical_name || String(e.zoho_item_id)) + (e.zoho_sku ? ' <span class="font-mono text-gray-400">(' + esc(e.zoho_sku) + ')</span>' : ''))
+            : '<span class="text-gray-400">— not linked —</span>';
+        document.getElementById('catEditName').value = e.canonical_name || '';
+        document.getElementById('catEditSku').value = e.canonical_sku || '';
+        document.getElementById('catEditDesc').value = e.canonical_description || '';
+        document.getElementById('catEditModal').style.display = 'flex';
+        catEditCheckSku();
+    }
+    function closeCatEdit() { document.getElementById('catEditModal').style.display = 'none'; catEditEntryId = null; }
+    function catEditCheckSku() {
+        var e = catalogEntries.find(function(x){ return x.id === catEditEntryId; });
+        var warn = document.getElementById('catEditSkuWarn');
+        if (!e) { warn.classList.add('hidden'); return; }
+        var val = document.getElementById('catEditSku').value.trim().toUpperCase();
+        if (e.sku_conflict && e.canonical_sku && val === String(e.canonical_sku).toUpperCase()) {
+            warn.textContent = '⚠ SKU already used by: ' + e.sku_conflict + ' — edit to a unique SKU before pushing.';
+            warn.classList.remove('hidden');
+        } else {
+            warn.classList.add('hidden');
+        }
+    }
+    async function saveCatEdit() {
+        if (catEditEntryId == null) return;
+        var btn = document.getElementById('catEditSaveBtn');
+        btn.disabled = true;
+        try {
+            var resp = await fetch('/api/zoho/items/dpl-catalog/entry/' + catEditEntryId, {
+                method: 'PUT',
+                headers: { 'Authorization': 'Bearer ' + getToken(), 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    canonical_name: document.getElementById('catEditName').value,
+                    canonical_sku: document.getElementById('catEditSku').value,
+                    canonical_description: document.getElementById('catEditDesc').value
+                })
+            });
+            var body = await resp.json();
+            if (!resp.ok || !body.success) throw new Error(body.message || 'Save failed');
+            closeCatEdit();
+            showToast('Saved', 'success');
+            await loadCatalog();
+        } catch (err) {
+            showToast('Save error: ' + err.message, 'error');
+        } finally {
+            btn.disabled = false;
+        }
+    }
     function catPickerSearchDebounced() { clearTimeout(catPickerTimer); catPickerTimer = setTimeout(catPickerSearch, 300); }
     async function catPickerSearch() {
         var q = document.getElementById('catPickerSearch').value.trim();
