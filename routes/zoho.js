@@ -250,11 +250,13 @@ router.post('/items/dpl-catalog/:brand/push', requirePermission('zoho', 'manage'
         const jobItems = items.map(({ _entry, _zc, ...keep }) => keep);
         const result = await createBulkEditJob(jobItems, req.user);
 
-        // Log price history (best-effort; mirrors routes/item-master.js /dpl-apply).
+        // Log price history (best-effort). NOTE: the real column is `dpl_version_id`
+        // (verified on prod) — routes/item-master.js uses `version_id` here, which is a
+        // latent bug (Unknown column) that its own try/catch-less path silently 500s on.
         for (const it of items) {
             try {
                 await pool.query(
-                    `INSERT INTO dpl_price_history (zoho_item_id, version_id, old_dpl, new_dpl, old_purchase_rate, new_purchase_rate, old_sales_rate, new_sales_rate, changed_by)
+                    `INSERT INTO dpl_price_history (zoho_item_id, dpl_version_id, old_dpl, new_dpl, old_purchase_rate, new_purchase_rate, old_sales_rate, new_sales_rate, changed_by)
                      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
                     [
                         it.zoho_item_id, null,
