@@ -173,6 +173,88 @@ describe('applyDplPrices', () => {
     });
 });
 
+describe('applyDplPrices — enriched diff fields', () => {
+    const existing = [
+        { id: 1, match_key: 'birlaopus|941001|white|1l', zoho_item_id: 'Z1', current_dpl: 490,
+          current_rate: 636, link_status: 'confirmed', product_name: 'One Pure Elegance',
+          base_name: 'White', size_tier: '1L', dpl_size_label: '1L',
+          canonical_name: 'BIRLA OPUS ONE PURE ELEGANCE WHITE 1L', canonical_sku: 'PE9901',
+          canonical_description: 'desc' },
+    ];
+    const rows = [{ product: 'One Pure Elegance - White', packSize: '1L', dpl: 510, baseCode: '941001' }];
+
+    test('updated rows carry id, zoho_item_id, link_status, old_rate, canonical + display fields', () => {
+        const u = catalog.applyDplPrices('birlaopus', rows, existing).updated[0];
+        expect(u.id).toBe(1);
+        expect(u.zoho_item_id).toBe('Z1');
+        expect(u.link_status).toBe('confirmed');
+        expect(u.old_rate).toBe(636);
+        expect(u.new_rate).toBe(Math.ceil(510 * 1.18 * 1.10));
+        expect(u.product_name).toBe('One Pure Elegance');
+        expect(u.base_name).toBe('White');
+        expect(u.size_tier).toBe('1L');
+        expect(u.canonical_sku).toBe('PE9901');
+        expect(u.canonical_name).toBe('BIRLA OPUS ONE PURE ELEGANCE WHITE 1L');
+    });
+});
+
+describe('buildPushChanges', () => {
+    const entry = {
+        current_dpl: 510, current_rate: 662,
+        canonical_name: 'BIRLA OPUS ONE PURE ELEGANCE WHITE 1L', canonical_sku: 'PE9901',
+        canonical_description: 'Premium interior emulsion', category: 'Interior Luxury',
+    };
+
+    test('always includes prices', () => {
+        const c = catalog.buildPushChanges(entry, { sku: 'PE9901', name: entry.canonical_name,
+            description: entry.canonical_description, category: 'Interior Luxury', cf_dpl: 490 });
+        expect(c.cf_dpl).toBe(510);
+        expect(c.purchase_rate).toBe(510);
+        expect(c.rate).toBe(662);
+    });
+
+    test('adds name/sku/description/category only when they differ', () => {
+        const c = catalog.buildPushChanges(entry, { sku: 'OLD', name: 'Old Name',
+            description: 'old', category: 'Old Cat', cf_dpl: 490 });
+        expect(c.name).toBe('BIRLA OPUS ONE PURE ELEGANCE WHITE 1L');
+        expect(c.sku).toBe('PE9901');
+        expect(c.description).toBe('Premium interior emulsion');
+        expect(c.category).toBe('Interior Luxury');
+    });
+
+    test('omits name/sku when identical to current Zoho values', () => {
+        const c = catalog.buildPushChanges(entry, { sku: 'PE9901', name: entry.canonical_name,
+            description: entry.canonical_description, category: 'Interior Luxury', cf_dpl: 490 });
+        expect(c).not.toHaveProperty('name');
+        expect(c).not.toHaveProperty('sku');
+        expect(c).not.toHaveProperty('description');
+        expect(c).not.toHaveProperty('category');
+    });
+
+    test('never emits empty canonical values', () => {
+        const c = catalog.buildPushChanges({ current_dpl: 510, current_rate: 662,
+            canonical_name: '', canonical_sku: null }, { sku: 'X', name: 'Y', cf_dpl: 1 });
+        expect(c).not.toHaveProperty('name');
+        expect(c).not.toHaveProperty('sku');
+    });
+
+    test('returns null when entry has no current_dpl', () => {
+        expect(catalog.buildPushChanges({ current_dpl: null }, {})).toBeNull();
+    });
+});
+
+describe('updateAppliedPrices', () => {
+    test('issues one UPDATE per row with new dpl/rate', async () => {
+        const calls = [];
+        catalog.setPool({ query: async (sql, params) => { calls.push({ sql, params }); return [{}]; } });
+        await catalog.updateAppliedPrices(
+            [{ id: 7, new_dpl: 510, new_rate: 662 }], 'admin');
+        expect(calls).toHaveLength(1);
+        expect(calls[0].sql).toMatch(/UPDATE dpl_catalog SET/i);
+        expect(calls[0].params).toEqual([510, 662, 'admin', 7]);
+    });
+});
+
 describe('dpl-catalog DB layer', () => {
     test('upsertEntries issues an INSERT ... ON DUPLICATE KEY per entry', async () => {
         const calls = [];

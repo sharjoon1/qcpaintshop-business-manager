@@ -238,7 +238,13 @@ function applyDplPrices(brand, parsedRows, existingCatalog) {
             seen.add(match_key);
             updated.push({
                 id: existing.id, match_key, zoho_item_id: existing.zoho_item_id,
+                link_status: existing.link_status,
+                product_name: existing.product_name, base_name: existing.base_name,
+                size_tier: existing.size_tier, dpl_size_label: existing.dpl_size_label,
+                canonical_name: existing.canonical_name, canonical_sku: existing.canonical_sku,
+                canonical_description: existing.canonical_description,
                 old_dpl: existing.current_dpl != null ? parseFloat(existing.current_dpl) : null,
+                old_rate: existing.current_rate != null ? parseFloat(existing.current_rate) : null,
                 new_dpl: n.dpl, new_rate,
             });
         } else {
@@ -248,6 +254,28 @@ function applyDplPrices(brand, parsedRows, existingCatalog) {
 
     const noDplThisTime = (existingCatalog || []).filter(e => !seen.has(e.match_key));
     return { updated, newNeedsLinking, noDplThisTime };
+}
+
+// Build the per-item `changes` payload for a bulk-edit push from a confirmed
+// catalog entry. Prices are always pushed; name/sku/description/category are
+// pushed ONLY when the canonical value is non-empty AND differs from the
+// current Zoho value (avoids needless writes + SKU-collision churn).
+// Returns null when the entry has no DPL to push.
+function buildPushChanges(entry, zohoCurrent) {
+    const dpl = entry.current_dpl != null ? parseFloat(entry.current_dpl) : null;
+    if (!(dpl > 0)) return null;
+    const rate = entry.current_rate != null ? parseFloat(entry.current_rate) : Math.ceil(dpl * 1.18 * 1.10);
+    const changes = { cf_dpl: dpl, purchase_rate: dpl, rate };
+    const z = zohoCurrent || {};
+    const diff = (canon, current) => {
+        const c = (canon == null ? '' : String(canon)).trim();
+        return c && c !== String(current == null ? '' : current).trim();
+    };
+    if (diff(entry.canonical_name, z.name)) changes.name = String(entry.canonical_name).trim();
+    if (diff(entry.canonical_sku, z.sku)) changes.sku = String(entry.canonical_sku).trim();
+    if (diff(entry.canonical_description, z.description)) changes.description = String(entry.canonical_description).trim();
+    if (diff(entry.category, z.category)) changes.category = String(entry.category || '').trim();
+    return changes;
 }
 
 // ── DB layer ────────────────────────────────────────────────────
@@ -291,8 +319,18 @@ async function confirmLink(id, zohoItemId, updatedBy) {
     );
 }
 
+// Persist freshly-applied DPL prices onto matched catalog rows (local only).
+async function updateAppliedPrices(rows, updatedBy) {
+    for (const r of (rows || [])) {
+        await pool.query(
+            `UPDATE dpl_catalog SET current_dpl = ?, current_rate = ?, updated_by = ? WHERE id = ?`,
+            [r.new_dpl, r.new_rate, updatedBy || null, r.id]
+        );
+    }
+}
+
 module.exports = {
     setPool, slug, normalizeSizeTier, extractSizeFromZohoName, buildMatchKey,
     dplBaseStem, zohoSkuStem, linkEntryToZoho, buildCatalogFromDpl, applyDplPrices,
-    upsertEntries, getCatalog, confirmLink,
+    buildPushChanges, upsertEntries, getCatalog, confirmLink, updateAppliedPrices,
 };
