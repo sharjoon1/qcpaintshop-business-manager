@@ -348,6 +348,12 @@
                     <span class="text-[11px] text-gray-500 whitespace-nowrap">Showing <b id="catShowing">0 of 0</b></span>
                     <button onclick="setCatalogFilter('pushable')" id="catPushableHint" class="hidden text-[11px] text-emerald-700 bg-emerald-50 border border-emerald-200 rounded px-2 py-1 font-semibold whitespace-nowrap"></button>
                 </div>
+                <div id="confirmedSubFilter" class="hidden flex flex-wrap items-center gap-1 mb-2">
+                    <span class="text-[11px] text-gray-500 whitespace-nowrap">Push:</span>
+                    <button onclick="setConfirmedPushSub('all')" id="cpsAll" class="cps px-2 py-1 rounded text-[11px] font-semibold bg-indigo-600 text-white">All</button>
+                    <button onclick="setConfirmedPushSub('pushed')" id="cpsPushed" class="cps px-2 py-1 rounded text-[11px] font-semibold bg-gray-100 text-gray-600">✅ Pushed</button>
+                    <button onclick="setConfirmedPushSub('unpushed')" id="cpsUnpushed" class="cps px-2 py-1 rounded text-[11px] font-semibold bg-gray-100 text-gray-600">⏳ Not pushed</button>
+                </div>
                 <div class="overflow-x-auto border rounded-lg hidden sm:block">
                     <table class="w-full text-[11px]">
                         <thead class="bg-gray-50 text-gray-500">
@@ -1288,6 +1294,7 @@
     var catPushSelected = {}; // { entryId: true }
     var catalogSearch = '';
     var catalogSearchTimer = null;
+    var confirmedPushSub = 'all'; // 'all' | 'pushed' | 'unpushed' — sub-filter shown only under the Confirmed view
 
     // Single source of truth for "can this row be pushed to Zoho?"
     function isPushable(e) {
@@ -1319,6 +1326,11 @@
                 if (catalogFilter === 'pushable') { if (!isPushable(e)) return false; }
                 else if (catalogFilter === 'pushed') { if (!e.pushed_at) return false; }
                 else if (catalogFilter !== 'all' && e.link_status !== catalogFilter) return false;
+                // Within the Confirmed view, optionally split pushed vs not-pushed.
+                if (catalogFilter === 'confirmed' && confirmedPushSub !== 'all') {
+                    if (confirmedPushSub === 'pushed' && !e.pushed_at) return false;
+                    if (confirmedPushSub === 'unpushed' && e.pushed_at) return false;
+                }
             }
             if (q) {
                 var hay = ((e.product_name || '') + ' ' + (e.base_name || '') + ' ' +
@@ -1475,6 +1487,25 @@
         var map = { all: 'catFilterAll', review: 'catFilterReview', needs_creating: 'catFilterNeeds', confirmed: 'catFilterConfirmed', pushable: 'catFilterPushable', pushed: 'catFilterPushed', pending: 'catFilterPending' };
         var active = document.getElementById(map[f]);
         if (active) active.className = 'cat-filter px-2 py-1 rounded text-[11px] font-semibold bg-indigo-600 text-white';
+        // The Confirmed view gets a pushed/not-pushed sub-filter; reset it on every (re)entry.
+        var sub = document.getElementById('confirmedSubFilter');
+        if (sub) sub.classList.toggle('hidden', f !== 'confirmed');
+        confirmedPushSub = 'all';
+        setConfirmedPushSubChips('all');
+        renderCatalog();
+    }
+
+    // Highlight the active push sub-filter chip without re-rendering.
+    function setConfirmedPushSubChips(v) {
+        var ids = { all: 'cpsAll', pushed: 'cpsPushed', unpushed: 'cpsUnpushed' };
+        document.querySelectorAll('.cps').forEach(function(b){ b.className = 'cps px-2 py-1 rounded text-[11px] font-semibold bg-gray-100 text-gray-600'; });
+        var active = document.getElementById(ids[v]);
+        if (active) active.className = 'cps px-2 py-1 rounded text-[11px] font-semibold bg-indigo-600 text-white';
+    }
+
+    function setConfirmedPushSub(v) {
+        confirmedPushSub = v;
+        setConfirmedPushSubChips(v);
         renderCatalog();
     }
 
