@@ -58,13 +58,21 @@ describe('calculateItemPricing', () => {
         expect(r.final_price).toBe(130); // ceil(121/10)*10
     });
 
-    // --- KNOWN DEFECT (P0-1): double ₹10 rounding overcharges ---
-    it('[KNOWN BUG] double-rounds unit AND line total → systematic overcharge', () => {
+    // --- P0-1 FIXED: single ₹10 round at line level (no overcharge) ---
+    it('rounds the line total ONCE; unit price is consistent (line ÷ qty)', () => {
         const r = calculateItemPricing({ base_price: 127.5, quantity: 5 });
-        // Engine: unit r10(127.5)=130, then line r10(130*5)=r10(650)=650.
-        // Correct (single round at line level) would be r10(127.5*5)=r10(637.5)=640.
-        expect(r.final_price).toBe(130);
-        expect(r.line_total).toBe(650); // <-- documents the ₹10 overcharge vs 640
+        // Line rounded once: r10(127.5*5)=r10(637.5)=640 (not the old 650).
+        // unit_price = line/qty = 128, so 5 × 128 = 640 reconciles on the invoice.
+        expect(r.line_total).toBe(640);
+        expect(r.final_price).toBe(128);
+        expect(r.unit_price).toBe(128);
+        expect(r.final_price * 5).toBe(r.line_total); // unit × qty === line
+    });
+
+    it('single-quantity rounding is unchanged (still up to nearest ₹10)', () => {
+        const r = calculateItemPricing({ base_price: 121, quantity: 1 });
+        expect(r.line_total).toBe(130);
+        expect(r.unit_price).toBe(130);
     });
 });
 
