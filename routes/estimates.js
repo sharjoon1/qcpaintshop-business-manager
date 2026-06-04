@@ -91,18 +91,22 @@ function calculateItemPricing(item) {
         finalPrice = priceAfterMarkup - discountAmount;
     }
 
-    // Round up to nearest 10
+    // Round the PAYABLE line total up to the nearest ₹10 exactly ONCE, from the
+    // un-rounded unit price. Deriving unit_price from that line keeps the invoice
+    // internally consistent (unit_price × quantity === line_total) without the
+    // old double-rounding overcharge. See tests/unit/estimate-pricing.test.js.
     const r10 = n => Math.ceil(n / 10) * 10;
-    finalPrice = r10(finalPrice);
-    const lineTotal = r10(finalPrice * quantity);
+    const safeQty = quantity > 0 ? quantity : 1;
+    const lineTotal = r10(finalPrice * safeQty);
+    const unitPrice = Math.round((lineTotal / safeQty) * 100) / 100;
 
     return {
         base_price: r10(basePrice),
         markup_amount: Math.round(markupAmount * 100) / 100,
         price_after_markup: Math.round(priceAfterMarkup * 100) / 100,
         discount_amount: Math.round(discountAmount * 100) / 100,
-        final_price: finalPrice,
-        unit_price: finalPrice,
+        final_price: unitPrice,
+        unit_price: unitPrice,
         line_total: lineTotal
     };
 }
@@ -1219,4 +1223,5 @@ router.get('/:id/history', requirePermission('estimates', 'view'), async (req, r
     }
 });
 
-module.exports = { router, setPool };
+// Exported for unit testing (pure functions, no DB). See tests/unit/estimate-pricing.test.js
+module.exports = { router, setPool, calculateItemPricing, calculateEstimateTotals };

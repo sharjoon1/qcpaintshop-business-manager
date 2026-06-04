@@ -9,12 +9,15 @@ describe('reorder-report helpers', () => {
             { zoho_item_id: 'I2', local_branch_id: 1, location_name: 'Main', stock_on_hand: 5 }
         ];
         const map = buildOtherBranchesMap(stocks, 2);
+        // Each entry now also carries their_reorder_level + transferable_qty (for
+        // inter-branch transfer suggestions). With no reorder level in the input,
+        // transferable_qty === stock_on_hand, and rows sort by transferable desc.
         expect(map.get('I1')).toEqual([
-            { branch_id: 1, branch_name: 'Main', stock_on_hand: 50 },
-            { branch_id: 3, branch_name: 'Paramakudi', stock_on_hand: 20 }
+            { branch_id: 1, branch_name: 'Main', stock_on_hand: 50, their_reorder_level: 0, transferable_qty: 50 },
+            { branch_id: 3, branch_name: 'Paramakudi', stock_on_hand: 20, their_reorder_level: 0, transferable_qty: 20 }
         ]);
         expect(map.get('I2')).toEqual([
-            { branch_id: 1, branch_name: 'Main', stock_on_hand: 5 }
+            { branch_id: 1, branch_name: 'Main', stock_on_hand: 5, their_reorder_level: 0, transferable_qty: 5 }
         ]);
     });
 

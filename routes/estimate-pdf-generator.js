@@ -176,14 +176,17 @@ function generateEstimatePDF(res, estimate, items, branding, colVis) {
     const summaryW = 205;
 
     if (estimate.show_gst_breakdown) {
+        // Prices are GST-inclusive (Zoho rates already include 18% GST), so there
+        // is no separate GST line to add — show the subtotal and an inclusive note
+        // rather than a misleading "GST @18%: ₹0" row.
         doc.fontSize(9).fillColor(darkGray).font('Helvetica');
-        doc.text('Subtotal (excl. GST):', summaryX, y, { width: 120 });
+        doc.text('Subtotal:', summaryX, y, { width: 120 });
         doc.text(`₹${formatINR(estimate.subtotal)}`, summaryX + 120, y, { width: summaryW - 120, align: 'right' });
-        y += 16;
+        y += 14;
 
-        doc.text('GST @18%:', summaryX, y, { width: 120 });
-        doc.text(`₹${formatINR(estimate.gst_amount)}`, summaryX + 120, y, { width: summaryW - 120, align: 'right' });
-        y += 16;
+        doc.fontSize(7.5).fillColor(medGray).font('Helvetica')
+            .text('(Prices inclusive of GST @18%)', summaryX, y, { width: summaryW });
+        y += 14;
 
         doc.moveTo(summaryX, y).lineTo(summaryX + summaryW, y).strokeColor('#d1d5db').lineWidth(0.5).stroke();
         y += 5;

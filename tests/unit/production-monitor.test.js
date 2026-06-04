@@ -49,8 +49,10 @@ describe('Production Monitor', () => {
 
     describe('DEFAULTS', () => {
         it('should have required threshold values', () => {
-            expect(DEFAULTS.memoryWarningPct).toBe(80);
-            expect(DEFAULTS.memoryCriticalPct).toBe(90);
+            // Memory thresholds are RSS-MB based (not percentage) since the
+            // monitor was reworked to alert on absolute RSS.
+            expect(DEFAULTS.memoryWarningMB).toBe(512);
+            expect(DEFAULTS.memoryCriticalMB).toBe(768);
             expect(DEFAULTS.eventLoopLagWarnMs).toBe(100);
             expect(DEFAULTS.eventLoopLagCriticalMs).toBe(500);
             expect(DEFAULTS.dbPoolWarnPct).toBe(80);

@@ -7,9 +7,11 @@ describe('invoice-line-sync helpers', () => {
         expect(w.to).toBe('2026-04-13');
     });
 
-    test('computeSyncWindow returns incremental window when lastDate given', () => {
+    test('computeSyncWindow ignores lastDate and always uses the full backfill window (cursor de-dups)', () => {
+        // The sync window is intentionally always (today - backfillDays)..yesterday;
+        // already-synced invoices are skipped by the cursor, not by narrowing the window.
         const w = computeSyncWindow('2026-04-10', new Date('2026-04-14T12:00:00Z'));
-        expect(w.from).toBe('2026-04-09');
+        expect(w.from).toBe('2026-01-14');
         expect(w.to).toBe('2026-04-13');
     });
 

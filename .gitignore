@@ -10,6 +10,12 @@ storage/framework/sessions/*
 storage/framework/views/*
 .DS_Store
 *.log
+
+# Playwright E2E artifacts
+/test-results/
+/playwright-report/
+/blob-report/
+/playwright/.cache/
 composer.lock
 package-lock.json
 

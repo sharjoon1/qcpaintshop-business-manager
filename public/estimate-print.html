@@ -741,7 +741,9 @@
                         r += `<td style="text-align:right;">-</td>`;
                     }
                 }
-                if (colVis.show_final_price) r += `<td style="text-align:right;">${item.hide_price ? '' : formatINR(roundUp10(parseFloat(item.final_price || item.unit_price) || 0))}</td>`;
+                // final_price is already the server-derived per-unit value (line ÷ qty);
+                // do NOT re-round it to ₹10 or unit × qty stops reconciling with the total.
+                if (colVis.show_final_price) r += `<td style="text-align:right;">${item.hide_price ? '' : formatINR(parseFloat(item.final_price || item.unit_price) || 0)}</td>`;
                 if (colVis.show_price_sqft) {
                     const area = parseFloat(item.area) || 0;
                     const lt = parseFloat(item.line_total) || 0;
