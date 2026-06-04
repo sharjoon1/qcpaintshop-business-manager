@@ -70,9 +70,10 @@ function buildMatchKey({ brand, product_code, product_name, base_name, size_tier
 // Per-tier Zoho SKU size-code suffix.
 const SIZE_CODE = { '1L': '01', '4L': '04', '10L': '10', '20L': '20' };
 
-// Colour-word → Zoho base segment (numeric bases pass through; words need a map).
-// Extend as new special bases surface; unmapped ones fall to review.
-const BASE_WORD_CODE = { white: '99' };
+// Colour word → possible Zoho SKU base codes. NOTE: on Birla Opus 99 = CLEAR, NOT
+// White — Clear matches via its numeric base ("PE 99" → "pe99") with no rule. White
+// is encoded as WT/WHT in SKUs (e.g. PBSWT04). Numeric/unmapped bases pass through.
+const BASE_WORD_CODE = { white: ['wt', 'wht'] };
 
 // DPL productCode → exact Zoho SKU, for product families the name/SKU-stem linkers
 // can't match (Birla water colorants: Zoho names lack the colour word and the DPL
@@ -85,15 +86,17 @@ const PRODUCT_CODE_SKU = {
     '970013': 'OPCLEXR', '970014': 'OPCLEXHR', '970015': 'OPCLEXHDY', '970016': 'OPCLSWT',
 };
 
-// DPL baseCode ("PE White" / "PE 1") → SKU stem ("pe99" / "pe1").
-function dplBaseStem(baseCode) {
-    const bc = String(baseCode == null ? '' : baseCode).trim().toLowerCase();
-    if (!bc) return '';
+// DPL baseCode ("PE White" / "PBS White" / "PE 1" / "PE 99") → candidate Zoho SKU
+// stems. A colour word expands to its possible codes; numeric/other bases pass through.
+function dplBaseStems(baseCode) {
+    const bc = String(baseCode == null ? "" : baseCode).trim().toLowerCase();
+    if (!bc) return [];
     const m = bc.match(/^([a-z]+)\s+(.+)$/);
-    if (!m) return bc.replace(/[^a-z0-9]+/g, '');
-    let base = m[2].replace(/\s+/g, '');
-    base = BASE_WORD_CODE[base] || base;
-    return m[1] + base.replace(/[^a-z0-9]+/g, '');
+    if (!m) return [bc.replace(/[^a-z0-9]+/g, '')];
+    const prefix = m[1];
+    const baseRaw = m[2].replace(/\s+/g, '');
+    const codes = BASE_WORD_CODE[baseRaw] || [baseRaw];
+    return codes.map(c => prefix + String(c).replace(/[^a-z0-9]+/g, ""));
 }
 
 // Zoho item → { stem, tier } when its SKU ends with the expected size-code for
@@ -117,7 +120,7 @@ function hasAllTokens(tokenSet, needleTokens) {
 
 // Link one catalog entry to exactly one Zoho item.
 //   S0 exact canonical SKU (100, confirmed) — re-match of a pinned entry
-//   S1 SKU reconstruction: dplBaseStem(base_code) + size-code == Zoho SKU stem (95, confirmed)
+//   S1 SKU reconstruction: dplBaseStems(base_code) + size-code == Zoho SKU stems (95, confirmed)
 //   S2 name product-token + tier fallback (≤70, REVIEW only — names lack base, can't confirm)
 //   else needs_creating.
 // NOTE: entry.size_tier MUST already be a canonical tier. Size is matched by TIER,
@@ -147,12 +150,13 @@ function linkEntryToZoho(entry, zohoItems) {
         if (hit) return { zoho_item_id: hit.zoho_item_id, link_status: 'confirmed', link_confidence: 100, link_reason: 'exact-sku' };
     }
 
-    // S1: SKU reconstruction (PRIMARY — deterministic)
-    const stem = dplBaseStem(entry.base_code);
-    if (stem && SIZE_CODE[entry.size_tier]) {
+    // S1: SKU reconstruction (PRIMARY — deterministic). A colour word yields several
+    // candidate stems (e.g. White → wt/wht); a unique hit across them confirms.
+    const stems = dplBaseStems(entry.base_code);
+    if (stems.length && SIZE_CODE[entry.size_tier]) {
         const hits = items.filter(z => {
             const s = zohoSkuStem(z);
-            return s && s.stem === stem && s.tier === entry.size_tier;
+            return s && stems.includes(s.stem) && s.tier === entry.size_tier;
         });
         if (hits.length === 1) return { zoho_item_id: hits[0].zoho_item_id, link_status: 'confirmed', link_confidence: 95, link_reason: 'sku-reconstruct' };
         if (hits.length > 1) return { zoho_item_id: null, link_status: 'review', link_confidence: 55, link_reason: 'ambiguous-sku' };
@@ -438,7 +442,7 @@ async function updateAppliedPrices(rows, updatedBy) {
 
 module.exports = {
     setPool, slug, normalizeSizeTier, extractSizeFromZohoName, buildMatchKey,
-    dplBaseStem, zohoSkuStem, linkEntryToZoho, buildCatalogFromDpl, applyDplPrices,
+    dplBaseStems, zohoSkuStem, linkEntryToZoho, buildCatalogFromDpl, applyDplPrices,
     buildPushChanges, upsertEntries, deleteOrphans, getCatalog, reconcileCanonical, confirmLink,
     updateAppliedPrices, updateCanonicalFields, markPushed,
 };

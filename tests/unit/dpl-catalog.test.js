@@ -56,12 +56,13 @@ describe('buildMatchKey', () => {
     });
 });
 
-describe('dplBaseStem / zohoSkuStem', () => {
-    test('dplBaseStem maps White→99 and passes numeric bases through', () => {
-        expect(catalog.dplBaseStem('PE White')).toBe('pe99');
-        expect(catalog.dplBaseStem('PE 1')).toBe('pe1');
-        expect(catalog.dplBaseStem('PES White')).toBe('pes99');
-        expect(catalog.dplBaseStem('')).toBe('');
+describe('dplBaseStems / zohoSkuStem', () => {
+    test('White → [wt, wht] (NOT 99 — that is Clear); numeric/other bases pass through', () => {
+        expect(catalog.dplBaseStems('PE White')).toEqual(['pewt', 'pewht']);
+        expect(catalog.dplBaseStems('PBS White')).toEqual(['pbswt', 'pbswht']);
+        expect(catalog.dplBaseStems('PE 99')).toEqual(['pe99']);
+        expect(catalog.dplBaseStems('PE 1')).toEqual(['pe1']);
+        expect(catalog.dplBaseStems('')).toEqual([]);
     });
     test('zohoSkuStem strips the per-tier size code', () => {
         expect(catalog.zohoSkuStem({ name: 'PE9901 ONE PURE ELEGANCE BIRLA OPUS 01 L', sku: 'PE9901' })).toEqual({ stem: 'pe99', tier: '1L' });
@@ -73,55 +74,68 @@ describe('dplBaseStem / zohoSkuStem', () => {
 });
 
 describe('linkEntryToZoho', () => {
-    // Real Birla Zoho shape: the base lives in the SKU (PE+base+size), NOT the name.
+    // Real Birla shape: base in the SKU. 99 = CLEAR (not White). White is encoded as WT.
     const zoho = [
-        { zoho_item_id: 'Z1', name: 'PE9901 ONE PURE ELEGANCE BIRLA OPUS 01 L', sku: 'PE9901' }, // White 1L
-        { zoho_item_id: 'Z2', name: 'PE101 ONE PURE ELEGANCE BIRLA OPUS 01 L', sku: 'PE101' },    // Base 1 (Pastel) 1L
-        { zoho_item_id: 'Z3', name: 'PE9904 ONE PURE ELEGANCE BIRLA OPUS 04 L', sku: 'PE9904' }, // White 4L
+        { zoho_item_id: 'Z1', name: 'PE9901 ONE PURE ELEGANCE BIRLA OPUS 01 L', sku: 'PE9901' },
+        { zoho_item_id: 'Z2', name: 'PE101 ONE PURE ELEGANCE BIRLA OPUS 01 L', sku: 'PE101' },
+        { zoho_item_id: 'Z3', name: 'PE9904 ONE PURE ELEGANCE BIRLA OPUS 04 L', sku: 'PE9904' },
+        { zoho_item_id: 'Z4', name: 'PBSWT04 STYLE POWER BRIGHT SHINE BIRLA OPUS 04 L', sku: 'PBSWT04' },
     ];
 
     test('S0 exact canonical SKU wins', () => {
-        const r = catalog.linkEntryToZoho({ base_code: 'PE White', product_name: 'One Pure Elegance', size_tier: '1L', canonical_sku: 'PE9901' }, zoho);
+        const r = catalog.linkEntryToZoho({ base_code: 'PE 99', product_name: 'One Pure Elegance', size_tier: '1L', canonical_sku: 'PE9901' }, zoho);
         expect(r.zoho_item_id).toBe('Z1');
         expect(r.link_reason).toBe('exact-sku');
         expect(r.link_confidence).toBe(100);
     });
 
-    test('S1 SKU reconstruction: White (PE99 stem) → PE9901', () => {
-        const r = catalog.linkEntryToZoho({ base_code: 'PE White', product_name: 'One Pure Elegance', size_tier: '1L' }, zoho);
+    test('S1: Clear (PE 99 → pe99) → PE9901', () => {
+        const r = catalog.linkEntryToZoho({ base_code: 'PE 99', product_name: 'One Pure Elegance', size_tier: '1L' }, zoho);
         expect(r.zoho_item_id).toBe('Z1');
         expect(r.link_reason).toBe('sku-reconstruct');
         expect(r.link_status).toBe('confirmed');
     });
 
-    test('S1 Base 1 (PE1 stem) → PE101, not the White PE9901', () => {
+    test('S1: White does NOT steal the Clear PE99 SKU', () => {
+        const r = catalog.linkEntryToZoho({ base_code: 'PE White', product_name: 'One Pure Elegance', size_tier: '1L' }, zoho);
+        expect(r.zoho_item_id).not.toBe('Z1');
+        expect(r.link_status).not.toBe('confirmed');
+    });
+
+    test('S1: White encoded as WT → PBSWT04', () => {
+        const r = catalog.linkEntryToZoho({ base_code: 'PBS White', product_name: 'Style Power Bright Shine', size_tier: '4L' }, zoho);
+        expect(r.zoho_item_id).toBe('Z4');
+        expect(r.link_reason).toBe('sku-reconstruct');
+        expect(r.link_status).toBe('confirmed');
+    });
+
+    test('S1 Base 1 (PE 1 stem) → PE101', () => {
         const r = catalog.linkEntryToZoho({ base_code: 'PE 1', product_name: 'One Pure Elegance', size_tier: '1L' }, zoho);
         expect(r.zoho_item_id).toBe('Z2');
         expect(r.link_status).toBe('confirmed');
     });
 
-    test('off-size: DPL White 3.6L (tier 4L) links to the Zoho 4L SKU PE9904', () => {
-        const r = catalog.linkEntryToZoho({ base_code: 'PE White', product_name: 'One Pure Elegance', size_tier: catalog.normalizeSizeTier('3.6L') }, zoho);
+    test('off-size: DPL Clear 3.6L (tier 4L) links to the Zoho 4L SKU PE9904', () => {
+        const r = catalog.linkEntryToZoho({ base_code: 'PE 99', product_name: 'One Pure Elegance', size_tier: catalog.normalizeSizeTier('3.6L') }, zoho);
         expect(r.zoho_item_id).toBe('Z3');
         expect(r.link_reason).toBe('sku-reconstruct');
     });
 
     test('a tier Zoho lacks → needs_creating', () => {
-        const r = catalog.linkEntryToZoho({ base_code: 'PE White', product_name: 'One Pure Elegance', size_tier: '20L' }, zoho);
+        const r = catalog.linkEntryToZoho({ base_code: 'PE 99', product_name: 'One Pure Elegance', size_tier: '20L' }, zoho);
         expect(r.zoho_item_id).toBe(null);
         expect(r.link_status).toBe('needs_creating');
     });
 });
 
 describe('buildCatalogFromDpl', () => {
-    // CSV-parser row shape (the real stored DPL): productCode/colourName/baseCode present.
     const zoho = [
-        { zoho_item_id: 'Z1', name: 'PE9901 ONE PURE ELEGANCE BIRLA OPUS 01 L', sku: 'PE9901', description: '', category: 'INTERIOR EMULSION' }, // White 1L
-        { zoho_item_id: 'Z3', name: 'PE9904 ONE PURE ELEGANCE BIRLA OPUS 04 L', sku: 'PE9904', description: '', category: 'INTERIOR EMULSION' }, // White 4L
+        { zoho_item_id: 'Z1', name: 'PE9901 ONE PURE ELEGANCE BIRLA OPUS 01 L', sku: 'PE9901', description: '', category: 'INTERIOR EMULSION' },
+        { zoho_item_id: 'Z3', name: 'PE9904 ONE PURE ELEGANCE BIRLA OPUS 04 L', sku: 'PE9904', description: '', category: 'INTERIOR EMULSION' },
     ];
     const rows = [
-        { product: 'One Pure Elegance - White', productName: 'One Pure Elegance', colourName: 'White', baseCode: 'PE White', productCode: '941001', colourCode: '9900', packSize: '1L', dpl: 520, category: 'INTERIOR EMULSION', brand: 'Birla Opus' },
-        { product: 'One Pure Elegance - White', productName: 'One Pure Elegance', colourName: 'White', baseCode: 'PE White', productCode: '941001', colourCode: '9900', packSize: '3.6L', dpl: 2050, category: 'INTERIOR EMULSION', brand: 'Birla Opus' },
+        { product: 'One Pure Elegance - Clear', productName: 'One Pure Elegance', colourName: 'Clear', baseCode: 'PE 99', productCode: '941001', colourCode: '9999', packSize: '1L', dpl: 445, category: 'INTERIOR EMULSION', brand: 'Birla Opus' },
+        { product: 'One Pure Elegance - Clear', productName: 'One Pure Elegance', colourName: 'Clear', baseCode: 'PE 99', productCode: '941001', colourCode: '9999', packSize: '3.6L', dpl: 1751, category: 'INTERIOR EMULSION', brand: 'Birla Opus' },
     ];
 
     test('entry has tier, match_key, price, and SKU-reconstructed link', () => {
@@ -129,11 +143,11 @@ describe('buildCatalogFromDpl', () => {
         expect(entries).toHaveLength(2);
         const e1 = entries.find(e => e.size_tier === '1L');
         expect(e1.product_code).toBe('941001');
-        expect(e1.base_name).toBe('White');
+        expect(e1.base_name).toBe('Clear');
         expect(e1.dpl_size_label).toBe('1L');
-        expect(e1.current_dpl).toBe(520);
-        expect(e1.current_rate).toBe(Math.ceil(520 * 1.18 * 1.10));
-        expect(e1.match_key).toBe('birlaopus|941001|white|1l');
+        expect(e1.current_dpl).toBe(445);
+        expect(e1.current_rate).toBe(Math.ceil(445 * 1.18 * 1.10));
+        expect(e1.match_key).toBe('birlaopus|941001|clear|1l');
         expect(e1.zoho_item_id).toBe('Z1');
         expect(e1.link_status).toBe('confirmed');
         expect(e1.link_reason).toBe('sku-reconstruct');
