@@ -415,6 +415,25 @@ describe('markPushed', () => {
     });
 });
 
+describe('deleteOrphans', () => {
+    test('deletes rows for the brand whose match_key is not in keepKeys', async () => {
+        const calls = [];
+        catalog.setPool({ query: async (sql, params) => { calls.push({ sql, params }); return [{ affectedRows: 3 }]; } });
+        const n = await catalog.deleteOrphans('birlaopus', ['k1', 'k2']);
+        expect(n).toBe(3);
+        expect(calls).toHaveLength(1);
+        expect(calls[0].sql).toMatch(/DELETE FROM dpl_catalog WHERE brand = \? AND match_key NOT IN \(\?, \?\)/);
+        expect(calls[0].params).toEqual(['birlaopus', 'k1', 'k2']);
+    });
+
+    test('empty keepKeys → no query, returns 0 (never wipes)', async () => {
+        const calls = [];
+        catalog.setPool({ query: async (sql, params) => { calls.push({ sql, params }); return [{}]; } });
+        expect(await catalog.deleteOrphans('birlaopus', [])).toBe(0);
+        expect(calls).toHaveLength(0);
+    });
+});
+
 describe('migrate-dpl-catalog', () => {
     test('exports up() and creates the table idempotently', async () => {
         const mig = require('../../migrations/migrate-dpl-catalog');

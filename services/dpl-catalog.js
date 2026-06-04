@@ -304,6 +304,18 @@ function buildPushChanges(entry, zohoCurrent) {
     return changes;
 }
 
+// Delete catalog rows for a brand whose match_key is NOT in the freshly-built set
+// (self-cleaning rebuild — removes products no longer in the DPL). Empty keepKeys
+// is a no-op so a failed/empty build can never wipe the table.
+async function deleteOrphans(brand, keepKeys) {
+    if (!keepKeys || !keepKeys.length) return 0;
+    const [r] = await pool.query(
+        `DELETE FROM dpl_catalog WHERE brand = ? AND match_key NOT IN (${keepKeys.map(() => '?').join(', ')})`,
+        [brand, ...keepKeys]
+    );
+    return r.affectedRows || 0;
+}
+
 // ── DB layer ────────────────────────────────────────────────────
 
 const _COLS = [
@@ -427,6 +439,6 @@ async function updateAppliedPrices(rows, updatedBy) {
 module.exports = {
     setPool, slug, normalizeSizeTier, extractSizeFromZohoName, buildMatchKey,
     dplBaseStem, zohoSkuStem, linkEntryToZoho, buildCatalogFromDpl, applyDplPrices,
-    buildPushChanges, upsertEntries, getCatalog, reconcileCanonical, confirmLink,
+    buildPushChanges, upsertEntries, deleteOrphans, getCatalog, reconcileCanonical, confirmLink,
     updateAppliedPrices, updateCanonicalFields, markPushed,
 };

@@ -142,9 +142,10 @@ router.post('/items/dpl-catalog/:brand/build', requirePermission('zoho', 'manage
         const entries = dplCatalogService.buildCatalogFromDpl(brand, parsedRows, zohoItems);
         const updatedBy = req.user ? (req.user.username || String(req.user.id)) : null;
         await dplCatalogService.upsertEntries(entries, updatedBy);
+        const removed = await dplCatalogService.deleteOrphans(brand, entries.map(e => e.match_key));
 
-        const summary = { total: entries.length, confirmed: 0, review: 0, needs_creating: 0 };
-        entries.forEach(e => { summary[e.link_status] = (summary[e.link_status] || 0) + 1; });
+        const summary = { total: entries.length, confirmed: 0, review: 0, needs_creating: 0, removed };
+        entries.forEach(e => { if (e.link_status in summary) summary[e.link_status] += 1; });
 
         res.json({ success: true, data: summary });
     } catch (err) {
