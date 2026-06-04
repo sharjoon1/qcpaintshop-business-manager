@@ -162,6 +162,52 @@ describe('buildCatalogFromDpl', () => {
     });
 });
 
+describe('buildCatalogFromDpl — preserve user-confirmed/pushed links across rebuild', () => {
+    // The linker can only auto-reach 'review'/'needs_creating' for this row (no SKU stem,
+    // no colorant). A prior user confirm/push must survive a rebuild instead of being
+    // clobbered back to review by the fresh linker result.
+    const rows = [
+        { productName: 'Style Perfect Start Primer', colourName: 'White', baseCode: '', productCode: '800010', packSize: '10L', dpl: 1200, category: 'PRIMER', brand: 'Birla Opus' },
+    ];
+    const mk = 'birlaopus|800010|white|10l';
+
+    test('no existing → linker decides (needs_creating, no zoho match)', () => {
+        const e = catalog.buildCatalogFromDpl('birlaopus', rows, [], [])[0];
+        expect(e.match_key).toBe(mk);
+        expect(e.link_status).toBe('needs_creating');
+        expect(e.zoho_item_id).toBeNull();
+    });
+
+    test('user-confirmed prev is restored to confirmed (+ canonical preserved)', () => {
+        const existing = [{ match_key: mk, zoho_item_id: 'Z9', link_status: 'confirmed', link_reason: 'user-confirmed',
+            canonical_name: 'PSP CANON', canonical_sku: 'PSP9910', canonical_description: 'd', pushed_at: null }];
+        const e = catalog.buildCatalogFromDpl('birlaopus', rows, [], existing)[0];
+        expect(e.link_status).toBe('confirmed');
+        expect(e.link_confidence).toBe(100);
+        expect(e.link_reason).toBe('user-confirmed');
+        expect(e.zoho_item_id).toBe('Z9');
+        expect(e.canonical_sku).toBe('PSP9910');
+        expect(e.canonical_name).toBe('PSP CANON');
+    });
+
+    test('previously-pushed-but-downgraded prev is restored to confirmed', () => {
+        const existing = [{ match_key: mk, zoho_item_id: 'Z9', link_status: 'review', link_reason: 'product+tier-only',
+            canonical_name: 'PSP CANON', canonical_sku: 'PSP9910', canonical_description: 'd', pushed_at: '2026-06-04 10:11:53' }];
+        const e = catalog.buildCatalogFromDpl('birlaopus', rows, [], existing)[0];
+        expect(e.link_status).toBe('confirmed');
+        expect(e.link_confidence).toBe(100);
+        expect(e.zoho_item_id).toBe('Z9');
+    });
+
+    test('prev marked not-in-zoho (no link) is NOT restored', () => {
+        const existing = [{ match_key: mk, zoho_item_id: null, link_status: 'needs_creating', link_reason: 'marked-not-in-zoho',
+            canonical_name: null, canonical_sku: null, canonical_description: null, pushed_at: '2026-06-04 10:11:53' }];
+        const e = catalog.buildCatalogFromDpl('birlaopus', rows, [], existing)[0];
+        expect(e.link_status).toBe('needs_creating');
+        expect(e.zoho_item_id).toBeNull();
+    });
+});
+
 describe('applyDplPrices', () => {
     const existing = [
         { id: 1, match_key: 'birlaopus|941001|white|1l', zoho_item_id: 'Z1', current_dpl: 490 },

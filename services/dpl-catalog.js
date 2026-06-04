@@ -204,7 +204,11 @@ function normalizeRow(row) {
     };
 }
 
-function buildCatalogFromDpl(brand, parsedRows, zohoItems) {
+// `existingCatalog` (optional) lets a rebuild PRESERVE user decisions the fresh linker
+// can't re-derive: a manually-confirmed link, or one that was already pushed to Zoho.
+// Without this the ON DUPLICATE KEY upsert clobbers a confirmed entry back to 'review'.
+function buildCatalogFromDpl(brand, parsedRows, zohoItems, existingCatalog) {
+    const existingByKey = new Map((existingCatalog || []).map(e => [e.match_key, e]));
     const out = [];
     for (const row of (parsedRows || [])) {
         const n = normalizeRow(row);
@@ -244,6 +248,21 @@ function buildCatalogFromDpl(brand, parsedRows, zohoItems) {
                 entry.canonical_sku = pf.proposed_sku || null;
                 entry.canonical_description = pf.proposed_description || null;
             }
+        }
+
+        // Preserve a prior user decision the linker can't reproduce: an explicit confirm
+        // (link_reason='user-confirmed') OR an entry that was already pushed to Zoho
+        // (pushed_at set ⇒ it must have been confirmed). Carry over the link + the user's
+        // canonical values so a rebuild never silently reverts it to 'review'.
+        const prev = existingByKey.get(entry.match_key);
+        if (prev && prev.zoho_item_id && (prev.link_reason === 'user-confirmed' || prev.pushed_at != null)) {
+            entry.zoho_item_id = prev.zoho_item_id;
+            entry.link_status = 'confirmed';
+            entry.link_confidence = 100;
+            entry.link_reason = 'user-confirmed';
+            entry.canonical_name = prev.canonical_name != null ? prev.canonical_name : entry.canonical_name;
+            entry.canonical_sku = prev.canonical_sku != null ? prev.canonical_sku : entry.canonical_sku;
+            entry.canonical_description = prev.canonical_description != null ? prev.canonical_description : entry.canonical_description;
         }
         out.push(entry);
     }

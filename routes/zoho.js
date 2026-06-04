@@ -139,7 +139,8 @@ router.post('/items/dpl-catalog/:brand/build', requirePermission('zoho', 'manage
              FROM zoho_items_map WHERE zoho_status = 'active'${catalogZohoScopeSql(brand)}`
         );
 
-        const entries = dplCatalogService.buildCatalogFromDpl(brand, parsedRows, zohoItems);
+        const existingCatalog = await dplCatalogService.getCatalog(brand);
+        const entries = dplCatalogService.buildCatalogFromDpl(brand, parsedRows, zohoItems, existingCatalog);
         const updatedBy = req.user ? (req.user.username || String(req.user.id)) : null;
         await dplCatalogService.upsertEntries(entries, updatedBy);
         const removed = await dplCatalogService.deleteOrphans(brand, entries.map(e => e.match_key));
