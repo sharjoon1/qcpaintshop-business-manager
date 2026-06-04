@@ -1219,4 +1219,5 @@ router.get('/:id/history', requirePermission('estimates', 'view'), async (req, r
     }
 });
 
-module.exports = { router, setPool };
+// Exported for unit testing (pure functions, no DB). See tests/unit/estimate-pricing.test.js
+module.exports = { router, setPool, calculateItemPricing, calculateEstimateTotals };
