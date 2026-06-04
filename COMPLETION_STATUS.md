@@ -104,6 +104,25 @@ These are deployed on prod and exercised daily; code is coherent and (mostly) te
 - Rate limiting: global 100/min, auth 10/min, OTP 5/min.
 - helmet + CORS env-whitelist (no `*`).
 
+### Known limitations — accepted, NOT fixing
+
+- **NIT-1: Estimate ↔ Zoho line-total sub-rupee drift.** The estimate stores a
+  line total rounded up to ₹10 and a derived `unit_price = line_total/qty`
+  (2-decimal). The Zoho push (`services/billing-zoho-service.js:140-144`) sends
+  `{ item_id, quantity, rate: unit_price }` and **Zoho recomputes the line as
+  rate × qty**, so the Zoho-invoiced line can differ from the estimate line by
+  up to ~₹1 (drift ≈ `qty × 0.005`; e.g. `base 1 × qty 199` → estimate ₹200,
+  Zoho ₹200.99). Surfaced (not caused) by the 2026-06-04 single-round pricing
+  fix — the old code only "reconciled" with Zoho because it overcharged the
+  customer to a whole-₹10 unit price. **Decision (owner, 2026-06-05): accept as
+  a known limitation.** Zoho is the system-of-record for the actual invoice/GST;
+  a code fix would change live invoicing for a sub-rupee cosmetic delta and is
+  entangled with the Zoho org's price-precision / line-discount / tax-inclusive
+  configuration (unverifiable offline). Revisit only if penny-exact estimate↔Zoho
+  parity becomes an audit requirement; any fix MUST be verified on a real Zoho
+  draft invoice before deploy. Painter points are unaffected (they use the stored
+  `item_total`/`line_total`, not the Zoho-recomputed value).
+
 ---
 
 ## 5. Top recommendations (sequenced)
