@@ -352,6 +352,7 @@
                     <span class="text-[11px] text-gray-500 whitespace-nowrap">Push:</span>
                     <button onclick="setConfirmedPushSub('all')" id="cpsAll" class="cps px-2 py-1 rounded text-[11px] font-semibold bg-indigo-600 text-white">All</button>
                     <button onclick="setConfirmedPushSub('pushed')" id="cpsPushed" class="cps px-2 py-1 rounded text-[11px] font-semibold bg-gray-100 text-gray-600">✅ Pushed</button>
+                    <button onclick="setConfirmedPushSub('changed')" id="cpsChanged" class="cps px-2 py-1 rounded text-[11px] font-semibold bg-gray-100 text-gray-600">⚠ DPL changed</button>
                     <button onclick="setConfirmedPushSub('unpushed')" id="cpsUnpushed" class="cps px-2 py-1 rounded text-[11px] font-semibold bg-gray-100 text-gray-600">⏳ Not pushed</button>
                 </div>
                 <div class="overflow-x-auto border rounded-lg hidden sm:block">
@@ -1330,6 +1331,8 @@
                 if (catalogFilter === 'confirmed' && confirmedPushSub !== 'all') {
                     if (confirmedPushSub === 'pushed' && !e.pushed_at) return false;
                     if (confirmedPushSub === 'unpushed' && e.pushed_at) return false;
+                    // 'changed' = already pushed, but the latest DPL/rate differs from what was pushed.
+                    if (confirmedPushSub === 'changed' && !(e.pushed_at && e.push_changed)) return false;
                 }
             }
             if (q) {
@@ -1497,7 +1500,7 @@
 
     // Highlight the active push sub-filter chip without re-rendering.
     function setConfirmedPushSubChips(v) {
-        var ids = { all: 'cpsAll', pushed: 'cpsPushed', unpushed: 'cpsUnpushed' };
+        var ids = { all: 'cpsAll', pushed: 'cpsPushed', changed: 'cpsChanged', unpushed: 'cpsUnpushed' };
         document.querySelectorAll('.cps').forEach(function(b){ b.className = 'cps px-2 py-1 rounded text-[11px] font-semibold bg-gray-100 text-gray-600'; });
         var active = document.getElementById(ids[v]);
         if (active) active.className = 'cps px-2 py-1 rounded text-[11px] font-semibold bg-indigo-600 text-white';
