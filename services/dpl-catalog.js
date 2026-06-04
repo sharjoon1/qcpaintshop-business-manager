@@ -403,6 +403,17 @@ async function updateCanonicalFields(id, fields, updatedBy) {
     return true;
 }
 
+// Stamp the push state on entries that were just pushed (job created). These columns
+// are NOT in _COLS, so a later rebuild preserves them.
+async function markPushed(rows, jobId) {
+    for (const r of (rows || [])) {
+        await pool.query(
+            `UPDATE dpl_catalog SET pushed_at = NOW(), pushed_job_id = ?, pushed_dpl = ?, pushed_rate = ? WHERE id = ?`,
+            [jobId, r.dpl != null ? r.dpl : null, r.rate != null ? r.rate : null, r.id]
+        );
+    }
+}
+
 // Persist freshly-applied DPL prices onto matched catalog rows (local only).
 async function updateAppliedPrices(rows, updatedBy) {
     for (const r of (rows || [])) {
@@ -417,5 +428,5 @@ module.exports = {
     setPool, slug, normalizeSizeTier, extractSizeFromZohoName, buildMatchKey,
     dplBaseStem, zohoSkuStem, linkEntryToZoho, buildCatalogFromDpl, applyDplPrices,
     buildPushChanges, upsertEntries, getCatalog, reconcileCanonical, confirmLink,
-    updateAppliedPrices, updateCanonicalFields,
+    updateAppliedPrices, updateCanonicalFields, markPushed,
 };

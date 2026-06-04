@@ -396,6 +396,25 @@ describe('linkEntryToZoho — colorant map', () => {
     });
 });
 
+describe('markPushed', () => {
+    test('stamps pushed_at/job/dpl/rate per row', async () => {
+        const calls = [];
+        catalog.setPool({ query: async (sql, params) => { calls.push({ sql, params }); return [{}]; } });
+        await catalog.markPushed([{ id: 7, dpl: 510, rate: 662 }, { id: 9, dpl: 100, rate: 130 }], 86);
+        expect(calls).toHaveLength(2);
+        expect(calls[0].sql).toMatch(/UPDATE dpl_catalog SET pushed_at = NOW\(\), pushed_job_id = \?, pushed_dpl = \?, pushed_rate = \? WHERE id = \?/);
+        expect(calls[0].params).toEqual([86, 510, 662, 7]);
+        expect(calls[1].params).toEqual([86, 100, 130, 9]);
+    });
+
+    test('no rows → no query', async () => {
+        const calls = [];
+        catalog.setPool({ query: async (sql, params) => { calls.push({ sql, params }); return [{}]; } });
+        await catalog.markPushed([], 1);
+        expect(calls).toHaveLength(0);
+    });
+});
+
 describe('migrate-dpl-catalog', () => {
     test('exports up() and creates the table idempotently', async () => {
         const mig = require('../../migrations/migrate-dpl-catalog');
