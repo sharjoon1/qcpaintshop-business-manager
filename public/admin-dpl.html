@@ -333,6 +333,7 @@
                         <button onclick="setCatalogFilter('needs_creating')" id="catFilterNeeds" class="cat-filter px-2 py-1 rounded text-[11px] font-semibold bg-gray-100 text-gray-600">Needs creating</button>
                         <button onclick="setCatalogFilter('confirmed')" id="catFilterConfirmed" class="cat-filter px-2 py-1 rounded text-[11px] font-semibold bg-gray-100 text-gray-600">Confirmed</button>
                         <button onclick="setCatalogFilter('pushable')" id="catFilterPushable" class="cat-filter px-2 py-1 rounded text-[11px] font-semibold bg-gray-100 text-gray-600">☑ Pushable</button>
+                        <button onclick="setCatalogFilter('pushed')" id="catFilterPushed" class="cat-filter px-2 py-1 rounded text-[11px] font-semibold bg-gray-100 text-gray-600">✅ Pushed</button>
                         <span class="mx-1 w-px bg-gray-200"></span>
                         <button onclick="toggleSelectAllConfirmed()" id="catSelectAllBtn" class="px-2 py-1 rounded text-[11px] font-semibold border border-emerald-300 text-emerald-700 bg-white hover:bg-emerald-50">☑ Select confirmed</button>
                         <button onclick="pushCatalogToZoho()" id="pushZohoBtn" class="px-2 py-1 rounded text-[11px] font-bold bg-emerald-600 hover:bg-emerald-700 text-white disabled:opacity-50 flex items-center gap-1" disabled>
@@ -1286,7 +1287,17 @@
 
     // Single source of truth for "can this row be pushed to Zoho?"
     function isPushable(e) {
-        return e.link_status === 'confirmed' && e.zoho_item_id && e.current_dpl != null && Number(e.current_dpl) > 0;
+        return e.link_status === 'confirmed' && e.zoho_item_id && e.current_dpl != null && Number(e.current_dpl) > 0
+            && (!e.pushed_at || e.push_changed);
+    }
+
+    var CAT_MON = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+    function fmtPushed(ts) {
+        if (!ts) return '';
+        var d = new Date(ts.replace ? ts.replace(' ', 'T') : ts);
+        if (isNaN(d.getTime())) return String(ts);
+        function p(n){ return (n < 10 ? '0' : '') + n; }
+        return p(d.getDate()) + '-' + CAT_MON[d.getMonth()] + ' ' + p(d.getHours()) + ':' + p(d.getMinutes());
     }
 
     // Rows visible after the active status/pushable filter AND the text search.
@@ -1294,6 +1305,7 @@
         var q = catalogSearch.trim().toLowerCase();
         return catalogEntries.filter(function(e){
             if (catalogFilter === 'pushable') { if (!isPushable(e)) return false; }
+            else if (catalogFilter === 'pushed') { if (!e.pushed_at) return false; }
             else if (catalogFilter !== 'all' && e.link_status !== catalogFilter) return false;
             if (q) {
                 var hay = ((e.product_name || '') + ' ' + (e.base_name || '') + ' ' +
@@ -1447,7 +1459,7 @@
     function setCatalogFilter(f) {
         catalogFilter = f;
         document.querySelectorAll('.cat-filter').forEach(function(b){ b.className = 'cat-filter px-2 py-1 rounded text-[11px] font-semibold bg-gray-100 text-gray-600'; });
-        var map = { all: 'catFilterAll', review: 'catFilterReview', needs_creating: 'catFilterNeeds', confirmed: 'catFilterConfirmed', pushable: 'catFilterPushable' };
+        var map = { all: 'catFilterAll', review: 'catFilterReview', needs_creating: 'catFilterNeeds', confirmed: 'catFilterConfirmed', pushable: 'catFilterPushable', pushed: 'catFilterPushed' };
         var active = document.getElementById(map[f]);
         if (active) active.className = 'cat-filter px-2 py-1 rounded text-[11px] font-semibold bg-indigo-600 text-white';
         renderCatalog();
@@ -1494,6 +1506,15 @@
         }
         if (emptyEl) emptyEl.classList.add('hidden');
 
+        function pushedBadge(e) {
+            if (!e.pushed_at) return '';
+            var base = '✅ Pushed ' + esc(fmtPushed(e.pushed_at)) + (e.pushed_job_id ? ' · job #' + esc(String(e.pushed_job_id)) : '');
+            if (e.push_changed) {
+                return '<div class="text-[10px] text-amber-600 mt-0.5">' + base + ' · ⚠ ₹' + esc(String(e.pushed_dpl)) + '→₹' + esc(String(e.current_dpl)) + ' re-push</div>';
+            }
+            return '<div class="text-[10px] text-emerald-600 mt-0.5">' + base + ' · no change</div>';
+        }
+
         function statusBadge(e) {
             return e.link_status === 'confirmed'
                 ? '<span class="px-1.5 py-0.5 rounded bg-green-100 text-green-700">✅ ' + esc(String(e.link_confidence || '')) + '</span>'
@@ -1532,7 +1553,7 @@
                     '<td class="px-2 py-1.5 text-right">' + priceCell + '</td>' +
                     '<td class="px-2 py-1.5 font-mono">' + skuCell + '</td>' +
                     '<td class="px-2 py-1.5">' + linkedHtml(e) + '</td>' +
-                    '<td class="px-2 py-1.5 text-center">' + statusBadge(e) + '</td>' +
+                    '<td class="px-2 py-1.5 text-center">' + statusBadge(e) + pushedBadge(e) + '</td>' +
                     '<td class="px-2 py-1.5 text-center whitespace-nowrap">' + actionHtml(e) + '</td>' +
                     '</tr>';
             }).join('');
@@ -1559,6 +1580,7 @@
                         '<div class="text-[12px] text-gray-700 mt-1">' + price + '</div>' +
                         skuLine +
                         '<div class="text-[11px] text-gray-600 mt-0.5 truncate">' + linkedHtml(e) + '</div>' +
+                        pushedBadge(e) +
                         '<div class="mt-2 flex flex-wrap gap-1">' + actionHtml(e) + '</div>' +
                     '</div>' +
                 '</div>';
