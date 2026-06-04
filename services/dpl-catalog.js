@@ -430,6 +430,15 @@ async function markPushed(rows, jobId) {
     }
 }
 
+// Flag/unflag an entry as "not in Zoho (pending creation)". Kept out of _COLS so it
+// survives rebuilds.
+async function setNotInZoho(id, value, updatedBy) {
+    await pool.query(
+        `UPDATE dpl_catalog SET not_in_zoho = ?, updated_by = ? WHERE id = ?`,
+        [value ? 1 : 0, updatedBy || null, id]
+    );
+}
+
 // Persist freshly-applied DPL prices onto matched catalog rows (local only).
 async function updateAppliedPrices(rows, updatedBy) {
     for (const r of (rows || [])) {
@@ -444,5 +453,5 @@ module.exports = {
     setPool, slug, normalizeSizeTier, extractSizeFromZohoName, buildMatchKey,
     dplBaseStems, zohoSkuStem, linkEntryToZoho, buildCatalogFromDpl, applyDplPrices,
     buildPushChanges, upsertEntries, deleteOrphans, getCatalog, reconcileCanonical, confirmLink,
-    updateAppliedPrices, updateCanonicalFields, markPushed,
+    updateAppliedPrices, updateCanonicalFields, markPushed, setNotInZoho,
 };

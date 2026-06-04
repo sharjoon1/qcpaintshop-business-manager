@@ -251,6 +251,21 @@ router.put('/items/dpl-catalog/entry/:id', requirePermission('zoho', 'manage'), 
     }
 });
 
+// Mark/unmark a catalog entry as "not in Zoho (pending creation)".
+router.post('/items/dpl-catalog/entry/:id/not-in-zoho', requirePermission('zoho', 'manage'), async (req, res) => {
+    try {
+        const id = parseInt(req.params.id, 10);
+        if (!Number.isFinite(id)) return res.status(400).json({ success: false, message: 'Invalid entry id' });
+        const value = !!(req.body && req.body.value);
+        const updatedBy = req.user ? (req.user.username || String(req.user.id)) : null;
+        await dplCatalogService.setNotInZoho(id, value, updatedBy);
+        res.json({ success: true });
+    } catch (err) {
+        console.error('DPL catalog not-in-zoho error:', err);
+        res.status(500).json({ success: false, message: err.message });
+    }
+});
+
 // Re-key the latest saved DPL onto the pinned catalog → price diff. Persists the
 // new current_dpl/current_rate locally (no Zoho write). Returns three buckets.
 router.post('/items/dpl-catalog/:brand/apply-prices', requirePermission('zoho', 'manage'), async (req, res) => {

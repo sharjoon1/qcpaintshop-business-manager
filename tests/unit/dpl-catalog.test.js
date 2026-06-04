@@ -480,3 +480,15 @@ describe('migrate-dpl-catalog', () => {
         expect(queries.some(q => /CREATE TABLE/.test(q))).toBe(false);
     });
 });
+
+describe('setNotInZoho', () => {
+    test('sets the flag (1/0) with updated_by', async () => {
+        const calls = [];
+        catalog.setPool({ query: async (sql, params) => { calls.push({ sql, params }); return [{}]; } });
+        await catalog.setNotInZoho(5, true, 'u');
+        expect(calls[0].sql).toMatch(/UPDATE dpl_catalog SET not_in_zoho = \?, updated_by = \? WHERE id = \?/);
+        expect(calls[0].params).toEqual([1, 'u', 5]);
+        await catalog.setNotInZoho(6, false, 'u');
+        expect(calls[1].params).toEqual([0, 'u', 6]);
+    });
+});
