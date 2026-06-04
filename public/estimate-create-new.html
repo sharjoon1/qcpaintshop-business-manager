@@ -1319,8 +1319,12 @@ function recalcItem(item) {
         if (item.discount_type === 'price_pct') discount = afterMarkup * dv / 100;
         else if (item.discount_type === 'price_value') discount = dv;
     }
-    item.final_price = roundUp10(afterMarkup - discount);
-    item.line_total = roundUp10(item.final_price * qty);
+    // Mirror server calculateItemPricing: round the line total to ₹10 ONCE from the
+    // un-rounded unit price, then derive unit price as line/qty (no double-round).
+    var finalUnrounded = afterMarkup - discount;
+    var safeQty = qty > 0 ? qty : 1;
+    item.line_total = roundUp10(finalUnrounded * safeQty);
+    item.final_price = Math.round((item.line_total / safeQty) * 100) / 100;
 }
 
 // ════════════════════════════════════════
