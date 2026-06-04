@@ -1570,7 +1570,16 @@
                 : '<span class="px-1.5 py-0.5 rounded bg-rose-100 text-rose-700">🆕</span>';
         }
         function linkedHtml(e) {
-            return e.zoho_item_id ? esc(zohoNameFor(e.zoho_item_id, e)) : '<span class="text-gray-400">— not linked —</span>';
+            if (!e.zoho_item_id) return '<span class="text-gray-400">— not linked —</span>';
+            // Primary = the pending PUSH name (canonical_name, what the user edits & what
+            // gets written to Zoho on push). Show the live Zoho name as secondary context
+            // when it still differs (i.e. the rename hasn't been pushed yet).
+            var pushName = e.canonical_name || zohoNameFor(e.zoho_item_id, e);
+            var live = e.zoho_name || '';
+            var pending = live && e.canonical_name && live !== e.canonical_name;
+            return esc(pushName) + (pending
+                ? '<div class="text-[10px] text-amber-600 truncate" title="current name in Zoho — updates on push">↺ Zoho now: ' + esc(live) + '</div>'
+                : '');
         }
         function actionHtml(e) {
             var action = '';
