@@ -385,7 +385,7 @@ async function confirmLink(id, zohoItemId, updatedBy) {
         await pool.query(
             `UPDATE dpl_catalog SET zoho_item_id = ?, link_status = 'confirmed', link_confidence = 100,
                 link_reason = 'user-confirmed', canonical_name = ?, canonical_sku = ?, canonical_description = ?,
-                updated_by = ? WHERE id = ?`,
+                not_in_zoho = 0, updated_by = ? WHERE id = ?`,
             [zohoItemId, c.canonical_name, c.canonical_sku, c.canonical_description, updatedBy || null, id]
         );
         return;
@@ -393,7 +393,7 @@ async function confirmLink(id, zohoItemId, updatedBy) {
     // Fallback: entry or Zoho item not found — original link-only update.
     await pool.query(
         `UPDATE dpl_catalog SET zoho_item_id = ?, link_status = 'confirmed', link_confidence = 100,
-            link_reason = 'user-confirmed', updated_by = ? WHERE id = ?`,
+            link_reason = 'user-confirmed', not_in_zoho = 0, updated_by = ? WHERE id = ?`,
         [zohoItemId, updatedBy || null, id]
     );
 }
@@ -430,13 +430,36 @@ async function markPushed(rows, jobId) {
     }
 }
 
-// Flag/unflag an entry as "not in Zoho (pending creation)". Kept out of _COLS so it
-// survives rebuilds.
+// Mark/unmark an entry as "not in Zoho (pending creation)". Marking REJECTS the
+// (often wrong) auto-link: it unlinks and clears the canonical fields so the entry
+// moves to the Pending filter. Kept out of _COLS so the flag survives rebuilds.
 async function setNotInZoho(id, value, updatedBy) {
-    await pool.query(
-        `UPDATE dpl_catalog SET not_in_zoho = ?, updated_by = ? WHERE id = ?`,
-        [value ? 1 : 0, updatedBy || null, id]
+    if (value) {
+        await pool.query(
+            `UPDATE dpl_catalog SET not_in_zoho = 1, zoho_item_id = NULL, link_status = 'needs_creating',
+                link_confidence = 0, link_reason = 'marked-not-in-zoho',
+                canonical_name = NULL, canonical_sku = NULL, canonical_description = NULL,
+                updated_by = ? WHERE id = ?`,
+            [updatedBy || null, id]
+        );
+    } else {
+        await pool.query(
+            `UPDATE dpl_catalog SET not_in_zoho = 0, updated_by = ? WHERE id = ?`,
+            [updatedBy || null, id]
+        );
+    }
+}
+
+// After a rebuild, re-unlink any entries the user marked not-in-Zoho (the linker would
+// otherwise re-attach the wrong item). Keeps marked items in Pending across rebuilds.
+async function unlinkMarked(brand) {
+    const [r] = await pool.query(
+        `UPDATE dpl_catalog SET zoho_item_id = NULL, link_status = 'needs_creating', link_confidence = 0,
+            link_reason = 'marked-not-in-zoho', canonical_name = NULL, canonical_sku = NULL, canonical_description = NULL
+         WHERE brand = ? AND not_in_zoho = 1 AND zoho_item_id IS NOT NULL`,
+        [brand]
     );
+    return r.affectedRows || 0;
 }
 
 // Persist freshly-applied DPL prices onto matched catalog rows (local only).
@@ -452,6 +475,6 @@ async function updateAppliedPrices(rows, updatedBy) {
 module.exports = {
     setPool, slug, normalizeSizeTier, extractSizeFromZohoName, buildMatchKey,
     dplBaseStems, zohoSkuStem, linkEntryToZoho, buildCatalogFromDpl, applyDplPrices,
-    buildPushChanges, upsertEntries, deleteOrphans, getCatalog, reconcileCanonical, confirmLink,
+    buildPushChanges, upsertEntries, deleteOrphans, unlinkMarked, getCatalog, reconcileCanonical, confirmLink,
     updateAppliedPrices, updateCanonicalFields, markPushed, setNotInZoho,
 };

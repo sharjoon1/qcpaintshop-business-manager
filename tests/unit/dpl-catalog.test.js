@@ -482,13 +482,33 @@ describe('migrate-dpl-catalog', () => {
 });
 
 describe('setNotInZoho', () => {
-    test('sets the flag (1/0) with updated_by', async () => {
+    test('value=true unlinks + clears canonical + sets the flag', async () => {
         const calls = [];
         catalog.setPool({ query: async (sql, params) => { calls.push({ sql, params }); return [{}]; } });
         await catalog.setNotInZoho(5, true, 'u');
-        expect(calls[0].sql).toMatch(/UPDATE dpl_catalog SET not_in_zoho = \?, updated_by = \? WHERE id = \?/);
-        expect(calls[0].params).toEqual([1, 'u', 5]);
+        expect(calls[0].sql).toMatch(/not_in_zoho = 1/);
+        expect(calls[0].sql).toMatch(/zoho_item_id = NULL/);
+        expect(calls[0].sql).toMatch(/link_status = 'needs_creating'/);
+        expect(calls[0].sql).toMatch(/canonical_sku = NULL/);
+        expect(calls[0].params).toEqual(['u', 5]);
+    });
+    test('value=false clears the flag only', async () => {
+        const calls = [];
+        catalog.setPool({ query: async (sql, params) => { calls.push({ sql, params }); return [{}]; } });
         await catalog.setNotInZoho(6, false, 'u');
-        expect(calls[1].params).toEqual([0, 'u', 6]);
+        expect(calls[0].sql).toMatch(/SET not_in_zoho = 0, updated_by = \? WHERE id = \?/);
+        expect(calls[0].params).toEqual(['u', 6]);
+    });
+});
+
+describe('unlinkMarked', () => {
+    test('unlinks marked-not-in-zoho entries for the brand', async () => {
+        const calls = [];
+        catalog.setPool({ query: async (sql, params) => { calls.push({ sql, params }); return [{ affectedRows: 2 }]; } });
+        const n = await catalog.unlinkMarked('birlaopus');
+        expect(n).toBe(2);
+        expect(calls[0].sql).toMatch(/UPDATE dpl_catalog SET zoho_item_id = NULL/);
+        expect(calls[0].sql).toMatch(/WHERE brand = \? AND not_in_zoho = 1 AND zoho_item_id IS NOT NULL/);
+        expect(calls[0].params).toEqual(['birlaopus']);
     });
 });

@@ -143,6 +143,7 @@ router.post('/items/dpl-catalog/:brand/build', requirePermission('zoho', 'manage
         const updatedBy = req.user ? (req.user.username || String(req.user.id)) : null;
         await dplCatalogService.upsertEntries(entries, updatedBy);
         const removed = await dplCatalogService.deleteOrphans(brand, entries.map(e => e.match_key));
+        await dplCatalogService.unlinkMarked(brand);
 
         const summary = { total: entries.length, confirmed: 0, review: 0, needs_creating: 0, removed };
         entries.forEach(e => { if (e.link_status in summary) summary[e.link_status] += 1; });
