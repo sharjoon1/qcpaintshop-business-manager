@@ -1547,7 +1547,7 @@
                 action += '<button onclick="openCatPicker(' + e.id + ')" class="px-2 py-1 rounded border text-gray-500 text-[10px]">change</button>';
             }
             action += '<button onclick="openCatEdit(' + e.id + ')" class="px-2 py-1 rounded border border-amber-300 text-amber-700 text-[10px] font-bold ml-1">✏ Edit</button>';
-            if (!e.zoho_item_id) {
+            if (e.link_status !== 'confirmed') {
                 action += e.not_in_zoho
                     ? '<button onclick="markNotInZoho(' + e.id + ', false)" class="px-2 py-1 rounded border text-gray-500 text-[10px] ml-1">↩ Unmark</button>'
                     : '<button onclick="markNotInZoho(' + e.id + ', true)" class="px-2 py-1 rounded border border-rose-300 text-rose-700 text-[10px] font-bold ml-1">🚫 Not in Zoho</button>';
@@ -1724,10 +1724,8 @@
             });
             var body = await resp.json();
             if (!resp.ok || !body.success) throw new Error(body.message || 'Failed');
-            var e = catalogEntries.find(function(x){ return x.id === id; });
-            if (e) e.not_in_zoho = value ? 1 : 0;
             showToast(value ? 'Marked: not in Zoho (pending)' : 'Unmarked', 'success');
-            renderCatalog();
+            await loadCatalog();
         } catch (err) { showToast('Mark error: ' + err.message, 'error'); }
     }
     function markNotInZohoFromPicker() {
