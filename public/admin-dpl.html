@@ -334,6 +334,7 @@
                         <button onclick="setCatalogFilter('confirmed')" id="catFilterConfirmed" class="cat-filter px-2 py-1 rounded text-[11px] font-semibold bg-gray-100 text-gray-600">Confirmed</button>
                         <button onclick="setCatalogFilter('pushable')" id="catFilterPushable" class="cat-filter px-2 py-1 rounded text-[11px] font-semibold bg-gray-100 text-gray-600">☑ Pushable</button>
                         <button onclick="setCatalogFilter('pushed')" id="catFilterPushed" class="cat-filter px-2 py-1 rounded text-[11px] font-semibold bg-gray-100 text-gray-600">✅ Pushed</button>
+                        <button onclick="setCatalogFilter('pending')" id="catFilterPending" class="cat-filter px-2 py-1 rounded text-[11px] font-semibold bg-gray-100 text-gray-600">🚫 Pending</button>
                         <span class="mx-1 w-px bg-gray-200"></span>
                         <button onclick="toggleSelectAllConfirmed()" id="catSelectAllBtn" class="px-2 py-1 rounded text-[11px] font-semibold border border-emerald-300 text-emerald-700 bg-white hover:bg-emerald-50">☑ Select confirmed</button>
                         <button onclick="pushCatalogToZoho()" id="pushZohoBtn" class="px-2 py-1 rounded text-[11px] font-bold bg-emerald-600 hover:bg-emerald-700 text-white disabled:opacity-50 flex items-center gap-1" disabled>
@@ -379,6 +380,9 @@
                         <input type="text" id="catPickerSearch" oninput="catPickerSearchDebounced()" placeholder="Search name / SKU..." class="w-full px-3 py-2 border rounded text-xs outline-none focus:border-indigo-500">
                     </div>
                     <div id="catPickerResults" class="flex-1 overflow-y-auto px-3 pb-3 space-y-1"></div>
+                    <div class="p-3 border-t">
+                        <button onclick="markNotInZohoFromPicker()" class="w-full px-3 py-2 rounded border border-rose-300 text-rose-700 text-xs font-bold hover:bg-rose-50">🚫 This item isn't in Zoho — mark pending</button>
+                    </div>
                 </div>
             </div>
 
@@ -1300,13 +1304,22 @@
         return p(d.getDate()) + '-' + CAT_MON[d.getMonth()] + ' ' + p(d.getHours()) + ':' + p(d.getMinutes());
     }
 
-    // Rows visible after the active status/pushable filter AND the text search.
+    // An entry the user marked "not in Zoho" that isn't linked yet → pending creation.
+    function isPending(e) { return !!e.not_in_zoho && !e.zoho_item_id; }
+
+    // Rows visible after the active filter AND the text search. Pending items show ONLY
+    // under the 'pending' filter and are hidden from every other view.
     function visibleCatalogRows() {
         var q = catalogSearch.trim().toLowerCase();
         return catalogEntries.filter(function(e){
-            if (catalogFilter === 'pushable') { if (!isPushable(e)) return false; }
-            else if (catalogFilter === 'pushed') { if (!e.pushed_at) return false; }
-            else if (catalogFilter !== 'all' && e.link_status !== catalogFilter) return false;
+            if (catalogFilter === 'pending') {
+                if (!isPending(e)) return false;
+            } else {
+                if (isPending(e)) return false;
+                if (catalogFilter === 'pushable') { if (!isPushable(e)) return false; }
+                else if (catalogFilter === 'pushed') { if (!e.pushed_at) return false; }
+                else if (catalogFilter !== 'all' && e.link_status !== catalogFilter) return false;
+            }
             if (q) {
                 var hay = ((e.product_name || '') + ' ' + (e.base_name || '') + ' ' +
                            (e.canonical_sku || '') + ' ' + zohoNameFor(e.zoho_item_id, e)).toLowerCase();
@@ -1459,7 +1472,7 @@
     function setCatalogFilter(f) {
         catalogFilter = f;
         document.querySelectorAll('.cat-filter').forEach(function(b){ b.className = 'cat-filter px-2 py-1 rounded text-[11px] font-semibold bg-gray-100 text-gray-600'; });
-        var map = { all: 'catFilterAll', review: 'catFilterReview', needs_creating: 'catFilterNeeds', confirmed: 'catFilterConfirmed', pushable: 'catFilterPushable', pushed: 'catFilterPushed' };
+        var map = { all: 'catFilterAll', review: 'catFilterReview', needs_creating: 'catFilterNeeds', confirmed: 'catFilterConfirmed', pushable: 'catFilterPushable', pushed: 'catFilterPushed', pending: 'catFilterPending' };
         var active = document.getElementById(map[f]);
         if (active) active.className = 'cat-filter px-2 py-1 rounded text-[11px] font-semibold bg-indigo-600 text-white';
         renderCatalog();
@@ -1534,6 +1547,11 @@
                 action += '<button onclick="openCatPicker(' + e.id + ')" class="px-2 py-1 rounded border text-gray-500 text-[10px]">change</button>';
             }
             action += '<button onclick="openCatEdit(' + e.id + ')" class="px-2 py-1 rounded border border-amber-300 text-amber-700 text-[10px] font-bold ml-1">✏ Edit</button>';
+            if (!e.zoho_item_id) {
+                action += e.not_in_zoho
+                    ? '<button onclick="markNotInZoho(' + e.id + ', false)" class="px-2 py-1 rounded border text-gray-500 text-[10px] ml-1">↩ Unmark</button>'
+                    : '<button onclick="markNotInZoho(' + e.id + ', true)" class="px-2 py-1 rounded border border-rose-300 text-rose-700 text-[10px] font-bold ml-1">🚫 Not in Zoho</button>';
+            }
             return action;
         }
 
@@ -1696,6 +1714,26 @@
         var id = catPickerEntryId;
         closeCatPicker();
         if (id != null) confirmCatalogEntry(id, zohoItemId);
+    }
+    async function markNotInZoho(id, value) {
+        try {
+            var resp = await fetch('/api/zoho/items/dpl-catalog/entry/' + id + '/not-in-zoho', {
+                method: 'POST',
+                headers: { 'Authorization': 'Bearer ' + getToken(), 'Content-Type': 'application/json' },
+                body: JSON.stringify({ value: value })
+            });
+            var body = await resp.json();
+            if (!resp.ok || !body.success) throw new Error(body.message || 'Failed');
+            var e = catalogEntries.find(function(x){ return x.id === id; });
+            if (e) e.not_in_zoho = value ? 1 : 0;
+            showToast(value ? 'Marked: not in Zoho (pending)' : 'Unmarked', 'success');
+            renderCatalog();
+        } catch (err) { showToast('Mark error: ' + err.message, 'error'); }
+    }
+    function markNotInZohoFromPicker() {
+        var id = catPickerEntryId;
+        closeCatPicker();
+        if (id != null) markNotInZoho(id, true);
     }
     function catLinkBadge(zid) {
         var e = catalogEntries.find(function(x){ return x.zoho_item_id && String(x.zoho_item_id) === String(zid); });
