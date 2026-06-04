@@ -194,6 +194,8 @@ router.get('/items/dpl-catalog/:brand', requirePermission('zoho', 'manage'), asy
                 const other = holders.find(h => h.id !== String(e.zoho_item_id));
                 if (other) sku_conflict = other.name;
             }
+            const push_changed = !!(e.pushed_at != null &&
+                (Number(e.pushed_dpl) !== Number(e.current_dpl) || Number(e.pushed_rate) !== Number(e.current_rate)));
             return Object.assign({}, e, {
                 old_dpl: z && z.zoho_cf_dpl != null ? z.zoho_cf_dpl : null,
                 old_rate: z && z.zoho_rate != null ? z.zoho_rate : null,
@@ -201,6 +203,7 @@ router.get('/items/dpl-catalog/:brand', requirePermission('zoho', 'manage'), asy
                 zoho_sku: z ? z.zoho_sku : null,
                 zoho_description: z ? z.zoho_description : null,
                 sku_conflict,
+                push_changed,
             });
         });
 
@@ -326,9 +329,14 @@ router.post('/items/dpl-catalog/:brand/push', requirePermission('zoho', 'manage'
             const other = holders.find(h => h.id !== String(e.zoho_item_id));
             if (other) {
                 skipped.push({ id: e.id, reason: `SKU '${e.canonical_sku}' already used by '${other.name}'` });
-            } else {
-                conflictFree.push(e);
+                continue;
             }
+            // Skip entries already pushed with no price change (redundant Zoho write).
+            if (e.pushed_at && Number(e.pushed_dpl) === Number(e.current_dpl) && Number(e.pushed_rate) === Number(e.current_rate)) {
+                skipped.push({ id: e.id, reason: `already pushed (job #${e.pushed_job_id}), no price change` });
+                continue;
+            }
+            conflictFree.push(e);
         }
         if (!conflictFree.length) {
             return res.status(400).json({ success: false, message: 'Nothing to push — all selected items have SKU conflicts. Edit the SKUs and retry.', skipped });
@@ -356,6 +364,16 @@ router.post('/items/dpl-catalog/:brand/push', requirePermission('zoho', 'manage'
 
         const jobItems = items.map(({ _entry, _zc, ...keep }) => keep);
         const result = await createBulkEditJob(jobItems, req.user);
+
+        // Stamp push state on the pushed entries (best-effort; never fail the push).
+        try {
+            await dplCatalogService.markPushed(
+                items.map(it => ({ id: it._entry.id, dpl: it._entry.current_dpl, rate: it._entry.current_rate })),
+                result.job_id
+            );
+        } catch (stampErr) {
+            console.error('DPL catalog push: markPushed failed (non-fatal):', stampErr.message);
+        }
 
         // Log price history (best-effort). NOTE: the real column is `dpl_version_id`
         // (verified on prod) — routes/item-master.js uses `version_id` here, which is a
