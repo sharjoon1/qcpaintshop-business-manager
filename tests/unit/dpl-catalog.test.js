@@ -333,7 +333,10 @@ describe('dpl-catalog DB layer', () => {
         catalog.setPool({ query: async (sql, params) => { captured = { sql, params }; return [[{ id: 1 }]]; } });
         const rows = await catalog.getCatalog('birlaopus');
         expect(rows).toEqual([{ id: 1 }]);
-        expect(/FROM dpl_catalog WHERE brand = \?/i.test(captured.sql)).toBe(true);
+        expect(/FROM dpl_catalog d/i.test(captured.sql)).toBe(true);
+        expect(/LEFT JOIN zoho_items_map z/i.test(captured.sql)).toBe(true);
+        expect(/z\.zoho_sku AS zoho_sku/i.test(captured.sql)).toBe(true);
+        expect(/WHERE d\.brand = \?/i.test(captured.sql)).toBe(true);
         expect(captured.params).toEqual(['birlaopus']);
     });
 

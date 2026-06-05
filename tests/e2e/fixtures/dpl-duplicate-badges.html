@@ -1,0 +1,54 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <link rel="stylesheet" href="../../../public/css/tailwind.css">
+  <link rel="stylesheet" href="../../../public/css/design-system.css">
+  <script src="../../../public/js/dpl-duplicate-detect.js"></script>
+  <style>#t{table-layout:fixed} #t td,#t th{overflow-wrap:anywhere}</style>
+</head>
+<body class="p-4" style="width:760px">
+  <div class="overflow-x-auto border rounded-lg">
+    <table id="t" class="w-full text-[11px]">
+      <thead class="bg-gray-50 text-gray-500"><tr>
+        <th class="px-2 py-2 text-left">Product / Base</th>
+        <th class="px-2 py-2 text-left" style="width:64px">Size</th>
+        <th class="px-2 py-2 text-left" style="width:96px">Canonical SKU</th>
+        <th class="px-2 py-2 text-left">Linked Zoho item</th>
+        <th class="px-2 py-2 text-center" style="width:170px">Status</th>
+      </tr></thead>
+      <tbody id="b"></tbody>
+    </table>
+  </div>
+  <script>
+    // Real collision scenario: the Zoho item TF110 is confirmed against TWO entries.
+    var entries = [
+      {id:1, link_status:'confirmed', zoho_item_id:'Z_TF110', product_code:'TF110',  zoho_sku:'TF110', product_name:'One True Flex', base_name:'White',  size_tier:'10L', canonical_sku:'TF110',  zoho_name:'TF110 ONE TRUE FLEX BIRLA OPUS 10 L', link_confidence:100},
+      {id:2, link_status:'confirmed', zoho_item_id:'Z_TF110', product_code:'TFP310', zoho_sku:'TF110', product_name:'One True Flex', base_name:'Pastel', size_tier:'10L', canonical_sku:'TF110',  zoho_name:'TF110 ONE TRUE FLEX BIRLA OPUS 10 L', link_confidence:100},
+      {id:3, link_status:'confirmed', zoho_item_id:'Z_TLI',   product_code:'TLI9910',zoho_sku:'TLI9910',product_name:'One True Life', base_name:'Clear',  size_tier:'10L', canonical_sku:'TLI9910',zoho_name:'TLI9910 ONE TRUE LIFE BIRLA OPUS 10 L', link_confidence:100}
+    ];
+    var catDupInfo = computeDuplicateInfo(entries);
+    function esc(s){return String(s==null?'':s);}
+    function statusBadge(e){return '<span class="px-1.5 py-0.5 rounded bg-green-100 text-green-700">✅ '+e.link_confidence+'</span>';}
+    // dupBadge mirrors admin-dpl.html
+    function dupBadge(e){
+      var d=catDupInfo[e.id]; if(!d) return '';
+      var verdict = d.role==='best'
+        ? '<span class="px-1.5 py-0.5 rounded bg-green-100 text-green-700">✓ best match</span>'
+        : d.role==='wrong'
+        ? '<span class="px-1.5 py-0.5 rounded bg-rose-100 text-rose-700">✗ different product</span>'
+        : '<span class="px-1.5 py-0.5 rounded bg-amber-100 text-amber-700">⚠ check</span>';
+      return '<div class="mt-0.5 leading-tight"><span class="px-1.5 py-0.5 rounded bg-rose-50 text-rose-600">⚠ shared ×'+d.count+'</span> '+verdict+'</div>';
+    }
+    document.getElementById('b').innerHTML = entries.map(function(e){
+      return '<tr class="border-t">'
+        + '<td class="px-2 py-1.5"><div class="font-semibold text-gray-800">'+esc(e.product_name)+'</div><div class="text-gray-500">'+esc(e.base_name)+'</div></td>'
+        + '<td class="px-2 py-1.5">'+esc(e.size_tier)+'</td>'
+        + '<td class="px-2 py-1.5 font-mono">'+esc(e.canonical_sku)+'</td>'
+        + '<td class="px-2 py-1.5">'+esc(e.zoho_name)+'</td>'
+        + '<td class="px-2 py-1.5 text-center">'+statusBadge(e)+dupBadge(e)+'</td>'
+        + '</tr>';
+    }).join('');
+  </script>
+</body>
+</html>

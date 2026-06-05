@@ -365,8 +365,15 @@ async function upsertEntries(entries, updatedBy) {
 }
 
 async function getCatalog(brand) {
+    // LEFT JOIN the live Zoho item so each linked entry carries the real SKU/name.
+    // zoho_sku powers the duplicate-link best-match check; zoho_name lets the UI
+    // show the current Zoho name. Both are null for unlinked entries.
     const [rows] = await pool.query(
-        `SELECT * FROM dpl_catalog WHERE brand = ? ORDER BY category, product_name, base_name, size_tier`,
+        `SELECT d.*, z.zoho_sku AS zoho_sku, z.zoho_item_name AS zoho_name
+           FROM dpl_catalog d
+           LEFT JOIN zoho_items_map z ON z.zoho_item_id = d.zoho_item_id
+          WHERE d.brand = ?
+          ORDER BY d.category, d.product_name, d.base_name, d.size_tier`,
         [brand]
     );
     return rows;
