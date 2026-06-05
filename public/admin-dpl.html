@@ -1489,7 +1489,12 @@
             var body = await resp.json();
             if (!resp.ok || !body.success) throw new Error(body.message || ('Server error ' + resp.status));
             catalogEntries = body.data || [];
-            catPushSelected = {};
+            // Preserve the user's push selection across a reload (e.g. after editing
+            // one item's name/SKU/description) instead of clearing every checkbox.
+            // Keep only entries that still exist AND are still pushable.
+            var keepSel = {};
+            catalogEntries.forEach(function(e){ if (catPushSelected[e.id] && isPushable(e)) keepSel[e.id] = true; });
+            catPushSelected = keepSel;
             document.getElementById('catalogPanel').classList.remove('hidden');
             renderCatalog();
         } catch (err) {
