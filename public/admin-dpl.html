@@ -85,6 +85,19 @@
         @media (max-width:639px) {
             .ai-card input[type="text"] { font-size:13px !important; padding:5px 8px !important; }
         }
+        /* DPL catalog table: fit within the screen — fixed layout so wide
+           columns wrap/truncate instead of forcing a horizontal scrollbar. */
+        #dplCatTable { table-layout: fixed; }
+        #dplCatTable th, #dplCatTable td { overflow-wrap: anywhere; word-break: break-word; }
+        #dplCatTable .col-chk    { width: 30px; }
+        #dplCatTable .col-size   { width: 58px; }
+        #dplCatTable .col-dpl    { width: 80px; }
+        #dplCatTable .col-sku    { width: 94px; }
+        #dplCatTable .col-status { width: 66px; }
+        #dplCatTable .col-act    { width: 124px; }
+        /* Product/Base and Linked-Zoho columns share the remaining width. */
+        #dplCatTable .cat-actions { display: flex; flex-wrap: wrap; gap: 4px; justify-content: center; }
+        #dplCatTable .cat-actions > button { margin: 0 !important; }
     </style>
 </head>
 <body data-page="zoho-dpl" class="bg-gray-50">
@@ -356,17 +369,17 @@
                     <button onclick="setConfirmedPushSub('unpushed')" id="cpsUnpushed" class="cps px-2 py-1 rounded text-[11px] font-semibold bg-gray-100 text-gray-600">⏳ Not pushed</button>
                 </div>
                 <div class="overflow-x-auto border rounded-lg hidden sm:block">
-                    <table class="w-full text-[11px]">
+                    <table id="dplCatTable" class="w-full text-[11px]">
                         <thead class="bg-gray-50 text-gray-500">
                             <tr>
-                                <th class="px-2 py-2 text-center"><input type="checkbox" id="catHeadCheck" onclick="toggleHeadCheck(this)" aria-label="Select all visible confirmed"></th>
+                                <th class="px-2 py-2 text-center col-chk"><input type="checkbox" id="catHeadCheck" onclick="toggleHeadCheck(this)" aria-label="Select all visible confirmed"></th>
                                 <th class="px-2 py-2 text-left">Product / Base</th>
-                                <th class="px-2 py-2 text-left">Size</th>
-                                <th class="px-2 py-2 text-right">DPL</th>
-                                <th class="px-2 py-2 text-left">Canonical SKU</th>
+                                <th class="px-2 py-2 text-left col-size">Size</th>
+                                <th class="px-2 py-2 text-right col-dpl">DPL</th>
+                                <th class="px-2 py-2 text-left col-sku">Canonical SKU</th>
                                 <th class="px-2 py-2 text-left">Linked Zoho item</th>
-                                <th class="px-2 py-2 text-center">Status</th>
-                                <th class="px-2 py-2 text-center">Action</th>
+                                <th class="px-2 py-2 text-center col-status">Status</th>
+                                <th class="px-2 py-2 text-center col-act">Action</th>
                             </tr>
                         </thead>
                         <tbody id="catalogTableBody"></tbody>
@@ -1615,7 +1628,7 @@
                     '<td class="px-2 py-1.5 font-mono">' + skuCell + '</td>' +
                     '<td class="px-2 py-1.5">' + linkedHtml(e) + '</td>' +
                     '<td class="px-2 py-1.5 text-center">' + statusBadge(e) + pushedBadge(e) + '</td>' +
-                    '<td class="px-2 py-1.5 text-center whitespace-nowrap">' + actionHtml(e) + '</td>' +
+                    '<td class="px-2 py-1.5 text-center"><div class="cat-actions">' + actionHtml(e) + '</div></td>' +
                     '</tr>';
             }).join('');
         }
