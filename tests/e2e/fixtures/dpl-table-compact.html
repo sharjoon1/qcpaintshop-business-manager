@@ -1,0 +1,71 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <link rel="stylesheet" href="../../../public/css/tailwind.css">
+  <link rel="stylesheet" href="../../../public/css/design-system.css">
+  <style>
+    /* Mirror of admin-dpl.html #dplCatTable rules (compact redesign). */
+    #dplCatTable { table-layout: fixed; }
+    #dplCatTable th, #dplCatTable td { overflow-wrap: anywhere; word-break: break-word; vertical-align: top; }
+    #dplCatTable td { padding: 5px 8px !important; }
+    #dplCatTable .col-chk { width:28px } #dplCatTable .col-size { width:46px }
+    #dplCatTable .col-dpl { width:96px } #dplCatTable .col-sku { width:86px }
+    #dplCatTable .col-status { width:138px } #dplCatTable .col-act { width:120px }
+    #dplCatTable .cat-actions { display:flex; flex-wrap:wrap; gap:4px; justify-content:center }
+    #dplCatTable .cat-status { display:flex; flex-wrap:wrap; gap:3px; align-items:center; justify-content:center; line-height:1.3 }
+    #dplCatTable .cat-status > span { white-space:nowrap }
+    #panel { width: 1180px; padding: 12px; }
+  </style>
+</head>
+<body class="bg-white">
+  <div id="panel">
+    <div class="overflow-x-auto border rounded-lg">
+      <table id="dplCatTable" class="w-full text-[11px]">
+        <thead class="bg-gray-50 text-gray-500"><tr>
+          <th class="px-2 py-2 text-center col-chk"><input type="checkbox"></th>
+          <th class="px-2 py-2 text-left">Product / Base</th>
+          <th class="px-2 py-2 text-left col-size">Size</th>
+          <th class="px-2 py-2 text-right col-dpl">DPL</th>
+          <th class="px-2 py-2 text-left col-sku">Canonical SKU</th>
+          <th class="px-2 py-2 text-left">Linked Zoho item</th>
+          <th class="px-2 py-2 text-center col-status">Status</th>
+          <th class="px-2 py-2 text-center col-act">Action</th>
+        </tr></thead>
+        <tbody id="b"></tbody>
+      </table>
+    </div>
+  </div>
+  <script>
+    function statusBadge(c){return '<span class="px-1.5 py-0.5 rounded bg-green-100 text-green-700">✅ '+c+'</span>';}
+    function pushedChip(re){return re
+      ? '<span class="px-1.5 py-0.5 rounded bg-amber-100 text-amber-700" title="Pushed 12-May 23:19 · job #73 · ₹4070→₹4370 — re-push">⚠ re-push</span>'
+      : '<span class="px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-700" title="Pushed 12-May · no change">✅ pushed</span>';}
+    function dupChip(role,n){var v=role==='best'?'<span class="px-1.5 py-0.5 rounded bg-green-100 text-green-700">✓ best</span>'
+      :role==='wrong'?'<span class="px-1.5 py-0.5 rounded bg-rose-100 text-rose-700">✗ wrong</span>':'';
+      return n?('<span class="px-1.5 py-0.5 rounded bg-rose-50 text-rose-600">⚠ ×'+n+'</span>'+v):'';}
+    function actions(conf){return '<div class="cat-actions">'
+      + (conf?'<button class="px-2 py-1 rounded border text-gray-500 text-[10px]">change</button>':'<button class="px-2 py-1 rounded bg-green-600 text-white text-[10px] font-bold">✓ Confirm</button><button class="px-2 py-1 rounded border border-indigo-300 text-indigo-700 text-[10px] font-bold">🔄 Pick</button>')
+      + '<button class="px-2 py-1 rounded border border-amber-300 text-amber-700 text-[10px] font-bold">✏ Edit</button>'
+      + '<button class="px-2 py-1 rounded border border-rose-300 text-rose-700 text-[10px] font-bold">🚫 Not in Zoho</button></div>';}
+    var rows = [
+      {p:'One True Flex',b:'White',sz:'10L',dpl:'₹4370 → ₹5673',sku:'TF110',z:'TF110 ONE TRUE FLEX BIRLA OPUS 10 L',c:100,re:true,dup:'wrong',n:2,conf:true},
+      {p:'One True Flex',b:'Pastel',sz:'10L',dpl:'₹4070 → ₹5290',sku:'TF110',z:'TF110 ONE TRUE FLEX BIRLA OPUS 10 L',c:100,re:false,dup:'best',n:2,conf:true},
+      {p:'One True Life',b:'Clear',sz:'10L',dpl:'₹4080 → ₹5677',sku:'TLI9910',z:'TLI9910 ONE TRUE LIFE BIRLA OPUS 10 L',c:100,re:false,dup:null,n:0,conf:true},
+      {p:'Ever Stay Calista',b:'Mid Tone',sz:'20L',dpl:'₹7949 → ₹11097',sku:'ES220',z:'ES220 CALISTA EVER STAY BIRLA OPUS 20 L',c:95,re:false,dup:null,n:0,conf:false}
+    ];
+    document.getElementById('b').innerHTML = rows.map(function(r){
+      return '<tr class="border-t">'
+        + '<td class="text-center"><input type="checkbox"></td>'
+        + '<td><div class="font-semibold text-gray-800">'+r.p+'</div><div class="text-gray-500">'+r.b+'</div></td>'
+        + '<td>'+r.sz+'</td>'
+        + '<td class="text-right">'+r.dpl+'</td>'
+        + '<td class="font-mono">'+r.sku+'</td>'
+        + '<td>'+r.z+'</td>'
+        + '<td class="text-center"><div class="cat-status">'+statusBadge(r.c)+pushedChip(r.re)+dupChip(r.dup,r.n)+'</div></td>'
+        + '<td class="text-center">'+actions(r.conf)+'</td>'
+        + '</tr>';
+    }).join('');
+  </script>
+</body>
+</html>
