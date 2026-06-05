@@ -1,0 +1,63 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <link rel="stylesheet" href="../../../public/css/tailwind.css">
+  <link rel="stylesheet" href="../../../public/css/design-system.css">
+  <style>
+    /* Mirror of the #dplCatTable rules added to admin-dpl.html's <style>. */
+    #dplCatTable { table-layout: fixed; }
+    #dplCatTable th, #dplCatTable td { overflow-wrap: anywhere; word-break: break-word; }
+    #dplCatTable .col-chk    { width: 30px; }
+    #dplCatTable .col-size   { width: 58px; }
+    #dplCatTable .col-dpl    { width: 80px; }
+    #dplCatTable .col-sku    { width: 94px; }
+    #dplCatTable .col-status { width: 66px; }
+    #dplCatTable .col-act    { width: 124px; }
+    #dplCatTable .cat-actions { display: flex; flex-wrap: wrap; gap: 4px; justify-content: center; }
+    #dplCatTable .cat-actions > button { margin: 0 !important; }
+    /* Simulate the catalog panel on a modest desktop where it used to scroll. */
+    #panel { width: 760px; padding: 12px; }
+  </style>
+</head>
+<body>
+  <div id="panel">
+    <div id="wrap" class="overflow-x-auto border rounded-lg">
+      <table id="dplCatTable" class="w-full text-[11px]">
+        <thead class="bg-gray-50 text-gray-500">
+          <tr>
+            <th class="px-2 py-2 text-center col-chk"><input type="checkbox"></th>
+            <th class="px-2 py-2 text-left">Product / Base</th>
+            <th class="px-2 py-2 text-left col-size">Size</th>
+            <th class="px-2 py-2 text-right col-dpl">DPL</th>
+            <th class="px-2 py-2 text-left col-sku">Canonical SKU</th>
+            <th class="px-2 py-2 text-left">Linked Zoho item</th>
+            <th class="px-2 py-2 text-center col-status">Status</th>
+            <th class="px-2 py-2 text-center col-act">Action</th>
+          </tr>
+        </thead>
+        <tbody id="catalogTableBody"></tbody>
+      </table>
+    </div>
+  </div>
+  <script>
+    // A long, worst-case row repeated — long product name, long Zoho name, long SKU,
+    // and the full set of action buttons (needs-creating + linked variants).
+    var actions = '<button class="px-2 py-1 rounded bg-green-600 text-white text-[10px] font-bold mr-1">✓ Confirm</button>'
+      + '<button class="px-2 py-1 rounded border border-indigo-300 text-indigo-700 text-[10px] font-bold">🔄 Pick</button>'
+      + '<button class="px-2 py-1 rounded border border-amber-300 text-amber-700 text-[10px] font-bold ml-1">✏ Edit</button>'
+      + '<button class="px-2 py-1 rounded border border-rose-300 text-rose-700 text-[10px] font-bold ml-1">🚫 Not in Zoho</button>';
+    var row = '<tr class="border-t">'
+      + '<td class="px-2 py-1.5 text-center"><input type="checkbox"></td>'
+      + '<td class="px-2 py-1.5"><div class="font-semibold text-gray-800">BIRLA OPUS ULTIMATE SHINE PREMIUM EXTERIOR EMULSION WEATHERGUARD</div><div class="text-gray-500">Base Tinting Pastel White-Reduced</div></td>'
+      + '<td class="px-2 py-1.5">0.9L (900ml)</td>'
+      + '<td class="px-2 py-1.5 text-right"><span class="text-gray-400">₹1250 → </span>₹1290<div class="text-[10px] text-gray-400">→ ₹1674</div></td>'
+      + '<td class="px-2 py-1.5 font-mono">OPUSWGEXTPW9901LONG</td>'
+      + '<td class="px-2 py-1.5">BIRLA OPUS ULTIMATE SHINE PREMIUM EXTERIOR EMULSION 0.9L WEATHERGUARD PASTEL</td>'
+      + '<td class="px-2 py-1.5 text-center"><span class="px-1.5 py-0.5 rounded bg-rose-100 text-rose-700">🆕</span></td>'
+      + '<td class="px-2 py-1.5 text-center"><div class="cat-actions">' + actions + '</div></td>'
+      + '</tr>';
+    document.getElementById('catalogTableBody').innerHTML = Array(6).fill(row).join('');
+  </script>
+</body>
+</html>
