@@ -6,9 +6,14 @@
  * across the entire application.
  */
 
-/* Tailwind JIT compat: CDN added !important; local build does not.
-   This restores the expected behaviour so .hidden always wins. */
-.hidden { display: none !important; }
+/* Tailwind JIT compat: CDN added !important; local build does not, so a plain
+   `.hidden` could lose to component display rules. Force it to win for PLAIN
+   hides — but NOT for elements that also carry a responsive variant
+   (hidden sm:block / hidden md:flex …), or the !important would defeat Tailwind's
+   responsive show utilities and keep them hidden at every breakpoint. */
+.hidden:not([class*="sm:"]):not([class*="md:"]):not([class*="lg:"]):not([class*="xl:"]) {
+    display: none !important;
+}
 
 /* Load Inter font */
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');

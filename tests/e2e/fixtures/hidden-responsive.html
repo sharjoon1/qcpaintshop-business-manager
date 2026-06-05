@@ -1,0 +1,17 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <!-- Real app stylesheets, in the SAME order admin-dpl.html loads them. -->
+  <link rel="stylesheet" href="../../../public/css/tailwind.css">
+  <link rel="stylesheet" href="../../../public/css/design-system.css">
+</head>
+<body>
+  <!-- Responsive toggle: must be display:none below sm, display:block at >=640px.
+       This is the exact pattern admin-dpl.html uses for its desktop table. -->
+  <div id="resp" class="hidden sm:block">responsive content (desktop table)</div>
+
+  <!-- Plain hide: must stay display:none at every width. -->
+  <div id="plain" class="hidden">always hidden</div>
+</body>
+</html>
