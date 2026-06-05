@@ -36,4 +36,29 @@ describe('skuBaseMatch (Birla base-code aware)', () => {
     test('unparseable Zoho SKU (no size code) → null', () => {
         expect(catalog.skuBaseMatch(E('White', '10L', 'WEIRDSKU', 'No size here'))).toBeNull();
     });
+
+    // --- Variant bases that DON'T share the plain-colour code (from real prod data) ---
+    test('Organic Yellow 10L matches NS510 (code 5)', () => {
+        expect(catalog.skuBaseMatch(E('Organic Yellow', '10L', 'NS510', 'NS510 ... BIRLA OPUS 10 L'))).toBe(true);
+    });
+
+    test('Inorganic Yellow 10L matches TLI410 (code 4, NOT 5)', () => {
+        expect(catalog.skuBaseMatch(E('Inorganic Yellow', '10L', 'TLI410', 'TLI410 ... BIRLA OPUS 10 L'))).toBe(true);
+    });
+
+    test('Inorganic Yellow does NOT match the Organic Yellow SKU (4 ≠ 5)', () => {
+        expect(catalog.skuBaseMatch(E('Inorganic Yellow', '10L', 'NS510', 'NS510 ... BIRLA OPUS 10 L'))).toBe(false);
+    });
+
+    test('Organic Red 10L matches NS610 (code 6)', () => {
+        expect(catalog.skuBaseMatch(E('Organic Red', '10L', 'NS610', 'NS610 ... BIRLA OPUS 10 L'))).toBe(true);
+    });
+
+    test('Tintable White 10L matches PF1310 (code 13, NOT WT)', () => {
+        expect(catalog.skuBaseMatch(E('Tintable White', '10L', 'PF1310', 'PF1310 ... BIRLA OPUS 10 L'))).toBe(true);
+    });
+
+    test('plain Mid Tone 10L still matches NS210 (code 2)', () => {
+        expect(catalog.skuBaseMatch(E('Mid Tone', '10L', 'NS210', 'NS210 ... BIRLA OPUS 10 L'))).toBe(true);
+    });
 });
