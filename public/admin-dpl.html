@@ -367,6 +367,7 @@
                     <button onclick="setConfirmedPushSub('pushed')" id="cpsPushed" class="cps px-2 py-1 rounded text-[11px] font-semibold bg-gray-100 text-gray-600">✅ Pushed</button>
                     <button onclick="setConfirmedPushSub('changed')" id="cpsChanged" class="cps px-2 py-1 rounded text-[11px] font-semibold bg-gray-100 text-gray-600">⚠ DPL changed</button>
                     <button onclick="setConfirmedPushSub('unpushed')" id="cpsUnpushed" class="cps px-2 py-1 rounded text-[11px] font-semibold bg-gray-100 text-gray-600">⏳ Not pushed</button>
+                    <button onclick="setConfirmedPushSub('duplicates')" id="cpsDuplicates" class="hidden px-2 py-1 rounded text-[11px] font-semibold bg-rose-100 text-rose-700">⚠ Duplicates <span id="cpsDupCount"></span></button>
                 </div>
                 <div class="overflow-x-auto border rounded-lg hidden sm:block">
                     <table id="dplCatTable" class="w-full text-[11px]">
@@ -777,6 +778,7 @@
         </div>
     </div>
 
+    <script src="/js/dpl-duplicate-detect.js"></script>
     <script>
     // ============ STATE ============
     var parseResult = null;
@@ -1306,6 +1308,7 @@
     var catZohoNameCache = {};
 
     var catPushSelected = {}; // { entryId: true }
+    var catDupInfo = {}; // { entryId: {count, role} } — confirmed entries sharing one Zoho item
     var catalogSearch = '';
     var catalogSearchTimer = null;
     var confirmedPushSub = 'all'; // 'all' | 'pushed' | 'unpushed' — sub-filter shown only under the Confirmed view
@@ -1346,6 +1349,8 @@
                     if (confirmedPushSub === 'unpushed' && e.pushed_at) return false;
                     // 'changed' = already pushed, but the latest DPL/rate differs from what was pushed.
                     if (confirmedPushSub === 'changed' && !(e.pushed_at && e.push_changed)) return false;
+                    // 'duplicates' = this Zoho item is shared by more than one confirmed entry.
+                    if (confirmedPushSub === 'duplicates' && !catDupInfo[e.id]) return false;
                 }
             }
             if (q) {
@@ -1495,6 +1500,7 @@
             var keepSel = {};
             catalogEntries.forEach(function(e){ if (catPushSelected[e.id] && isPushable(e)) keepSel[e.id] = true; });
             catPushSelected = keepSel;
+            catDupInfo = (typeof computeDuplicateInfo === 'function') ? computeDuplicateInfo(catalogEntries) : {};
             document.getElementById('catalogPanel').classList.remove('hidden');
             renderCatalog();
         } catch (err) {
@@ -1550,6 +1556,19 @@
         var showEl = document.getElementById('catShowing');
         if (showEl) showEl.textContent = rows.length + ' of ' + catalogEntries.length;
 
+        // Duplicate-link sub-filter chip: show only when collisions exist; highlight
+        // when active. (Kept out of the .cps blanket reset so we own its styling.)
+        var dupCount = Object.keys(catDupInfo).length;
+        var dupChip = document.getElementById('cpsDuplicates');
+        if (dupChip) {
+            var dupCountEl = document.getElementById('cpsDupCount');
+            if (dupCountEl) dupCountEl.textContent = dupCount ? '(' + dupCount + ')' : '';
+            var dupActive = (catalogFilter === 'confirmed' && confirmedPushSub === 'duplicates');
+            dupChip.className = 'px-2 py-1 rounded text-[11px] font-semibold ' +
+                (dupCount === 0 ? 'hidden ' : '') +
+                (dupActive ? 'bg-rose-600 text-white' : 'bg-rose-100 text-rose-700');
+        }
+
         var pushableTotal = catalogEntries.filter(isPushable).length;
         var hintEl = document.getElementById('catPushableHint');
         if (hintEl) {
@@ -1587,6 +1606,18 @@
                 ? '<span class="px-1.5 py-0.5 rounded bg-amber-100 text-amber-700" title="' + esc(e.link_reason || '') + '">⚠ ' + esc(String(e.link_confidence || '')) + '</span>'
                 : '<span class="px-1.5 py-0.5 rounded bg-rose-100 text-rose-700">🆕</span>';
         }
+        // Collision badge: this Zoho item is confirmed against >1 entry. Shows the
+        // SKU-based verdict (best / different product / ambiguous). Empty otherwise.
+        function dupBadge(e) {
+            var d = catDupInfo[e.id];
+            if (!d) return '';
+            var verdict = d.role === 'best'
+                ? '<span class="px-1.5 py-0.5 rounded bg-green-100 text-green-700" title="this entry\'s code matches the Zoho SKU">✓ best match</span>'
+                : d.role === 'wrong'
+                ? '<span class="px-1.5 py-0.5 rounded bg-rose-100 text-rose-700" title="different product — likely the wrong link">✗ different product</span>'
+                : '<span class="px-1.5 py-0.5 rounded bg-amber-100 text-amber-700" title="cannot tell which entry owns this Zoho item by SKU">⚠ check</span>';
+            return '<div class="mt-0.5 leading-tight"><span class="px-1.5 py-0.5 rounded bg-rose-50 text-rose-600" title="this Zoho item is linked to ' + d.count + ' confirmed entries">⚠ shared ×' + d.count + '</span> ' + verdict + '</div>';
+        }
         function linkedHtml(e) {
             if (!e.zoho_item_id) return '<span class="text-gray-400">— not linked —</span>';
             // Primary = the pending PUSH name (canonical_name, what the user edits & what
@@ -1612,6 +1643,10 @@
                 action += e.not_in_zoho
                     ? '<button onclick="markNotInZoho(' + e.id + ', false)" class="px-2 py-1 rounded border text-gray-500 text-[10px] ml-1">↩ Unmark</button>'
                     : '<button onclick="markNotInZoho(' + e.id + ', true)" class="px-2 py-1 rounded border border-rose-300 text-rose-700 text-[10px] font-bold ml-1">🚫 Not in Zoho</button>';
+            } else if (catDupInfo[e.id] && catDupInfo[e.id].role !== 'best') {
+                // Confirmed but this Zoho item is shared by another entry — let the user
+                // unlink this likely-wrong one straight to Pending (needs creating).
+                action += '<button onclick="markNotInZoho(' + e.id + ', true)" class="px-2 py-1 rounded border border-rose-300 text-rose-700 text-[10px] font-bold ml-1" title="unlink from the shared Zoho item and mark for creation">🚫 Not in Zoho</button>';
             }
             return action;
         }
@@ -1632,7 +1667,7 @@
                     '<td class="px-2 py-1.5 text-right">' + priceCell + '</td>' +
                     '<td class="px-2 py-1.5 font-mono">' + skuCell + '</td>' +
                     '<td class="px-2 py-1.5">' + linkedHtml(e) + '</td>' +
-                    '<td class="px-2 py-1.5 text-center">' + statusBadge(e) + pushedBadge(e) + '</td>' +
+                    '<td class="px-2 py-1.5 text-center">' + statusBadge(e) + pushedBadge(e) + dupBadge(e) + '</td>' +
                     '<td class="px-2 py-1.5 text-center"><div class="cat-actions">' + actionHtml(e) + '</div></td>' +
                     '</tr>';
             }).join('');
@@ -1659,7 +1694,7 @@
                         '<div class="text-[12px] text-gray-700 mt-1">' + price + '</div>' +
                         skuLine +
                         '<div class="text-[11px] text-gray-600 mt-0.5 truncate">' + linkedHtml(e) + '</div>' +
-                        pushedBadge(e) +
+                        pushedBadge(e) + dupBadge(e) +
                         '<div class="mt-2 flex flex-wrap gap-1">' + actionHtml(e) + '</div>' +
                     '</div>' +
                 '</div>';
