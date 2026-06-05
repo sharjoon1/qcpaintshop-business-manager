@@ -75,10 +75,24 @@ const SIZE_CODE = { '1L': '01', '4L': '04', '10L': '10', '20L': '20' };
 // is encoded as WT/WHT in SKUs (e.g. PBSWT04). Numeric/unmapped bases pass through.
 const BASE_WORD_CODE = { white: ['wt', 'wht'] };
 
-// Birla Opus base WORD → SKU base-code candidate(s). Used by skuBaseMatch to decide
-// which of several entries sharing one Zoho item is the real owner.
-//   white=WT  pastel=1  mid=2  clear=99  yellow=5  red=6
+// Birla Opus base NAME → SKU base-code candidate(s). Used by skuBaseMatch to decide
+// which of several entries sharing one Zoho item is the real owner. Codes verified
+// against real prod Zoho SKUs (2026-06-05). birlaBaseCodes() matches the LONGEST key
+// first, so variant bases ("inorganic yellow") win over the plain colour ("yellow").
+//   plain:  white=WT  pastel=1  mid=2  clear=99  (organic) yellow=5  (organic) red=6
+//   variant: inorganic yellow=4  tintable white=13  brilliant/blazzing white=BRW  terracotta=81
 const BASE_NAME_CODE = {
+    // Variants (distinct codes) — must be listed so the plain-colour fallback can't grab them.
+    'inorganic yellow': ['4'],
+    'organic yellow': ['5'],
+    'organic red': ['6'],
+    'tintable white': ['13'],
+    'brilliant white': ['brw'],
+    'white brilliant': ['brw'],
+    'blazzing white': ['brw'],
+    'white blazzing': ['brw'],
+    terracotta: ['81'],
+    // Plain colour words.
     white: ['wt', 'wht'],
     pastel: ['1'],
     mid: ['2'],
