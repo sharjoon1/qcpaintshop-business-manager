@@ -332,7 +332,8 @@ describe('dpl-catalog DB layer', () => {
         let captured;
         catalog.setPool({ query: async (sql, params) => { captured = { sql, params }; return [[{ id: 1 }]]; } });
         const rows = await catalog.getCatalog('birlaopus');
-        expect(rows).toEqual([{ id: 1 }]);
+        // Each row is annotated with sku_base_match (null here — the mock row is unlinked).
+        expect(rows).toEqual([{ id: 1, sku_base_match: null }]);
         expect(/FROM dpl_catalog d/i.test(captured.sql)).toBe(true);
         expect(/LEFT JOIN zoho_items_map z/i.test(captured.sql)).toBe(true);
         expect(/z\.zoho_sku AS zoho_sku/i.test(captured.sql)).toBe(true);

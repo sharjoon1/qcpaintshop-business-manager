@@ -21,11 +21,12 @@
     </table>
   </div>
   <script>
-    // Real collision scenario: the Zoho item TF110 is confirmed against TWO entries.
+    // Real collision: Zoho item TF110 (base code 1 = PASTEL) is confirmed against TWO
+    // entries. sku_base_match is the server verdict: pastel matches TF110, white (WT) does not.
     var entries = [
-      {id:1, link_status:'confirmed', zoho_item_id:'Z_TF110', product_code:'TF110',  zoho_sku:'TF110', product_name:'One True Flex', base_name:'White',  size_tier:'10L', canonical_sku:'TF110',  zoho_name:'TF110 ONE TRUE FLEX BIRLA OPUS 10 L', link_confidence:100},
-      {id:2, link_status:'confirmed', zoho_item_id:'Z_TF110', product_code:'TFP310', zoho_sku:'TF110', product_name:'One True Flex', base_name:'Pastel', size_tier:'10L', canonical_sku:'TF110',  zoho_name:'TF110 ONE TRUE FLEX BIRLA OPUS 10 L', link_confidence:100},
-      {id:3, link_status:'confirmed', zoho_item_id:'Z_TLI',   product_code:'TLI9910',zoho_sku:'TLI9910',product_name:'One True Life', base_name:'Clear',  size_tier:'10L', canonical_sku:'TLI9910',zoho_name:'TLI9910 ONE TRUE LIFE BIRLA OPUS 10 L', link_confidence:100}
+      {id:1, link_status:'confirmed', zoho_item_id:'Z_TF110', sku_base_match:false, product_name:'One True Flex', base_name:'White',  size_tier:'10L', canonical_sku:'TF110',  zoho_name:'TF110 ONE TRUE FLEX BIRLA OPUS 10 L', link_confidence:100},
+      {id:2, link_status:'confirmed', zoho_item_id:'Z_TF110', sku_base_match:true,  product_name:'One True Flex', base_name:'Pastel', size_tier:'10L', canonical_sku:'TF110',  zoho_name:'TF110 ONE TRUE FLEX BIRLA OPUS 10 L', link_confidence:100},
+      {id:3, link_status:'confirmed', zoho_item_id:'Z_TLI',   sku_base_match:true,  product_name:'One True Life', base_name:'Clear',  size_tier:'10L', canonical_sku:'TLI9910',zoho_name:'TLI9910 ONE TRUE LIFE BIRLA OPUS 10 L', link_confidence:100}
     ];
     var catDupInfo = computeDuplicateInfo(entries);
     function esc(s){return String(s==null?'':s);}
