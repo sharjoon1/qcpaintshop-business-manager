@@ -75,6 +75,18 @@ const SIZE_CODE = { '1L': '01', '4L': '04', '10L': '10', '20L': '20' };
 // is encoded as WT/WHT in SKUs (e.g. PBSWT04). Numeric/unmapped bases pass through.
 const BASE_WORD_CODE = { white: ['wt', 'wht'] };
 
+// Birla Opus base WORD → SKU base-code candidate(s). Used by skuBaseMatch to decide
+// which of several entries sharing one Zoho item is the real owner.
+//   white=WT  pastel=1  mid=2  clear=99  yellow=5  red=6
+const BASE_NAME_CODE = {
+    white: ['wt', 'wht'],
+    pastel: ['1'],
+    mid: ['2'],
+    clear: ['99'],
+    yellow: ['5'],
+    red: ['6'],
+};
+
 // DPL productCode → exact Zoho SKU, for product families the name/SKU-stem linkers
 // can't match (Birla water colorants: Zoho names lack the colour word and the DPL
 // base abbreviations don't map to the Zoho suffix). Verified against prod. Solvent
@@ -108,6 +120,40 @@ function zohoSkuStem(zi) {
     const sc = SIZE_CODE[tier];
     if (!sc || !sku.endsWith(sc)) return null;
     return { stem: sku.slice(0, -sc.length), tier };
+}
+
+// Map a base NAME ("White", "Pastel Base") to its candidate SKU base-codes.
+function birlaBaseCodes(baseName) {
+    const b = String(baseName == null ? '' : baseName).toLowerCase();
+    if (!b) return null;
+    // Longest key first so a compound base name still resolves to the right word.
+    const keys = Object.keys(BASE_NAME_CODE).sort((a, c) => c.length - a.length);
+    for (const k of keys) { if (b.indexOf(k) !== -1) return BASE_NAME_CODE[k]; }
+    return null;
+}
+
+// A base code must sit at the END of the stem, immediately after the (alphabetic)
+// product prefix — so a numeric code like '1' doesn't spuriously match the tail of
+// a longer number.
+function stemEndsWithCode(stem, code) {
+    const c = String(code).toLowerCase();
+    if (!c || !stem.endsWith(c)) return false;
+    const i = stem.length - c.length;
+    return i === 0 || /[a-z]/.test(stem[i - 1]);
+}
+
+// Does a linked entry's base + size match the SKU of the Zoho item it points to?
+// true / false, or null when undeterminable (unknown base, or the Zoho SKU is not a
+// cleanly structured Birla SKU). The duplicate-link UI uses this to pick which entry
+// among several sharing one Zoho item is the real owner (e.g. TF110 = pastel, not white).
+function skuBaseMatch(entry) {
+    const e = entry || {};
+    const codes = birlaBaseCodes(e.base_name);
+    if (!codes) return null;
+    const info = zohoSkuStem({ sku: e.zoho_sku, name: e.zoho_name });
+    if (!info) return null;
+    if (e.size_tier && info.tier !== e.size_tier) return false;
+    return codes.some(c => stemEndsWithCode(info.stem, c));
 }
 
 // Tokenize a string into lowercase alphanumeric word tokens (for the name fallback).
@@ -376,6 +422,12 @@ async function getCatalog(brand) {
           ORDER BY d.category, d.product_name, d.base_name, d.size_tier`,
         [brand]
     );
+    // Per-entry: does this linked entry's base+size match its Zoho item's SKU?
+    // Drives the duplicate-link "best match" verdict in the UI. Birla-only for now.
+    const isBirla = /birla/i.test(String(brand || ''));
+    for (const r of rows) {
+        r.sku_base_match = (isBirla && r.zoho_item_id) ? skuBaseMatch(r) : null;
+    }
     return rows;
 }
 
@@ -500,7 +552,7 @@ async function updateAppliedPrices(rows, updatedBy) {
 
 module.exports = {
     setPool, slug, normalizeSizeTier, extractSizeFromZohoName, buildMatchKey,
-    dplBaseStems, zohoSkuStem, linkEntryToZoho, buildCatalogFromDpl, applyDplPrices,
+    dplBaseStems, zohoSkuStem, skuBaseMatch, linkEntryToZoho, buildCatalogFromDpl, applyDplPrices,
     buildPushChanges, upsertEntries, deleteOrphans, unlinkMarked, getCatalog, reconcileCanonical, confirmLink,
     updateAppliedPrices, updateCanonicalFields, markPushed, setNotInZoho,
 };

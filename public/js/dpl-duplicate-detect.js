@@ -14,16 +14,6 @@
  * Non-collision entries are absent from the result.
  */
 (function (global) {
-    function norm(s) { return String(s == null ? '' : s).toUpperCase().trim(); }
-
-    // Does this entry's DPL product code correspond to the linked Zoho SKU?
-    function skuMatches(productCode, zohoSku) {
-        var pc = norm(productCode);
-        var sku = norm(zohoSku);
-        if (!pc || !sku) return false;
-        return pc === sku || (pc.length >= 3 && sku.indexOf(pc) === 0);
-    }
-
     function computeDuplicateInfo(entries) {
         var groups = {}; // zoho_item_id -> [entry]
         (entries || []).forEach(function (e) {
@@ -37,7 +27,10 @@
             var group = groups[key];
             if (group.length < 2) return; // not a collision
 
-            var matches = group.filter(function (e) { return skuMatches(e.product_code, e.zoho_sku); });
+            // Best = the single entry whose base+size matches the Zoho item's SKU.
+            // sku_base_match is computed on the server (Birla base-code aware:
+            // white=WT, pastel=1, mid=2, clear=99, yellow=5, red=6).
+            var matches = group.filter(function (e) { return e.sku_base_match === true; });
             var best = matches.length === 1 ? matches[0] : null;
 
             group.forEach(function (e) {

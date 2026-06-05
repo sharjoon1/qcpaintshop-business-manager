@@ -96,6 +96,19 @@ build/load → getCatalog (now with zoho_sku/zoho_name) → `catalogEntries` →
   marks White 10L as ✓ and Pastel 10L as ✗, and the quick "Not in Zoho" button
   moves Pastel to Pending.
 
+## Correction (2026-06-05, post-review)
+
+The first cut compared a DPL `product_code` prefix to `zoho_sku` — wrong for Birla,
+which encodes the BASE in the SKU: **white=WT, pastel=1, mid=2, clear=99, yellow=5,
+red=6**. So `TF110` = `TF`+`1`+`10` = **Pastel** 10L, NOT White. Best-match now uses
+the server-computed `skuBaseMatch(entry)` (`services/dpl-catalog.js`): map the
+entry's base NAME → base code(s), take the Zoho SKU stem via the existing
+`zohoSkuStem` (size code stripped), and check the stem ends with the base code right
+after the alphabetic product prefix. `getCatalog` annotates each linked Birla entry
+with `sku_base_match` (true/false/null); the client picks best = the single group
+member with `sku_base_match === true` (else ambiguous). Reuses the proven linker
+helpers instead of re-deriving SKU structure on the client.
+
 ## Out of scope
 - Preventing duplicate confirmation at link time.
 - Auto-resolving collisions without user action.
