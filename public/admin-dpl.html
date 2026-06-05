@@ -88,16 +88,21 @@
         /* DPL catalog table: fit within the screen — fixed layout so wide
            columns wrap/truncate instead of forcing a horizontal scrollbar. */
         #dplCatTable { table-layout: fixed; }
-        #dplCatTable th, #dplCatTable td { overflow-wrap: anywhere; word-break: break-word; }
-        #dplCatTable .col-chk    { width: 30px; }
-        #dplCatTable .col-size   { width: 58px; }
-        #dplCatTable .col-dpl    { width: 80px; }
-        #dplCatTable .col-sku    { width: 94px; }
-        #dplCatTable .col-status { width: 66px; }
-        #dplCatTable .col-act    { width: 124px; }
+        #dplCatTable th, #dplCatTable td { overflow-wrap: anywhere; word-break: break-word; vertical-align: top; }
+        /* Compact rows: tighter padding so a row isn't dominated by the tallest cell. */
+        #dplCatTable td { padding: 5px 8px !important; }
+        #dplCatTable .col-chk    { width: 28px; }
+        #dplCatTable .col-size   { width: 46px; }
+        #dplCatTable .col-dpl    { width: 96px; }
+        #dplCatTable .col-sku    { width: 86px; }
+        #dplCatTable .col-status { width: 138px; }
+        #dplCatTable .col-act    { width: 120px; }
         /* Product/Base and Linked-Zoho columns share the remaining width. */
         #dplCatTable .cat-actions { display: flex; flex-wrap: wrap; gap: 4px; justify-content: center; }
         #dplCatTable .cat-actions > button { margin: 0 !important; }
+        /* Status cell: small chips flowing horizontally, not a tall stack of text. */
+        #dplCatTable .cat-status { display: flex; flex-wrap: wrap; gap: 3px; align-items: center; justify-content: center; line-height: 1.3; }
+        #dplCatTable .cat-status > span { white-space: nowrap; }
     </style>
 </head>
 <body data-page="zoho-dpl" class="bg-gray-50">
@@ -1618,6 +1623,25 @@
                 : '<span class="px-1.5 py-0.5 rounded bg-amber-100 text-amber-700" title="cannot tell which entry owns this Zoho item by SKU">⚠ check</span>';
             return '<div class="mt-0.5 leading-tight"><span class="px-1.5 py-0.5 rounded bg-rose-50 text-rose-600" title="this Zoho item is linked to ' + d.count + ' confirmed entries">⚠ shared ×' + d.count + '</span> ' + verdict + '</div>';
         }
+        // Compact single-chip versions for the DESKTOP TABLE status cell — full detail
+        // sits in the tooltip so a row stays short. (Cards keep the verbose badges.)
+        function pushedChip(e) {
+            if (!e.pushed_at) return '';
+            var detail = 'Pushed ' + fmtPushed(e.pushed_at) + (e.pushed_job_id ? ' · job #' + e.pushed_job_id : '');
+            return e.push_changed
+                ? '<span class="px-1.5 py-0.5 rounded bg-amber-100 text-amber-700" title="' + esc(detail + ' · ₹' + e.pushed_dpl + '→₹' + e.current_dpl + ' — DPL changed, re-push') + '">⚠ re-push</span>'
+                : '<span class="px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-700" title="' + esc(detail + ' · no change') + '">✅ pushed</span>';
+        }
+        function dupChip(e) {
+            var d = catDupInfo[e.id];
+            if (!d) return '';
+            var v = d.role === 'best'
+                ? '<span class="px-1.5 py-0.5 rounded bg-green-100 text-green-700" title="base/SKU matches this Zoho item">✓ best</span>'
+                : d.role === 'wrong'
+                ? '<span class="px-1.5 py-0.5 rounded bg-rose-100 text-rose-700" title="different product — likely the wrong link">✗ wrong</span>'
+                : '<span class="px-1.5 py-0.5 rounded bg-amber-100 text-amber-700" title="cannot tell which entry owns this Zoho item by SKU">⚠ ?</span>';
+            return '<span class="px-1.5 py-0.5 rounded bg-rose-50 text-rose-600" title="this Zoho item is shared by ' + d.count + ' confirmed entries">⚠ ×' + d.count + '</span>' + v;
+        }
         function linkedHtml(e) {
             if (!e.zoho_item_id) return '<span class="text-gray-400">— not linked —</span>';
             // Primary = the pending PUSH name (canonical_name, what the user edits & what
@@ -1667,7 +1691,7 @@
                     '<td class="px-2 py-1.5 text-right">' + priceCell + '</td>' +
                     '<td class="px-2 py-1.5 font-mono">' + skuCell + '</td>' +
                     '<td class="px-2 py-1.5">' + linkedHtml(e) + '</td>' +
-                    '<td class="px-2 py-1.5 text-center">' + statusBadge(e) + pushedBadge(e) + dupBadge(e) + '</td>' +
+                    '<td class="text-center"><div class="cat-status">' + statusBadge(e) + pushedChip(e) + dupChip(e) + '</div></td>' +
                     '<td class="px-2 py-1.5 text-center"><div class="cat-actions">' + actionHtml(e) + '</div></td>' +
                     '</tr>';
             }).join('');
