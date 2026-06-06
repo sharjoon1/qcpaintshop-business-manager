@@ -588,6 +588,19 @@ function buildZohoFirstView(zohoItems, catalogEntries) {
         linkMap.get(k).push(e);
     }
 
+    // Unlinked entries = attach-picker candidates + reverse-match pool (carry size_tier).
+    const unlinkedEntries = (catalogEntries || [])
+        .filter(e => e.zoho_item_id == null)
+        .map(e => ({
+            entry_id: e.id,
+            product_name: e.product_name || '',
+            base_name: e.base_name || '',
+            size_tier: e.size_tier || '',
+            dpl_size_label: e.dpl_size_label || '',
+            current_dpl: num(e.current_dpl),
+            canonical_sku: e.canonical_sku || '',
+        }));
+
     const rows = (zohoItems || []).map(zi => {
         const linked = linkMap.get(String(zi.zoho_item_id)) || [];
         const old_dpl = num(zi.zoho_cf_dpl);
@@ -610,6 +623,10 @@ function buildZohoFirstView(zohoItems, catalogEntries) {
             shared_count = linked.length;
         }
 
+        const proposal = status === 'unmatched'
+            ? proposeDplForZoho({ zoho_item_id: zi.zoho_item_id, zoho_item_name: zi.zoho_item_name, zoho_sku: zi.zoho_sku }, unlinkedEntries)
+            : null;
+
         return {
             zoho_item_id: zi.zoho_item_id,
             zoho_name: zi.zoho_item_name || '',
@@ -617,7 +634,7 @@ function buildZohoFirstView(zohoItems, catalogEntries) {
             category: zi.zoho_category_name || '',
             old_dpl, old_rate,
             entry_id, new_dpl, new_rate, diff,
-            status, changed, shared_count,
+            status, changed, shared_count, proposal,
         };
     });
 
@@ -633,17 +650,6 @@ function buildZohoFirstView(zohoItems, catalogEntries) {
         if (d !== 0) return d;
         return String(a.zoho_name).localeCompare(String(b.zoho_name), 'en', { numeric: true });
     });
-
-    const unlinkedEntries = (catalogEntries || [])
-        .filter(e => e.zoho_item_id == null)
-        .map(e => ({
-            entry_id: e.id,
-            product_name: e.product_name || '',
-            base_name: e.base_name || '',
-            dpl_size_label: e.dpl_size_label || '',
-            current_dpl: num(e.current_dpl),
-            canonical_sku: e.canonical_sku || '',
-        }));
 
     return { rows, unlinkedEntries };
 }

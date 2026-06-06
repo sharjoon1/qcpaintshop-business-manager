@@ -18,7 +18,7 @@ const catalogEntries = [
     { id: 14, zoho_item_id: 'Z4', current_dpl: '8000', current_rate: '10380', product_name: 'C', base_name: 'White', dpl_size_label: '18L', canonical_sku: 'XYZ20' },
     { id: 15, zoho_item_id: 'Z4', current_dpl: '8100', current_rate: '10510', product_name: 'C', base_name: 'Pastel', dpl_size_label: '18L', canonical_sku: 'XYZ20B' },
     // unlinked (attach candidate): no zoho_item_id
-    { id: 99, zoho_item_id: null, current_dpl: '700', current_rate: '910', product_name: 'A', base_name: 'White', dpl_size_label: '0.9L', canonical_sku: 'WPRC1' },
+    { id: 99, zoho_item_id: null, current_dpl: '700', current_rate: '910', product_name: 'A', base_name: 'White', size_tier: '1L', dpl_size_label: '0.9L', canonical_sku: 'WPRC1' },
 ];
 
 describe('buildZohoFirstView', () => {
@@ -96,6 +96,31 @@ describe('buildZohoFirstView', () => {
         const out = buildZohoFirstView([], []);
         expect(out.rows).toEqual([]);
         expect(out.unlinkedEntries).toEqual([]);
+    });
+
+    test('unmatched rows carry a proposal field; matched/shared carry null', () => {
+        const { rows } = buildZohoFirstView(zohoItems, catalogEntries);
+        const z1 = rows.find(r => r.zoho_item_id === 'Z1'); // matched
+        const z2 = rows.find(r => r.zoho_item_id === 'Z2'); // unmatched
+        const z4 = rows.find(r => r.zoho_item_id === 'Z4'); // shared
+        expect(z1.proposal).toBeNull();
+        expect(z4.proposal).toBeNull();
+        expect(z2).toHaveProperty('proposal'); // present (value may be a proposal or null)
+    });
+
+    test('unlinkedEntries now include size_tier', () => {
+        const { unlinkedEntries } = buildZohoFirstView(zohoItems, catalogEntries);
+        expect(unlinkedEntries[0]).toHaveProperty('size_tier');
+    });
+
+    test('an unmatched Zoho item whose SKU exactly matches an unlinked entry gets that proposal', () => {
+        const zItems = [{ zoho_item_id: 'ZX', zoho_item_name: 'BIRLA OPUS X 1L', zoho_sku: 'WPRC1', zoho_cf_dpl: '600', zoho_rate: '780' }];
+        const entries = [{ id: 99, zoho_item_id: null, current_dpl: '700', current_rate: '910', product_name: 'X', base_name: 'White', size_tier: '1L', dpl_size_label: '0.9L', canonical_sku: 'WPRC1' }];
+        const { rows } = buildZohoFirstView(zItems, entries);
+        expect(rows[0].status).toBe('unmatched');
+        expect(rows[0].proposal).not.toBeNull();
+        expect(rows[0].proposal.entry_id).toBe(99);
+        expect(rows[0].proposal.reason).toBe('exact-sku');
     });
 });
 
