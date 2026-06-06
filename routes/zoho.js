@@ -446,6 +446,85 @@ router.post('/items/dpl-catalog/:brand/push', requirePermission('zoho', 'manage'
     }
 });
 
+// Edit a single Zoho item's details LOCALLY (zoho_items_map only — no Zoho write).
+// Body: { name?, sku?, description?, dpl? }. When dpl is given, the selling rate is
+// recomputed server-side. Pushing to Zoho is a separate step (see /push below).
+router.put('/items/zoho-item/:id', requirePermission('zoho', 'manage'), async (req, res) => {
+    try {
+        const id = String(req.params.id || '');
+        if (!id) return res.status(400).json({ success: false, message: 'Invalid item id' });
+
+        const body = req.body || {};
+        const sets = [];
+        const vals = [];
+        if (body.name !== undefined)        { sets.push('zoho_item_name = ?'); vals.push(String(body.name).trim()); }
+        if (body.sku !== undefined)         { sets.push('zoho_sku = ?');       vals.push(String(body.sku).trim()); }
+        if (body.description !== undefined) { sets.push('zoho_description = ?'); vals.push(String(body.description).trim()); }
+
+        let rate = null;
+        if (body.dpl !== undefined) {
+            const dpl = parseFloat(body.dpl);
+            if (!Number.isFinite(dpl) || dpl < 0 || dpl > 100000) {
+                return res.status(400).json({ success: false, message: 'dpl must be a number between 0 and 100000' });
+            }
+            rate = dplCatalogService.computeZohoRate(dpl);
+            sets.push('zoho_cf_dpl = ?'); vals.push(dpl);
+            sets.push('zoho_rate = ?');   vals.push(rate);
+        }
+
+        if (!sets.length) return res.status(400).json({ success: false, message: 'No editable fields provided' });
+
+        // Confirm the item exists first — a no-op UPDATE returns affectedRows 0 even
+        // for an existing row under mysql2's default flags, so we can't rely on it for 404.
+        const [exist] = await pool.query('SELECT zoho_item_id FROM zoho_items_map WHERE zoho_item_id = ?', [id]);
+        if (!exist.length) return res.status(404).json({ success: false, message: 'Item not found' });
+
+        vals.push(id);
+        await pool.query(`UPDATE zoho_items_map SET ${sets.join(', ')} WHERE zoho_item_id = ?`, vals);
+        res.json({ success: true, rate });
+    } catch (err) {
+        console.error('Zoho-item edit error:', err.message);
+        res.status(500).json({ success: false, message: err.message });
+    }
+});
+
+// Push ONE Zoho item's current (locally-edited) name/SKU/description/DPL/rate to the
+// live Zoho item, via the same bulk-edit job path the catalog push uses (which also
+// guards SKU conflicts and mirrors confirmed values back to zoho_items_map).
+router.post('/items/zoho-item/:id/push', requirePermission('zoho', 'manage'), async (req, res) => {
+    try {
+        const id = String(req.params.id || '');
+        if (!id) return res.status(400).json({ success: false, message: 'Invalid item id' });
+
+        const [rows] = await pool.query(
+            `SELECT zoho_item_id, zoho_item_name, zoho_sku, zoho_description, zoho_cf_dpl, zoho_rate
+               FROM zoho_items_map WHERE zoho_item_id = ?`, [id]
+        );
+        if (!rows.length) return res.status(404).json({ success: false, message: 'Item not found' });
+
+        const z = rows[0];
+        const dpl = z.zoho_cf_dpl != null ? parseFloat(z.zoho_cf_dpl) : null;
+        if (!(dpl > 0)) return res.status(400).json({ success: false, message: 'Set a DPL before pushing' });
+        const rate = z.zoho_rate != null ? parseFloat(z.zoho_rate) : dplCatalogService.computeZohoRate(dpl);
+
+        const changes = { cf_dpl: dpl, purchase_rate: dpl, rate };
+        if (z.zoho_item_name)        changes.name = String(z.zoho_item_name).trim();
+        if (z.zoho_sku)              changes.sku = String(z.zoho_sku).trim();
+        if (z.zoho_description != null) changes.description = String(z.zoho_description).trim();
+
+        const result = await createBulkEditJob(
+            [{ zoho_item_id: id, item_name: z.zoho_item_name || '', changes }],
+            req.user
+        );
+        res.json({ success: true, job_id: result.job_id });
+    } catch (err) {
+        // createBulkEditJob throws with an httpStatus on validation / SKU conflict.
+        const status = err.httpStatus || 500;
+        console.error('Zoho-item push error:', err.message);
+        res.status(status).json({ success: false, message: err.message });
+    }
+});
+
 // Module-scoped flag to prevent concurrent invoice-line back-fills
 let invoiceBackfillState = { running: false, startedAt: null };
 
