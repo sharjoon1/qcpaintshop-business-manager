@@ -1692,11 +1692,14 @@
         btn.disabled = true;
         try {
             var dplVal = document.getElementById('zfEditDpl').value;
+            var descVal = document.getElementById('zfEditDesc').value;
             var payload = {
                 name: document.getElementById('zfEditName').value,
-                sku: document.getElementById('zfEditSku').value,
-                description: document.getElementById('zfEditDesc').value
+                sku: document.getElementById('zfEditSku').value
             };
+            // The sheet can't show the item's existing description (not on the row),
+            // so a blank box means "leave it unchanged" — only send it when typed.
+            if (descVal.trim() !== '') payload.description = descVal;
             if (dplVal !== '') payload.dpl = parseFloat(dplVal);
             var resp = await fetch('/api/zoho/items/zoho-item/' + encodeURIComponent(zfEditItemId), {
                 method: 'PUT',
@@ -1715,7 +1718,10 @@
         }
     }
 
+    var zfPushInFlight = {};
     async function pushZfItem(zohoItemId) {
+        if (zfPushInFlight[zohoItemId]) return;
+        zfPushInFlight[zohoItemId] = true;
         try {
             var resp = await fetch('/api/zoho/items/zoho-item/' + encodeURIComponent(zohoItemId) + '/push', {
                 method: 'POST',
@@ -1727,6 +1733,8 @@
             await loadZohoFirst();
         } catch (err) {
             showToast('Push error: ' + err.message, 'error');
+        } finally {
+            delete zfPushInFlight[zohoItemId];
         }
     }
 
