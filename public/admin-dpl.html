@@ -416,7 +416,14 @@
                         <input type="text" id="zfSearch" oninput="renderZohoFirst()" aria-label="Search Zoho items" placeholder="🔍 Search Zoho item / SKU…" class="flex-1 min-w-[180px] px-3 py-1.5 border rounded text-[11px] outline-none focus:border-indigo-500">
                         <span class="text-[11px] text-gray-500 whitespace-nowrap">Showing <b id="zfShowing">0 of 0</b></span>
                     </div>
-                    <div class="overflow-x-auto border rounded-lg">
+                    <div class="flex flex-wrap gap-1 mb-2">
+                        <button onclick="setZohoFilter('all')"       id="zffAll"       class="zf-filter px-2 py-1 rounded text-[11px] font-semibold bg-indigo-600 text-white">All</button>
+                        <button onclick="setZohoFilter('unmatched')" id="zffUnmatched" class="zf-filter px-2 py-1 rounded text-[11px] font-semibold bg-gray-100 text-gray-600">⚠ No match</button>
+                        <button onclick="setZohoFilter('changed')"   id="zffChanged"   class="zf-filter px-2 py-1 rounded text-[11px] font-semibold bg-gray-100 text-gray-600">↕ Changed</button>
+                        <button onclick="setZohoFilter('shared')"    id="zffShared"    class="zf-filter px-2 py-1 rounded text-[11px] font-semibold bg-gray-100 text-gray-600">⚠ Shared</button>
+                        <button onclick="setZohoFilter('unchanged')" id="zffUnchanged" class="zf-filter px-2 py-1 rounded text-[11px] font-semibold bg-gray-100 text-gray-600">✓ Unchanged</button>
+                    </div>
+                    <div class="overflow-x-auto border rounded-lg hidden sm:block">
                         <table class="w-full text-[11px]">
                             <thead class="bg-gray-50 text-gray-500">
                                 <tr>
@@ -432,6 +439,7 @@
                             <tbody id="zohoFirstTableBody"></tbody>
                         </table>
                     </div>
+                    <div id="zohoFirstCards" class="sm:hidden space-y-2"></div>
                     <div id="zohoFirstEmpty" class="hidden text-center text-gray-400 text-xs py-8">No Zoho items for this brand.</div>
                 </div>
 
@@ -1364,6 +1372,7 @@
     // Zoho-first reconciliation view state
     var catalogViewMode = 'dpl';        // 'dpl' | 'zoho'
     var zfRows = [];                    // rows from GET .../by-zoho
+    var zfFilter = 'all';              // 'all' | 'unmatched' | 'changed' | 'shared' | 'unchanged'
     var zfUnlinked = [];               // attach-picker candidates
     var zfAttachItemId = null;         // Zoho item id currently being attached
 
@@ -1583,12 +1592,43 @@
 
     function zfStatusChip(r) {
         if (r.status === 'unmatched')
-            return '<button onclick="openAttachPicker(\'' + esc(r.zoho_item_id) + '\')" class="px-2 py-0.5 rounded text-[10px] font-bold bg-rose-100 text-rose-700 hover:bg-rose-200">⚠ Attach DPL</button>';
+            return '<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-rose-100 text-rose-700">⚠ no match</span>';
         if (r.status === 'shared')
             return '<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-amber-100 text-amber-700">⚠ shared ×' + r.shared_count + '</span>';
         if (r.changed)
             return '<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-indigo-100 text-indigo-700">↕ changed</span>';
         return '<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-green-100 text-green-700">✓ ok</span>';
+    }
+
+    // Action area for an unmatched row: auto-proposal (if any) + Accept + Attach DPL.
+    function zfProposalHtml(r) {
+        if (r.status !== 'unmatched') return '';
+        var idAttr = esc(r.zoho_item_id);
+        var attachBtn = '<button onclick="openAttachPicker(\'' + idAttr + '\')" class="px-2 py-0.5 rounded text-[10px] font-bold bg-rose-100 text-rose-700 hover:bg-rose-200">Attach DPL</button>';
+        if (r.proposal) {
+            var p = r.proposal;
+            var confCls = p.confidence === 'high' ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700';
+            var acceptBtn = '<button onclick="acceptProposal(\'' + idAttr + '\',' + Number(p.entry_id) + ')" class="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-600 text-white hover:bg-emerald-700">✓ Accept</button>';
+            return '<div class="mt-1 text-[10px] text-gray-600">Proposed: <b>' + esc(p.product_name) + '</b> · ' + esc(p.base_name || '—') + ' · ' + esc(p.dpl_size_label) + ' · ' + fmtMoney(p.current_dpl) +
+                ' <span class="px-1 rounded ' + confCls + '">' + esc(p.confidence) + '</span></div>' +
+                '<div class="mt-1 flex flex-wrap gap-1">' + acceptBtn + attachBtn + '</div>';
+        }
+        return '<div class="mt-1">' + attachBtn + '</div>';
+    }
+
+    // One mobile card per row (mirrors the DPL-first card style).
+    function zfCardHtml(r) {
+        var price = fmtMoney(r.old_dpl) + ' <span class="text-gray-400">→</span> ' + fmtMoney(r.new_dpl) +
+                    ' <span class="text-gray-400">→ ' + fmtMoney(r.new_rate) + '</span>';
+        return '<div class="border rounded-lg p-3 bg-white">' +
+            '<div class="flex items-start justify-between gap-2">' +
+                '<div class="min-w-0"><div class="font-semibold text-gray-800 truncate">' + esc(r.zoho_name) + '</div>' +
+                '<div class="text-[10px] font-mono text-gray-400">' + esc(r.zoho_sku) + '</div></div>' +
+                zfStatusChip(r) +
+            '</div>' +
+            '<div class="text-[12px] text-gray-700 mt-1">' + price + ' &nbsp; ' + zfDiffCell(r) + '</div>' +
+            zfProposalHtml(r) +
+        '</div>';
     }
 
     function zfDiffCell(r) {
@@ -1600,13 +1640,32 @@
         return '<span class="' + cls + ' font-semibold">' + (up ? '+' : '') + fmtMoney(r.diff) + ' ' + arrow + '</span>';
     }
 
-    function renderZohoFirst() {
+    function visibleZohoFirstRows() {
         var q = (document.getElementById('zfSearch').value || '').toLowerCase().trim();
-        var visible = zfRows.filter(function(r) {
-            if (!q) return true;
-            return (r.zoho_name || '').toLowerCase().indexOf(q) !== -1 ||
-                   (r.zoho_sku  || '').toLowerCase().indexOf(q) !== -1;
+        return zfRows.filter(function(r) {
+            if (zfFilter === 'unmatched' && r.status !== 'unmatched') return false;
+            if (zfFilter === 'changed'   && !r.changed) return false;
+            if (zfFilter === 'shared'    && r.status !== 'shared') return false;
+            if (zfFilter === 'unchanged' && !(r.status === 'matched' && !r.changed)) return false;
+            if (q) {
+                return (r.zoho_name || '').toLowerCase().indexOf(q) !== -1 ||
+                       (r.zoho_sku  || '').toLowerCase().indexOf(q) !== -1;
+            }
+            return true;
         });
+    }
+
+    function setZohoFilter(f) {
+        zfFilter = f;
+        var ids = { all: 'zffAll', unmatched: 'zffUnmatched', changed: 'zffChanged', shared: 'zffShared', unchanged: 'zffUnchanged' };
+        document.querySelectorAll('.zf-filter').forEach(function(b){ b.className = 'zf-filter px-2 py-1 rounded text-[11px] font-semibold bg-gray-100 text-gray-600'; });
+        var active = document.getElementById(ids[f]);
+        if (active) active.className = 'zf-filter px-2 py-1 rounded text-[11px] font-semibold bg-indigo-600 text-white';
+        renderZohoFirst();
+    }
+
+    function renderZohoFirst() {
+        var visible = visibleZohoFirstRows();
 
         var unmatched = zfRows.filter(function(r){ return r.status === 'unmatched'; }).length;
         var changed   = zfRows.filter(function(r){ return r.changed; });
@@ -1618,23 +1677,22 @@
         document.getElementById('zfPushCount').textContent = changed.length;
         document.getElementById('zfPushBtn').disabled = changed.length === 0;
 
-        var tbody = document.getElementById('zohoFirstTableBody');
-        tbody.innerHTML = visible.map(function(r) {
-            return '<tr class="border-t hover:bg-gray-50">' +
+        document.getElementById('zohoFirstTableBody').innerHTML = visible.map(function(r) {
+            return '<tr class="border-t hover:bg-gray-50 align-top">' +
                 '<td class="px-2 py-1.5 text-left">' + esc(r.zoho_name) + '</td>' +
                 '<td class="px-2 py-1.5 text-left text-gray-500">' + esc(r.zoho_sku) + '</td>' +
                 '<td class="px-2 py-1.5 text-right">' + fmtMoney(r.old_dpl) + '</td>' +
                 '<td class="px-2 py-1.5 text-right">' + fmtMoney(r.new_dpl) + '</td>' +
                 '<td class="px-2 py-1.5 text-right">' + fmtMoney(r.new_rate) + '</td>' +
                 '<td class="px-2 py-1.5 text-right">' + zfDiffCell(r) + '</td>' +
-                '<td class="px-2 py-1.5 text-center">' + zfStatusChip(r) + '</td>' +
+                '<td class="px-2 py-1.5 text-center">' + zfStatusChip(r) + zfProposalHtml(r) + '</td>' +
                 '</tr>';
         }).join('');
 
+        document.getElementById('zohoFirstCards').innerHTML = visible.map(zfCardHtml).join('');
+
         var emptyEl = document.getElementById('zohoFirstEmpty');
-        emptyEl.textContent = zfRows.length === 0
-            ? 'No Zoho items for this brand.'
-            : 'No Zoho items match your search.';
+        emptyEl.textContent = zfRows.length === 0 ? 'No Zoho items for this brand.' : 'No Zoho items match.';
         emptyEl.classList.toggle('hidden', visible.length !== 0);
     }
 
@@ -1673,6 +1731,22 @@
                 '<div class="text-[10px] text-gray-500">' + esc(e.dpl_size_label) + ' · SKU ' + esc(e.canonical_sku || '—') + ' · DPL ' + fmtMoney(e.current_dpl) + '</div>' +
                 '</button>';
         }).join('');
+    }
+
+    async function acceptProposal(zohoItemId, entryId) {
+        try {
+            var resp = await fetch('/api/zoho/items/dpl-catalog/entry/' + entryId + '/confirm-link', {
+                method: 'POST',
+                headers: { 'Authorization': 'Bearer ' + getToken(), 'Content-Type': 'application/json' },
+                body: JSON.stringify({ zoho_item_id: zohoItemId })
+            });
+            var body = await resp.json();
+            if (!resp.ok || !body.success) throw new Error(body.message || ('Server error ' + resp.status));
+            showToast('Linked proposed DPL', 'success');
+            await loadZohoFirst();
+        } catch (err) {
+            showToast('Accept error: ' + err.message, 'error');
+        }
     }
 
     async function attachDpl(entryId) {
