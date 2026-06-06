@@ -588,6 +588,19 @@ function buildZohoFirstView(zohoItems, catalogEntries) {
         linkMap.get(k).push(e);
     }
 
+    // Unlinked entries = attach-picker candidates + reverse-match pool (carry size_tier).
+    const unlinkedEntries = (catalogEntries || [])
+        .filter(e => e.zoho_item_id == null)
+        .map(e => ({
+            entry_id: e.id,
+            product_name: e.product_name || '',
+            base_name: e.base_name || '',
+            size_tier: e.size_tier || '',
+            dpl_size_label: e.dpl_size_label || '',
+            current_dpl: num(e.current_dpl),
+            canonical_sku: e.canonical_sku || '',
+        }));
+
     const rows = (zohoItems || []).map(zi => {
         const linked = linkMap.get(String(zi.zoho_item_id)) || [];
         const old_dpl = num(zi.zoho_cf_dpl);
@@ -610,6 +623,10 @@ function buildZohoFirstView(zohoItems, catalogEntries) {
             shared_count = linked.length;
         }
 
+        const proposal = status === 'unmatched'
+            ? proposeDplForZoho({ zoho_item_id: zi.zoho_item_id, zoho_item_name: zi.zoho_item_name, zoho_sku: zi.zoho_sku }, unlinkedEntries)
+            : null;
+
         return {
             zoho_item_id: zi.zoho_item_id,
             zoho_name: zi.zoho_item_name || '',
@@ -617,7 +634,7 @@ function buildZohoFirstView(zohoItems, catalogEntries) {
             category: zi.zoho_category_name || '',
             old_dpl, old_rate,
             entry_id, new_dpl, new_rate, diff,
-            status, changed, shared_count,
+            status, changed, shared_count, proposal,
         };
     });
 
@@ -634,18 +651,64 @@ function buildZohoFirstView(zohoItems, catalogEntries) {
         return String(a.zoho_name).localeCompare(String(b.zoho_name), 'en', { numeric: true });
     });
 
-    const unlinkedEntries = (catalogEntries || [])
-        .filter(e => e.zoho_item_id == null)
-        .map(e => ({
-            entry_id: e.id,
-            product_name: e.product_name || '',
-            base_name: e.base_name || '',
-            dpl_size_label: e.dpl_size_label || '',
-            current_dpl: num(e.current_dpl),
-            canonical_sku: e.canonical_sku || '',
-        }));
-
     return { rows, unlinkedEntries };
+}
+
+// ── Reverse matcher: propose the best unlinked DPL entry for a Zoho item ─────
+// Inverse of linkEntryToZoho. Pure/deterministic. Uses STORED catalog fields
+// (base_code is not stored, so S1 derives codes from base_name via birlaBaseCodes).
+//   zohoItem       : { zoho_item_id, zoho_item_name, zoho_sku }
+//   unlinkedEntries: [{ entry_id, product_name, base_name, size_tier,
+//                       dpl_size_label, current_dpl, canonical_sku }]
+// Returns the single best candidate or null:
+//   S0 exact canonical SKU         → confidence 'high', reason 'exact-sku'
+//   S1 SKU reconstruct (base+tier) → confidence 'high', reason 'sku-reconstruct'
+//   S2 product tokens + tier       → confidence 'low',  reason 'product+tier-only'
+// Ambiguous S1/S2 (more than one candidate) → null (never guess).
+function proposeDplForZoho(zohoItem, unlinkedEntries) {
+    const zi = zohoItem || {};
+    const entries = unlinkedEntries || [];
+    const sku = String(zi.zoho_sku || '');
+    const name = String(zi.zoho_item_name || '');
+
+    const shape = (e, confidence, reason) => ({
+        entry_id: e.entry_id,
+        product_name: e.product_name || '',
+        base_name: e.base_name || '',
+        dpl_size_label: e.dpl_size_label || '',
+        current_dpl: e.current_dpl != null ? e.current_dpl : null,
+        confidence,
+        reason,
+    });
+
+    // S0: exact canonical SKU
+    if (sku) {
+        const want = sku.toUpperCase();
+        const hit = entries.find(e => String(e.canonical_sku || '').toUpperCase() === want);
+        if (hit) return shape(hit, 'high', 'exact-sku');
+    }
+
+    // S1: SKU reconstruct — Zoho stem+tier vs entry base_name codes at the same tier.
+    const info = zohoSkuStem({ sku, name });
+    if (info) {
+        const s1 = entries.filter(e => {
+            if (e.size_tier !== info.tier) return false;
+            const codes = birlaBaseCodes(e.base_name);
+            return codes && codes.some(c => stemEndsWithCode(info.stem, c));
+        });
+        if (s1.length === 1) return shape(s1[0], 'high', 'sku-reconstruct');
+        if (s1.length > 1) return null; // ambiguous — don't guess
+    }
+
+    // S2: product-name tokens + tier fallback.
+    const tier = normalizeSizeTier(extractSizeFromZohoName(name, sku));
+    const tokenSet = new Set(tokenize(name + ' ' + sku));
+    const s2 = entries.filter(e =>
+        e.size_tier === tier && hasAllTokens(tokenSet, tokenize(e.product_name))
+    );
+    if (s2.length === 1) return shape(s2[0], 'low', 'product+tier-only');
+
+    return null;
 }
 
 module.exports = {
@@ -653,5 +716,5 @@ module.exports = {
     dplBaseStems, zohoSkuStem, skuBaseMatch, linkEntryToZoho, buildCatalogFromDpl, applyDplPrices,
     buildPushChanges, upsertEntries, deleteOrphans, unlinkMarked, getCatalog, reconcileCanonical, confirmLink,
     updateAppliedPrices, updateCanonicalFields, markPushed, setNotInZoho,
-    buildZohoFirstView,
+    buildZohoFirstView, proposeDplForZoho,
 };

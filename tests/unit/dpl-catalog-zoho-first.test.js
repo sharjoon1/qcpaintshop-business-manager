@@ -18,7 +18,7 @@ const catalogEntries = [
     { id: 14, zoho_item_id: 'Z4', current_dpl: '8000', current_rate: '10380', product_name: 'C', base_name: 'White', dpl_size_label: '18L', canonical_sku: 'XYZ20' },
     { id: 15, zoho_item_id: 'Z4', current_dpl: '8100', current_rate: '10510', product_name: 'C', base_name: 'Pastel', dpl_size_label: '18L', canonical_sku: 'XYZ20B' },
     // unlinked (attach candidate): no zoho_item_id
-    { id: 99, zoho_item_id: null, current_dpl: '700', current_rate: '910', product_name: 'A', base_name: 'White', dpl_size_label: '0.9L', canonical_sku: 'WPRC1' },
+    { id: 99, zoho_item_id: null, current_dpl: '700', current_rate: '910', product_name: 'A', base_name: 'White', size_tier: '1L', dpl_size_label: '0.9L', canonical_sku: 'WPRC1' },
 ];
 
 describe('buildZohoFirstView', () => {
@@ -96,5 +96,130 @@ describe('buildZohoFirstView', () => {
         const out = buildZohoFirstView([], []);
         expect(out.rows).toEqual([]);
         expect(out.unlinkedEntries).toEqual([]);
+    });
+
+    test('unmatched rows carry a proposal field; matched/shared carry null', () => {
+        const { rows } = buildZohoFirstView(zohoItems, catalogEntries);
+        const z1 = rows.find(r => r.zoho_item_id === 'Z1'); // matched
+        const z2 = rows.find(r => r.zoho_item_id === 'Z2'); // unmatched
+        const z4 = rows.find(r => r.zoho_item_id === 'Z4'); // shared
+        expect(z1.proposal).toBeNull();
+        expect(z4.proposal).toBeNull();
+        // Z2 (WPRC1) exactly matches unlinked entry 99 (canonical_sku WPRC1) → non-null proposal.
+        expect(z2.proposal).not.toBeNull();
+        expect(z2.proposal.reason).toBe('exact-sku');
+    });
+
+    test('unlinkedEntries now include size_tier', () => {
+        const { unlinkedEntries } = buildZohoFirstView(zohoItems, catalogEntries);
+        expect(unlinkedEntries[0]).toHaveProperty('size_tier');
+    });
+
+    test('an unmatched Zoho item whose SKU exactly matches an unlinked entry gets that proposal', () => {
+        const zItems = [{ zoho_item_id: 'ZX', zoho_item_name: 'BIRLA OPUS X 1L', zoho_sku: 'WPRC1', zoho_cf_dpl: '600', zoho_rate: '780' }];
+        const entries = [{ id: 99, zoho_item_id: null, current_dpl: '700', current_rate: '910', product_name: 'X', base_name: 'White', size_tier: '1L', dpl_size_label: '0.9L', canonical_sku: 'WPRC1' }];
+        const { rows } = buildZohoFirstView(zItems, entries);
+        expect(rows[0].status).toBe('unmatched');
+        expect(rows[0].proposal).not.toBeNull();
+        expect(rows[0].proposal.entry_id).toBe(99);
+        expect(rows[0].proposal.reason).toBe('exact-sku');
+    });
+});
+
+const { proposeDplForZoho } = require('../../services/dpl-catalog');
+
+describe('proposeDplForZoho', () => {
+    // Unlinked DPL catalog entries (subset of getCatalog with zoho_item_id == null),
+    // already carrying size_tier (added in Task 2).
+    const unlinked = [
+        // entry 1 has NO canonical SKU on purpose, so the S1 test exercises
+        // reconstruction (not exact-SKU). Its base 'White' + tier '4L' is what matches.
+        { entry_id: 1, product_name: 'Weather Shield', base_name: 'White', size_tier: '4L',  dpl_size_label: '3.6L', current_dpl: 2180, canonical_sku: '' },
+        { entry_id: 2, product_name: 'Weather Shield', base_name: 'Clear', size_tier: '10L', dpl_size_label: '9L',   current_dpl: 4100, canonical_sku: 'PBS9910' },
+        { entry_id: 3, product_name: 'Pure Elegance',  base_name: 'White', size_tier: '1L',  dpl_size_label: '0.9L', current_dpl: 700,  canonical_sku: 'PE WT 01' },
+    ];
+
+    test('S0 exact canonical SKU → high / exact-sku', () => {
+        const p = proposeDplForZoho(
+            { zoho_item_id: 'Z', zoho_item_name: 'BIRLA OPUS WEATHER SHIELD 10 L', zoho_sku: 'PBS9910' },
+            unlinked
+        );
+        expect(p).not.toBeNull();
+        expect(p.entry_id).toBe(2);
+        expect(p.confidence).toBe('high');
+        expect(p.reason).toBe('exact-sku');
+        expect(p.current_dpl).toBe(4100);
+        expect(p.dpl_size_label).toBe('9L');
+    });
+
+    test('S1 SKU reconstruct (base_name + tier) → high / sku-reconstruct', () => {
+        // Zoho SKU 'PBSWT04' → stem 'pbswt', tier '4L'; entry 1 base 'White'→'wt' ends the stem.
+        const p = proposeDplForZoho(
+            { zoho_item_id: 'Z', zoho_item_name: 'BIRLA OPUS WEATHER SHIELD 4 L', zoho_sku: 'PBSWT04' },
+            unlinked
+        );
+        expect(p).not.toBeNull();
+        expect(p.entry_id).toBe(1);
+        expect(p.confidence).toBe('high');
+        expect(p.reason).toBe('sku-reconstruct');
+    });
+
+    test('S1 ambiguous (two entries reconstruct to same stem+tier) → null', () => {
+        const dup = [
+            { entry_id: 10, product_name: 'A', base_name: 'White', size_tier: '4L', dpl_size_label: '3.6L', current_dpl: 100, canonical_sku: 'X1' },
+            { entry_id: 11, product_name: 'B', base_name: 'White', size_tier: '4L', dpl_size_label: '3.6L', current_dpl: 200, canonical_sku: 'X2' },
+        ];
+        const p = proposeDplForZoho(
+            { zoho_item_id: 'Z', zoho_item_name: 'BIRLA OPUS 4 L', zoho_sku: 'PBSWT04' },
+            dup
+        );
+        expect(p).toBeNull();
+    });
+
+    test('S2 name + tier (SKU not a clean Birla stem) → low / product+tier-only', () => {
+        // SKU 'RANDOM' yields no stem; name tokens "weather shield" + tier 10L match entry 2.
+        const p = proposeDplForZoho(
+            { zoho_item_id: 'Z', zoho_item_name: 'WEATHER SHIELD 10 L', zoho_sku: 'RANDOM' },
+            unlinked
+        );
+        expect(p).not.toBeNull();
+        expect(p.entry_id).toBe(2);
+        expect(p.confidence).toBe('low');
+        expect(p.reason).toBe('product+tier-only');
+    });
+
+    test('S2 ambiguous (two entries match name+tier) → null', () => {
+        const dup = [
+            { entry_id: 20, product_name: 'Weather Shield', base_name: 'White', size_tier: '10L', dpl_size_label: '9L', current_dpl: 100, canonical_sku: 'A' },
+            { entry_id: 21, product_name: 'Weather Shield', base_name: 'Clear', size_tier: '10L', dpl_size_label: '9L', current_dpl: 200, canonical_sku: 'B' },
+        ];
+        const p = proposeDplForZoho(
+            { zoho_item_id: 'Z', zoho_item_name: 'WEATHER SHIELD 10 L', zoho_sku: 'RANDOM' },
+            dup
+        );
+        expect(p).toBeNull();
+    });
+
+    test('no candidate → null', () => {
+        const p = proposeDplForZoho(
+            { zoho_item_id: 'Z', zoho_item_name: 'SOMETHING ELSE 20 L', zoho_sku: 'NOPE' },
+            unlinked
+        );
+        expect(p).toBeNull();
+    });
+
+    test('blank SKU falls through to S2 by name+tier', () => {
+        const p = proposeDplForZoho(
+            { zoho_item_id: 'Z', zoho_item_name: 'PURE ELEGANCE 1 L', zoho_sku: '' },
+            unlinked
+        );
+        expect(p).not.toBeNull();
+        expect(p.entry_id).toBe(3);
+        expect(p.reason).toBe('product+tier-only');
+    });
+
+    test('handles empty / missing inputs', () => {
+        expect(proposeDplForZoho({}, [])).toBeNull();
+        expect(proposeDplForZoho(null, null)).toBeNull();
     });
 });
