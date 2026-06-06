@@ -458,6 +458,42 @@
                 </div>
             </div>
 
+                <!-- Zoho-first: edit a Zoho item's details (local save; push is separate) -->
+                <div id="zfEditModal" class="fixed inset-0 bg-black/40 items-center justify-center z-50" style="display:none">
+                    <div class="bg-white rounded-xl shadow-2xl w-full max-w-lg mx-4 max-h-[85vh] flex flex-col">
+                        <div class="p-3 border-b flex items-center justify-between">
+                            <div class="font-bold text-sm" id="zfEditTitle">Edit Zoho item</div>
+                            <button onclick="closeZfEdit()" class="text-gray-400 hover:text-gray-700 text-xl leading-none">&times;</button>
+                        </div>
+                        <div class="p-3 overflow-y-auto space-y-3 text-xs">
+                            <div id="zfEditMeta" class="text-gray-500"></div>
+                            <div>
+                                <label class="block text-[11px] text-gray-500 mb-0.5">Name</label>
+                                <input type="text" id="zfEditName" class="w-full px-3 py-2 border rounded text-xs outline-none focus:border-indigo-500">
+                            </div>
+                            <div>
+                                <label class="block text-[11px] text-gray-500 mb-0.5">SKU</label>
+                                <input type="text" id="zfEditSku" class="w-full px-3 py-2 border rounded text-xs font-mono outline-none focus:border-indigo-500">
+                            </div>
+                            <div>
+                                <label class="block text-[11px] text-gray-500 mb-0.5">Description</label>
+                                <textarea id="zfEditDesc" rows="3" class="w-full px-3 py-2 border rounded text-xs outline-none focus:border-indigo-500 resize-y"></textarea>
+                            </div>
+                            <div class="flex items-center gap-3">
+                                <div class="flex-1">
+                                    <label class="block text-[11px] text-gray-500 mb-0.5">DPL</label>
+                                    <input type="number" id="zfEditDpl" oninput="updateZfRatePreview()" class="w-full px-3 py-2 border rounded text-xs outline-none focus:border-indigo-500">
+                                </div>
+                                <div class="text-[11px] text-gray-500">Rate (auto): <b id="zfEditRatePreview" class="text-emerald-700">—</b></div>
+                            </div>
+                        </div>
+                        <div class="p-3 border-t flex justify-end gap-2">
+                            <button onclick="closeZfEdit()" class="px-3 py-2 rounded border text-gray-600 text-xs">Cancel</button>
+                            <button onclick="saveZfEdit()" id="zfEditSaveBtn" class="px-4 py-2 rounded bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold disabled:opacity-50">💾 Save</button>
+                        </div>
+                    </div>
+                </div>
+
             <!-- Zoho item picker for catalog re-link -->
             <div id="catPickerModal" class="fixed inset-0 bg-black/40 items-center justify-center z-50" style="display:none">
                 <div class="bg-white rounded-xl shadow-2xl w-full max-w-lg mx-4 max-h-[80vh] flex flex-col">
@@ -1375,6 +1411,7 @@
     var zfFilter = 'all';              // 'all' | 'unmatched' | 'changed' | 'shared' | 'unchanged'
     var zfUnlinked = [];               // attach-picker candidates
     var zfAttachItemId = null;         // Zoho item id currently being attached
+    var zfEditItemId = null;            // Zoho item id currently being edited
 
     var catalogEntries = [];
     var catalogFilter = 'all';
@@ -1616,6 +1653,91 @@
         return '<div class="mt-1">' + attachBtn + '</div>';
     }
 
+    // Per-row actions: edit the real Zoho item (local) + push it to Zoho.
+    function zfRowActions(r) {
+        var idAttr = esc(r.zoho_item_id);
+        return '<div class="mt-1 flex flex-wrap gap-1">' +
+            '<button onclick="openZfEdit(\'' + idAttr + '\')" class="px-2 py-0.5 rounded text-[10px] font-bold bg-gray-100 text-gray-700 hover:bg-gray-200">✏ Edit</button>' +
+            '<button onclick="pushZfItem(\'' + idAttr + '\')" class="px-2 py-0.5 rounded text-[10px] font-bold bg-indigo-600 text-white hover:bg-indigo-700">⬆ Push</button>' +
+            '</div>';
+    }
+
+    function updateZfRatePreview() {
+        var dpl = parseFloat(document.getElementById('zfEditDpl').value);
+        var el = document.getElementById('zfEditRatePreview');
+        el.textContent = (isFinite(dpl) && dpl > 0) ? ('₹' + Math.ceil(dpl * 1.18 * 1.10).toLocaleString('en-IN')) : '—';
+    }
+
+    function openZfEdit(zohoItemId) {
+        var r = zfRows.find(function(x){ return String(x.zoho_item_id) === String(zohoItemId); });
+        if (!r) return;
+        zfEditItemId = zohoItemId;
+        document.getElementById('zfEditMeta').textContent = (r.category || '') + (r.category && r.zoho_sku ? ' · ' : '') + (r.zoho_sku || '');
+        document.getElementById('zfEditName').value = r.zoho_name || '';
+        document.getElementById('zfEditSku').value = r.zoho_sku || '';
+        document.getElementById('zfEditDesc').value = '';
+        document.getElementById('zfEditDpl').value = (r.old_dpl != null ? r.old_dpl : '');
+        updateZfRatePreview();
+        document.getElementById('zfEditModal').style.display = 'flex';
+    }
+
+    function closeZfEdit() {
+        zfEditItemId = null;
+        document.getElementById('zfEditModal').style.display = 'none';
+    }
+
+    async function saveZfEdit() {
+        if (!zfEditItemId) return;
+        var btn = document.getElementById('zfEditSaveBtn');
+        btn.disabled = true;
+        try {
+            var dplVal = document.getElementById('zfEditDpl').value;
+            var descVal = document.getElementById('zfEditDesc').value;
+            var payload = {
+                name: document.getElementById('zfEditName').value,
+                sku: document.getElementById('zfEditSku').value
+            };
+            // The sheet can't show the item's existing description (not on the row),
+            // so a blank box means "leave it unchanged" — only send it when typed.
+            if (descVal.trim() !== '') payload.description = descVal;
+            if (dplVal !== '') payload.dpl = parseFloat(dplVal);
+            var resp = await fetch('/api/zoho/items/zoho-item/' + encodeURIComponent(zfEditItemId), {
+                method: 'PUT',
+                headers: { 'Authorization': 'Bearer ' + getToken(), 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
+            var body = await resp.json();
+            if (!resp.ok || !body.success) throw new Error(body.message || ('Server error ' + resp.status));
+            closeZfEdit();
+            showToast('Saved', 'success');
+            await loadZohoFirst();
+        } catch (err) {
+            showToast('Save error: ' + err.message, 'error');
+        } finally {
+            btn.disabled = false;
+        }
+    }
+
+    var zfPushInFlight = {};
+    async function pushZfItem(zohoItemId) {
+        if (zfPushInFlight[zohoItemId]) return;
+        zfPushInFlight[zohoItemId] = true;
+        try {
+            var resp = await fetch('/api/zoho/items/zoho-item/' + encodeURIComponent(zohoItemId) + '/push', {
+                method: 'POST',
+                headers: { 'Authorization': 'Bearer ' + getToken(), 'Content-Type': 'application/json' }
+            });
+            var body = await resp.json();
+            if (!resp.ok || !body.success) throw new Error(body.message || ('Server error ' + resp.status));
+            showToast('Pushed to Zoho (job #' + body.job_id + ')', 'success');
+            await loadZohoFirst();
+        } catch (err) {
+            showToast('Push error: ' + err.message, 'error');
+        } finally {
+            delete zfPushInFlight[zohoItemId];
+        }
+    }
+
     // One mobile card per row (mirrors the DPL-first card style).
     function zfCardHtml(r) {
         var price = fmtMoney(r.old_dpl) + ' <span class="text-gray-400">→</span> ' + fmtMoney(r.new_dpl) +
@@ -1627,7 +1749,7 @@
                 zfStatusChip(r) +
             '</div>' +
             '<div class="text-[12px] text-gray-700 mt-1">' + price + ' &nbsp; ' + zfDiffCell(r) + '</div>' +
-            zfProposalHtml(r) +
+            zfProposalHtml(r) + zfRowActions(r) +
         '</div>';
     }
 
@@ -1685,7 +1807,7 @@
                 '<td class="px-2 py-1.5 text-right">' + fmtMoney(r.new_dpl) + '</td>' +
                 '<td class="px-2 py-1.5 text-right">' + fmtMoney(r.new_rate) + '</td>' +
                 '<td class="px-2 py-1.5 text-right">' + zfDiffCell(r) + '</td>' +
-                '<td class="px-2 py-1.5 text-center">' + zfStatusChip(r) + zfProposalHtml(r) + '</td>' +
+                '<td class="px-2 py-1.5 text-center">' + zfStatusChip(r) + zfProposalHtml(r) + zfRowActions(r) + '</td>' +
                 '</tr>';
         }).join('');
 

@@ -711,10 +711,17 @@ function proposeDplForZoho(zohoItem, unlinkedEntries) {
     return null;
 }
 
+// Selling rate from DPL: ceil(dpl × 1.18 GST × 1.10 markup), to a whole rupee.
+// Returns 0 for non-positive / non-numeric input (so callers never push NaN).
+function computeZohoRate(dpl) {
+    const d = parseFloat(dpl);
+    return Number.isFinite(d) && d > 0 ? Math.ceil(d * 1.18 * 1.10) : 0;
+}
+
 module.exports = {
     setPool, slug, normalizeSizeTier, extractSizeFromZohoName, buildMatchKey,
     dplBaseStems, zohoSkuStem, skuBaseMatch, linkEntryToZoho, buildCatalogFromDpl, applyDplPrices,
     buildPushChanges, upsertEntries, deleteOrphans, unlinkMarked, getCatalog, reconcileCanonical, confirmLink,
     updateAppliedPrices, updateCanonicalFields, markPushed, setNotInZoho,
-    buildZohoFirstView, proposeDplForZoho,
+    buildZohoFirstView, proposeDplForZoho, computeZohoRate,
 };

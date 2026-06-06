@@ -110,3 +110,57 @@ test('proposal Accept button, filter narrows rows, and cards populate', async ({
     expect(res.afterRows).toBe(1);           // "Changed" filter → only the changed row
     expect(res.afterFirstText).toContain('BIRLA OPUS A 4L');
 });
+
+test('Edit sheet opens prefilled, rate preview computes, Push button present', async ({ page }) => {
+    const pageErrors = [];
+    page.on('pageerror', e => pageErrors.push(e.message));
+    await page.route('**/universal-nav-loader.js', r => r.abort());
+    await page.addInitScript(() => {
+        window.requireAdminOrRedirect = function () {};
+        window.getToken = function () { return 'test'; };
+    });
+    await page.goto(pageUrl).catch(() => {});
+
+    const res = await page.evaluate(() => {
+        window.zfRows = [
+            { zoho_item_id: 'Z1', zoho_name: 'BIRLA OPUS A 4L', zoho_sku: 'WPRC4', category: 'Interior', old_dpl: 2050, old_rate: 2660, entry_id: 11, new_dpl: 2180, new_rate: 2830, diff: 130, status: 'matched', changed: true, shared_count: 0, proposal: null },
+        ];
+        window.zfUnlinked = [];
+
+        const panel = document.getElementById('catalogPanel');
+        if (panel) panel.classList.remove('hidden');
+        document.getElementById('zohoFirstView').classList.remove('hidden');
+        window.renderZohoFirst();
+
+        const tableHtml = document.getElementById('zohoFirstTableBody').innerHTML;
+
+        // Open the edit sheet for Z1.
+        window.openZfEdit('Z1');
+        const modalShown = document.getElementById('zfEditModal').style.display === 'flex';
+        const nameVal = document.getElementById('zfEditName').value;
+        const skuVal = document.getElementById('zfEditSku').value;
+        const dplVal = document.getElementById('zfEditDpl').value;
+        const ratePrefill = document.getElementById('zfEditRatePreview').textContent;
+
+        // Change DPL → rate preview recomputes (ceil(500*1.18*1.10)=649).
+        document.getElementById('zfEditDpl').value = '500';
+        window.updateZfRatePreview();
+        const rateAfter = document.getElementById('zfEditRatePreview').textContent;
+
+        return {
+            hasEditBtn: tableHtml.indexOf('Edit') !== -1,
+            hasPushBtn: tableHtml.indexOf('Push') !== -1,
+            modalShown, nameVal, skuVal, dplVal, ratePrefill, rateAfter,
+        };
+    });
+
+    expect(pageErrors).toEqual([]);
+    expect(res.hasEditBtn).toBe(true);            // ✏ Edit rendered on the row
+    expect(res.hasPushBtn).toBe(true);            // ⬆ Push rendered on the row
+    expect(res.modalShown).toBe(true);            // edit sheet opened
+    expect(res.nameVal).toBe('BIRLA OPUS A 4L');  // prefilled from the row
+    expect(res.skuVal).toBe('WPRC4');
+    expect(res.dplVal).toBe('2050');              // old_dpl prefilled
+    expect(res.ratePrefill).toContain('2,661');   // ceil(2050*1.18*1.10)=2661 (en-IN locale)
+    expect(res.rateAfter).toContain('649');       // ceil(500*1.18*1.10)=649 after DPL→500
+});

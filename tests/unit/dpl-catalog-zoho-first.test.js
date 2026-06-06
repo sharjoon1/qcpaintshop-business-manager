@@ -223,3 +223,28 @@ describe('proposeDplForZoho', () => {
         expect(proposeDplForZoho(null, null)).toBeNull();
     });
 });
+
+const { computeZohoRate } = require('../../services/dpl-catalog');
+
+describe('computeZohoRate', () => {
+    test('DPL 100 → 130 (ceil(100*1.18*1.10))', () => {
+        expect(computeZohoRate(100)).toBe(130); // 129.8 → 130
+    });
+    test('DPL 500 → 649', () => {
+        expect(computeZohoRate(500)).toBe(649); // 649.0 → 649
+    });
+    test('accepts numeric strings', () => {
+        expect(computeZohoRate('500')).toBe(649);
+    });
+    test('DPL 0 → 0', () => {
+        expect(computeZohoRate(0)).toBe(0);
+    });
+    test('null / non-numeric → 0', () => {
+        expect(computeZohoRate(null)).toBe(0);
+        expect(computeZohoRate('abc')).toBe(0);
+        expect(computeZohoRate(undefined)).toBe(0);
+    });
+    test('negative → 0', () => {
+        expect(computeZohoRate(-50)).toBe(0);
+    });
+});
