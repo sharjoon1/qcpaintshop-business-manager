@@ -105,7 +105,9 @@ describe('buildZohoFirstView', () => {
         const z4 = rows.find(r => r.zoho_item_id === 'Z4'); // shared
         expect(z1.proposal).toBeNull();
         expect(z4.proposal).toBeNull();
-        expect(z2).toHaveProperty('proposal'); // present (value may be a proposal or null)
+        // Z2 (WPRC1) exactly matches unlinked entry 99 (canonical_sku WPRC1) → non-null proposal.
+        expect(z2.proposal).not.toBeNull();
+        expect(z2.proposal.reason).toBe('exact-sku');
     });
 
     test('unlinkedEntries now include size_tier', () => {
