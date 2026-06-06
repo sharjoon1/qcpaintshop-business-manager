@@ -520,8 +520,12 @@ router.post('/items/zoho-item/:id/push', requirePermission('zoho', 'manage'), as
     } catch (err) {
         // createBulkEditJob throws with an httpStatus on validation / SKU conflict.
         const status = err.httpStatus || 500;
-        console.error('Zoho-item push error:', err.message);
-        res.status(status).json({ success: false, message: err.message });
+        console.error('Zoho-item push error:', err);
+        res.status(status).json(Object.assign(
+            { success: false, message: err.message },
+            err.code ? { code: err.code } : {},
+            err.payload || {}
+        ));
     }
 });
 
