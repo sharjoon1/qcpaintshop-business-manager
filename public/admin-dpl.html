@@ -1631,7 +1631,11 @@
                 '</tr>';
         }).join('');
 
-        document.getElementById('zohoFirstEmpty').classList.toggle('hidden', zfRows.length !== 0);
+        var emptyEl = document.getElementById('zohoFirstEmpty');
+        emptyEl.textContent = zfRows.length === 0
+            ? 'No Zoho items for this brand.'
+            : 'No Zoho items match your search.';
+        emptyEl.classList.toggle('hidden', visible.length !== 0);
     }
 
     function openAttachPicker(zohoItemId) {
