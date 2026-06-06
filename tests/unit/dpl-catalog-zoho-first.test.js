@@ -66,6 +66,15 @@ describe('buildZohoFirstView', () => {
         expect(rows.map(r => r.zoho_item_id)).toEqual(['Z2', 'Z1', 'Z4', 'Z3']);
     });
 
+    test('same-rank rows tie-break by name with numeric collation', () => {
+        // Two unmatched (same rank 0) items; numeric collation must order "1L" before "10L".
+        const out = buildZohoFirstView([
+            { zoho_item_id: 'B', zoho_item_name: 'BIRLA OPUS A 10L', zoho_sku: 'S10', zoho_cf_dpl: '100', zoho_rate: '130' },
+            { zoho_item_id: 'A', zoho_item_name: 'BIRLA OPUS A 1L',  zoho_sku: 'S1',  zoho_cf_dpl: '50',  zoho_rate: '65' },
+        ], []);
+        expect(out.rows.map(r => r.zoho_item_id)).toEqual(['A', 'B']); // "1L" sorts before "10L" numerically
+    });
+
     test('unlinkedEntries lists only entries without a zoho_item_id', () => {
         expect(unlinkedEntries).toHaveLength(1);
         expect(unlinkedEntries[0]).toMatchObject({
