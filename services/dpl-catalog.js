@@ -564,9 +564,94 @@ async function updateAppliedPrices(rows, updatedBy) {
     }
 }
 
+// ── Zoho-first reconciliation view ──────────────────────────────────────────
+// Invert the DPL-anchored catalog into ONE ROW PER ACTIVE ZOHO ITEM. Pure /
+// deterministic (no DB, no clock) so it is unit-testable in isolation.
+//   zohoItems     : [{ zoho_item_id, zoho_item_name, zoho_sku, zoho_cf_dpl,
+//                       zoho_rate, zoho_category_name }]  (active, brand-scoped)
+//   catalogEntries: getCatalog(brand) output (entries carry zoho_item_id when linked)
+// Returns { rows, unlinkedEntries }. rows are sorted:
+//   unmatched → matched&changed → shared → matched&unchanged, then by name (numeric).
+function buildZohoFirstView(zohoItems, catalogEntries) {
+    const num = v => {
+        const n = parseFloat(v);
+        return Number.isFinite(n) ? n : null;
+    };
+    const round2 = n => Math.round(n * 100) / 100;
+
+    // Group linked entries by Zoho item id.
+    const linkMap = new Map();
+    for (const e of (catalogEntries || [])) {
+        if (e.zoho_item_id == null) continue;
+        const k = String(e.zoho_item_id);
+        if (!linkMap.has(k)) linkMap.set(k, []);
+        linkMap.get(k).push(e);
+    }
+
+    const rows = (zohoItems || []).map(zi => {
+        const linked = linkMap.get(String(zi.zoho_item_id)) || [];
+        const old_dpl = num(zi.zoho_cf_dpl);
+        const old_rate = num(zi.zoho_rate);
+
+        let status = 'unmatched';
+        let entry_id = null, new_dpl = null, new_rate = null, diff = null;
+        let changed = false, shared_count = 0;
+
+        if (linked.length === 1) {
+            const e = linked[0];
+            status = 'matched';
+            entry_id = e.id;
+            new_dpl = num(e.current_dpl);
+            new_rate = num(e.current_rate);
+            diff = (new_dpl != null && old_dpl != null) ? round2(new_dpl - old_dpl) : null;
+            changed = diff != null && diff !== 0;
+        } else if (linked.length > 1) {
+            status = 'shared';
+            shared_count = linked.length;
+        }
+
+        return {
+            zoho_item_id: zi.zoho_item_id,
+            zoho_name: zi.zoho_item_name || '',
+            zoho_sku: zi.zoho_sku || '',
+            category: zi.zoho_category_name || '',
+            old_dpl, old_rate,
+            entry_id, new_dpl, new_rate, diff,
+            status, changed, shared_count,
+        };
+    });
+
+    // Sort rank: unmatched(0) < changed(1) < shared(2) < unchanged(3).
+    const rank = r => {
+        if (r.status === 'unmatched') return 0;
+        if (r.status === 'matched' && r.changed) return 1;
+        if (r.status === 'shared') return 2;
+        return 3; // matched & unchanged
+    };
+    rows.sort((a, b) => {
+        const d = rank(a) - rank(b);
+        if (d !== 0) return d;
+        return String(a.zoho_name).localeCompare(String(b.zoho_name), 'en', { numeric: true });
+    });
+
+    const unlinkedEntries = (catalogEntries || [])
+        .filter(e => e.zoho_item_id == null)
+        .map(e => ({
+            entry_id: e.id,
+            product_name: e.product_name || '',
+            base_name: e.base_name || '',
+            dpl_size_label: e.dpl_size_label || '',
+            current_dpl: num(e.current_dpl),
+            canonical_sku: e.canonical_sku || '',
+        }));
+
+    return { rows, unlinkedEntries };
+}
+
 module.exports = {
     setPool, slug, normalizeSizeTier, extractSizeFromZohoName, buildMatchKey,
     dplBaseStems, zohoSkuStem, skuBaseMatch, linkEntryToZoho, buildCatalogFromDpl, applyDplPrices,
     buildPushChanges, upsertEntries, deleteOrphans, unlinkMarked, getCatalog, reconcileCanonical, confirmLink,
     updateAppliedPrices, updateCanonicalFields, markPushed, setNotInZoho,
+    buildZohoFirstView,
 };

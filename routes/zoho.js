@@ -217,6 +217,30 @@ router.get('/items/dpl-catalog/:brand', requirePermission('zoho', 'manage'), asy
     }
 });
 
+// Zoho-first reconciliation: ONE ROW PER ACTIVE ZOHO ITEM for the brand, each
+// matched to its DPL price via the existing dpl_catalog link. Read-only — attach
+// and push reuse the confirm-link / push endpoints below.
+router.get('/items/dpl-catalog/:brand/by-zoho', requirePermission('zoho', 'manage'), async (req, res) => {
+    try {
+        const brand = String(req.params.brand || '').toLowerCase();
+        if (!assertSupportedBrand(brand, res)) return;
+
+        const [zohoItems] = await pool.query(
+            `SELECT zoho_item_id, zoho_item_name, zoho_sku, zoho_cf_dpl, zoho_rate, zoho_category_name
+               FROM zoho_items_map
+              WHERE zoho_status = 'active'${catalogZohoScopeSql(brand)}`
+        );
+
+        const entries = await dplCatalogService.getCatalog(brand);
+        const view = dplCatalogService.buildZohoFirstView(zohoItems, entries);
+
+        res.json({ success: true, data: view });
+    } catch (err) {
+        console.error('DPL catalog by-zoho error:', err);
+        res.status(500).json({ success: false, message: err.message });
+    }
+});
+
 // Pin a catalog entry to a specific Zoho item (user-confirmed link).
 router.post('/items/dpl-catalog/entry/:id/confirm-link', requirePermission('zoho', 'manage'), async (req, res) => {
     try {
