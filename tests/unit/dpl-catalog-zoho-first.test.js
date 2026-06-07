@@ -3,7 +3,7 @@ const { buildZohoFirstView } = require('../../services/dpl-catalog');
 // Active Zoho items (as returned by the by-zoho query — see Task 2).
 const zohoItems = [
     { zoho_item_id: 'Z1', zoho_item_name: 'BIRLA OPUS A 4L',  zoho_sku: 'WPRC4',  zoho_cf_dpl: '2050', zoho_rate: '2660', zoho_category_name: 'Interior' },
-    { zoho_item_id: 'Z2', zoho_item_name: 'BIRLA OPUS A 1L',  zoho_sku: 'WPRC1',  zoho_cf_dpl: '620',  zoho_rate: '805',  zoho_category_name: 'Interior' },
+    { zoho_item_id: 'Z2', zoho_item_name: 'BIRLA OPUS A 1L',  zoho_sku: 'WPRC1',  zoho_cf_dpl: '620',  zoho_rate: '805',  zoho_category_name: 'Interior', dpl_disposition: 'later' },
     { zoho_item_id: 'Z3', zoho_item_name: 'BIRLA OPUS B 10L', zoho_sku: 'ADSS10', zoho_cf_dpl: '4100', zoho_rate: '5322', zoho_category_name: 'Exterior' },
     { zoho_item_id: 'Z4', zoho_item_name: 'BIRLA OPUS C 20L', zoho_sku: 'XYZ20',  zoho_cf_dpl: '8000', zoho_rate: '10380', zoho_category_name: 'Exterior' },
 ];
@@ -53,6 +53,16 @@ describe('buildZohoFirstView', () => {
         expect(r.new_dpl).toBeNull();
         expect(r.diff).toBeNull();
         expect(r.changed).toBe(false);
+    });
+
+    test('row surfaces dpl_disposition from the Zoho item', () => {
+        const r = rows.find(x => x.zoho_item_id === 'Z2');
+        expect(r.disposition).toBe('later');
+    });
+
+    test('disposition defaults to pending when the Zoho item has none', () => {
+        const r = rows.find(x => x.zoho_item_id === 'Z1');
+        expect(r.disposition).toBe('pending');
     });
 
     test('Zoho item linked by >1 entry is shared with shared_count and no entry_id', () => {

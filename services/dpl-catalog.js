@@ -657,6 +657,7 @@ function buildZohoFirstView(zohoItems, catalogEntries) {
             zoho_name: zi.zoho_item_name || '',
             zoho_sku: zi.zoho_sku || '',
             category: zi.zoho_category_name || '',
+            disposition: zi.dpl_disposition || 'pending',
             old_dpl, old_rate,
             entry_id, new_dpl, new_rate, diff,
             status, changed, shared_count, proposal,

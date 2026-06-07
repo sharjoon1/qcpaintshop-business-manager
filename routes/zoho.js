@@ -226,7 +226,7 @@ router.get('/items/dpl-catalog/:brand/by-zoho', requirePermission('zoho', 'manag
         if (!assertSupportedBrand(brand, res)) return;
 
         const [zohoItems] = await pool.query(
-            `SELECT zoho_item_id, zoho_item_name, zoho_sku, zoho_cf_dpl, zoho_rate, zoho_category_name
+            `SELECT zoho_item_id, zoho_item_name, zoho_sku, zoho_cf_dpl, zoho_rate, zoho_category_name, dpl_disposition
                FROM zoho_items_map
               WHERE zoho_status = 'active'${catalogZohoScopeSql(brand)}`
         );
