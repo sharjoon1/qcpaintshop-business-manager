@@ -62,6 +62,36 @@ describe('buildZohoFirstView', () => {
         expect(r.changed).toBe(false);
     });
 
+    test('matched row carries a matched block with the linked DPL entry detail', () => {
+        const r = rows.find(x => x.zoho_item_id === 'Z1');
+        expect(r.matched).toMatchObject({
+            entry_id: 11,
+            product_name: 'A',
+            base_name: 'White',
+            dpl_size_label: '3.6L',
+            canonical_sku: 'WPRC4',
+        });
+        expect(r.linked_entries).toBeNull();
+    });
+
+    test('shared row carries linked_entries for every colliding entry', () => {
+        const r = rows.find(x => x.zoho_item_id === 'Z4');
+        expect(r.matched).toBeNull();
+        expect(Array.isArray(r.linked_entries)).toBe(true);
+        expect(r.linked_entries).toHaveLength(2);
+        expect(r.linked_entries[0]).toMatchObject({
+            entry_id: 14, product_name: 'C', base_name: 'White',
+            dpl_size_label: '18L', canonical_sku: 'XYZ20', current_dpl: 8000,
+        });
+        expect(r.linked_entries[1]).toMatchObject({ entry_id: 15, current_dpl: 8100 });
+    });
+
+    test('unmatched row has matched and linked_entries both null', () => {
+        const r = rows.find(x => x.zoho_item_id === 'Z2');
+        expect(r.matched).toBeNull();
+        expect(r.linked_entries).toBeNull();
+    });
+
     test('rows sorted: unmatched, then changed, then shared, then unchanged', () => {
         expect(rows.map(r => r.zoho_item_id)).toEqual(['Z2', 'Z1', 'Z4', 'Z3']);
     });

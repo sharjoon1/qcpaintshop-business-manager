@@ -406,6 +406,8 @@
                             <span class="px-2 py-1 rounded bg-gray-100 text-gray-700">Zoho items: <b id="zfTotal">0</b></span>
                             <span class="px-2 py-1 rounded bg-rose-100 text-rose-700">⚠ No match: <b id="zfUnmatched">0</b></span>
                             <span class="px-2 py-1 rounded bg-amber-100 text-amber-700">↕ Changed: <b id="zfChanged">0</b></span>
+                            <span class="px-2 py-1 rounded bg-orange-100 text-orange-700">⚠ Shared: <b id="zfShared">0</b></span>
+                            <span class="px-2 py-1 rounded bg-green-100 text-green-700">✓ Unchanged: <b id="zfUnchanged">0</b></span>
                         </div>
                         <button onclick="pushZohoFirstChanged()" id="zfPushBtn" class="px-2 py-1 rounded text-[11px] font-bold bg-emerald-600 hover:bg-emerald-700 text-white disabled:opacity-50 flex items-center gap-1" disabled>
                             <svg id="zfPushSpinner" class="hidden w-3 h-3 animate-spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
@@ -427,12 +429,14 @@
                         <table class="w-full text-[11px]">
                             <thead class="bg-gray-50 text-gray-500">
                                 <tr>
+                                    <th class="px-2 py-2 text-center"><input type="checkbox" id="zfHeadCheck" onclick="zfToggleHeadCheck(this)" aria-label="Select all visible changed rows"></th>
                                     <th class="px-2 py-2 text-left">Zoho item</th>
                                     <th class="px-2 py-2 text-left">SKU</th>
                                     <th class="px-2 py-2 text-right">Current DPL</th>
                                     <th class="px-2 py-2 text-right">New DPL</th>
                                     <th class="px-2 py-2 text-right">New rate</th>
                                     <th class="px-2 py-2 text-right">Diff</th>
+                                    <th class="px-2 py-2 text-left">Linked DPL product</th>
                                     <th class="px-2 py-2 text-center">Status</th>
                                 </tr>
                             </thead>
@@ -1616,6 +1620,13 @@
             if (!resp.ok || !body.success) throw new Error(body.message || ('Server error ' + resp.status));
             zfRows = (body.data && body.data.rows) || [];
             zfUnlinked = (body.data && body.data.unlinkedEntries) || [];
+            // Default: every changed row selected (preserves the old "push all changed"
+            // behavior); drop selections for entries that are no longer changed.
+            var keep = {};
+            zfRows.forEach(function(r){
+                if (r.changed && r.entry_id != null) keep[r.entry_id] = true;
+            });
+            zfPushSelected = keep;
             renderZohoFirst();
         } catch (err) {
             showToast('Load Zoho-first error: ' + err.message, 'error');
@@ -1718,6 +1729,36 @@
         }
     }
 
+    var zfPushSelected = {};   // entry_id → true, for changed rows queued to push
+    // A changed, pushable row carries an entry_id.
+    function zfChangedRows() {
+        return zfRows.filter(function(r){ return r.changed && r.entry_id != null; });
+    }
+    function zfSelectedIds() {
+        return zfChangedRows().filter(function(r){ return zfPushSelected[r.entry_id]; })
+                              .map(function(r){ return r.entry_id; });
+    }
+    function zfTogglePush(entryId, checked) {
+        if (checked) zfPushSelected[entryId] = true;
+        else delete zfPushSelected[entryId];
+        zfRefreshPushBtn();
+    }
+    function zfToggleHeadCheck(cb) {
+        // Toggle every VISIBLE changed row.
+        visibleZohoFirstRows().forEach(function(r){
+            if (r.changed && r.entry_id != null) {
+                if (cb.checked) zfPushSelected[r.entry_id] = true;
+                else delete zfPushSelected[r.entry_id];
+            }
+        });
+        renderZohoFirst();
+    }
+    function zfRefreshPushBtn() {
+        var n = zfSelectedIds().length;
+        document.getElementById('zfPushCount').textContent = n;
+        document.getElementById('zfPushBtn').disabled = n === 0;
+    }
+
     var zfPushInFlight = {};
     async function pushZfItem(zohoItemId) {
         if (zfPushInFlight[zohoItemId]) return;
@@ -1745,12 +1786,54 @@
         return '<div class="border rounded-lg p-3 bg-white">' +
             '<div class="flex items-start justify-between gap-2">' +
                 '<div class="min-w-0"><div class="font-semibold text-gray-800 truncate">' + esc(r.zoho_name) + '</div>' +
-                '<div class="text-[10px] font-mono text-gray-400">' + esc(r.zoho_sku) + '</div></div>' +
+                '<div class="text-[10px] font-mono text-gray-400">' + esc(r.zoho_sku) +
+                    (r.category ? ' · ' + esc(r.category) : '') + '</div></div>' +
                 zfStatusChip(r) +
             '</div>' +
             '<div class="text-[12px] text-gray-700 mt-1">' + price + ' &nbsp; ' + zfDiffCell(r) + '</div>' +
+            '<div class="text-[11px] mt-1">' + zfLinkedDplCell(r) + '</div>' +
             zfProposalHtml(r) + zfRowActions(r) +
         '</div>';
+    }
+
+    // Shared row: list every colliding DPL entry with a detach action that reuses
+    // the existing not-in-zoho endpoint (same mechanism DPL-first uses for dups).
+    function zfSharedCell(r) {
+        var list = r.linked_entries || [];
+        if (!list.length) {
+            return '<span class="text-amber-700 font-semibold">' + (r.shared_count || 0) + ' DPL entries</span>';
+        }
+        var head = '<div class="text-amber-700 font-semibold mb-0.5">⚠ ' + list.length + ' DPL entries share this item</div>';
+        var items = list.map(function(e) {
+            var label = esc(e.product_name) +
+                (e.base_name ? ' · ' + esc(e.base_name) : '') +
+                (e.dpl_size_label ? ' · ' + esc(e.dpl_size_label) : '') +
+                ' · ' + fmtMoney(e.current_dpl);
+            return '<div class="flex items-center justify-between gap-2 py-0.5">' +
+                '<span class="text-[10px] text-gray-700 min-w-0">' + label + '</span>' +
+                '<button onclick="zfDetachEntry(' + Number(e.entry_id) + ')" ' +
+                    'class="shrink-0 px-1.5 py-0.5 rounded text-[10px] font-bold bg-rose-100 text-rose-700 hover:bg-rose-200" ' +
+                    'title="Unlink this DPL entry and mark it for creation">🚫 Not in Zoho</button>' +
+            '</div>';
+        }).join('');
+        return head + items;
+    }
+
+    // Linked DPL entry detail for a Zoho-first row (symmetric to DPL-first's
+    // "Linked Zoho item" column). matched → product · base · size + SKU line.
+    function zfLinkedDplCell(r) {
+        if (r.status === 'matched' && r.matched) {
+            var m = r.matched;
+            var head = esc(m.product_name) +
+                (m.base_name ? ' · ' + esc(m.base_name) : '') +
+                (m.dpl_size_label ? ' · ' + esc(m.dpl_size_label) : '');
+            return '<div class="text-gray-700">' + head + '</div>' +
+                (m.canonical_sku ? '<div class="text-[10px] font-mono text-gray-400">' + esc(m.canonical_sku) + '</div>' : '');
+        }
+        if (r.status === 'shared') {
+            return zfSharedCell(r);
+        }
+        return '<span class="text-gray-300">—</span>';
     }
 
     function zfDiffCell(r) {
@@ -1790,23 +1873,32 @@
         var visible = visibleZohoFirstRows();
 
         var unmatched = zfRows.filter(function(r){ return r.status === 'unmatched'; }).length;
+        var shared    = zfRows.filter(function(r){ return r.status === 'shared'; }).length;
+        var unchanged = zfRows.filter(function(r){ return r.status === 'matched' && !r.changed; }).length;
         var changed   = zfRows.filter(function(r){ return r.changed; });
         document.getElementById('zfTotal').textContent = zfRows.length;
         document.getElementById('zfUnmatched').textContent = unmatched;
         document.getElementById('zfChanged').textContent = changed.length;
+        document.getElementById('zfShared').textContent = shared;
+        document.getElementById('zfUnchanged').textContent = unchanged;
         document.getElementById('zfShowing').textContent = visible.length + ' of ' + zfRows.length;
 
-        document.getElementById('zfPushCount').textContent = changed.length;
-        document.getElementById('zfPushBtn').disabled = changed.length === 0;
+        zfRefreshPushBtn();
 
         document.getElementById('zohoFirstTableBody').innerHTML = visible.map(function(r) {
+            var chk = (r.changed && r.entry_id != null)
+                ? '<input type="checkbox" onchange="zfTogglePush(' + Number(r.entry_id) + ', this.checked)"' + (zfPushSelected[r.entry_id] ? ' checked' : '') + ' aria-label="Queue this row for push">'
+                : '';
             return '<tr class="border-t hover:bg-gray-50 align-top">' +
-                '<td class="px-2 py-1.5 text-left">' + esc(r.zoho_name) + '</td>' +
+                '<td class="px-2 py-1.5 text-center">' + chk + '</td>' +
+                '<td class="px-2 py-1.5 text-left"><div>' + esc(r.zoho_name) + '</div>' +
+                    (r.category ? '<div class="text-[10px] text-gray-400">' + esc(r.category) + '</div>' : '') + '</td>' +
                 '<td class="px-2 py-1.5 text-left text-gray-500">' + esc(r.zoho_sku) + '</td>' +
                 '<td class="px-2 py-1.5 text-right">' + fmtMoney(r.old_dpl) + '</td>' +
                 '<td class="px-2 py-1.5 text-right">' + fmtMoney(r.new_dpl) + '</td>' +
                 '<td class="px-2 py-1.5 text-right">' + fmtMoney(r.new_rate) + '</td>' +
                 '<td class="px-2 py-1.5 text-right">' + zfDiffCell(r) + '</td>' +
+                '<td class="px-2 py-1.5 text-left">' + zfLinkedDplCell(r) + '</td>' +
                 '<td class="px-2 py-1.5 text-center">' + zfStatusChip(r) + zfProposalHtml(r) + zfRowActions(r) + '</td>' +
                 '</tr>';
         }).join('');
@@ -1855,6 +1947,25 @@
         }).join('');
     }
 
+    // Detach one colliding DPL entry from a shared Zoho item: marks it "not in Zoho"
+    // (pending creation) via the existing endpoint, then refreshes the Zoho-first view.
+    async function zfDetachEntry(entryId) {
+        if (!confirm('Unlink this DPL entry from the shared Zoho item and mark it "not in Zoho"?')) return;
+        try {
+            var resp = await fetch('/api/zoho/items/dpl-catalog/entry/' + entryId + '/not-in-zoho', {
+                method: 'POST',
+                headers: { 'Authorization': 'Bearer ' + getToken(), 'Content-Type': 'application/json' },
+                body: JSON.stringify({ value: true })
+            });
+            var body = await resp.json();
+            if (!resp.ok || !body.success) throw new Error(body.message || ('Server error ' + resp.status));
+            showToast('Detached DPL entry', 'success');
+            await loadZohoFirst();
+        } catch (err) {
+            showToast('Detach error: ' + err.message, 'error');
+        }
+    }
+
     async function acceptProposal(zohoItemId, entryId) {
         try {
             var resp = await fetch('/api/zoho/items/dpl-catalog/entry/' + entryId + '/confirm-link', {
@@ -1890,8 +2001,7 @@
     }
 
     async function pushZohoFirstChanged() {
-        var ids = zfRows.filter(function(r){ return r.changed && r.entry_id != null; })
-                        .map(function(r){ return r.entry_id; });
+        var ids = zfSelectedIds();
         if (!ids.length) return;
         var brand = currentBrandDpl || DEFAULT_BRAND;
         var btn = document.getElementById('zfPushBtn');
