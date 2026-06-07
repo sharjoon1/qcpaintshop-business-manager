@@ -1424,7 +1424,6 @@
     var zfUnlinked = [];               // attach-picker candidates
     var zfAttachItemId = null;         // Zoho item id currently being attached
     var zfEditItemId = null;            // Zoho item id currently being edited
-    var zfDoneMode = false;             // true while the edit sheet is in "Push & mark Done" mode
 
     var catalogEntries = [];
     var catalogFilter = 'all';
@@ -1723,7 +1722,6 @@
         document.getElementById('zfEditDesc').value = '';
         document.getElementById('zfEditDpl').value = (r.old_dpl != null ? r.old_dpl : '');
         updateZfRatePreview();
-        zfDoneMode = false;
         document.getElementById('zfEditDoneBtn').style.display = 'none';
         document.getElementById('zfEditSaveBtn').style.display = '';
         document.getElementById('zfEditModal').style.display = 'flex';
@@ -1737,7 +1735,6 @@
     // Open the edit sheet in "Push & mark Done" mode for an unmatched item.
     function zfMarkDone(zohoItemId) {
         openZfEdit(zohoItemId);
-        zfDoneMode = true;
         document.getElementById('zfEditDoneBtn').style.display = '';
         document.getElementById('zfEditSaveBtn').style.display = 'none';
     }
