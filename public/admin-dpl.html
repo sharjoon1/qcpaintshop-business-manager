@@ -1648,6 +1648,7 @@
 
     // Badge shown on a row that the owner has triaged out of "No match".
     function zfDispositionBadge(r) {
+        if (r.status !== 'unmatched') return '';
         var disp = r.disposition || 'pending';
         if (disp === 'done')  return ' <span class="px-1.5 py-0.5 rounded text-[10px] bg-emerald-100 text-emerald-700" title="Manually finalized — no DPL match">✅ Done</span>';
         if (disp === 'later') return ' <span class="px-1.5 py-0.5 rounded text-[10px] bg-sky-100 text-sky-700" title="Deferred — set up later">🕒 Later</span>';
@@ -2004,8 +2005,8 @@
             if (zfFilter === 'unchanged' && !(r.status === 'matched' && !r.changed)) return false;
             if (zfFilter === 'pushable'  && !zfIsPushable(r)) return false;
             if (zfFilter === 'pushed'    && !r.pushed_at) return false;
-            if (zfFilter === 'done'      && disp !== 'done') return false;
-            if (zfFilter === 'later'     && disp !== 'later') return false;
+            if (zfFilter === 'done'      && !(r.status === 'unmatched' && disp === 'done')) return false;
+            if (zfFilter === 'later'     && !(r.status === 'unmatched' && disp === 'later')) return false;
             if (q) return zfHaystack(r).indexOf(q) !== -1;
             return true;
         });

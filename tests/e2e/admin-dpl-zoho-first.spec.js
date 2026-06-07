@@ -400,6 +400,11 @@ test('disposition: No-match excludes done/later, Done+Later chips filter, badges
             { zoho_item_id: 'Zl', zoho_name: 'THINNER 5L', zoho_sku: 'THIN5', old_dpl: 300, old_rate: 390,
               entry_id: null, new_dpl: null, new_rate: null, diff: null, status: 'unmatched', changed: false, shared_count: 0,
               proposal: null, matched: null, linked_entries: null, disposition: 'later' },
+            // matched row that still carries a stale 'done' disposition → badge must NOT show, must NOT appear under Done chip
+            { zoho_item_id: 'Zm', zoho_name: 'MATCHED STALE DONE 4L', zoho_sku: 'MSD4', old_dpl: 2000, old_rate: 2600,
+              entry_id: 50, new_dpl: 2100, new_rate: 2730, diff: 100, status: 'matched', changed: true, shared_count: 0,
+              proposal: null, matched: { entry_id: 50, product_name: 'X', base_name: 'White', dpl_size_label: '3.6L', canonical_sku: 'MSD4' },
+              linked_entries: null, pushed_at: null, push_changed: false, disposition: 'done' },
         ];
         window.zfUnlinked = [];
         window.zfPushSelected = {};
@@ -441,6 +446,13 @@ test('disposition: No-match excludes done/later, Done+Later chips filter, badges
             laterFirst: laterTexts[0] || '',
             allCount,
             cardsHaveDoneBadge: cardsHtml.indexOf('✅ Done') !== -1,
+            staleMatchedHasNoBadge: (function(){
+                window.setZohoFilter('all');
+                var rowsAll = Array.from(document.querySelectorAll('#zohoFirstTableBody tr'));
+                var msd = rowsAll.find(function(t){ return t.textContent.indexOf('MATCHED STALE DONE 4L') !== -1; });
+                return msd ? msd.innerHTML.indexOf('✅ Done') === -1 : false;
+            })(),
+            doneBucketExcludesMatched: doneTexts.every(function(t){ return t.indexOf('MATCHED STALE DONE 4L') === -1; }),
         };
     });
 
@@ -454,6 +466,8 @@ test('disposition: No-match excludes done/later, Done+Later chips filter, badges
     expect(res.doneHasReopen).toBe(true);                    // ↩ Reopen action
     expect(res.laterCount).toBe(1);
     expect(res.laterFirst).toContain('THINNER 5L');
-    expect(res.allCount).toBe(3);                            // All shows everything
+    expect(res.allCount).toBe(4);                            // All shows everything
     expect(res.cardsHaveDoneBadge).toBe(true);               // mobile card parity
+    expect(res.staleMatchedHasNoBadge).toBe(true);   // matched row never shows a disposition badge
+    expect(res.doneBucketExcludesMatched).toBe(true); // Done chip shows only unmatched done items
 });
