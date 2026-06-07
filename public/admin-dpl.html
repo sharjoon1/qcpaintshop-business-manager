@@ -406,6 +406,8 @@
                             <span class="px-2 py-1 rounded bg-gray-100 text-gray-700">Zoho items: <b id="zfTotal">0</b></span>
                             <span class="px-2 py-1 rounded bg-rose-100 text-rose-700">⚠ No match: <b id="zfUnmatched">0</b></span>
                             <span class="px-2 py-1 rounded bg-amber-100 text-amber-700">↕ Changed: <b id="zfChanged">0</b></span>
+                            <span class="px-2 py-1 rounded bg-orange-100 text-orange-700">⚠ Shared: <b id="zfShared">0</b></span>
+                            <span class="px-2 py-1 rounded bg-green-100 text-green-700">✓ Unchanged: <b id="zfUnchanged">0</b></span>
                         </div>
                         <button onclick="pushZohoFirstChanged()" id="zfPushBtn" class="px-2 py-1 rounded text-[11px] font-bold bg-emerald-600 hover:bg-emerald-700 text-white disabled:opacity-50 flex items-center gap-1" disabled>
                             <svg id="zfPushSpinner" class="hidden w-3 h-3 animate-spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
@@ -427,6 +429,7 @@
                         <table class="w-full text-[11px]">
                             <thead class="bg-gray-50 text-gray-500">
                                 <tr>
+                                    <th class="px-2 py-2 text-center"><input type="checkbox" id="zfHeadCheck" onclick="zfToggleHeadCheck(this)" aria-label="Select all visible changed rows"></th>
                                     <th class="px-2 py-2 text-left">Zoho item</th>
                                     <th class="px-2 py-2 text-left">SKU</th>
                                     <th class="px-2 py-2 text-right">Current DPL</th>
@@ -1617,6 +1620,13 @@
             if (!resp.ok || !body.success) throw new Error(body.message || ('Server error ' + resp.status));
             zfRows = (body.data && body.data.rows) || [];
             zfUnlinked = (body.data && body.data.unlinkedEntries) || [];
+            // Default: every changed row selected (preserves the old "push all changed"
+            // behavior); drop selections for entries that are no longer changed.
+            var keep = {};
+            zfRows.forEach(function(r){
+                if (r.changed && r.entry_id != null) keep[r.entry_id] = true;
+            });
+            zfPushSelected = keep;
             renderZohoFirst();
         } catch (err) {
             showToast('Load Zoho-first error: ' + err.message, 'error');
@@ -1717,6 +1727,36 @@
         } finally {
             btn.disabled = false;
         }
+    }
+
+    var zfPushSelected = {};   // entry_id → true, for changed rows queued to push
+    // A changed, pushable row carries an entry_id.
+    function zfChangedRows() {
+        return zfRows.filter(function(r){ return r.changed && r.entry_id != null; });
+    }
+    function zfSelectedIds() {
+        return zfChangedRows().filter(function(r){ return zfPushSelected[r.entry_id]; })
+                              .map(function(r){ return r.entry_id; });
+    }
+    function zfTogglePush(entryId, checked) {
+        if (checked) zfPushSelected[entryId] = true;
+        else delete zfPushSelected[entryId];
+        zfRefreshPushBtn();
+    }
+    function zfToggleHeadCheck(cb) {
+        // Toggle every VISIBLE changed row.
+        visibleZohoFirstRows().forEach(function(r){
+            if (r.changed && r.entry_id != null) {
+                if (cb.checked) zfPushSelected[r.entry_id] = true;
+                else delete zfPushSelected[r.entry_id];
+            }
+        });
+        renderZohoFirst();
+    }
+    function zfRefreshPushBtn() {
+        var n = zfSelectedIds().length;
+        document.getElementById('zfPushCount').textContent = n;
+        document.getElementById('zfPushBtn').disabled = n === 0;
     }
 
     var zfPushInFlight = {};
@@ -1833,17 +1873,24 @@
         var visible = visibleZohoFirstRows();
 
         var unmatched = zfRows.filter(function(r){ return r.status === 'unmatched'; }).length;
+        var shared    = zfRows.filter(function(r){ return r.status === 'shared'; }).length;
+        var unchanged = zfRows.filter(function(r){ return r.status === 'matched' && !r.changed; }).length;
         var changed   = zfRows.filter(function(r){ return r.changed; });
         document.getElementById('zfTotal').textContent = zfRows.length;
         document.getElementById('zfUnmatched').textContent = unmatched;
         document.getElementById('zfChanged').textContent = changed.length;
+        document.getElementById('zfShared').textContent = shared;
+        document.getElementById('zfUnchanged').textContent = unchanged;
         document.getElementById('zfShowing').textContent = visible.length + ' of ' + zfRows.length;
 
-        document.getElementById('zfPushCount').textContent = changed.length;
-        document.getElementById('zfPushBtn').disabled = changed.length === 0;
+        zfRefreshPushBtn();
 
         document.getElementById('zohoFirstTableBody').innerHTML = visible.map(function(r) {
+            var chk = (r.changed && r.entry_id != null)
+                ? '<input type="checkbox" onchange="zfTogglePush(' + Number(r.entry_id) + ', this.checked)"' + (zfPushSelected[r.entry_id] ? ' checked' : '') + ' aria-label="Queue this row for push">'
+                : '';
             return '<tr class="border-t hover:bg-gray-50 align-top">' +
+                '<td class="px-2 py-1.5 text-center">' + chk + '</td>' +
                 '<td class="px-2 py-1.5 text-left"><div>' + esc(r.zoho_name) + '</div>' +
                     (r.category ? '<div class="text-[10px] text-gray-400">' + esc(r.category) + '</div>' : '') + '</td>' +
                 '<td class="px-2 py-1.5 text-left text-gray-500">' + esc(r.zoho_sku) + '</td>' +
@@ -1954,8 +2001,7 @@
     }
 
     async function pushZohoFirstChanged() {
-        var ids = zfRows.filter(function(r){ return r.changed && r.entry_id != null; })
-                        .map(function(r){ return r.entry_id; });
+        var ids = zfSelectedIds();
         if (!ids.length) return;
         var brand = currentBrandDpl || DEFAULT_BRAND;
         var btn = document.getElementById('zfPushBtn');

@@ -29,6 +29,9 @@ test('renderZohoFirst populates the table, unmatched first', async ({ page }) =>
             { zoho_item_id: 'Z3', zoho_name: 'BIRLA OPUS B 10L', zoho_sku: 'ADSS10', old_dpl: 4100, old_rate: 5322, entry_id: 13,   new_dpl: 4100, new_rate: 5322, diff: 0,    status: 'matched',   changed: false, shared_count: 0 },
         ];
         window.zfUnlinked = [];
+        // loadZohoFirst() auto-selects changed rows for push; renderZohoFirst() alone
+        // doesn't, so simulate that loaded state here (Z1 is the one changed row).
+        window.zfPushSelected = { 11: true };
 
         const panel = document.getElementById('catalogPanel');
         if (panel) panel.classList.remove('hidden');
