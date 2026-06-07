@@ -236,3 +236,80 @@ test('linked DPL column, shared resolver, and checkbox-driven push', async ({ pa
     expect(res.pushCountAfter).toBe('0');      // deselected → count 0
     expect(res.pushDisabledAfter).toBe(true);  // → push disabled
 });
+
+test('pushed chip, pushable filter, DPL-name search, SKU conflict, re-pick button', async ({ page }) => {
+    const pageErrors = [];
+    page.on('pageerror', e => pageErrors.push(e.message));
+    await page.route('**/universal-nav-loader.js', r => r.abort());
+    await page.addInitScript(() => {
+        window.requireAdminOrRedirect = function () {};
+        window.getToken = function () { return 'test'; };
+    });
+    await page.goto(pageUrl).catch(() => {});
+
+    const res = await page.evaluate(() => {
+        window.zfRows = [
+            // matched, never pushed, pushable, has linked DPL "Pure Elegance"
+            { zoho_item_id: 'Z1', zoho_name: 'BIRLA OPUS A 4L', zoho_sku: 'WPRC4', category: 'Interior',
+              old_dpl: 2050, old_rate: 2660, entry_id: 11, new_dpl: 2180, new_rate: 2830, diff: 130,
+              status: 'matched', changed: true, shared_count: 0, proposal: null,
+              matched: { entry_id: 11, product_name: 'Pure Elegance', base_name: 'White', dpl_size_label: '3.6L', canonical_sku: 'WPRC4' },
+              linked_entries: null, pushed_at: null, pushed_job_id: null, pushed_dpl: null, push_changed: false, sku_conflict: 'DUP ITEM' },
+            // matched, already pushed, no change → ✅ pushed chip, NOT pushable
+            { zoho_item_id: 'Z3', zoho_name: 'BIRLA OPUS B 10L', zoho_sku: 'ADSS10', category: 'Exterior',
+              old_dpl: 4100, old_rate: 5322, entry_id: 13, new_dpl: 4100, new_rate: 5322, diff: 0,
+              status: 'matched', changed: false, shared_count: 0, proposal: null,
+              matched: { entry_id: 13, product_name: 'Weather Coat', base_name: 'Clear', dpl_size_label: '9L', canonical_sku: 'ADSS10' },
+              linked_entries: null, pushed_at: '2026-06-01 10:00:00', pushed_job_id: 9, pushed_dpl: 4100, push_changed: false, sku_conflict: null },
+        ];
+        window.zfUnlinked = [];
+
+        const panel = document.getElementById('catalogPanel');
+        if (panel) panel.classList.remove('hidden');
+        document.getElementById('zohoFirstView').classList.remove('hidden');
+        window.zfPushSelected = { 11: true };
+        window.renderZohoFirst();
+
+        const tableHtml = document.getElementById('zohoFirstTableBody').innerHTML;
+
+        // Pushable filter → only Z1 (Z3 is pushed+unchanged, not pushable).
+        window.setZohoFilter('pushable');
+        const pushableRows = document.querySelectorAll('#zohoFirstTableBody tr').length;
+        const pushableFirst = document.querySelectorAll('#zohoFirstTableBody tr')[0];
+
+        // Pushed filter → only Z3.
+        window.setZohoFilter('pushed');
+        const pushedRows = document.querySelectorAll('#zohoFirstTableBody tr').length;
+        const pushedFirst = document.querySelectorAll('#zohoFirstTableBody tr')[0];
+
+        // Search by a linked DPL product name → matches Z1 only.
+        window.setZohoFilter('all');
+        document.getElementById('zfSearch').value = 'pure elegance';
+        window.renderZohoFirst();
+        const searchRows = document.querySelectorAll('#zohoFirstTableBody tr').length;
+        const searchFirst = document.querySelectorAll('#zohoFirstTableBody tr')[0];
+
+        return {
+            hasPushedChip: tableHtml.indexOf('✅ pushed') !== -1,
+            hasSkuConflict: tableHtml.indexOf('SKU also used by: DUP ITEM') !== -1,
+            hasRepick: tableHtml.indexOf('Re-pick') !== -1,
+            pushableRows,
+            pushableFirstText: pushableFirst ? pushableFirst.textContent : '',
+            pushedRows,
+            pushedFirstText: pushedFirst ? pushedFirst.textContent : '',
+            searchRows,
+            searchFirstText: searchFirst ? searchFirst.textContent : '',
+        };
+    });
+
+    expect(pageErrors).toEqual([]);
+    expect(res.hasPushedChip).toBe(true);                  // Z3 shows ✅ pushed
+    expect(res.hasSkuConflict).toBe(true);                 // Z1 SKU conflict ⚠ tooltip
+    expect(res.hasRepick).toBe(true);                      // matched rows have 🔄 Re-pick
+    expect(res.pushableRows).toBe(1);                      // only Z1 pushable
+    expect(res.pushableFirstText).toContain('BIRLA OPUS A 4L');
+    expect(res.pushedRows).toBe(1);                        // only Z3 pushed
+    expect(res.pushedFirstText).toContain('BIRLA OPUS B 10L');
+    expect(res.searchRows).toBe(1);                        // DPL-name search hits Z1
+    expect(res.searchFirstText).toContain('BIRLA OPUS A 4L');
+});
