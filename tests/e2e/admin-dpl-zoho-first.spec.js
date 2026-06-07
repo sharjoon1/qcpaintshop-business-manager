@@ -167,3 +167,72 @@ test('Edit sheet opens prefilled, rate preview computes, Push button present', a
     expect(res.ratePrefill).toContain('2,661');   // ceil(2050*1.18*1.10)=2661 (en-IN locale)
     expect(res.rateAfter).toContain('649');       // ceil(500*1.18*1.10)=649 after DPL→500
 });
+
+test('linked DPL column, shared resolver, and checkbox-driven push', async ({ page }) => {
+    const pageErrors = [];
+    page.on('pageerror', e => pageErrors.push(e.message));
+    await page.route('**/universal-nav-loader.js', r => r.abort());
+    await page.addInitScript(() => {
+        window.requireAdminOrRedirect = function () {};
+        window.getToken = function () { return 'test'; };
+    });
+    await page.goto(pageUrl).catch(() => {});
+
+    const res = await page.evaluate(() => {
+        window.zfRows = [
+            { zoho_item_id: 'Z1', zoho_name: 'BIRLA OPUS A 4L', zoho_sku: 'WPRC4', category: 'Interior',
+              old_dpl: 2050, old_rate: 2660, entry_id: 11, new_dpl: 2180, new_rate: 2830, diff: 130,
+              status: 'matched', changed: true, shared_count: 0, proposal: null,
+              matched: { entry_id: 11, product_name: 'Pure Elegance', base_name: 'White', dpl_size_label: '3.6L', canonical_sku: 'WPRC4' },
+              linked_entries: null },
+            { zoho_item_id: 'Z4', zoho_name: 'BIRLA OPUS C 20L', zoho_sku: 'XYZ20', category: 'Exterior',
+              old_dpl: 8000, old_rate: 10380, entry_id: null, new_dpl: null, new_rate: null, diff: null,
+              status: 'shared', changed: false, shared_count: 2, proposal: null, matched: null,
+              linked_entries: [
+                { entry_id: 14, product_name: 'C', base_name: 'White',  dpl_size_label: '18L', canonical_sku: 'XYZ20',  current_dpl: 8000 },
+                { entry_id: 15, product_name: 'C', base_name: 'Pastel', dpl_size_label: '18L', canonical_sku: 'XYZ20B', current_dpl: 8100 },
+              ] },
+        ];
+        window.zfUnlinked = [];
+
+        const panel = document.getElementById('catalogPanel');
+        if (panel) panel.classList.remove('hidden');
+        document.getElementById('zohoFirstView').classList.remove('hidden');
+        // Simulate loadZohoFirst's default selection (changed rows auto-selected).
+        window.zfPushSelected = { 11: true };
+        window.renderZohoFirst();
+
+        const tableHtml = document.getElementById('zohoFirstTableBody').innerHTML;
+        const sharedText = document.getElementById('zohoFirstTableBody').textContent;
+        const pushCountBefore = document.getElementById('zfPushCount').textContent;
+        const pushDisabledBefore = document.getElementById('zfPushBtn').disabled;
+
+        // Deselect the only changed row via its checkbox handler.
+        window.zfTogglePush(11, false);
+        const pushCountAfter = document.getElementById('zfPushCount').textContent;
+        const pushDisabledAfter = document.getElementById('zfPushBtn').disabled;
+
+        return {
+            hasLinkedProduct: tableHtml.indexOf('Pure Elegance') !== -1,
+            hasCategory: tableHtml.indexOf('Interior') !== -1,
+            hasDetachBtn: tableHtml.indexOf('Not in Zoho') !== -1,
+            sharedSummary: sharedText.indexOf('DPL entries share this item') !== -1,
+            sharedCount: document.getElementById('zfShared').textContent,
+            unchangedCount: document.getElementById('zfUnchanged').textContent,
+            pushCountBefore, pushDisabledBefore,
+            pushCountAfter, pushDisabledAfter,
+        };
+    });
+
+    expect(pageErrors).toEqual([]);
+    expect(res.hasLinkedProduct).toBe(true);   // matched row shows the DPL product name
+    expect(res.hasCategory).toBe(true);        // category rendered
+    expect(res.hasDetachBtn).toBe(true);       // shared row detach button
+    expect(res.sharedSummary).toBe(true);      // shared resolver header
+    expect(res.sharedCount).toBe('1');         // one shared row
+    expect(res.unchangedCount).toBe('0');      // no unchanged matched rows here
+    expect(res.pushCountBefore).toBe('1');     // changed row pre-selected
+    expect(res.pushDisabledBefore).toBe(false);
+    expect(res.pushCountAfter).toBe('0');      // deselected → count 0
+    expect(res.pushDisabledAfter).toBe(true);  // → push disabled
+});
