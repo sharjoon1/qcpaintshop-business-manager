@@ -375,3 +375,85 @@ test('mobile cards carry a per-row push checkbox for pushable rows + a select-al
     expect(res.countAfterToggle).toBe('1');         // toggling the card checkbox queues 1
     expect(res.btnDisabledAfter).toBe(false);       // push button enabled after selection
 });
+
+test('disposition: No-match excludes done/later, Done+Later chips filter, badges render, card parity', async ({ page }) => {
+    const pageErrors = [];
+    page.on('pageerror', e => pageErrors.push(e.message));
+    await page.route('**/universal-nav-loader.js', r => r.abort());
+    await page.addInitScript(() => {
+        window.requireAdminOrRedirect = function () {};
+        window.getToken = function () { return 'test'; };
+    });
+    await page.goto(pageUrl).catch(() => {});
+
+    const res = await page.evaluate(() => {
+        window.zfRows = [
+            // pending unmatched → stays under No match
+            { zoho_item_id: 'Zp', zoho_name: 'BIRLA OPUS PENDING 1L', zoho_sku: 'PEND1', old_dpl: 600, old_rate: 780,
+              entry_id: null, new_dpl: null, new_rate: null, diff: null, status: 'unmatched', changed: false, shared_count: 0,
+              proposal: null, matched: null, linked_entries: null, disposition: 'pending' },
+            // done unmatched → out of No match, ✅ Done badge + Reopen
+            { zoho_item_id: 'Zd', zoho_name: 'ACCESSORY ROLLER', zoho_sku: 'ROLL1', old_dpl: 120, old_rate: 156,
+              entry_id: null, new_dpl: null, new_rate: null, diff: null, status: 'unmatched', changed: false, shared_count: 0,
+              proposal: null, matched: null, linked_entries: null, disposition: 'done' },
+            // later unmatched → out of No match, 🕒 Later badge
+            { zoho_item_id: 'Zl', zoho_name: 'THINNER 5L', zoho_sku: 'THIN5', old_dpl: 300, old_rate: 390,
+              entry_id: null, new_dpl: null, new_rate: null, diff: null, status: 'unmatched', changed: false, shared_count: 0,
+              proposal: null, matched: null, linked_entries: null, disposition: 'later' },
+        ];
+        window.zfUnlinked = [];
+        window.zfPushSelected = {};
+
+        const panel = document.getElementById('catalogPanel');
+        if (panel) panel.classList.remove('hidden');
+        document.getElementById('zohoFirstView').classList.remove('hidden');
+        window.renderZohoFirst();
+
+        const rowTexts = () => Array.from(document.querySelectorAll('#zohoFirstTableBody tr')).map(t => t.textContent);
+
+        // No match → only the pending item.
+        window.setZohoFilter('unmatched');
+        const noMatch = rowTexts();
+
+        // Done chip → only the done item, with badge + Reopen.
+        window.setZohoFilter('done');
+        const doneTexts = rowTexts();
+        const doneHtml = document.getElementById('zohoFirstTableBody').innerHTML;
+
+        // Later chip → only the later item.
+        window.setZohoFilter('later');
+        const laterTexts = rowTexts();
+
+        // All → all three, badges present; check card parity for the Done badge.
+        window.setZohoFilter('all');
+        const allCount = document.querySelectorAll('#zohoFirstTableBody tr').length;
+        const cardsHtml = document.getElementById('zohoFirstCards').innerHTML;
+
+        return {
+            chipsExist: !!document.getElementById('zffDone') && !!document.getElementById('zffLater'),
+            noMatchCount: noMatch.length,
+            noMatchFirst: noMatch[0] || '',
+            doneCount: doneTexts.length,
+            doneFirst: doneTexts[0] || '',
+            doneHasBadge: doneHtml.indexOf('✅ Done') !== -1,
+            doneHasReopen: doneHtml.indexOf('↩ Reopen') !== -1,
+            laterCount: laterTexts.length,
+            laterFirst: laterTexts[0] || '',
+            allCount,
+            cardsHaveDoneBadge: cardsHtml.indexOf('✅ Done') !== -1,
+        };
+    });
+
+    expect(pageErrors).toEqual([]);
+    expect(res.chipsExist).toBe(true);
+    expect(res.noMatchCount).toBe(1);                        // pending only
+    expect(res.noMatchFirst).toContain('BIRLA OPUS PENDING 1L');
+    expect(res.doneCount).toBe(1);
+    expect(res.doneFirst).toContain('ACCESSORY ROLLER');
+    expect(res.doneHasBadge).toBe(true);                     // ✅ Done badge
+    expect(res.doneHasReopen).toBe(true);                    // ↩ Reopen action
+    expect(res.laterCount).toBe(1);
+    expect(res.laterFirst).toContain('THINNER 5L');
+    expect(res.allCount).toBe(3);                            // All shows everything
+    expect(res.cardsHaveDoneBadge).toBe(true);               // mobile card parity
+});
