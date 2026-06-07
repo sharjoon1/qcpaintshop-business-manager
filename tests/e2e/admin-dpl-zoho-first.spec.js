@@ -313,3 +313,65 @@ test('pushed chip, pushable filter, DPL-name search, SKU conflict, re-pick butto
     expect(res.searchRows).toBe(1);                        // DPL-name search hits Z1
     expect(res.searchFirstText).toContain('BIRLA OPUS A 4L');
 });
+
+test('mobile cards carry a per-row push checkbox for pushable rows + a select-all toggle', async ({ page }) => {
+    const pageErrors = [];
+    page.on('pageerror', e => pageErrors.push(e.message));
+    await page.route('**/universal-nav-loader.js', r => r.abort());
+    await page.addInitScript(() => {
+        window.requireAdminOrRedirect = function () {};
+        window.getToken = function () { return 'test'; };
+    });
+    await page.goto(pageUrl).catch(() => {});
+
+    const res = await page.evaluate(() => {
+        window.zfRows = [
+            // unmatched → no checkbox
+            { zoho_item_id: 'Z2', zoho_name: 'BIRLA OPUS A 1L', zoho_sku: 'WPRC1', old_dpl: 620, old_rate: 805,
+              entry_id: null, new_dpl: null, new_rate: null, diff: null, status: 'unmatched', changed: false, shared_count: 0 },
+            // matched + changed + not pushed → pushable → checkbox
+            { zoho_item_id: 'Z1', zoho_name: 'BIRLA OPUS A 4L', zoho_sku: 'WPRC4', old_dpl: 2050, old_rate: 2660,
+              entry_id: 11, new_dpl: 2180, new_rate: 2830, diff: 130, status: 'matched', changed: true, shared_count: 0,
+              pushed_at: null, push_changed: false },
+            // matched, already pushed, no change since → NOT pushable → no checkbox
+            { zoho_item_id: 'Z3', zoho_name: 'BIRLA OPUS B 10L', zoho_sku: 'ADSS10', old_dpl: 4100, old_rate: 5322,
+              entry_id: 13, new_dpl: 4100, new_rate: 5322, diff: 0, status: 'matched', changed: false, shared_count: 0,
+              pushed_at: '2026-06-01 10:00:00', push_changed: false },
+        ];
+        window.zfUnlinked = [];
+        window.zfPushSelected = {};
+
+        const panel = document.getElementById('catalogPanel');
+        if (panel) panel.classList.remove('hidden');
+        document.getElementById('zohoFirstView').classList.remove('hidden');
+        window.renderZohoFirst();
+
+        const cards = document.getElementById('zohoFirstCards');
+        const cardChecks = cards.querySelectorAll('input[type="checkbox"]');
+        const selectAll = document.getElementById('zfHeadCheckMobile');
+
+        // Toggle the lone card checkbox → push count + button should react.
+        let countAfterToggle = null, btnDisabledAfter = null;
+        if (cardChecks.length === 1) {
+            cardChecks[0].checked = true;
+            cardChecks[0].dispatchEvent(new Event('change', { bubbles: true }));
+            countAfterToggle = document.getElementById('zfPushCount').textContent;
+            btnDisabledAfter = document.getElementById('zfPushBtn').disabled;
+        }
+
+        return {
+            cardCheckCount: cardChecks.length,
+            cardChecksWiredToToggle: cards.innerHTML.indexOf('zfTogglePush(11') !== -1,
+            hasSelectAll: !!selectAll,
+            countAfterToggle,
+            btnDisabledAfter,
+        };
+    });
+
+    expect(pageErrors).toEqual([]);
+    expect(res.cardCheckCount).toBe(1);            // only the pushable row (Z1) gets a card checkbox
+    expect(res.cardChecksWiredToToggle).toBe(true); // wired to zfTogglePush(entry_id,…)
+    expect(res.hasSelectAll).toBe(true);            // mobile select-all toggle exists
+    expect(res.countAfterToggle).toBe('1');         // toggling the card checkbox queues 1
+    expect(res.btnDisabledAfter).toBe(false);       // push button enabled after selection
+});
