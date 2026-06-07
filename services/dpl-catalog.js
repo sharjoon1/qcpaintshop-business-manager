@@ -609,6 +609,7 @@ function buildZohoFirstView(zohoItems, catalogEntries) {
         let status = 'unmatched';
         let entry_id = null, new_dpl = null, new_rate = null, diff = null;
         let changed = false, shared_count = 0;
+        let matched = null, linked_entries = null;
 
         if (linked.length === 1) {
             const e = linked[0];
@@ -618,9 +619,24 @@ function buildZohoFirstView(zohoItems, catalogEntries) {
             new_rate = num(e.current_rate);
             diff = (new_dpl != null && old_dpl != null) ? round2(new_dpl - old_dpl) : null;
             changed = diff != null && diff !== 0;
+            matched = {
+                entry_id: e.id,
+                product_name: e.product_name || '',
+                base_name: e.base_name || '',
+                dpl_size_label: e.dpl_size_label || '',
+                canonical_sku: e.canonical_sku || '',
+            };
         } else if (linked.length > 1) {
             status = 'shared';
             shared_count = linked.length;
+            linked_entries = linked.map(e => ({
+                entry_id: e.id,
+                product_name: e.product_name || '',
+                base_name: e.base_name || '',
+                dpl_size_label: e.dpl_size_label || '',
+                canonical_sku: e.canonical_sku || '',
+                current_dpl: num(e.current_dpl),
+            }));
         }
 
         const proposal = status === 'unmatched'
@@ -635,6 +651,7 @@ function buildZohoFirstView(zohoItems, catalogEntries) {
             old_dpl, old_rate,
             entry_id, new_dpl, new_rate, diff,
             status, changed, shared_count, proposal,
+            matched, linked_entries,
         };
     });
 
