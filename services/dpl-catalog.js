@@ -610,6 +610,8 @@ function buildZohoFirstView(zohoItems, catalogEntries) {
         let entry_id = null, new_dpl = null, new_rate = null, diff = null;
         let changed = false, shared_count = 0;
         let matched = null, linked_entries = null;
+        let pushed_at = null, pushed_job_id = null, pushed_dpl = null;
+        let push_changed = false, sku_conflict = null;
 
         if (linked.length === 1) {
             const e = linked[0];
@@ -626,6 +628,13 @@ function buildZohoFirstView(zohoItems, catalogEntries) {
                 dpl_size_label: e.dpl_size_label || '',
                 canonical_sku: e.canonical_sku || '',
             };
+            pushed_at = e.pushed_at != null ? e.pushed_at : null;
+            pushed_job_id = e.pushed_job_id != null ? e.pushed_job_id : null;
+            pushed_dpl = num(e.pushed_dpl);
+            sku_conflict = e.sku_conflict || null;
+            push_changed = pushed_at != null &&
+                (Number(e.pushed_dpl) !== Number(e.current_dpl) ||
+                 Number(e.pushed_rate) !== Number(e.current_rate));
         } else if (linked.length > 1) {
             status = 'shared';
             shared_count = linked.length;
@@ -652,6 +661,7 @@ function buildZohoFirstView(zohoItems, catalogEntries) {
             entry_id, new_dpl, new_rate, diff,
             status, changed, shared_count, proposal,
             matched, linked_entries,
+            pushed_at, pushed_job_id, pushed_dpl, push_changed, sku_conflict,
         };
     });
 

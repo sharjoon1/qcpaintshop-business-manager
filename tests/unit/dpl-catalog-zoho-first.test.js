@@ -11,7 +11,8 @@ const zohoItems = [
 // dpl_catalog entries (as returned by getCatalog) — only some carry a zoho_item_id.
 const catalogEntries = [
     // matched + changed: new DPL 2180 vs old 2050
-    { id: 11, zoho_item_id: 'Z1', current_dpl: '2180', current_rate: '2830', product_name: 'A', base_name: 'White', dpl_size_label: '3.6L', canonical_sku: 'WPRC4' },
+    { id: 11, zoho_item_id: 'Z1', current_dpl: '2180', current_rate: '2830', product_name: 'A', base_name: 'White', dpl_size_label: '3.6L', canonical_sku: 'WPRC4',
+      pushed_at: '2026-06-01 10:00:00', pushed_job_id: 777, pushed_dpl: '2050', pushed_rate: '2660', sku_conflict: 'SOME OTHER ITEM' },
     // matched + unchanged: new DPL equals old 4100
     { id: 13, zoho_item_id: 'Z3', current_dpl: '4100', current_rate: '5322', product_name: 'B', base_name: 'Clear', dpl_size_label: '9L', canonical_sku: 'ADSS10' },
     // shared: two entries both link to Z4
@@ -90,6 +91,46 @@ describe('buildZohoFirstView', () => {
         const r = rows.find(x => x.zoho_item_id === 'Z2');
         expect(r.matched).toBeNull();
         expect(r.linked_entries).toBeNull();
+    });
+
+    test('matched row surfaces pushed-state + sku_conflict from the entry', () => {
+        const r = rows.find(x => x.zoho_item_id === 'Z1');
+        expect(r.pushed_at).toBe('2026-06-01 10:00:00');
+        expect(r.pushed_job_id).toBe(777);
+        expect(r.pushed_dpl).toBe(2050);
+        expect(r.sku_conflict).toBe('SOME OTHER ITEM');
+    });
+
+    test('push_changed is true when pushed_dpl differs from current dpl', () => {
+        // entry 11: pushed_dpl 2050 vs current_dpl 2180 → changed since last push.
+        const r = rows.find(x => x.zoho_item_id === 'Z1');
+        expect(r.push_changed).toBe(true);
+    });
+
+    test('push_changed is false when never pushed', () => {
+        // entry 13 (Z3) has no pushed_at in the fixture.
+        const r = rows.find(x => x.zoho_item_id === 'Z3');
+        expect(r.push_changed).toBe(false);
+        expect(r.pushed_at == null).toBe(true);
+    });
+
+    test('unmatched and shared rows have null pushed-state fields', () => {
+        const u = rows.find(x => x.zoho_item_id === 'Z2'); // unmatched
+        const s = rows.find(x => x.zoho_item_id === 'Z4'); // shared
+        expect(u.pushed_at).toBeNull();
+        expect(u.push_changed).toBe(false);
+        expect(u.sku_conflict).toBeNull();
+        expect(s.pushed_at).toBeNull();
+        expect(s.push_changed).toBe(false);
+        expect(s.sku_conflict).toBeNull();
+    });
+
+    test('push_changed is true when only the rate differs', () => {
+        const out = buildZohoFirstView(
+            [{ zoho_item_id: 'ZR', zoho_item_name: 'X', zoho_sku: 'S', zoho_cf_dpl: '100', zoho_rate: '130' }],
+            [{ id: 1, zoho_item_id: 'ZR', current_dpl: '100', current_rate: '140', pushed_at: '2026-06-01 00:00:00', pushed_dpl: '100', pushed_rate: '130' }]
+        );
+        expect(out.rows[0].push_changed).toBe(true); // dpl same, rate 130→140
     });
 
     test('rows sorted: unmatched, then changed, then shared, then unchanged', () => {

@@ -232,6 +232,29 @@ router.get('/items/dpl-catalog/:brand/by-zoho', requirePermission('zoho', 'manag
         );
 
         const entries = await dplCatalogService.getCatalog(brand);
+
+        // Decorate with sku_conflict: another ACTIVE Zoho item already holding this
+        // entry's canonical SKU (pushing would collide). Mirrors GET …/:brand.
+        const skus = [...new Set(entries.filter(e => e.canonical_sku).map(e => String(e.canonical_sku).toUpperCase()))];
+        const skuHolders = new Map();
+        if (skus.length) {
+            const [hrows] = await pool.query(
+                `SELECT zoho_item_id, zoho_item_name, UPPER(zoho_sku) AS sku
+                 FROM zoho_items_map WHERE zoho_status='active' AND UPPER(zoho_sku) IN (${skus.map(() => '?').join(',')})`,
+                skus
+            );
+            hrows.forEach(h => {
+                if (!skuHolders.has(h.sku)) skuHolders.set(h.sku, []);
+                skuHolders.get(h.sku).push({ id: String(h.zoho_item_id), name: h.zoho_item_name });
+            });
+        }
+        for (const e of entries) {
+            if (!e.canonical_sku) { e.sku_conflict = null; continue; }
+            const holders = skuHolders.get(String(e.canonical_sku).toUpperCase()) || [];
+            const other = holders.find(h => h.id !== String(e.zoho_item_id));
+            e.sku_conflict = other ? other.name : null;
+        }
+
         const view = dplCatalogService.buildZohoFirstView(zohoItems, entries);
 
         res.json({ success: true, data: view });
