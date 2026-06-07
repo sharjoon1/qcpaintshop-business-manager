@@ -9,7 +9,7 @@ async function migrate() {
             host: process.env.DB_HOST || 'localhost',
             user: process.env.DB_USER || 'root',
             password: process.env.DB_PASSWORD || '',
-            database: process.env.DB_NAME || 'business_manager',
+            database: process.env.DB_NAME || 'qc_business_manager',
             port: process.env.DB_PORT || 3306
         });
 
