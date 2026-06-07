@@ -1626,7 +1626,7 @@
             // behavior); drop selections for entries that are no longer changed.
             var keep = {};
             zfRows.forEach(function(r){
-                if (r.changed && r.entry_id != null) keep[r.entry_id] = true;
+                if (zfIsPushable(r) && r.entry_id != null) keep[r.entry_id] = true;
             });
             zfPushSelected = keep;
             renderZohoFirst();
@@ -1669,9 +1669,13 @@
     // Per-row actions: edit the real Zoho item (local) + push it to Zoho.
     function zfRowActions(r) {
         var idAttr = esc(r.zoho_item_id);
+        var repick = (r.status === 'matched')
+            ? '<button onclick="openAttachPicker(\'' + idAttr + '\')" class="px-2 py-0.5 rounded text-[10px] font-bold bg-amber-100 text-amber-700 hover:bg-amber-200" title="Swap this Zoho item to a different DPL entry">🔄 Re-pick</button>'
+            : '';
         return '<div class="mt-1 flex flex-wrap gap-1">' +
             '<button onclick="openZfEdit(\'' + idAttr + '\')" class="px-2 py-0.5 rounded text-[10px] font-bold bg-gray-100 text-gray-700 hover:bg-gray-200">✏ Edit</button>' +
             '<button onclick="pushZfItem(\'' + idAttr + '\')" class="px-2 py-0.5 rounded text-[10px] font-bold bg-indigo-600 text-white hover:bg-indigo-700">⬆ Push</button>' +
+            repick +
             '</div>';
     }
 
@@ -1739,12 +1743,12 @@
         return r.status === 'matched' && r.new_dpl != null && Number(r.new_dpl) > 0
             && (!r.pushed_at || r.push_changed);
     }
-    function zfChangedRows() {
-        return zfRows.filter(function(r){ return r.changed && r.entry_id != null; });
+    function zfPushableRows() {
+        return zfRows.filter(function(r){ return zfIsPushable(r) && r.entry_id != null; });
     }
     function zfSelectedIds() {
-        return zfChangedRows().filter(function(r){ return zfPushSelected[r.entry_id]; })
-                              .map(function(r){ return r.entry_id; });
+        return zfPushableRows().filter(function(r){ return zfPushSelected[r.entry_id]; })
+                               .map(function(r){ return r.entry_id; });
     }
     function zfTogglePush(entryId, checked) {
         if (checked) zfPushSelected[entryId] = true;
@@ -1754,7 +1758,7 @@
     function zfToggleHeadCheck(cb) {
         // Toggle every VISIBLE changed row.
         visibleZohoFirstRows().forEach(function(r){
-            if (r.changed && r.entry_id != null) {
+            if (zfIsPushable(r) && r.entry_id != null) {
                 if (cb.checked) zfPushSelected[r.entry_id] = true;
                 else delete zfPushSelected[r.entry_id];
             }
@@ -1923,7 +1927,7 @@
         zfRefreshPushBtn();
 
         document.getElementById('zohoFirstTableBody').innerHTML = visible.map(function(r) {
-            var chk = (r.changed && r.entry_id != null)
+            var chk = (zfIsPushable(r) && r.entry_id != null)
                 ? '<input type="checkbox" onchange="zfTogglePush(' + Number(r.entry_id) + ', this.checked)"' + (zfPushSelected[r.entry_id] ? ' checked' : '') + ' aria-label="Queue this row for push">'
                 : '';
             return '<tr class="border-t hover:bg-gray-50 align-top">' +
@@ -2022,6 +2026,19 @@
     async function attachDpl(entryId) {
         if (!zfAttachItemId) return;
         try {
+            // Re-pick: if this Zoho item already links a different DPL entry, detach the
+            // old one (→ not-in-zoho) first so attaching the new one doesn't make it shared.
+            var row = zfRows.find(function(r){ return String(r.zoho_item_id) === String(zfAttachItemId); });
+            var oldEntryId = row && row.entry_id != null ? row.entry_id : null;
+            if (oldEntryId != null && Number(oldEntryId) !== Number(entryId)) {
+                var dResp = await fetch('/api/zoho/items/dpl-catalog/entry/' + oldEntryId + '/not-in-zoho', {
+                    method: 'POST',
+                    headers: { 'Authorization': 'Bearer ' + getToken(), 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ value: true })
+                });
+                var dBody = await dResp.json();
+                if (!dResp.ok || !dBody.success) throw new Error(dBody.message || ('Server error ' + dResp.status));
+            }
             var resp = await fetch('/api/zoho/items/dpl-catalog/entry/' + entryId + '/confirm-link', {
                 method: 'POST',
                 headers: { 'Authorization': 'Bearer ' + getToken(), 'Content-Type': 'application/json' },
@@ -2029,7 +2046,7 @@
             });
             var body = await resp.json();
             if (!resp.ok || !body.success) throw new Error(body.message || ('Server error ' + resp.status));
-            showToast('DPL attached', 'success');
+            showToast(oldEntryId != null ? 'DPL re-picked' : 'DPL attached', 'success');
             closeAttachPicker();
             await loadZohoFirst();
         } catch (err) {
