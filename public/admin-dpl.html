@@ -426,6 +426,8 @@
                         <button onclick="setZohoFilter('unchanged')" id="zffUnchanged" class="zf-filter px-2 py-1 rounded text-[11px] font-semibold bg-gray-100 text-gray-600">✓ Unchanged</button>
                         <button onclick="setZohoFilter('pushable')"  id="zffPushable"  class="zf-filter px-2 py-1 rounded text-[11px] font-semibold bg-gray-100 text-gray-600">☑ Pushable</button>
                         <button onclick="setZohoFilter('pushed')"    id="zffPushed"    class="zf-filter px-2 py-1 rounded text-[11px] font-semibold bg-gray-100 text-gray-600">✅ Pushed</button>
+                        <button onclick="setZohoFilter('done')"      id="zffDone"      class="zf-filter px-2 py-1 rounded text-[11px] font-semibold bg-gray-100 text-gray-600">✅ Done</button>
+                        <button onclick="setZohoFilter('later')"     id="zffLater"     class="zf-filter px-2 py-1 rounded text-[11px] font-semibold bg-gray-100 text-gray-600">🕒 Later</button>
                     </div>
                     <div class="overflow-x-auto border rounded-lg hidden sm:block">
                         <table class="w-full text-[11px]">
@@ -499,6 +501,7 @@
                         <div class="p-3 border-t flex justify-end gap-2">
                             <button onclick="closeZfEdit()" class="px-3 py-2 rounded border text-gray-600 text-xs">Cancel</button>
                             <button onclick="saveZfEdit()" id="zfEditSaveBtn" class="px-4 py-2 rounded bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold disabled:opacity-50">💾 Save</button>
+                            <button onclick="saveZfEditAndDone()" id="zfEditDoneBtn" class="px-4 py-2 rounded bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold disabled:opacity-50" style="display:none">✅ Push &amp; mark Done</button>
                         </div>
                     </div>
                 </div>
@@ -1421,6 +1424,7 @@
     var zfUnlinked = [];               // attach-picker candidates
     var zfAttachItemId = null;         // Zoho item id currently being attached
     var zfEditItemId = null;            // Zoho item id currently being edited
+    var zfDoneMode = false;             // true while the edit sheet is in "Push & mark Done" mode
 
     var catalogEntries = [];
     var catalogFilter = 'all';
@@ -1643,6 +1647,26 @@
         return '₹' + Number(n).toLocaleString('en-IN');
     }
 
+    // Badge shown on a row that the owner has triaged out of "No match".
+    function zfDispositionBadge(r) {
+        var disp = r.disposition || 'pending';
+        if (disp === 'done')  return ' <span class="px-1.5 py-0.5 rounded text-[10px] bg-emerald-100 text-emerald-700" title="Manually finalized — no DPL match">✅ Done</span>';
+        if (disp === 'later') return ' <span class="px-1.5 py-0.5 rounded text-[10px] bg-sky-100 text-sky-700" title="Deferred — set up later">🕒 Later</span>';
+        return '';
+    }
+
+    // Triage buttons for an unmatched row: pending → Done / Later; otherwise Reopen.
+    function zfDispositionActions(r) {
+        if (r.status !== 'unmatched') return '';
+        var idAttr = esc(r.zoho_item_id);
+        var disp = r.disposition || 'pending';
+        if (disp === 'pending') {
+            return '<button onclick="zfMarkDone(\'' + idAttr + '\')" class="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-600 text-white hover:bg-emerald-700" title="Set a manual price, push to Zoho, and finalize">✅ Done</button>' +
+                   '<button onclick="zfSetDisposition(\'' + idAttr + '\',\'later\')" class="px-2 py-0.5 rounded text-[10px] font-bold bg-sky-100 text-sky-700 hover:bg-sky-200" title="Set this item aside for later">🕒 Later</button>';
+        }
+        return '<button onclick="zfSetDisposition(\'' + idAttr + '\',\'pending\')" class="px-2 py-0.5 rounded text-[10px] font-bold bg-gray-100 text-gray-700 hover:bg-gray-200" title="Move back to No match">↩ Reopen</button>';
+    }
+
     function zfStatusChip(r) {
         if (r.status === 'unmatched')
             return '<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-rose-100 text-rose-700">⚠ no match</span>';
@@ -1657,6 +1681,7 @@
     function zfProposalHtml(r) {
         if (r.status !== 'unmatched') return '';
         var idAttr = esc(r.zoho_item_id);
+        var dispBtns = zfDispositionActions(r);
         var attachBtn = '<button onclick="openAttachPicker(\'' + idAttr + '\')" class="px-2 py-0.5 rounded text-[10px] font-bold bg-rose-100 text-rose-700 hover:bg-rose-200">Attach DPL</button>';
         if (r.proposal) {
             var p = r.proposal;
@@ -1664,9 +1689,9 @@
             var acceptBtn = '<button onclick="acceptProposal(\'' + idAttr + '\',' + Number(p.entry_id) + ')" class="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-600 text-white hover:bg-emerald-700">✓ Accept</button>';
             return '<div class="mt-1 text-[10px] text-gray-600">Proposed: <b>' + esc(p.product_name) + '</b> · ' + esc(p.base_name || '—') + ' · ' + esc(p.dpl_size_label) + ' · ' + fmtMoney(p.current_dpl) +
                 ' <span class="px-1 rounded ' + confCls + '">' + esc(p.confidence) + '</span></div>' +
-                '<div class="mt-1 flex flex-wrap gap-1">' + acceptBtn + attachBtn + '</div>';
+                '<div class="mt-1 flex flex-wrap gap-1">' + acceptBtn + attachBtn + dispBtns + '</div>';
         }
-        return '<div class="mt-1">' + attachBtn + '</div>';
+        return '<div class="mt-1 flex flex-wrap gap-1">' + attachBtn + dispBtns + '</div>';
     }
 
     // Per-row actions: edit the real Zoho item (local) + push it to Zoho.
@@ -1698,12 +1723,88 @@
         document.getElementById('zfEditDesc').value = '';
         document.getElementById('zfEditDpl').value = (r.old_dpl != null ? r.old_dpl : '');
         updateZfRatePreview();
+        zfDoneMode = false;
+        document.getElementById('zfEditDoneBtn').style.display = 'none';
+        document.getElementById('zfEditSaveBtn').style.display = '';
         document.getElementById('zfEditModal').style.display = 'flex';
     }
 
     function closeZfEdit() {
         zfEditItemId = null;
         document.getElementById('zfEditModal').style.display = 'none';
+    }
+
+    // Open the edit sheet in "Push & mark Done" mode for an unmatched item.
+    function zfMarkDone(zohoItemId) {
+        openZfEdit(zohoItemId);
+        zfDoneMode = true;
+        document.getElementById('zfEditDoneBtn').style.display = '';
+        document.getElementById('zfEditSaveBtn').style.display = 'none';
+    }
+
+    // Save manual details → push to Zoho → only on success, mark disposition 'done'.
+    async function saveZfEditAndDone() {
+        if (!zfEditItemId) return;
+        var itemId = zfEditItemId;
+        var btn = document.getElementById('zfEditDoneBtn');
+        btn.disabled = true;
+        try {
+            var dplVal = document.getElementById('zfEditDpl').value;
+            var descVal = document.getElementById('zfEditDesc').value;
+            var payload = {
+                name: document.getElementById('zfEditName').value,
+                sku: document.getElementById('zfEditSku').value
+            };
+            if (descVal.trim() !== '') payload.description = descVal;
+            if (dplVal !== '') payload.dpl = parseFloat(dplVal);
+            var sResp = await fetch('/api/zoho/items/zoho-item/' + encodeURIComponent(itemId), {
+                method: 'PUT',
+                headers: { 'Authorization': 'Bearer ' + getToken(), 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
+            var sBody = await sResp.json();
+            if (!sResp.ok || !sBody.success) throw new Error(sBody.message || ('Save failed ' + sResp.status));
+
+            var pResp = await fetch('/api/zoho/items/zoho-item/' + encodeURIComponent(itemId) + '/push', {
+                method: 'POST',
+                headers: { 'Authorization': 'Bearer ' + getToken(), 'Content-Type': 'application/json' }
+            });
+            var pBody = await pResp.json();
+            if (!pResp.ok || !pBody.success) throw new Error(pBody.message || ('Push failed ' + pResp.status));
+
+            var dResp = await fetch('/api/zoho/items/zoho-item/' + encodeURIComponent(itemId) + '/disposition', {
+                method: 'POST',
+                headers: { 'Authorization': 'Bearer ' + getToken(), 'Content-Type': 'application/json' },
+                body: JSON.stringify({ disposition: 'done' })
+            });
+            var dBody = await dResp.json();
+            if (!dResp.ok || !dBody.success) throw new Error(dBody.message || ('Disposition failed ' + dResp.status));
+
+            closeZfEdit();
+            showToast('Pushed & marked Done', 'success');
+            await loadZohoFirst();
+        } catch (err) {
+            showToast('Done error: ' + err.message, 'error');
+        } finally {
+            btn.disabled = false;
+        }
+    }
+
+    // Set/clear a Zoho item's disposition (later / pending-reopen) and reload.
+    async function zfSetDisposition(zohoItemId, disposition) {
+        try {
+            var resp = await fetch('/api/zoho/items/zoho-item/' + encodeURIComponent(zohoItemId) + '/disposition', {
+                method: 'POST',
+                headers: { 'Authorization': 'Bearer ' + getToken(), 'Content-Type': 'application/json' },
+                body: JSON.stringify({ disposition: disposition })
+            });
+            var body = await resp.json();
+            if (!resp.ok || !body.success) throw new Error(body.message || ('Server error ' + resp.status));
+            showToast(disposition === 'later' ? 'Set aside for later' : (disposition === 'pending' ? 'Reopened' : 'Updated'), 'success');
+            await loadZohoFirst();
+        } catch (err) {
+            showToast('Disposition error: ' + err.message, 'error');
+        }
     }
 
     async function saveZfEdit() {
@@ -1809,7 +1910,7 @@
                 '<div class="min-w-0"><div class="font-semibold text-gray-800 truncate">' + esc(r.zoho_name) + '</div>' +
                 '<div class="text-[10px] font-mono ' + (r.sku_conflict ? 'text-rose-600' : 'text-gray-400') + '">' + esc(r.zoho_sku) +
                     (r.sku_conflict ? ' ⚠' : '') + (r.category ? ' · ' + esc(r.category) : '') + '</div></div></div>' +
-                '<div class="text-right">' + zfStatusChip(r) + zfPushedChip(r) + '</div>' +
+                '<div class="text-right">' + zfStatusChip(r) + zfPushedChip(r) + zfDispositionBadge(r) + '</div>' +
             '</div>' +
             '<div class="text-[12px] text-gray-700 mt-1">' + price + ' &nbsp; ' + zfDiffCell(r) + '</div>' +
             '<div class="text-[11px] mt-1">' + zfLinkedDplCell(r) + '</div>' +
@@ -1899,12 +2000,15 @@
     function visibleZohoFirstRows() {
         var q = (document.getElementById('zfSearch').value || '').toLowerCase().trim();
         return zfRows.filter(function(r) {
-            if (zfFilter === 'unmatched' && r.status !== 'unmatched') return false;
+            var disp = r.disposition || 'pending';
+            if (zfFilter === 'unmatched' && !(r.status === 'unmatched' && disp === 'pending')) return false;
             if (zfFilter === 'changed'   && !r.changed) return false;
             if (zfFilter === 'shared'    && r.status !== 'shared') return false;
             if (zfFilter === 'unchanged' && !(r.status === 'matched' && !r.changed)) return false;
             if (zfFilter === 'pushable'  && !zfIsPushable(r)) return false;
             if (zfFilter === 'pushed'    && !r.pushed_at) return false;
+            if (zfFilter === 'done'      && disp !== 'done') return false;
+            if (zfFilter === 'later'     && disp !== 'later') return false;
             if (q) return zfHaystack(r).indexOf(q) !== -1;
             return true;
         });
@@ -1912,7 +2016,7 @@
 
     function setZohoFilter(f) {
         zfFilter = f;
-        var ids = { all: 'zffAll', unmatched: 'zffUnmatched', changed: 'zffChanged', shared: 'zffShared', unchanged: 'zffUnchanged', pushable: 'zffPushable', pushed: 'zffPushed' };
+        var ids = { all: 'zffAll', unmatched: 'zffUnmatched', changed: 'zffChanged', shared: 'zffShared', unchanged: 'zffUnchanged', pushable: 'zffPushable', pushed: 'zffPushed', done: 'zffDone', later: 'zffLater' };
         document.querySelectorAll('.zf-filter').forEach(function(b){ b.className = 'zf-filter px-2 py-1 rounded text-[11px] font-semibold bg-gray-100 text-gray-600'; });
         var active = document.getElementById(ids[f]);
         if (active) active.className = 'zf-filter px-2 py-1 rounded text-[11px] font-semibold bg-indigo-600 text-white';
@@ -1922,7 +2026,7 @@
     function renderZohoFirst() {
         var visible = visibleZohoFirstRows();
 
-        var unmatched = zfRows.filter(function(r){ return r.status === 'unmatched'; }).length;
+        var unmatched = zfRows.filter(function(r){ return r.status === 'unmatched' && (r.disposition || 'pending') === 'pending'; }).length;
         var shared    = zfRows.filter(function(r){ return r.status === 'shared'; }).length;
         var unchanged = zfRows.filter(function(r){ return r.status === 'matched' && !r.changed; }).length;
         var changed   = zfRows.filter(function(r){ return r.changed; });
@@ -1949,7 +2053,7 @@
                 '<td class="px-2 py-1.5 text-right">' + fmtMoney(r.new_rate) + '</td>' +
                 '<td class="px-2 py-1.5 text-right">' + zfDiffCell(r) + '</td>' +
                 '<td class="px-2 py-1.5 text-left">' + zfLinkedDplCell(r) + '</td>' +
-                '<td class="px-2 py-1.5 text-center">' + zfStatusChip(r) + zfPushedChip(r) + zfProposalHtml(r) + zfRowActions(r) + '</td>' +
+                '<td class="px-2 py-1.5 text-center">' + zfStatusChip(r) + zfPushedChip(r) + zfDispositionBadge(r) + zfProposalHtml(r) + zfRowActions(r) + '</td>' +
                 '</tr>';
         }).join('');
 
