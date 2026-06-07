@@ -424,6 +424,8 @@
                         <button onclick="setZohoFilter('changed')"   id="zffChanged"   class="zf-filter px-2 py-1 rounded text-[11px] font-semibold bg-gray-100 text-gray-600">↕ Changed</button>
                         <button onclick="setZohoFilter('shared')"    id="zffShared"    class="zf-filter px-2 py-1 rounded text-[11px] font-semibold bg-gray-100 text-gray-600">⚠ Shared</button>
                         <button onclick="setZohoFilter('unchanged')" id="zffUnchanged" class="zf-filter px-2 py-1 rounded text-[11px] font-semibold bg-gray-100 text-gray-600">✓ Unchanged</button>
+                        <button onclick="setZohoFilter('pushable')"  id="zffPushable"  class="zf-filter px-2 py-1 rounded text-[11px] font-semibold bg-gray-100 text-gray-600">☑ Pushable</button>
+                        <button onclick="setZohoFilter('pushed')"    id="zffPushed"    class="zf-filter px-2 py-1 rounded text-[11px] font-semibold bg-gray-100 text-gray-600">✅ Pushed</button>
                     </div>
                     <div class="overflow-x-auto border rounded-lg hidden sm:block">
                         <table class="w-full text-[11px]">
@@ -1731,6 +1733,12 @@
 
     var zfPushSelected = {};   // entry_id → true, for changed rows queued to push
     // A changed, pushable row carries an entry_id.
+    // A row is pushable when it's matched, carries a DPL to write, and is either
+    // not yet pushed or its DPL/rate changed since the last push (mirrors isPushable).
+    function zfIsPushable(r) {
+        return r.status === 'matched' && r.new_dpl != null && Number(r.new_dpl) > 0
+            && (!r.pushed_at || r.push_changed);
+    }
     function zfChangedRows() {
         return zfRows.filter(function(r){ return r.changed && r.entry_id != null; });
     }
@@ -1864,6 +1872,17 @@
         return '<span class="' + cls + ' font-semibold">' + (up ? '+' : '') + fmtMoney(r.diff) + ' ' + arrow + '</span>';
     }
 
+    // Build the search haystack: Zoho name/SKU + any linked DPL product/base/SKU.
+    function zfHaystack(r) {
+        var parts = [r.zoho_name || '', r.zoho_sku || ''];
+        if (r.matched) parts.push(r.matched.product_name, r.matched.base_name, r.matched.canonical_sku);
+        if (r.linked_entries) r.linked_entries.forEach(function(e){
+            parts.push(e.product_name, e.base_name, e.canonical_sku);
+        });
+        if (r.proposal) parts.push(r.proposal.product_name, r.proposal.base_name);
+        return parts.join(' ').toLowerCase();
+    }
+
     function visibleZohoFirstRows() {
         var q = (document.getElementById('zfSearch').value || '').toLowerCase().trim();
         return zfRows.filter(function(r) {
@@ -1871,17 +1890,16 @@
             if (zfFilter === 'changed'   && !r.changed) return false;
             if (zfFilter === 'shared'    && r.status !== 'shared') return false;
             if (zfFilter === 'unchanged' && !(r.status === 'matched' && !r.changed)) return false;
-            if (q) {
-                return (r.zoho_name || '').toLowerCase().indexOf(q) !== -1 ||
-                       (r.zoho_sku  || '').toLowerCase().indexOf(q) !== -1;
-            }
+            if (zfFilter === 'pushable'  && !zfIsPushable(r)) return false;
+            if (zfFilter === 'pushed'    && !r.pushed_at) return false;
+            if (q) return zfHaystack(r).indexOf(q) !== -1;
             return true;
         });
     }
 
     function setZohoFilter(f) {
         zfFilter = f;
-        var ids = { all: 'zffAll', unmatched: 'zffUnmatched', changed: 'zffChanged', shared: 'zffShared', unchanged: 'zffUnchanged' };
+        var ids = { all: 'zffAll', unmatched: 'zffUnmatched', changed: 'zffChanged', shared: 'zffShared', unchanged: 'zffUnchanged', pushable: 'zffPushable', pushed: 'zffPushed' };
         document.querySelectorAll('.zf-filter').forEach(function(b){ b.className = 'zf-filter px-2 py-1 rounded text-[11px] font-semibold bg-gray-100 text-gray-600'; });
         var active = document.getElementById(ids[f]);
         if (active) active.className = 'zf-filter px-2 py-1 rounded text-[11px] font-semibold bg-indigo-600 text-white';
