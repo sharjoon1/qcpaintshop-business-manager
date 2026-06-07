@@ -1786,14 +1786,33 @@
         return '<div class="border rounded-lg p-3 bg-white">' +
             '<div class="flex items-start justify-between gap-2">' +
                 '<div class="min-w-0"><div class="font-semibold text-gray-800 truncate">' + esc(r.zoho_name) + '</div>' +
-                '<div class="text-[10px] font-mono text-gray-400">' + esc(r.zoho_sku) +
-                    (r.category ? ' · ' + esc(r.category) : '') + '</div></div>' +
-                zfStatusChip(r) +
+                '<div class="text-[10px] font-mono ' + (r.sku_conflict ? 'text-rose-600' : 'text-gray-400') + '">' + esc(r.zoho_sku) +
+                    (r.sku_conflict ? ' ⚠' : '') + (r.category ? ' · ' + esc(r.category) : '') + '</div></div>' +
+                '<div class="text-right">' + zfStatusChip(r) + zfPushedChip(r) + '</div>' +
             '</div>' +
             '<div class="text-[12px] text-gray-700 mt-1">' + price + ' &nbsp; ' + zfDiffCell(r) + '</div>' +
             '<div class="text-[11px] mt-1">' + zfLinkedDplCell(r) + '</div>' +
             zfProposalHtml(r) + zfRowActions(r) +
         '</div>';
+    }
+
+    // SKU cell with a conflict warning when another active Zoho item holds this SKU.
+    function zfSkuCell(r) {
+        var sku = esc(r.zoho_sku || '—');
+        if (r.sku_conflict) {
+            return '<span class="text-rose-600">' + sku +
+                ' <span title="SKU also used by: ' + esc(r.sku_conflict) + '">⚠</span></span>';
+        }
+        return sku;
+    }
+
+    // Pushed-state chip for a matched Zoho-first row (mirrors DPL-first pushedChip).
+    function zfPushedChip(r) {
+        if (!r.pushed_at) return '';
+        var detail = 'Pushed ' + fmtPushed(r.pushed_at) + (r.pushed_job_id ? ' · job #' + r.pushed_job_id : '');
+        return r.push_changed
+            ? ' <span class="px-1.5 py-0.5 rounded text-[10px] bg-amber-100 text-amber-700" title="' + esc(detail + ' · ₹' + r.pushed_dpl + '→₹' + r.new_dpl + ' — DPL changed, re-push') + '">⚠ re-push</span>'
+            : ' <span class="px-1.5 py-0.5 rounded text-[10px] bg-emerald-100 text-emerald-700" title="' + esc(detail + ' · no change') + '">✅ pushed</span>';
     }
 
     // Shared row: list every colliding DPL entry with a detach action that reuses
@@ -1893,13 +1912,13 @@
                 '<td class="px-2 py-1.5 text-center">' + chk + '</td>' +
                 '<td class="px-2 py-1.5 text-left"><div>' + esc(r.zoho_name) + '</div>' +
                     (r.category ? '<div class="text-[10px] text-gray-400">' + esc(r.category) + '</div>' : '') + '</td>' +
-                '<td class="px-2 py-1.5 text-left text-gray-500">' + esc(r.zoho_sku) + '</td>' +
+                '<td class="px-2 py-1.5 text-left text-gray-500">' + zfSkuCell(r) + '</td>' +
                 '<td class="px-2 py-1.5 text-right">' + fmtMoney(r.old_dpl) + '</td>' +
                 '<td class="px-2 py-1.5 text-right">' + fmtMoney(r.new_dpl) + '</td>' +
                 '<td class="px-2 py-1.5 text-right">' + fmtMoney(r.new_rate) + '</td>' +
                 '<td class="px-2 py-1.5 text-right">' + zfDiffCell(r) + '</td>' +
                 '<td class="px-2 py-1.5 text-left">' + zfLinkedDplCell(r) + '</td>' +
-                '<td class="px-2 py-1.5 text-center">' + zfStatusChip(r) + zfProposalHtml(r) + zfRowActions(r) + '</td>' +
+                '<td class="px-2 py-1.5 text-center">' + zfStatusChip(r) + zfPushedChip(r) + zfProposalHtml(r) + zfRowActions(r) + '</td>' +
                 '</tr>';
         }).join('');
 
