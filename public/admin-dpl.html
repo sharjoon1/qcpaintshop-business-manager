@@ -1756,6 +1756,29 @@
         '</div>';
     }
 
+    // Shared row: list every colliding DPL entry with a detach action that reuses
+    // the existing not-in-zoho endpoint (same mechanism DPL-first uses for dups).
+    function zfSharedCell(r) {
+        var list = r.linked_entries || [];
+        if (!list.length) {
+            return '<span class="text-amber-700 font-semibold">' + (r.shared_count || 0) + ' DPL entries</span>';
+        }
+        var head = '<div class="text-amber-700 font-semibold mb-0.5">⚠ ' + list.length + ' DPL entries share this item</div>';
+        var items = list.map(function(e) {
+            var label = esc(e.product_name) +
+                (e.base_name ? ' · ' + esc(e.base_name) : '') +
+                (e.dpl_size_label ? ' · ' + esc(e.dpl_size_label) : '') +
+                ' · ' + fmtMoney(e.current_dpl);
+            return '<div class="flex items-center justify-between gap-2 py-0.5">' +
+                '<span class="text-[10px] text-gray-700 min-w-0">' + label + '</span>' +
+                '<button onclick="zfDetachEntry(' + Number(e.entry_id) + ')" ' +
+                    'class="shrink-0 px-1.5 py-0.5 rounded text-[10px] font-bold bg-rose-100 text-rose-700 hover:bg-rose-200" ' +
+                    'title="Unlink this DPL entry and mark it for creation">🚫 Not in Zoho</button>' +
+            '</div>';
+        }).join('');
+        return head + items;
+    }
+
     // Linked DPL entry detail for a Zoho-first row (symmetric to DPL-first's
     // "Linked Zoho item" column). matched → product · base · size + SKU line.
     function zfLinkedDplCell(r) {
@@ -1768,7 +1791,7 @@
                 (m.canonical_sku ? '<div class="text-[10px] font-mono text-gray-400">' + esc(m.canonical_sku) + '</div>' : '');
         }
         if (r.status === 'shared') {
-            return '<span class="text-amber-700 font-semibold">' + (r.shared_count || 0) + ' DPL entries</span>';
+            return zfSharedCell(r);
         }
         return '<span class="text-gray-300">—</span>';
     }
@@ -1875,6 +1898,25 @@
                 '<div class="text-[10px] text-gray-500">' + esc(e.dpl_size_label) + ' · SKU ' + esc(e.canonical_sku || '—') + ' · DPL ' + fmtMoney(e.current_dpl) + '</div>' +
                 '</button>';
         }).join('');
+    }
+
+    // Detach one colliding DPL entry from a shared Zoho item: marks it "not in Zoho"
+    // (pending creation) via the existing endpoint, then refreshes the Zoho-first view.
+    async function zfDetachEntry(entryId) {
+        if (!confirm('Unlink this DPL entry from the shared Zoho item and mark it "not in Zoho"?')) return;
+        try {
+            var resp = await fetch('/api/zoho/items/dpl-catalog/entry/' + entryId + '/not-in-zoho', {
+                method: 'POST',
+                headers: { 'Authorization': 'Bearer ' + getToken(), 'Content-Type': 'application/json' },
+                body: JSON.stringify({ value: true })
+            });
+            var body = await resp.json();
+            if (!resp.ok || !body.success) throw new Error(body.message || ('Server error ' + resp.status));
+            showToast('Detached DPL entry', 'success');
+            await loadZohoFirst();
+        } catch (err) {
+            showToast('Detach error: ' + err.message, 'error');
+        }
     }
 
     async function acceptProposal(zohoItemId, entryId) {
