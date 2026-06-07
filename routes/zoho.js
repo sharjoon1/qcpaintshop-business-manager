@@ -552,6 +552,57 @@ router.post('/items/zoho-item/:id/push', requirePermission('zoho', 'manage'), as
     }
 });
 
+// Set the DPL triage disposition for one Zoho item: pending (default / reopen),
+// done (owner finalized a manual price), or later (deferred). Stored on
+// zoho_items_map — the item sync upsert never touches these columns, so it persists.
+router.post('/items/zoho-item/:id/disposition', requirePermission('zoho', 'manage'), async (req, res) => {
+    try {
+        const id = String(req.params.id || '');
+        if (!id) return res.status(400).json({ success: false, message: 'Invalid item id' });
+
+        const disposition = String((req.body || {}).disposition || '').toLowerCase();
+        if (!['pending', 'done', 'later'].includes(disposition)) {
+            return res.status(400).json({ success: false, message: "disposition must be 'pending', 'done' or 'later'" });
+        }
+
+        const [exist] = await pool.query(
+            'SELECT zoho_item_id, dpl_disposition FROM zoho_items_map WHERE zoho_item_id = ?', [id]
+        );
+        if (!exist.length) return res.status(404).json({ success: false, message: 'Item not found' });
+
+        const userId = req.user ? req.user.id : null;
+        if (disposition === 'pending') {
+            await pool.query(
+                `UPDATE zoho_items_map SET dpl_disposition = 'pending', dpl_disposition_at = NULL, dpl_disposition_by = ? WHERE zoho_item_id = ?`,
+                [userId, id]
+            );
+        } else {
+            await pool.query(
+                `UPDATE zoho_items_map SET dpl_disposition = ?, dpl_disposition_at = NOW(), dpl_disposition_by = ? WHERE zoho_item_id = ?`,
+                [disposition, userId, id]
+            );
+        }
+
+        try {
+            const audit = require('../services/audit-log');
+            await audit.record(req, {
+                action: 'zoho_item_disposition',
+                entity_type: 'zoho_item',
+                entity_id: id,
+                before: { dpl_disposition: exist[0].dpl_disposition || 'pending' },
+                after: { dpl_disposition: disposition }
+            });
+        } catch (e) {
+            console.warn('audit-log record failed:', e.message);
+        }
+
+        res.json({ success: true, disposition });
+    } catch (err) {
+        console.error('Zoho-item disposition error:', err.message);
+        res.status(500).json({ success: false, message: err.message });
+    }
+});
+
 // Module-scoped flag to prevent concurrent invoice-line back-fills
 let invoiceBackfillState = { running: false, startedAt: null };
 

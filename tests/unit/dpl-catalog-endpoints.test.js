@@ -23,6 +23,9 @@ describe('dpl-catalog endpoints registered on zoho router', () => {
     test('POST /items/dpl-catalog/entry/:id/not-in-zoho', () => {
         expect(has('post', '/items/dpl-catalog/entry/:id/not-in-zoho')).toBe(true);
     });
+    test('POST /items/zoho-item/:id/disposition', () => {
+        expect(has('post', '/items/zoho-item/:id/disposition')).toBe(true);
+    });
 });
 
 describe('catalogZohoScopeSql', () => {
