@@ -60,6 +60,12 @@
 
         <!-- Customers Table -->
         <div class="card">
+            <div class="flex items-center justify-end mb-4">
+                <label class="form-label mr-2 mb-0">Branch:</label>
+                <select id="branchFilter" onchange="filterByBranch()" class="form-input" style="max-width:240px;">
+                    <option value="">All Branches</option>
+                </select>
+            </div>
             <div class="overflow-x-auto">
                 <table class="table min-w-0">
                     <thead>
