@@ -266,7 +266,8 @@
             
             try {
                 const response = await fetch(`/api/customer-types/${id}`, {
-                    method: 'DELETE'
+                    method: 'DELETE',
+                    headers: getAuthHeaders()
                 });
                 
                 if (response.ok) {

@@ -763,7 +763,7 @@
                 const pan = document.getElementById('panNumber').value.trim().toUpperCase();
                 if (pan) {
                     if (!/^[A-Z]{5}[0-9]{4}[A-Z]$/.test(pan)) {
-                        showToast('Invalid PAN format (e.g. ABCDE1234F)', 'error');
+                        showAlert('Invalid PAN format (e.g. ABCDE1234F)', 'error');
                         btn.disabled = false;
                         btn.textContent = 'Submit Registration';
                         return;
