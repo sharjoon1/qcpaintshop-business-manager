@@ -750,23 +750,25 @@ function renderBubble(msg) {
         content += `<div class="msg-sender">${escHtml(msg.sender_name)}</div>`;
     }
 
-    // Media content
+    // Media content — media_url is inbound (sender-influenced): allowlist the URL scheme and
+    // escape it into attributes; the lightbox opens via delegation (data-lightbox), not inline onclick.
+    const mu = safeMediaUrl(msg.media_url);
     if (msg.message_type === 'image' && msg.media_url) {
-        content += `<div class="msg-media"><img src="${msg.media_url}" loading="lazy" onclick="openLightbox('${msg.media_url}')" alt="Image"></div>`;
+        content += `<div class="msg-media"><img src="${escHtml(mu)}" loading="lazy" data-lightbox="${escHtml(mu)}" alt="Image"></div>`;
         if (msg.caption) content += `<div class="msg-caption">${escHtml(msg.caption)}</div>`;
     } else if (msg.message_type === 'video' && msg.media_url) {
-        content += `<div class="msg-media"><video controls preload="metadata" src="${msg.media_url}"></video></div>`;
+        content += `<div class="msg-media"><video controls preload="metadata" src="${escHtml(mu)}"></video></div>`;
         if (msg.caption) content += `<div class="msg-caption">${escHtml(msg.caption)}</div>`;
     } else if (msg.message_type === 'audio' && msg.media_url) {
-        content += `<div class="msg-media"><audio controls preload="metadata" src="${msg.media_url}"></audio></div>`;
+        content += `<div class="msg-media"><audio controls preload="metadata" src="${escHtml(mu)}"></audio></div>`;
     } else if (msg.message_type === 'document' && msg.media_url) {
         const fname = msg.media_filename || 'Document';
-        content += `<a class="msg-doc" href="${msg.media_url}" download="${escHtml(fname)}" target="_blank">
+        content += `<a class="msg-doc" href="${escHtml(mu)}" download="${escHtml(fname)}" target="_blank">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
             <span>${escHtml(fname)}</span></a>`;
         if (msg.caption) content += `<div class="msg-caption">${escHtml(msg.caption)}</div>`;
     } else if (msg.message_type === 'sticker') {
-        if (msg.media_url) content += `<div class="msg-media"><img src="${msg.media_url}" style="max-width:150px" alt="Sticker"></div>`;
+        if (msg.media_url) content += `<div class="msg-media"><img src="${escHtml(mu)}" style="max-width:150px" alt="Sticker"></div>`;
         else content += `<div class="msg-text" style="font-style:italic;color:#8696a0;">Sticker</div>`;
     } else if (msg.message_type === 'location') {
         content += `<div class="msg-text" style="font-style:italic;">📍 Location shared</div>`;
@@ -1063,8 +1065,18 @@ function closeChat() {
 // ========================================
 // LIGHTBOX
 // ========================================
+// Allow only http(s)/relative media URLs (blocks javascript:/data: from inbound media).
+function safeMediaUrl(u) {
+    u = String(u == null ? '' : u);
+    return (/^https?:\/\//i.test(u) || (u.charAt(0) === '/' && u.charAt(1) !== '/')) ? u : '';
+}
+// Open the lightbox via event delegation instead of an inline onclick on each <img>.
+document.addEventListener('click', function(e) {
+    const img = e.target.closest('[data-lightbox]');
+    if (img) openLightbox(img.getAttribute('data-lightbox'));
+});
 function openLightbox(url) {
-    document.getElementById('lightboxImg').src = url;
+    document.getElementById('lightboxImg').src = safeMediaUrl(url);
     document.getElementById('lightbox').classList.add('show');
 }
 function closeLightbox() {

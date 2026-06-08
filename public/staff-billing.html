@@ -1009,12 +1009,22 @@ async function searchProducts() {
         const data = await res.json();
         if (!data.success || !data.products.length) { el.classList.add('hidden'); return; }
 
-        el.innerHTML = data.products.map(p => `
-            <div class="suggestion-item" onclick="addProduct(${JSON.stringify(p).replace(/"/g, '&quot;')})">
+        // Keep the result objects on the element and reference them by index instead of
+        // serializing each product into an onclick attribute (avoids HTML/JS-context injection).
+        el._results = data.products;
+        el.innerHTML = data.products.map((p, i) => `
+            <div class="suggestion-item" data-idx="${i}">
                 <div class="font-medium text-gray-800">${esc(p.item_name)}</div>
                 <div class="text-xs text-gray-400">${p.pack_size ? esc(p.pack_size) + ' &middot; ' : ''}${formatCurrency(p.rate)}</div>
             </div>
         `).join('');
+        if (!el._wired) {
+            el._wired = true;
+            el.addEventListener('click', function(e) {
+                const item = e.target.closest('.suggestion-item[data-idx]');
+                if (item && el._results) addProduct(el._results[Number(item.dataset.idx)]);
+            });
+        }
         el.classList.remove('hidden');
     } catch (e) {
         el.classList.add('hidden');

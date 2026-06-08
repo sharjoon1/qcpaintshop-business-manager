@@ -515,7 +515,7 @@ function renderStaffCards(data) {
             const type = s.activity_type || s.current_activity || 'unknown';
             const info = ACTIVITY_ICONS[type] || { emoji: '\u2753', label: type, color: '#64748b', bg: '#f1f5f9' };
             const elapsed = elapsedSince(s.started_at || s.activity_started_at);
-            return '<div class="staff-card active" onclick="viewStaffTimeline(' + s.user_id + ', \'' + escapeHtml((s.full_name || s.name || '').replace(/'/g, "\\'")) + '\')">' +
+            return '<div class="staff-card active" data-user-id="' + s.user_id + '" data-name="' + escapeHtml(s.full_name || s.name || '') + '">' +
                 '<div style="display:flex;justify-content:space-between;align-items:flex-start;">' +
                     '<div>' +
                         '<div style="font-size:14px;font-weight:600;color:#0f172a;">' + escapeHtml(s.full_name || s.name) + '</div>' +
@@ -542,7 +542,7 @@ function renderStaffCards(data) {
     } else {
         document.getElementById('idleStaffGrid').innerHTML = idleStaff.map(function(s) {
             const idleMins = s.idle_minutes || elapsedMinutes(s.last_activity_end || s.idle_since);
-            return '<div class="staff-card idle" onclick="viewStaffTimeline(' + s.user_id + ', \'' + escapeHtml((s.full_name || s.name || '').replace(/'/g, "\\'")) + '\')">' +
+            return '<div class="staff-card idle" data-user-id="' + s.user_id + '" data-name="' + escapeHtml(s.full_name || s.name || '') + '">' +
                 '<div style="display:flex;justify-content:space-between;align-items:flex-start;">' +
                     '<div>' +
                         '<div style="font-size:14px;font-weight:600;color:#0f172a;">' + escapeHtml(s.full_name || s.name) + '</div>' +
@@ -566,7 +566,7 @@ function renderStaffCards(data) {
     } else {
         document.getElementById('breakStaffGrid').innerHTML = breakStaff.map(function(s) {
             const elapsed = elapsedSince(s.break_started_at || s.started_at);
-            return '<div class="staff-card on-break" onclick="viewStaffTimeline(' + s.user_id + ', \'' + escapeHtml((s.full_name || s.name || '').replace(/'/g, "\\'")) + '\')">' +
+            return '<div class="staff-card on-break" data-user-id="' + s.user_id + '" data-name="' + escapeHtml(s.full_name || s.name || '') + '">' +
                 '<div style="display:flex;justify-content:space-between;align-items:flex-start;">' +
                     '<div>' +
                         '<div style="font-size:14px;font-weight:600;color:#0f172a;">' + escapeHtml(s.full_name || s.name) + '</div>' +
@@ -578,6 +578,14 @@ function renderStaffCards(data) {
         }).join('');
     }
 }
+
+// ── Staff card click (event delegation: cards are rebuilt on every refresh; the
+//    Send Reminder button stops propagation so it never triggers the card) ──
+document.addEventListener('click', function(e) {
+    if (e.target.closest('.btn-reminder')) return;
+    const card = e.target.closest('.staff-card[data-user-id]');
+    if (card) viewStaffTimeline(Number(card.dataset.userId), card.dataset.name || '');
+});
 
 // ── Send Reminder ──
 async function sendReminder(userId, btn) {
@@ -677,7 +685,7 @@ function renderDaySummary(data) {
 async function viewStaffTimeline(userId, name) {
     document.getElementById('slideoutOverlay').classList.add('active');
     document.getElementById('slideoutPanel').classList.add('active');
-    document.getElementById('slideoutTitle').textContent = escapeHtml(name) + '\'s Timeline';
+    document.getElementById('slideoutTitle').textContent = (name || '') + '\'s Timeline';
     document.getElementById('slideoutSubtitle').textContent = 'Today - ' + new Date().toLocaleDateString('en-IN', { weekday: 'long', day: 'numeric', month: 'short', year: 'numeric' });
     document.getElementById('slideoutBody').innerHTML = '<div style="text-align:center;padding:24px;color:#94a3b8;">Loading timeline...</div>';
 
