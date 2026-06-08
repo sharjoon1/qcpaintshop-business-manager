@@ -710,9 +710,9 @@
             // Show PO actions modal
             document.getElementById('poActionsInfo').innerHTML =
                 '<div class="flex items-center justify-between mb-1">' +
-                '<span class="font-bold text-sm">PO #' + po.po_number + '</span>' +
+                '<span class="font-bold text-sm">PO #' + esc(po.po_number) + '</span>' +
                 '<span class="px-2 py-0.5 rounded-full text-xs font-bold ' + (po.status === 'sent' ? 'bg-blue-100 text-blue-700' : po.status === 'draft' ? 'bg-gray-100 text-gray-700' : 'bg-green-100 text-green-700') + '">' + po.status + '</span></div>' +
-                '<div class="text-xs text-gray-500">Vendor: ' + (po.vendor_name || 'Unknown') + '</div>' +
+                '<div class="text-xs text-gray-500">Vendor: ' + esc(po.vendor_name || 'Unknown') + '</div>' +
                 '<div class="text-xs text-gray-500">Total: ₹' + parseFloat(po.grand_total).toLocaleString('en-IN') + '</div>';
             document.getElementById('poActionsModal').style.display = 'flex';
         }
@@ -767,7 +767,7 @@
             const select = document.getElementById('poVendor');
             let html = '<option value="">-- Select Vendor --</option>';
             vendors.forEach(function(v) {
-                html += '<option value="' + v.id + '" data-phone="' + (v.phone || '') + '">' + (v.vendor_name || 'Vendor #' + v.id) + '</option>';
+                html += '<option value="' + v.id + '" data-phone="' + esc(v.phone || '') + '">' + esc(v.vendor_name || ('Vendor #' + v.id)) + '</option>';
             });
             select.innerHTML = html;
 
@@ -790,15 +790,15 @@
                 const qty = parseFloat(it.quantity) || 1;
                 const lineTotal = price * qty;
                 poTotal += lineTotal;
-                itemsHtml += '<div class="flex justify-between"><span>' + (it.item_name || it.product_name || 'Item') + ' x' + qty + '</span><span>' + fmtINR(lineTotal) + '</span></div>';
+                itemsHtml += '<div class="flex justify-between"><span>' + esc(it.item_name || it.product_name || 'Item') + ' x' + qty + '</span><span>' + fmtINR(lineTotal) + '</span></div>';
             });
             document.getElementById('poItemsList').innerHTML = itemsHtml || '<div class="text-gray-400">No product items</div>';
             document.getElementById('poTotal').textContent = fmtINR(poTotal);
 
             document.getElementById('poDeliveryInfo').innerHTML =
-                '<strong>' + (estimateData.customer_name || 'Customer') + '</strong><br>' +
-                (estimateData.customer_phone || '') + '<br>' +
-                (estimateData.customer_address || 'Address not provided');
+                '<strong>' + esc(estimateData.customer_name || 'Customer') + '</strong><br>' +
+                esc(estimateData.customer_phone || '') + '<br>' +
+                esc(estimateData.customer_address || 'Address not provided');
 
             document.getElementById('poNotes').value = '';
             document.getElementById('poStatus').classList.add('hidden');

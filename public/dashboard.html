@@ -720,14 +720,14 @@
             container.innerHTML = estimates.map(est => `
                 <div class="activity-item flex items-center justify-between flex-wrap sm:flex-nowrap gap-2">
                     <div class="flex-1 min-w-0">
-                        <div class="font-semibold text-gray-900 text-sm sm:text-base truncate">${est.customer_name || 'Unknown Customer'}</div>
-                        <div class="text-xs sm:text-sm text-gray-600 mt-0.5">Estimate #${est.estimate_number || est.id}</div>
+                        <div class="font-semibold text-gray-900 text-sm sm:text-base truncate">${escHtml(est.customer_name) || 'Unknown Customer'}</div>
+                        <div class="text-xs sm:text-sm text-gray-600 mt-0.5">Estimate #${escHtml(est.estimate_number || est.id)}</div>
                     </div>
                     <div class="text-right flex-shrink-0">
                         <div class="text-base sm:text-lg font-bold text-gray-900">${formatCurrency(est.grand_total)}</div>
                         <span class="inline-block mt-0.5 px-2 py-0.5 text-xs font-semibold rounded-full ${
                             est.status === 'approved' ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'
-                        }">${est.status || 'pending'}</span>
+                        }">${escHtml(est.status || 'pending')}</span>
                     </div>
                 </div>
             `).join('');

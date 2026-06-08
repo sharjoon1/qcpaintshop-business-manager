@@ -516,15 +516,15 @@
                 const sourceColors = { auto_estimate: 'badge-info', manual_request: 'badge-warning', admin_added: 'badge-customer' };
 
                 return `<tr>
-                    <td><strong>${i.staff_name}</strong></td>
-                    <td>${i.lead_name || '-'} ${i.lead_phone ? `<br><small style="color:#888">${i.lead_phone}</small>` : ''}${i.invoice_reference ? `<br><small style="color:#667eea;">Ref: ${i.invoice_reference}</small>` : ''}</td>
-                    <td><span class="badge badge-${typeColors[i.lead_type]}">${i.lead_type}</span></td>
-                    <td><span class="badge ${sourceColors[i.source] || 'badge-info'}">${sourceLabels[i.source] || i.source || 'Legacy'}</span></td>
+                    <td><strong>${esc(i.staff_name)}</strong></td>
+                    <td>${esc(i.lead_name) || '-'} ${i.lead_phone ? `<br><small style="color:#888">${esc(i.lead_phone)}</small>` : ''}${i.invoice_reference ? `<br><small style="color:#667eea;">Ref: ${esc(i.invoice_reference)}</small>` : ''}</td>
+                    <td><span class="badge badge-${typeColors[i.lead_type]}">${esc(i.lead_type)}</span></td>
+                    <td><span class="badge ${sourceColors[i.source] || 'badge-info'}">${sourceLabels[i.source] || esc(i.source) || 'Legacy'}</span></td>
                     <td>${i.incentive_month}</td>
                     <td>${i.estimate_amount ? '\u20B9' + fmtINR(i.estimate_amount) : '-'}</td>
                     <td class="money">\u20B9${fmtINR(i.amount)}</td>
                     <td><span class="badge badge-${statusColors[i.status]}">${i.status}</span></td>
-                    <td>${created}${i.approved_by_name ? `<br><small style="color:#888">by ${i.approved_by_name}</small>` : ''}</td>
+                    <td>${created}${i.approved_by_name ? `<br><small style="color:#888">by ${esc(i.approved_by_name)}</small>` : ''}</td>
                     <td>
                         <div class="action-buttons">
                             ${i.status === 'pending' ? `

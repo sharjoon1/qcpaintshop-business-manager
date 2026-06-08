@@ -963,7 +963,7 @@
                                                 </div>
                                                 <span class="text-sm text-gray-500">${formatDate(f.created_at)}</span>
                                             </div>
-                                            <p class="text-gray-700">${f.notes}</p>
+                                            <p class="text-gray-700">${escapeHtml(f.notes)}</p>
                                             ${f.next_followup_date ? `<p class="text-sm text-purple-600 mt-2">Next followup: ${formatDate(f.next_followup_date)}</p>` : ''}
                                         </div>
                                     `).join('')}

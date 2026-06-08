@@ -125,6 +125,8 @@
         let allTypes = [];
         let editingTypeId = null;
 
+        function esc(s){if(s==null)return '';const d=document.createElement('div');d.textContent=String(s);return d.innerHTML;}
+
         function getAuthHeaders() {
             const token = localStorage.getItem('auth_token');
             return {
@@ -161,8 +163,8 @@
                 <div class="border border-gray-200 rounded-lg p-4 hover:shadow-md transition ${type.status === 'inactive' ? 'bg-gray-50' : 'bg-white'}">
                     <div class="flex items-start justify-between mb-3">
                         <div>
-                            <h3 class="font-bold text-lg text-gray-900">${type.name}</h3>
-                            <p class="text-sm text-gray-600 mt-1">${type.description || 'No description'}</p>
+                            <h3 class="font-bold text-lg text-gray-900">${esc(type.name)}</h3>
+                            <p class="text-sm text-gray-600 mt-1">${type.description ? esc(type.description) : 'No description'}</p>
                         </div>
                         <span class="px-2 py-1 text-xs rounded-full ${type.status === 'active' ? 'bg-green-100 text-green-800' : 'bg-gray-200 text-gray-600'}">
                             ${type.status === 'active' ? '✅ Active' : '⏸️ Inactive'}

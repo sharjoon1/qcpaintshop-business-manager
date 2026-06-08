@@ -124,6 +124,8 @@
         let brands = [];
         let editingBrandId = null;
 
+        function esc(s){if(s==null)return '';const d=document.createElement('div');d.textContent=String(s);return d.innerHTML;}
+
         function getAuthHeaders() {
             const token = localStorage.getItem('auth_token');
             return {
@@ -160,10 +162,10 @@
             tbody.innerHTML = brands.map(brand => `
                 <tr class="hover:bg-gray-50">
                     <td class="px-4 py-3 text-sm font-medium text-gray-900">${brand.id}</td>
-                    <td class="px-4 py-3 text-sm font-semibold text-gray-900">${brand.name}</td>
+                    <td class="px-4 py-3 text-sm font-semibold text-gray-900">${esc(brand.name)}</td>
                     <td class="px-4 py-3 text-sm">
                         ${brand.logo_url 
-                            ? `<img id="headerLogo" src="${brand.logo_url}" alt="${brand.name}" class="h-8 w-auto object-contain" onerror="this.src='data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 width=%2240%22 height=%2240%22><text y=%2220%22 font-size=%2220%22>🏷️</text></svg>'">`
+                            ? `<img id="headerLogo" src="${esc(brand.logo_url)}" alt="${esc(brand.name)}" class="h-8 w-auto object-contain" onerror="this.src='data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 width=%2240%22 height=%2240%22><text y=%2220%22 font-size=%2220%22>🏷️</text></svg>'">`
                             : '<span class="text-gray-400">No logo</span>'
                         }
                     </td>

@@ -581,16 +581,16 @@
             tbody.innerHTML = payments.map(p => `
                 <tr>
                     <td>${new Date(p.payment_date).toLocaleDateString('en-IN')}</td>
-                    <td>${p.staff_name}</td>
-                    <td>${p.salary_month}</td>
+                    <td>${esc(p.staff_name)}</td>
+                    <td>${esc(p.salary_month)}</td>
                     <td class="money">₹${parseFloat(p.amount_paid).toLocaleString('en-IN', {minimumFractionDigits: 2})}</td>
                     <td>
                         <span class="badge badge-info">
-                            ${p.payment_method.replace('_', ' ').toUpperCase()}
+                            ${esc(p.payment_method.replace('_', ' ').toUpperCase())}
                         </span>
                     </td>
-                    <td>${p.payment_reference || '-'}</td>
-                    <td>${p.paid_by_name || '-'}</td>
+                    <td>${p.payment_reference ? esc(p.payment_reference) : '-'}</td>
+                    <td>${p.paid_by_name ? esc(p.paid_by_name) : '-'}</td>
                     <td>
                         <span class="badge ${p.is_verified ? 'badge-success' : 'badge-warning'}">
                             ${p.is_verified ? 'Verified' : 'Pending'}
@@ -664,9 +664,9 @@
                 
                 return `
                     <tr>
-                        <td>${s.staff_name}</td>
-                        <td>${s.branch_name}</td>
-                        <td>${s.salary_month}</td>
+                        <td>${esc(s.staff_name)}</td>
+                        <td>${esc(s.branch_name)}</td>
+                        <td>${esc(s.salary_month)}</td>
                         <td class="money">₹${netSalary.toLocaleString('en-IN', {minimumFractionDigits: 2})}</td>
                         <td class="money">${paidAmount > 0 ? '₹' + paidAmount.toLocaleString('en-IN', {minimumFractionDigits: 2}) : '-'}</td>
                         <td class="money" style="color: #dc3545; font-weight: bold;">₹${pending.toLocaleString('en-IN', {minimumFractionDigits: 2})}</td>

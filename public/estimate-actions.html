@@ -129,6 +129,7 @@
     </div>
 
     <script>
+        function esc(s){if(s==null)return '';const d=document.createElement('div');d.textContent=String(s);return d.innerHTML;}
         const urlParams = new URLSearchParams(window.location.search);
         const estimateId = urlParams.get('id');
         let currentNewStatus = '';
@@ -185,12 +186,12 @@
                         <div class="flex-1">
                             <div class="flex items-center gap-2 mb-1">
                                 ${getStatusBadge(h.new_status)}
-                                ${h.old_status ? `<span class="text-sm text-gray-500">from ${h.old_status}</span>` : ''}
+                                ${h.old_status ? `<span class="text-sm text-gray-500">from ${esc(h.old_status)}</span>` : ''}
                             </div>
-                            ${h.reason ? `<p class="text-sm text-gray-700 mb-1"><strong>Reason:</strong> ${h.reason}</p>` : ''}
-                            ${h.notes ? `<p class="text-sm text-gray-600 mb-1">${h.notes}</p>` : ''}
+                            ${h.reason ? `<p class="text-sm text-gray-700 mb-1"><strong>Reason:</strong> ${esc(h.reason)}</p>` : ''}
+                            ${h.notes ? `<p class="text-sm text-gray-600 mb-1">${esc(h.notes)}</p>` : ''}
                             <p class="text-xs text-gray-500">
-                                By ${h.changed_by_name || 'System'} • ${formatDate(h.timestamp)}
+                                By ${esc(h.changed_by_name) || 'System'} • ${formatDate(h.timestamp)}
                             </p>
                         </div>
                     </div>
