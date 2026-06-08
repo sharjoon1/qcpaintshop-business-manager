@@ -23,11 +23,15 @@
   }
 
   function handleAuthFail(r) {
-    if (r && (r.status === 401 || r.status === 403)) {
+    // 401 = invalid/expired session -> real logout.
+    if (r && r.status === 401) {
       clearSession();
       window.location.href = '/engineer-login.html';
       return true;
     }
+    // 403 = valid session but account not approved (pending/suspended/rejected).
+    // Do NOT log the engineer out; let the page render its pending/locked state.
+    if (r && r.status === 403) { return true; }
     return false;
   }
 

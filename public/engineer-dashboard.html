@@ -288,7 +288,22 @@
         hydrateHead(null);
         var me = await EP.loadMe();
         if (me) hydrateHead(me);
-        loadProjects();
+        var status = (me && me.status) || localStorage.getItem('engineer_status') || 'pending';
+        if (status === 'approved') {
+          loadProjects();
+        } else {
+          // Pending/suspended/rejected: do NOT call the approved-only /me/projects (it 403s).
+          // The status banner from hydrateHead already explains why; show a clear locked state.
+          ['kpiOpen', 'kpiQuotes', 'kpiAccepted', 'kpiCompleted'].forEach(function (id) {
+            var el = document.getElementById(id);
+            if (el) el.textContent = '—';
+          });
+          document.getElementById('projBody').innerHTML =
+            '<tr><td colspan="5"><div class="ep-empty">'
+            + '<h3>Requisitions unlock once your account is approved</h3>'
+            + '<p>Your application is under review. You will be able to submit and track project requisitions here after approval.</p>'
+            + '</div></td></tr>';
+        }
       });
     })();
   </script>

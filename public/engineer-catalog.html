@@ -565,10 +565,26 @@
         }
       });
 
-      document.addEventListener('DOMContentLoaded', function () {
-        EP.loadMe();
-        loadFilters();
-        loadCatalog();
+      document.addEventListener('DOMContentLoaded', async function () {
+        var me = await EP.loadMe();
+        var status = (me && me.status) || localStorage.getItem('engineer_status') || 'pending';
+        if (status === 'approved') {
+          loadFilters();
+          loadCatalog();
+        } else {
+          // Pending/suspended/rejected: never request the approved-only catalogue/pricing.
+          var toolbar = document.querySelector('.cat-toolbar');
+          if (toolbar) toolbar.style.display = 'none';
+          var pager = document.getElementById('qPager');
+          if (pager) pager.style.display = 'none';
+          var meta = document.getElementById('qMeta');
+          if (meta) meta.textContent = '';
+          document.getElementById('qGrid').innerHTML =
+            '<div style="grid-column:1/-1;"><div class="ep-notice warn" style="margin:0;">'
+            + '<strong>Catalogue access is pending approval.</strong> Engineer prices unlock once your account is approved by our team (typically within 24 hours). '
+            + 'You can still submit a <a href="/engineer-new-quote.html" style="color:var(--ep-active);font-weight:600;">custom quotation request</a> in the meantime.'
+            + '</div></div>';
+        }
         renderCart();
       });
     })();
