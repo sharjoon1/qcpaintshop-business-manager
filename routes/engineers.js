@@ -261,8 +261,13 @@ router.get('/me', requireEngineerAuth, async (req, res) => {
   }
 });
 
-router.put('/me', requireEngineerAuth, async (req, res) => {
+router.put('/me', requireEngineerSession, async (req, res) => {
   try {
+    // Onboarding steers PENDING engineers to complete their profile, so pending + approved
+    // may edit their own (self-scoped, non-sensitive) fields. Suspended/rejected may not.
+    if (req.engineer.status !== 'pending' && req.engineer.status !== 'approved') {
+      return res.status(403).json({ success: false, message: `Account is ${req.engineer.status}` });
+    }
     const allowed = ['full_name', 'email', 'company_name', 'designation', 'gst_number',
                      'address', 'city', 'district', 'pincode'];
     const sets = []; const vals = [];
