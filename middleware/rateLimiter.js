@@ -56,4 +56,20 @@ const otpLimiter = rateLimit({
     validate: { xForwardedForHeader: false, keyGeneratorIpFallback: false }
 });
 
-module.exports = { globalLimiter, authLimiter, otpLimiter };
+// ─── Lead-submit Limiter (public estimate-request POST; 8/hour per phone, else IP) ───
+
+const leadSubmitLimiter = rateLimit({
+    windowMs: 60 * 60 * 1000, // 1 hour
+    max: 8,
+    standardHeaders: true,
+    legacyHeaders: false,
+    keyGenerator: (req) => {
+        // Prefer the submitted phone so a shared office/NAT IP isn't throttled for everyone.
+        if (req.body?.phone) return 'lead:' + String(req.body.phone);
+        return undefined; // fall back to default IP key
+    },
+    handler: rateLimitHandler,
+    validate: { xForwardedForHeader: false, keyGeneratorIpFallback: false }
+});
+
+module.exports = { globalLimiter, authLimiter, otpLimiter, leadSubmitLimiter };

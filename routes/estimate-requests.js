@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const { requireAuth } = require('../middleware/permissionMiddleware');
+const { leadSubmitLimiter } = require('../middleware/rateLimiter');
 
 let pool;
 
@@ -218,7 +219,7 @@ router.get('/:id', requireAuth, async (req, res) => {
  * Create new estimate request (public endpoint)
  * Supports both 'simple' and 'product' methods
  */
-router.post('/', async (req, res) => {
+router.post('/', leadSubmitLimiter, async (req, res) => {
     try {
         const {
             customer_name,

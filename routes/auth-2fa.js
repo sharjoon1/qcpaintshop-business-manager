@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const { requireAuth } = require('../middleware/permissionMiddleware');
+const { otpLimiter } = require('../middleware/rateLimiter');
 const totpService = require('../services/totp-service');
 
 let pool;
@@ -51,8 +52,9 @@ router.post('/verify-setup', requireAuth, async (req, res) => {
     } catch (e) { res.status(500).json({ success: false, error: e.message }); }
 });
 
-// POST /api/2fa/validate — called at login for admin/manager after password check
-router.post('/validate', async (req, res) => {
+// POST /api/2fa/validate — called at login for admin/manager after password check.
+// otpLimiter (5/min, keyed on IP here since no phone) throttles TOTP brute-force.
+router.post('/validate', otpLimiter, async (req, res) => {
     try {
         const { user_id, token } = req.body;
         if (!user_id || !token) {
