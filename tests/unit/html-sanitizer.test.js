@@ -4,7 +4,7 @@
  * legitimate formatting. These rules are applied on write AND in the backfill, so a change
  * here is a deliberate, visible diff.
  */
-const { sanitizeRichText, sanitizeFullHtml, sanitizeGuideContent } = require('../../services/html-sanitizer');
+const { sanitizeRichText, sanitizeGuideContent } = require('../../services/html-sanitizer');
 
 describe('html-sanitizer — security (rich_text)', () => {
     test('strips on* event handlers but keeps the element', () => {
@@ -63,19 +63,16 @@ describe('html-sanitizer — preserves legitimate content', () => {
     });
 });
 
-describe('html-sanitizer — full_html mode + routing', () => {
-    test('full_html strips <script> and on* handlers', () => {
-        const out = sanitizeFullHtml('<div onclick="x()">d</div><script>bad()</script>');
-        expect(out).not.toMatch(/<script/i);
-        expect(out).not.toMatch(/onclick/i);
-        expect(out).toMatch(/<div>d<\/div>/);
-    });
-
-    test('sanitizeGuideContent routes by content_type', () => {
+describe('html-sanitizer — content_type routing', () => {
+    test('sanitizes rich_text but leaves full_html intact (iframe-isolated)', () => {
         const withScript = '<p>ok</p><script>bad()</script>';
-        expect(sanitizeGuideContent(withScript, 'full_html')).not.toMatch(/<script/i);
         expect(sanitizeGuideContent(withScript, 'rich_text')).not.toMatch(/<script/i);
-        expect(sanitizeGuideContent(withScript, undefined)).toMatch(/<p>ok<\/p>/);
+        expect(sanitizeGuideContent(withScript, undefined)).not.toMatch(/<script/i);
+        // full_html renders ONLY in a sandboxed iframe (no allow-scripts) -> returned unchanged,
+        // so its <!doctype>/<meta charset> (e.g. for Tamil) survive.
+        expect(sanitizeGuideContent(withScript, 'full_html')).toBe(withScript);
+        const doc = '<!DOCTYPE html><html><head><meta charset="UTF-8"></head><body>தமிழ்</body></html>';
+        expect(sanitizeGuideContent(doc, 'full_html')).toBe(doc);
     });
 
     test('passes through null / undefined unchanged', () => {

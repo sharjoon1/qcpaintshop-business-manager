@@ -1,13 +1,17 @@
 /**
- * Shared HTML sanitizer for guide content (PAGE-103).
+ * HTML sanitizer for guide content (PAGE-103).
  *
  * Used by the write path (routes/guides.js POST/PUT) AND the backfill
- * (scripts/sanitize-guides.js) so they apply identical rules. Goal: stored guide HTML
- * can never carry <script>, on* event handlers, or javascript:/data: URLs. The staff
- * viewer additionally runs DOMPurify as a second layer.
+ * (scripts/sanitize-guides.js) so they apply identical rules.
  *
- * sanitize-html always strips on* attributes (never in an allowlist) and removes the
- * text of <script>/<style>/<textarea>/<option> (its default nonTextTags).
+ * Only `rich_text` guides are sanitized: they are injected into the parent page via
+ * `content.innerHTML` (public/staff/guides.html), so inline on* handlers would execute.
+ * `full_html` guides are rendered ONLY inside a sandboxed iframe WITHOUT `allow-scripts`,
+ * where no <script>/handler/javascript: URL can run — so they are left intact (sanitizing them
+ * server-side strips <!doctype>/<meta charset> and corrupts the document, e.g. Tamil charset).
+ *
+ * sanitize-html always strips on* attributes (never in an allowlist) and removes the text of
+ * <script>/<style>/<textarea>/<option> (its default nonTextTags).
  */
 const sanitizeHtml = require('sanitize-html');
 
@@ -32,22 +36,14 @@ const ALLOWED_STYLES = {
     },
 };
 
-const RICH_TEXT_TAGS = [
-    'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'p', 'span', 'div', 'br', 'hr',
-    'ul', 'ol', 'li', 'strong', 'em', 'b', 'i', 'u', 's', 'sub', 'sup', 'small', 'mark',
-    'a', 'img', 'figure', 'figcaption', 'blockquote', 'code', 'pre',
-    'table', 'thead', 'tbody', 'tfoot', 'tr', 'td', 'th', 'caption', 'colgroup', 'col',
-];
-
-// Force rel=noopener on links that open a new tab.
-function hardenAnchor(tagName, attribs) {
-    if (attribs.target === '_blank') attribs.rel = 'noopener noreferrer';
-    return { tagName, attribs };
-}
-
 // Rich-text fragment allowlist (the default content_type, rendered via innerHTML).
 const RICH_TEXT = {
-    allowedTags: RICH_TEXT_TAGS,
+    allowedTags: [
+        'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'p', 'span', 'div', 'br', 'hr',
+        'ul', 'ol', 'li', 'strong', 'em', 'b', 'i', 'u', 's', 'sub', 'sup', 'small', 'mark',
+        'a', 'img', 'figure', 'figcaption', 'blockquote', 'code', 'pre',
+        'table', 'thead', 'tbody', 'tfoot', 'tr', 'td', 'th', 'caption', 'colgroup', 'col',
+    ],
     allowedAttributes: {
         a: ['href', 'title', 'target', 'rel'],
         img: ['src', 'alt', 'title', 'width', 'height'],
@@ -61,31 +57,13 @@ const RICH_TEXT = {
     allowedSchemesByTag: { img: ['http', 'https'] },
     allowProtocolRelative: false,
     disallowedTagsMode: 'discard',
-    transformTags: { a: hardenAnchor },
-};
-
-// Full-document mode: keep structural tags + inline style="" so docs still render, but strip
-// <script>, <style> blocks, and every on* handler / javascript: URL. (Viewer also iframe-isolates
-// this path, but we sanitize anyway as a second layer; inline styles via the style attribute remain.)
-const FULL_HTML = {
-    allowedTags: RICH_TEXT_TAGS.concat([
-        'html', 'head', 'body', 'title',
-        'section', 'article', 'header', 'footer', 'main', 'nav', 'aside',
-    ]),
-    allowedAttributes: {
-        a: ['href', 'title', 'target', 'rel'],
-        img: ['src', 'alt', 'title', 'width', 'height'],
-        td: ['colspan', 'rowspan'],
-        th: ['colspan', 'rowspan', 'scope'],
-        col: ['span'],
-        '*': ['class', 'style', 'id'],
+    transformTags: {
+        // Force rel=noopener on links that open a new tab.
+        a: (tagName, attribs) => {
+            if (attribs.target === '_blank') attribs.rel = 'noopener noreferrer';
+            return { tagName, attribs };
+        },
     },
-    allowedStyles: ALLOWED_STYLES,
-    allowedSchemes: ['http', 'https', 'mailto', 'tel'],
-    allowedSchemesByTag: { img: ['http', 'https'] },
-    allowProtocolRelative: false,
-    disallowedTagsMode: 'discard',
-    transformTags: { a: hardenAnchor },
 };
 
 function sanitizeRichText(html) {
@@ -93,15 +71,13 @@ function sanitizeRichText(html) {
     return sanitizeHtml(String(html), RICH_TEXT);
 }
 
-function sanitizeFullHtml(html) {
-    if (html == null) return html;
-    return sanitizeHtml(String(html), FULL_HTML);
-}
-
-/** Pick the sanitizer that matches a guide's content_type. */
+/**
+ * Sanitize a guide's stored content. `rich_text` (innerHTML sink) is sanitized; `full_html`
+ * (sandboxed-iframe, no allow-scripts) is left untouched to preserve its document structure.
+ */
 function sanitizeGuideContent(html, contentType) {
     if (html == null) return html;
-    return contentType === 'full_html' ? sanitizeFullHtml(html) : sanitizeRichText(html);
+    return contentType === 'full_html' ? html : sanitizeRichText(html);
 }
 
-module.exports = { sanitizeRichText, sanitizeFullHtml, sanitizeGuideContent };
+module.exports = { sanitizeRichText, sanitizeGuideContent };
