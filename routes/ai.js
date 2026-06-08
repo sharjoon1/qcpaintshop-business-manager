@@ -6,7 +6,7 @@
 const express = require('express');
 const router = express.Router();
 
-const { requireAuth } = require('../middleware/permissionMiddleware');
+const { requireAuth, requirePermission } = require('../middleware/permissionMiddleware');
 const aiEngine = require('../services/ai-engine');
 const aiAnalyzer = require('../services/ai-analyzer');
 const aiStaffAnalyzer = require('../services/ai-staff-analyzer');
@@ -531,8 +531,8 @@ router.get('/config', requireAuth, async (req, res) => {
     }
 });
 
-// PUT /api/ai/config
-router.put('/config', requireAuth, async (req, res) => {
+// PUT /api/ai/config — writes ai_config incl. provider API keys: admin/system.ai only
+router.put('/config', requireAuth, requirePermission('system', 'ai'), async (req, res) => {
     try {
         const updates = req.body;
         for (const [key, value] of Object.entries(updates)) {
@@ -669,8 +669,8 @@ router.get('/stats', requireAuth, async (req, res) => {
 // APP ANALYZER
 // ═══════════════════════════════════════════════════════════════
 
-// GET /api/ai/app-scan — run full application scan
-router.get('/app-scan', requireAuth, async (req, res) => {
+// GET /api/ai/app-scan — exposes internal DB/route/error metadata: admin/system.ai only
+router.get('/app-scan', requireAuth, requirePermission('system', 'ai'), async (req, res) => {
     try {
         if (!appCollector) return res.status(500).json({ error: 'App collector not initialized' });
         const scanData = await appCollector.runFullScan();
@@ -681,8 +681,8 @@ router.get('/app-scan', requireAuth, async (req, res) => {
     }
 });
 
-// POST /api/ai/app-analyze — AI deep analysis of scan data (SSE streaming)
-router.post('/app-analyze', requireAuth, async (req, res) => {
+// POST /api/ai/app-analyze — AI deep analysis of scan data (SSE): admin/system.ai only
+router.post('/app-analyze', requireAuth, requirePermission('system', 'ai'), async (req, res) => {
     const { scanData, focus } = req.body;
     if (!scanData) return res.status(400).json({ error: 'scanData required' });
 
