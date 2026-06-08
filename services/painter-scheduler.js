@@ -337,14 +337,21 @@ function start() {
 
     console.log('[Painter Scheduler] Started: monthly-slabs(1st 6AM), quarterly-slabs(Q1 6:30AM), credit-check(daily 8AM), streak-reset(midnight), bonus-rotation(00:05), daily-bonus-push(7AM), streak-reminder(8PM), attendance-open-claim(1st 00:05), attendance-recompute(every 6h days 1-7), attendance-remind(7th 8PM), attendance-forfeit(8th 2AM)');
 
-    // PNTR Painter Marketing — register 4 IST crons (02:30 incremental, 03:00 retry, 03:30 backfill, 06:00 daily list)
-    painterMarketingScheduler.registerCron({
-        pool,
-        zohoApi,
-        pntrImportService,
-        backfillService: painterBackfillService,
-        painterZohoSyncService
-    });
+    // PNTR Painter Marketing — register 4 IST crons (02:30 incremental, 03:00 retry, 03:30 backfill, 06:00 daily list).
+    // These call the Zoho API, so only register them when Zoho is configured; otherwise getAccessToken
+    // throws 'ZOHO_ORGANIZATION_ID not set' twice daily. The loyalty/streak/attendance crons above are
+    // Zoho-independent and always run (so painterScheduler can start outside the Zoho gate — SVC-007).
+    if (process.env.ZOHO_ORGANIZATION_ID) {
+        painterMarketingScheduler.registerCron({
+            pool,
+            zohoApi,
+            pntrImportService,
+            backfillService: painterBackfillService,
+            painterZohoSyncService
+        });
+    } else {
+        console.log('[Painter Scheduler] PNTR marketing crons skipped (ZOHO_ORGANIZATION_ID not set)');
+    }
 }
 
 function stop() {

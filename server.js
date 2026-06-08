@@ -4296,6 +4296,28 @@ server.listen(PORT, () => {
     }, 60 * 1000); // every 60 seconds
     console.log('[Geo Cron] Geofence enforcement cron started (every 60s)');
 
+    // Non-Zoho background schedulers — start regardless of Zoho config. These were previously
+    // gated behind ZOHO_ORGANIZATION_ID by accident, so painter loyalty, AI, anomaly scans, data
+    // retention, lead auto-assign, health checks and self-healing silently never ran on any
+    // environment without Zoho configured (SVC-001/007). None of them call Zoho at startup; the
+    // only Zoho-dependent piece (PNTR marketing crons) is guarded inside painter-scheduler.start().
+    aiScheduler.start();
+    painterScheduler.start();
+    dataRetentionService.start();
+    leadAutoAssignScheduler.start();
+    systemHealthService.startAutoHealthChecks(300000); // every 5 min
+    productionMonitor.start(); // Production health monitoring + self-healing
+    photosRoutes.startCleanupCron(); // Photo cleanup daily 2 AM IST
+    // Anomaly detection scan every 6 hours
+    setInterval(async () => {
+        try {
+            const result = await anomalyDetector.runFullScan();
+            if (result.inserted > 0) console.log(`[Anomaly] Scheduled scan: ${result.inserted} new anomalies`);
+        } catch (err) { console.error('[Anomaly] Scheduled scan error:', err.message); }
+    }, 6 * 60 * 60 * 1000);
+    console.log('Non-Zoho schedulers started: ai-scheduler, painter-scheduler, data-retention, lead-auto-assign, system-health, production-monitor, photo-cleanup; [Anomaly] scan every 6h');
+
+    // Zoho-dependent services — only when ZOHO_ORGANIZATION_ID is configured.
     if (process.env.ZOHO_ORGANIZATION_ID) {
         syncScheduler.start().catch(err => {
             console.error('Failed to start sync scheduler:', err.message);
@@ -4303,24 +4325,9 @@ server.listen(PORT, () => {
         whatsappProcessor.start();
         whatsappSessionManager.initializeSessions();
         waCampaignEngine.start();
-        aiScheduler.start();
-        painterScheduler.start();
-        dataRetentionService.start();
-        leadAutoAssignScheduler.start();
-        console.log('Background services started: sync-scheduler, whatsapp-processor, whatsapp-sessions, wa-campaign-engine, auto-clockout, ai-scheduler, painter-scheduler');
-        systemHealthService.startAutoHealthChecks(300000); // every 5 min
-        productionMonitor.start(); // Production health monitoring + self-healing
-        photosRoutes.startCleanupCron(); // Photo cleanup daily 2 AM IST
-        // Anomaly detection scan every 6 hours
-        setInterval(async () => {
-            try {
-                const result = await anomalyDetector.runFullScan();
-                if (result.inserted > 0) console.log(`[Anomaly] Scheduled scan: ${result.inserted} new anomalies`);
-            } catch (err) { console.error('[Anomaly] Scheduled scan error:', err.message); }
-        }, 6 * 60 * 60 * 1000);
-        console.log('[Anomaly] Scheduled scan every 6 hours');
+        console.log('Zoho services started: sync-scheduler, whatsapp-processor, whatsapp-sessions, wa-campaign-engine');
     } else {
-        console.log('Zoho not configured (ZOHO_ORGANIZATION_ID missing) - sync/whatsapp skipped');
+        console.log('ZOHO_ORGANIZATION_ID missing - Zoho sync/whatsapp skipped; non-Zoho schedulers started');
     }
 });
 
