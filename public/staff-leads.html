@@ -876,8 +876,9 @@
                 document.getElementById('leadCount').textContent = '0 dormant';
                 container.innerHTML = '';
                 document.getElementById('emptyState').classList.remove('hidden');
-                document.getElementById('emptyState').querySelector('h3').textContent = 'No dormant leads';
-                document.getElementById('emptyState').querySelector('p').textContent = `All converted customers have been active within ${data.config?.dormant_days || 90} days`;
+                const dormantEmptyP = document.getElementById('emptyState').querySelectorAll('p');
+                if (dormantEmptyP[0]) dormantEmptyP[0].textContent = 'No dormant leads';
+                if (dormantEmptyP[1]) dormantEmptyP[1].textContent = `All converted customers have been active within ${data.config?.dormant_days || 90} days`;
             }
         } catch (e) {
             console.error('Load dormant error:', e);

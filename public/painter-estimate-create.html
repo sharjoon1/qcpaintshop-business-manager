@@ -665,9 +665,10 @@
         _autosaveTimer = setInterval(saveDraft, 30000);
     }
 
-    // Start autosave and check for existing draft
+    // Start autosave and check for existing draft.
+    // #draftBanner is declared after this inline script, so defer the draft check until the DOM is parsed.
     startAutosave();
-    checkForDraft();
+    document.addEventListener('DOMContentLoaded', checkForDraft);
 
     // Initialize stepper for step 1
     buildStepper();

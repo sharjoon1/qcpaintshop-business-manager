@@ -5,6 +5,7 @@
  */
 
 const cron = require('node-cron');
+const { isClusterPrimary } = require('./cluster-guard');
 
 let pool, notificationService;
 
@@ -17,6 +18,12 @@ function init(dbPool, notifService) {
     pool = dbPool;
     notificationService = notifService;
 
+    // Only the PM2 cluster-primary worker registers the cron, so reminders don't multi-fire
+    // under cluster mode (matches data-retention/production-monitor/ai-scheduler/etc.).
+    if (!isClusterPrimary()) {
+        console.log('[Lead Reminders] skipping cron registration — not PM2 cluster primary');
+        return;
+    }
     cron.schedule('0 8 * * *', sendDailyReminders, { timezone: 'Asia/Kolkata' });
     console.log('[Lead Reminders] Scheduler initialized — runs at 8:00 AM IST daily');
 }
