@@ -661,7 +661,7 @@
                         ? '<option value="">All Branches</option>'
                         : '<option value="">Select Branch</option>';
                     branches.forEach(branch => {
-                        select.innerHTML += `<option value="${branch.id}">${branch.name}</option>`;
+                        select.innerHTML += `<option value="${branch.id}">${escapeHtml(branch.name)}</option>`;
                     });
                 });
             } catch (error) {
@@ -686,7 +686,7 @@
                         ? '<option value="">All Staff</option>'
                         : '<option value="">Select Staff</option>';
                     users.forEach(user => {
-                        select.innerHTML += `<option value="${user.id}">${user.full_name || user.name}</option>`;
+                        select.innerHTML += `<option value="${user.id}">${escapeHtml(user.full_name || user.name)}</option>`;
                     });
                 });
             } catch (error) {

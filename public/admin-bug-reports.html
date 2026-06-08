@@ -655,7 +655,7 @@ async function loadErrorAnalysis() {
 
         renderAnalysis(json.data);
     } catch (e) {
-        container.innerHTML = `<div class="text-center py-8 text-red-500">${e.message}</div>`;
+        container.innerHTML = `<div class="text-center py-8 text-red-500">${escHtml(e.message)}</div>`;
     }
 }
 

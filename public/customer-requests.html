@@ -143,6 +143,8 @@
     </footer>
 
     <script>
+        function esc(s){ if(s===null||s===undefined) return ''; const d=document.createElement('div'); d.textContent=String(s); return d.innerHTML; }
+
         const API_BASE = '/api';
         let customerPhone = null;
         let allRequests = [];
@@ -251,7 +253,7 @@
                     <div class="p-6">
                         <div class="flex items-start justify-between mb-4">
                             <div class="flex-1">
-                                <h3 class="text-lg font-bold text-gray-800 mb-1">${request.request_number}</h3>
+                                <h3 class="text-lg font-bold text-gray-800 mb-1">${esc(request.request_number)}</h3>
                                 <p class="text-sm text-gray-600">${formatProjectType(request.project_type)}</p>
                             </div>
                             <span class="status-badge status-${request.status} px-3 py-1 rounded-full text-xs font-semibold">
@@ -270,7 +272,7 @@
                                 <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z"></path>
                                 </svg>
-                                ${request.area_sqft} sq.ft
+                                ${esc(request.area_sqft)} sq.ft
                             </div>
                             <div class="flex items-center text-sm text-gray-600">
                                 <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -319,9 +321,9 @@
                             <div class="bg-gray-50 rounded-lg p-4 space-y-2">
                                 <p><span class="text-gray-600">Project Type:</span> <strong>${formatProjectType(req.project_type)}</strong></p>
                                 <p><span class="text-gray-600">Property Type:</span> <strong>${formatPropertyType(req.property_type)}</strong></p>
-                                <p><span class="text-gray-600">Area:</span> <strong>${req.area_sqft} sq.ft</strong></p>
-                                ${req.rooms ? `<p><span class="text-gray-600">Rooms:</span> <strong>${req.rooms}</strong></p>` : ''}
-                                <p><span class="text-gray-600">Location:</span> ${req.location}</p>
+                                <p><span class="text-gray-600">Area:</span> <strong>${esc(req.area_sqft)} sq.ft</strong></p>
+                                ${req.rooms ? `<p><span class="text-gray-600">Rooms:</span> <strong>${esc(req.rooms)}</strong></p>` : ''}
+                                <p><span class="text-gray-600">Location:</span> ${esc(req.location)}</p>
                             </div>
                         </div>
 
@@ -329,9 +331,9 @@
                         <div>
                             <h4 class="text-lg font-semibold text-gray-800 mb-3">💡 Your Preferences</h4>
                             <div class="bg-gray-50 rounded-lg p-4 space-y-2">
-                                ${req.preferred_brand ? `<p><span class="text-gray-600">Preferred Brand:</span> <strong>${req.preferred_brand}</strong></p>` : ''}
-                                ${req.timeline ? `<p><span class="text-gray-600">Timeline:</span> <strong>${req.timeline}</strong></p>` : ''}
-                                ${req.budget_range ? `<p><span class="text-gray-600">Budget Range:</span> <strong>${req.budget_range}</strong></p>` : ''}
+                                ${req.preferred_brand ? `<p><span class="text-gray-600">Preferred Brand:</span> <strong>${esc(req.preferred_brand)}</strong></p>` : ''}
+                                ${req.timeline ? `<p><span class="text-gray-600">Timeline:</span> <strong>${esc(req.timeline)}</strong></p>` : ''}
+                                ${req.budget_range ? `<p><span class="text-gray-600">Budget Range:</span> <strong>${esc(req.budget_range)}</strong></p>` : ''}
                             </div>
                         </div>
                         ` : ''}
@@ -340,7 +342,7 @@
                         <div>
                             <h4 class="text-lg font-semibold text-gray-800 mb-3">📝 Additional Notes</h4>
                             <div class="bg-gray-50 rounded-lg p-4">
-                                <p class="text-gray-700">${req.additional_notes}</p>
+                                <p class="text-gray-700">${esc(req.additional_notes)}</p>
                             </div>
                         </div>
                         ` : ''}

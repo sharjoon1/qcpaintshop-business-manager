@@ -379,6 +379,8 @@
     </div>
 
     <script>
+        function esc(s){ if(s===null||s===undefined) return ''; const d=document.createElement('div'); d.textContent=String(s); return d.innerHTML; }
+
         const API_BASE = '';
         let currentReportData = null;
 
@@ -418,7 +420,7 @@
                 const select = document.getElementById('filterBranch');
                 select.innerHTML = '<option value="">All Branches</option>';
                 branches.forEach(branch => {
-                    select.innerHTML += `<option value="${branch.id}">${branch.name}</option>`;
+                    select.innerHTML += `<option value="${branch.id}">${esc(branch.name)}</option>`;
                 });
             } catch (error) {
                 console.error('Error loading branches:', error);

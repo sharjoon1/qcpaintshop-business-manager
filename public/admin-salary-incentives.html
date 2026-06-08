@@ -288,6 +288,8 @@
     </div>
 
     <script>
+        function esc(s){ if(s===null||s===undefined) return ''; const d=document.createElement('div'); d.textContent=String(s); return d.innerHTML; }
+
         const API_BASE = '';
         const fmtINR = n => parseFloat(n || 0).toLocaleString('en-IN', {minimumFractionDigits: 2, maximumFractionDigits: 2});
         let editingSlabId = null;
@@ -448,7 +450,7 @@
                     const firstOpt = sel.options[0].outerHTML;
                     sel.innerHTML = firstOpt;
                     users.forEach(u => {
-                        sel.innerHTML += `<option value="${u.id}">${u.full_name}</option>`;
+                        sel.innerHTML += `<option value="${u.id}">${esc(u.full_name)}</option>`;
                     });
                 });
             } catch (err) {

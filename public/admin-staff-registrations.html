@@ -552,13 +552,13 @@
                 const select = document.getElementById('mBranch');
                 select.innerHTML = '<option value="">Select Branch</option>';
                 branches.forEach(b => {
-                    select.innerHTML += `<option value="${b.id}">${b.name}</option>`;
+                    select.innerHTML += `<option value="${b.id}">${escapeHtml(b.name)}</option>`;
                 });
                 // Populate edit staff modal branch dropdown
                 const esSelect = document.getElementById('esBranch');
                 esSelect.innerHTML = '<option value="">Select Branch</option>';
                 branches.forEach(b => {
-                    esSelect.innerHTML += `<option value="${b.id}">${b.name}</option>`;
+                    esSelect.innerHTML += `<option value="${b.id}">${escapeHtml(b.name)}</option>`;
                 });
             } catch (err) {
                 console.error('Failed to load branches:', err);
@@ -575,7 +575,7 @@
                     const esSelect = document.getElementById('esRole');
                     esSelect.innerHTML = '<option value="">Select Role</option>';
                     roles.forEach(r => {
-                        esSelect.innerHTML += `<option value="${r.id}" data-name="${r.name}">${r.display_name || r.name}</option>`;
+                        esSelect.innerHTML += `<option value="${r.id}" data-name="${r.name}">${escapeHtml(r.display_name || r.name)}</option>`;
                     });
                 }
             } catch (err) {

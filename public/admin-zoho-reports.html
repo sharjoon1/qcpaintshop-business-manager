@@ -205,6 +205,8 @@
     </div>
 
     <script>
+        function esc(s){ if(s===null||s===undefined) return ''; const d=document.createElement('div'); d.textContent=String(s); return d.innerHTML; }
+
         // ===== State =====
         let currentReport = 'profit_loss';
         let lastCacheTime = null;
@@ -513,9 +515,9 @@
                     const amount = row.amount || row.total || row.value || 0;
                     const isSection = row.is_section || row.is_header || false;
                     if (isSection) {
-                        tbody.innerHTML += `<tr class="bg-gray-50"><td colspan="2" class="px-4 py-3 font-bold text-gray-800 border-b">${name}</td></tr>`;
+                        tbody.innerHTML += `<tr class="bg-gray-50"><td colspan="2" class="px-4 py-3 font-bold text-gray-800 border-b">${esc(name)}</td></tr>`;
                     } else {
-                        tbody.innerHTML += buildTableRow([name, formatCurrency(amount)], row.is_total || false);
+                        tbody.innerHTML += buildTableRow([esc(name), formatCurrency(amount)], row.is_total || false);
                     }
                 });
             } else {
@@ -551,9 +553,9 @@
                     const amount = row.amount || row.total || row.value || 0;
                     const isSection = row.is_section || row.is_header || false;
                     if (isSection) {
-                        tbody.innerHTML += `<tr class="bg-gray-50"><td colspan="2" class="px-4 py-3 font-bold text-gray-800 border-b">${name}</td></tr>`;
+                        tbody.innerHTML += `<tr class="bg-gray-50"><td colspan="2" class="px-4 py-3 font-bold text-gray-800 border-b">${esc(name)}</td></tr>`;
                     } else {
-                        tbody.innerHTML += buildTableRow([name, formatCurrency(amount)], row.is_total || false);
+                        tbody.innerHTML += buildTableRow([esc(name), formatCurrency(amount)], row.is_total || false);
                     }
                 });
             } else {
@@ -584,7 +586,7 @@
                     const returns = parseFloat(row.returns || row.credit_notes || 0);
                     const netSales = parseFloat(row.net_sales || (totalSales - returns));
                     grandTotal += netSales;
-                    tbody.innerHTML += buildTableRow([name, invoices, formatCurrency(totalSales), formatCurrency(returns), formatCurrency(netSales)], false);
+                    tbody.innerHTML += buildTableRow([esc(name), invoices, formatCurrency(totalSales), formatCurrency(returns), formatCurrency(netSales)], false);
                 });
 
                 tbody.innerHTML += buildTableRow(['Total', '', '', '', formatCurrency(grandTotal)], true);
@@ -613,7 +615,7 @@
                     const qty = row.quantity_sold || row.quantity || row.qty || 0;
                     const amount = parseFloat(row.amount || row.total || row.sales_amount || 0);
                     grandTotal += amount;
-                    tbody.innerHTML += buildTableRow([name, qty, formatCurrency(amount)], false);
+                    tbody.innerHTML += buildTableRow([esc(name), qty, formatCurrency(amount)], false);
                 });
 
                 tbody.innerHTML += buildTableRow(['Total', '', formatCurrency(grandTotal)], true);
@@ -691,7 +693,7 @@
                         return formatCurrency(val);
                     });
 
-                    tbody.innerHTML += buildTableRow([name, ...bucketCells, formatCurrency(total)], false);
+                    tbody.innerHTML += buildTableRow([esc(name), ...bucketCells, formatCurrency(total)], false);
                 });
 
                 const totalCells = bucketTotals.map(v => formatCurrency(v));

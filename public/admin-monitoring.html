@@ -446,7 +446,7 @@ async function loadTableInfo() {
                     </tr>`).join('')}</tbody>
             </table>`;
     } catch (e) {
-        document.getElementById('dbTablesContent').innerHTML = `<div style="color:#ef4444;padding:12px;">Error: ${e.message}</div>`;
+        document.getElementById('dbTablesContent').innerHTML = `<div style="color:#ef4444;padding:12px;">Error: ${escapeHtml(e.message)}</div>`;
     }
 }
 

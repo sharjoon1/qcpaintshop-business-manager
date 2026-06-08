@@ -437,6 +437,8 @@
     </div>
 
     <script>
+        function esc(s){ if(s===null||s===undefined) return ''; const d=document.createElement('div'); d.textContent=String(s); return d.innerHTML; }
+
         const API_BASE = '';
         let currentUser = null;
 
@@ -475,7 +477,7 @@
             const select = document.getElementById('filterUser');
             select.innerHTML = '<option value="">All Staff</option>';
             data.forEach(user => {
-                select.innerHTML += `<option value="${user.id}">${user.full_name}</option>`;
+                select.innerHTML += `<option value="${user.id}">${esc(user.full_name)}</option>`;
             });
         }
 
@@ -492,7 +494,7 @@
                 const select = document.getElementById('pendingBranch');
                 select.innerHTML = '<option value="">All Branches</option>';
                 branches.forEach(branch => {
-                    select.innerHTML += `<option value="${branch.id}">${branch.name}</option>`;
+                    select.innerHTML += `<option value="${branch.id}">${esc(branch.name)}</option>`;
                 });
             } catch (error) {
                 console.error('Error loading branches:', error);

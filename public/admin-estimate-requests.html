@@ -224,6 +224,8 @@
     </div>
 
     <script>
+        function esc(s){ if(s===null||s===undefined) return ''; const d=document.createElement('div'); d.textContent=String(s); return d.innerHTML; }
+
         const API_BASE = '/api';
         let currentRequest = null;
 
@@ -320,18 +322,18 @@
                 tbody.innerHTML = result.data.map(request => `
                     <tr class="hover:bg-gray-50 priority-${request.priority}">
                         <td class="px-6 py-4 whitespace-nowrap">
-                            <div class="text-sm font-medium text-gray-900">${request.request_number}</div>
+                            <div class="text-sm font-medium text-gray-900">${esc(request.request_number)}</div>
                         </td>
                         <td class="px-6 py-4">
-                            <div class="text-sm font-medium text-gray-900">${request.customer_name}</div>
-                            <div class="text-sm text-gray-500">${request.phone}</div>
+                            <div class="text-sm font-medium text-gray-900">${esc(request.customer_name)}</div>
+                            <div class="text-sm text-gray-500">${esc(request.phone)}</div>
                         </td>
                         <td class="px-6 py-4">
                             <div class="text-sm text-gray-900">${formatProjectType(request.project_type)}</div>
                             <div class="text-sm text-gray-500">${formatPropertyType(request.property_type)}</div>
                         </td>
                         <td class="px-6 py-4 whitespace-nowrap hide-mobile">
-                            <div class="text-sm text-gray-900">${request.area_sqft} sq.ft</div>
+                            <div class="text-sm text-gray-900">${esc(request.area_sqft)} sq.ft</div>
                         </td>
                         <td class="px-6 py-4 whitespace-nowrap">
                             <span class="px-3 py-1 inline-flex text-xs leading-5 font-semibold rounded-full status-${request.status}">
@@ -384,15 +386,15 @@
                             <div class="grid grid-cols-2 gap-4 bg-gray-50 rounded-lg p-4">
                                 <div>
                                     <p class="text-sm text-gray-600">Name</p>
-                                    <p class="font-medium">${req.customer_name}</p>
+                                    <p class="font-medium">${esc(req.customer_name)}</p>
                                 </div>
                                 <div>
                                     <p class="text-sm text-gray-600">Phone</p>
-                                    <p class="font-medium">${req.phone}</p>
+                                    <p class="font-medium">${esc(req.phone)}</p>
                                 </div>
                                 <div class="col-span-2">
                                     <p class="text-sm text-gray-600">Email</p>
-                                    <p class="font-medium">${req.email || 'Not provided'}</p>
+                                    <p class="font-medium">${esc(req.email) || 'Not provided'}</p>
                                 </div>
                             </div>
                         </div>
@@ -411,15 +413,15 @@
                                 </div>
                                 <div>
                                     <p class="text-sm text-gray-600">Area</p>
-                                    <p class="font-medium">${req.area_sqft} sq.ft</p>
+                                    <p class="font-medium">${esc(req.area_sqft)} sq.ft</p>
                                 </div>
                                 <div>
                                     <p class="text-sm text-gray-600">Rooms</p>
-                                    <p class="font-medium">${req.rooms || 'Not specified'}</p>
+                                    <p class="font-medium">${esc(req.rooms) || 'Not specified'}</p>
                                 </div>
                                 <div class="col-span-2">
                                     <p class="text-sm text-gray-600">Location</p>
-                                    <p class="font-medium">${req.location}</p>
+                                    <p class="font-medium">${esc(req.location)}</p>
                                 </div>
                             </div>
                         </div>
@@ -430,15 +432,15 @@
                             <div class="grid grid-cols-3 gap-4 bg-gray-50 rounded-lg p-4">
                                 <div>
                                     <p class="text-sm text-gray-600">Preferred Brand</p>
-                                    <p class="font-medium">${req.preferred_brand || 'Any'}</p>
+                                    <p class="font-medium">${esc(req.preferred_brand) || 'Any'}</p>
                                 </div>
                                 <div>
                                     <p class="text-sm text-gray-600">Timeline</p>
-                                    <p class="font-medium">${req.timeline || 'Flexible'}</p>
+                                    <p class="font-medium">${esc(req.timeline) || 'Flexible'}</p>
                                 </div>
                                 <div>
                                     <p class="text-sm text-gray-600">Budget Range</p>
-                                    <p class="font-medium">${req.budget_range || 'Not specified'}</p>
+                                    <p class="font-medium">${esc(req.budget_range) || 'Not specified'}</p>
                                 </div>
                             </div>
                         </div>
@@ -447,7 +449,7 @@
                         <div>
                             <h4 class="text-lg font-semibold text-gray-800 mb-3">Additional Notes</h4>
                             <div class="bg-gray-50 rounded-lg p-4">
-                                <p class="text-gray-700">${req.additional_notes}</p>
+                                <p class="text-gray-700">${esc(req.additional_notes)}</p>
                             </div>
                         </div>
                         ` : ''}
@@ -478,14 +480,14 @@
                                             ${JSON.parse(req.products_json).items.map((item, idx) => `
                                                 <tr class="border-t border-blue-200">
                                                     <td class="px-3 py-2">${idx + 1}</td>
-                                                    <td class="px-3 py-2 font-medium text-gray-900">${item.product_name}</td>
-                                                    <td class="px-3 py-2 text-gray-700">${item.brand_name}</td>
+                                                    <td class="px-3 py-2 font-medium text-gray-900">${esc(item.product_name)}</td>
+                                                    <td class="px-3 py-2 text-gray-700">${esc(item.brand_name)}</td>
                                                     <td class="px-3 py-2">
                                                         <span class="px-2 py-1 text-xs rounded ${item.type === 'unit' ? 'bg-green-100 text-green-800' : 'bg-orange-100 text-orange-800'}">
                                                             ${item.type === 'unit' ? 'Unit' : 'Area'}
                                                         </span>
                                                     </td>
-                                                    <td class="px-3 py-2 text-gray-600 text-xs">${item.details}</td>
+                                                    <td class="px-3 py-2 text-gray-600 text-xs">${esc(item.details)}</td>
                                                 </tr>
                                             `).join('')}
                                         </tbody>
@@ -531,7 +533,7 @@
 
                         <!-- Quick Actions -->
                         <div class="flex gap-3">
-                            <a href="tel:${req.phone}" class="flex-1 bg-green-600 text-white py-3 rounded-lg text-center hover:bg-green-700">
+                            <a href="tel:${esc(req.phone)}" class="flex-1 bg-green-600 text-white py-3 rounded-lg text-center hover:bg-green-700">
                                 📞 Call Customer
                             </a>
                             <a href="estimate-create-new.html?from_request=${req.id}" class="flex-1 bg-purple-600 text-white py-3 rounded-lg text-center hover:bg-purple-700">

@@ -101,6 +101,8 @@
 
     <script src="/components/logo-loader.js"></script>
     <script>
+        function esc(s){ if(s===null||s===undefined) return ''; const d=document.createElement('div'); d.textContent=String(s); return d.innerHTML; }
+
         // Set default date range to last 7 days
         const today = new Date().toISOString().split('T')[0];
         const weekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
@@ -115,7 +117,7 @@
                 if (branchData.success) {
                     const sel = document.getElementById('filterBranch');
                     (branchData.data || []).forEach(b => {
-                        sel.innerHTML += `<option value="${b.id}">${b.name}</option>`;
+                        sel.innerHTML += `<option value="${b.id}">${esc(b.name)}</option>`;
                     });
                 }
 
@@ -125,7 +127,7 @@
                 if (staffData.success) {
                     const sel = document.getElementById('filterStaff');
                     (staffData.data || []).forEach(s => {
-                        sel.innerHTML += `<option value="${s.id}">${s.full_name || s.name}</option>`;
+                        sel.innerHTML += `<option value="${s.id}">${esc(s.full_name || s.name)}</option>`;
                     });
                 }
             } catch (e) {

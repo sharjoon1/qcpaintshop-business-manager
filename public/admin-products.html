@@ -742,15 +742,15 @@
             brandSelect.innerHTML = '<option value="">-- Select Brand --</option>';
             filterBrand.innerHTML = '<option value="">All Brands</option>';
             brands.forEach(brand => {
-                brandSelect.innerHTML += `<option value="${brand.id}">${brand.name}</option>`;
-                filterBrand.innerHTML += `<option value="${brand.id}">${brand.name}</option>`;
+                brandSelect.innerHTML += `<option value="${brand.id}">${escHtml(brand.name)}</option>`;
+                filterBrand.innerHTML += `<option value="${brand.id}">${escHtml(brand.name)}</option>`;
             });
 
             categorySelect.innerHTML = '<option value="">-- Select Category --</option>';
             filterCategory.innerHTML = '<option value="">All Categories</option>';
             categories.forEach(cat => {
-                categorySelect.innerHTML += `<option value="${cat.id}">${cat.name}</option>`;
-                filterCategory.innerHTML += `<option value="${cat.id}">${cat.name}</option>`;
+                categorySelect.innerHTML += `<option value="${cat.id}">${escHtml(cat.name)}</option>`;
+                filterCategory.innerHTML += `<option value="${cat.id}">${escHtml(cat.name)}</option>`;
             });
         }
 
