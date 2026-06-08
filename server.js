@@ -3495,6 +3495,7 @@ app.get('/api/customer/me/requests', requireCustomerAuth, async (req, res) => {
         const limit = Math.min(parseInt(req.query.limit) || 50, 100);
         const [rows] = await pool.query(
             `SELECT er.id, er.request_number, er.customer_name, er.phone, er.status, er.priority,
+                    er.project_type, er.property_type, er.area_sqft,
                     er.created_at, er.updated_at, COUNT(erp.id) AS photo_count
              FROM estimate_requests er
              LEFT JOIN estimate_request_photos erp ON er.id = erp.request_id

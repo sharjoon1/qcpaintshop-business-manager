@@ -10,8 +10,10 @@
     <link rel="icon" type="image/png" sizes="192x192" href="/icons/icon-192x192.png">
     <link rel="apple-touch-icon" href="/icons/icon-192x192.png">
     <title>My Requests - Quality Colours</title>
-    <script src="/js/auth-helper.js"></script>
-    <script>checkAuthOrRedirect();</script>
+    <script>
+    // Customer-token presence is the single source of truth (mirrors customer-dashboard.html).
+    if (!localStorage.getItem('customer_token')) { window.location.href = '/customer-login.html'; }
+    </script>
     <link rel="stylesheet" href="/css/tailwind.css">
     <style>
         .gradient-bg {
@@ -145,8 +147,22 @@
     <script>
         function esc(s){ if(s===null||s===undefined) return ''; const d=document.createElement('div'); d.textContent=String(s); return d.innerHTML; }
 
+        function customerHeaders() {
+            const token = localStorage.getItem('customer_token') || '';
+            return { 'Authorization': 'Bearer ' + token };
+        }
+
+        function handleAuthFailure(response) {
+            if (response.status === 401) {
+                ['customer_token', 'customer_phone', 'customer_name', 'customer_id']
+                    .forEach(k => localStorage.removeItem(k));
+                window.location.href = '/customer-login.html';
+                return true;
+            }
+            return false;
+        }
+
         const API_BASE = '/api';
-        let customerPhone = null;
         let allRequests = [];
         let currentFilter = 'all';
 
@@ -160,7 +176,6 @@
         });
 
         function loadCustomerInfo() {
-            customerPhone = localStorage.getItem('customer_phone') || '7418831122';
             const customerName = localStorage.getItem('customer_name') || 'Customer';
             document.getElementById('profileInitial').textContent = customerName.charAt(0).toUpperCase();
         }
@@ -170,17 +185,8 @@
             container.innerHTML = '<div class="col-span-full text-center py-12 text-gray-400"><div class="text-5xl mb-3">⏳</div><p>Loading...</p></div>';
 
             try {
-                if (!customerPhone) {
-                    container.innerHTML = `
-                        <div class="col-span-full text-center py-12">
-                            <p class="text-gray-600 mb-4">Please login to view your requests</p>
-                            <a href="login.html" class="bg-purple-600 text-white px-6 py-3 rounded-lg hover:bg-purple-700">Login</a>
-                        </div>
-                    `;
-                    return;
-                }
-
-                const response = await fetch(`${API_BASE}/estimate-requests?search=${customerPhone}`);
+                const response = await fetch(`${API_BASE}/customer/me/requests?limit=100`, { headers: customerHeaders() });
+                if (handleAuthFailure(response)) return;
                 const result = await response.json();
 
                 if (!result.success || result.data.length === 0) {
@@ -295,7 +301,8 @@
 
         async function viewRequest(id) {
             try {
-                const response = await fetch(`${API_BASE}/estimate-requests/${id}`);
+                const response = await fetch(`${API_BASE}/customer/me/requests/${id}`, { headers: customerHeaders() });
+                if (handleAuthFailure(response)) return;
                 const result = await response.json();
                 
                 if (!result.success) {
