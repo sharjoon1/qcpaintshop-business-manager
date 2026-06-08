@@ -6,6 +6,7 @@
 const express = require('express');
 const router = express.Router();
 const { requirePermission, requireAuth } = require('../middleware/permissionMiddleware');
+const { sanitizeGuideContent } = require('../services/html-sanitizer');
 
 let pool;
 function setPool(dbPool) { pool = dbPool; }
@@ -202,14 +203,17 @@ router.post('/', requirePermission('settings', 'manage'), async (req, res) => {
         if (!title) return res.status(400).json({ success: false, message: 'Title is required' });
 
         const slug = slugify(title) + '-' + Date.now().toString(36);
+        const ctype = content_type || 'rich_text';
+        const safeEn = sanitizeGuideContent(content_en, ctype);
+        const safeTa = sanitizeGuideContent(content_ta, ctype);
 
         const [result] = await pool.query(
             `INSERT INTO guides (category_id, title, title_ta, slug, content_en, content_ta,
              summary, summary_ta, language, content_type, status, visible_to_staff, author_id, version)
              VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1)`,
             [category_id || null, title, title_ta || null, slug,
-             content_en || null, content_ta || null, summary || null, summary_ta || null,
-             language || 'both', content_type || 'rich_text', status || 'draft',
+             safeEn || null, safeTa || null, summary || null, summary_ta || null,
+             language || 'both', ctype, status || 'draft',
              visible_to_staff !== undefined ? visible_to_staff : 1, req.user.id]
         );
 
@@ -250,8 +254,9 @@ router.put('/:id', requirePermission('settings', 'manage'), async (req, res) => 
         if (category_id !== undefined) { updates.push('category_id = ?'); params.push(category_id || null); }
         if (title !== undefined) { updates.push('title = ?'); params.push(title); }
         if (title_ta !== undefined) { updates.push('title_ta = ?'); params.push(title_ta); }
-        if (content_en !== undefined) { updates.push('content_en = ?'); params.push(content_en); }
-        if (content_ta !== undefined) { updates.push('content_ta = ?'); params.push(content_ta); }
+        const ctype = content_type || guide.content_type || 'rich_text';
+        if (content_en !== undefined) { updates.push('content_en = ?'); params.push(sanitizeGuideContent(content_en, ctype)); }
+        if (content_ta !== undefined) { updates.push('content_ta = ?'); params.push(sanitizeGuideContent(content_ta, ctype)); }
         if (summary !== undefined) { updates.push('summary = ?'); params.push(summary); }
         if (summary_ta !== undefined) { updates.push('summary_ta = ?'); params.push(summary_ta); }
         if (language !== undefined) { updates.push('language = ?'); params.push(language); }

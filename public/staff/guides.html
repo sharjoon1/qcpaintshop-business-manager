@@ -12,6 +12,8 @@
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="mobile-web-app-capable" content="yes">
     <title>Guides & Help - QC Staff</title>
+    <!-- DOMPurify: client-side defense-in-depth for guide HTML (server also sanitizes on write) -->
+    <script src="/js/purify.min.js"></script>
     <script src="/js/auth-helper.js"></script>
     <script>checkAuthOrRedirect();</script>
     <link rel="stylesheet" href="/css/tailwind.css">
@@ -831,8 +833,12 @@
             // Trigger load for blank iframe
             iframe.src = 'about:blank';
         } else {
-            // rich_text: render HTML directly
-            content.innerHTML = htmlContent;
+            // rich_text: sanitize client-side (DOMPurify) before innerHTML, in addition to the
+            // server-side sanitize-on-write. Falls back to raw only if the library failed to load
+            // (content is already server-sanitized, so this stays safe).
+            content.innerHTML = (typeof DOMPurify !== 'undefined')
+                ? DOMPurify.sanitize(htmlContent)
+                : htmlContent;
         }
     }
 
