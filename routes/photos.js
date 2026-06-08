@@ -51,7 +51,7 @@ function getFileDate(filePath) {
 /**
  * GET /categories — List all photo categories with counts
  */
-router.get('/categories', requireAuth, async (req, res) => {
+router.get('/categories', requireAuth, requirePermission('system', 'view'), async (req, res) => {
     try {
         const categories = PHOTO_CATEGORIES.map(cat => {
             const dir = fullDir(cat.dir);
@@ -83,7 +83,7 @@ router.get('/categories', requireAuth, async (req, res) => {
  * GET /list?category=clock-in&date=2026-03-09&page=1&limit=50
  * Returns photo list for a category, newest first
  */
-router.get('/list', requireAuth, async (req, res) => {
+router.get('/list', requireAuth, requirePermission('system', 'view'), async (req, res) => {
     try {
         const { category, date, page = 1, limit = 60 } = req.query;
         const cat = PHOTO_CATEGORIES.find(c => c.key === category);
