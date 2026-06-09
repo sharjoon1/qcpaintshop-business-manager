@@ -4,7 +4,17 @@
  * re-stamps existing versions without doubling, drops other queries, handles both
  * quote styles, and leaves CDN/unknown links untouched (idempotent).
  */
-const { stampHtml } = require('../../scripts/stamp-css-version');
+const { stampHtml, hashCssText } = require('../../scripts/stamp-css-version');
+
+describe('hashCssText (line-ending independent — cross-env stable)', () => {
+    test('CRLF and LF content hash identically', () => {
+        expect(hashCssText('a {\r\n  color: red;\r\n}')).toBe(hashCssText('a {\n  color: red;\n}'));
+    });
+    test('returns 8 hex chars and differs for different content', () => {
+        expect(hashCssText('body{}')).toMatch(/^[0-9a-f]{8}$/);
+        expect(hashCssText('body{}')).not.toBe(hashCssText('body{color:red}'));
+    });
+});
 
 const V = {
     '/css/tailwind.css': 'aaaa1111',

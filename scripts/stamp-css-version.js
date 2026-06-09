@@ -23,11 +23,21 @@ function hash8(buf) {
     return crypto.createHash('sha256').update(buf).digest('hex').slice(0, 8);
 }
 
+/**
+ * Hash CSS text line-ending-independently (CRLF normalized to LF) so the version
+ * is identical regardless of the checkout's autocrlf setting — otherwise a Windows
+ * dev (CRLF) and a Linux prod (LF) compute different hashes for the same committed
+ * file, and prod's build re-stamps every page (dirty tree / pull conflicts).
+ */
+function hashCssText(text) {
+    return hash8(Buffer.from(String(text).replace(/\r\n/g, '\n'), 'utf8'));
+}
+
 /** Build { '/css/<file>.css': '<hash8>' } for every CSS file in public/css. */
 function buildVersionMap(cssDir = CSS_DIR) {
     const map = {};
     for (const f of fs.readdirSync(cssDir)) {
-        if (f.endsWith('.css')) map['/css/' + f] = hash8(fs.readFileSync(path.join(cssDir, f)));
+        if (f.endsWith('.css')) map['/css/' + f] = hashCssText(fs.readFileSync(path.join(cssDir, f), 'utf8'));
     }
     return map;
 }
@@ -71,4 +81,4 @@ function main() {
 
 if (require.main === module) main();
 
-module.exports = { stampHtml, buildVersionMap, hash8 };
+module.exports = { stampHtml, buildVersionMap, hashCssText, hash8 };
