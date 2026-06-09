@@ -344,11 +344,11 @@
                         <div id="extraSummaryLines"></div>
                         <div id="gstBreakdownSection" class="hidden">
                             <div class="flex justify-between py-1.5 text-sm">
-                                <span class="text-gray-500">Subtotal (excl. GST)</span>
+                                <span class="text-gray-500">Subtotal</span>
                                 <span class="font-medium" id="subtotalVal"></span>
                             </div>
-                            <div class="flex justify-between py-1.5 text-sm">
-                                <span class="text-gray-500">GST @18%</span>
+                            <div class="flex justify-between py-1.5 text-sm" id="gstRow">
+                                <span class="text-gray-500">GST (incl.)</span>
                                 <span class="font-medium" id="gstVal"></span>
                             </div>
                             <div class="border-t border-gray-300 my-1"></div>
@@ -370,7 +370,7 @@
                     <a id="upiPayLink" href="#" class="no-print" style="display: inline-flex; align-items: center; gap: 4px; background: var(--primary); color: white; font-size: 12px; font-weight: 600; padding: 8px 16px; border-radius: 8px; text-decoration: none;">
                         Pay &#x20B9;<span id="upiAmount"></span>
                     </a>
-                    <div style="font-size: 11px; color: var(--text-light);">UPI ID: 7418831122@superyes</div>
+                    <div style="font-size: 11px; color: var(--text-light);">UPI ID: <span id="upiIdText">7418831122@superyes</span></div>
                 </div>
             </div>
 
@@ -524,7 +524,10 @@
 
                 if (estimateData.show_gst_breakdown) {
                     document.getElementById('subtotalVal').textContent = formatINR(parseFloat(estimateData.subtotal) || 0);
-                    document.getElementById('gstVal').textContent = formatINR(parseFloat(estimateData.gst_amount) || 0);
+                    const gstAmt = parseFloat(estimateData.gst_amount) || 0;
+                    document.getElementById('gstVal').textContent = formatINR(gstAmt);
+                    // RT-062: prices are GST-inclusive (gst_amount is 0) — hide the zero GST row
+                    document.getElementById('gstRow').style.display = gstAmt > 0 ? '' : 'none';
                     document.getElementById('gstBreakdownSection').classList.remove('hidden');
                 }
 
@@ -657,6 +660,7 @@
                     document.getElementById('upiQrImage').src = data.data.qr_image;
                     document.getElementById('upiPayLink').href = data.data.upi_url;
                     document.getElementById('upiAmount').textContent = parseFloat(data.data.amount).toLocaleString('en-IN');
+                    if (data.data.upi_vpa) document.getElementById('upiIdText').textContent = data.data.upi_vpa;
                     document.getElementById('upiSection').style.display = 'block';
                 }
             } catch (err) {
@@ -814,7 +818,10 @@
             if (colVis.show_subtotal || colVis.show_gst) {
                 if (gstSection) gstSection.classList.remove('hidden');
                 document.getElementById('subtotalVal').textContent = formatINR(productTotal);
-                document.getElementById('gstVal').textContent = formatINR(parseFloat(estimateData.gst_amount) || 0);
+                const gstAmt = parseFloat(estimateData.gst_amount) || 0;
+                document.getElementById('gstVal').textContent = formatINR(gstAmt);
+                // RT-062: prices are GST-inclusive (gst_amount is 0) — hide the zero GST row
+                document.getElementById('gstRow').style.display = gstAmt > 0 ? '' : 'none';
             } else {
                 if (gstSection) gstSection.classList.add('hidden');
             }

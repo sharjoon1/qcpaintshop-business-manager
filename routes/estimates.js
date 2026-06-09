@@ -380,7 +380,9 @@ router.get('/:id/upi-qr', requireAuth, async (req, res) => {
 
         const est = estimates[0];
         const amount = parseFloat(est.grand_total) || 0;
-        const upiUrl = `upi://pay?pa=7418831122@superyes&pn=Quality Colours&am=${amount.toFixed(2)}&cu=INR&tn=EST-${est.estimate_number}`;
+        const businessConfig = require('../services/business-config');
+        const upi = await businessConfig.getUpiConfig(pool);
+        const upiUrl = businessConfig.buildUpiUrl(upi, amount, `EST-${est.estimate_number}`);
 
         const QRCode = require('qrcode');
         const qrDataUrl = await QRCode.toDataURL(upiUrl, { width: 200, margin: 1 });
@@ -390,6 +392,7 @@ router.get('/:id/upi-qr', requireAuth, async (req, res) => {
             data: {
                 qr_image: qrDataUrl,
                 upi_url: upiUrl,
+                upi_vpa: upi.vpa,
                 amount: amount,
                 estimate_number: est.estimate_number
             }
@@ -447,8 +450,10 @@ router.post('/:id/send-whatsapp', requireAuth, async (req, res) => {
 
         // Build caption with UPI payment link — everything in ONE message with the PDF
         const amount = parseFloat(est.grand_total) || 0;
-        const upiUrl = `upi://pay?pa=7418831122@superyes&pn=Quality%20Colours&am=${amount.toFixed(2)}&cu=INR&tn=EST-${est.estimate_number}`;
-        const caption = `Dear ${est.customer_name || 'Customer'},\n\nEstimate *#${est.estimate_number}* from *Quality Colours*\n\n*Total: ₹${amount.toLocaleString('en-IN')}*\n\n💳 *Pay via UPI:*\n${upiUrl}\n\n_UPI ID: 7418831122@superyes_\n\nThank you!`;
+        const businessConfig = require('../services/business-config');
+        const upi = await businessConfig.getUpiConfig(pool);
+        const upiUrl = businessConfig.buildUpiUrl(upi, amount, `EST-${est.estimate_number}`);
+        const caption = `Dear ${est.customer_name || 'Customer'},\n\nEstimate *#${est.estimate_number}* from *Quality Colours*\n\n*Total: ₹${amount.toLocaleString('en-IN')}*\n\n💳 *Pay via UPI:*\n${upiUrl}\n\n_UPI ID: ${upi.vpa}_\n\nThank you!`;
 
         let sent = false;
         const mediaOpts = {

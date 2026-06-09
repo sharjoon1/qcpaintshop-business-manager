@@ -112,8 +112,10 @@ router.post('/whatsapp', requireAuth, async (req, res) => {
             const [estRows] = await pool.query('SELECT grand_total, estimate_number FROM estimates WHERE id = ?', [resource_id]);
             if (estRows.length) {
                 const amount = parseFloat(estRows[0].grand_total) || 0;
-                const upiUrl = `upi://pay?pa=7418831122@superyes&pn=Quality%20Colours&am=${amount.toFixed(2)}&cu=INR&tn=EST-${estRows[0].estimate_number}`;
-                upiLine = `\n\n💳 *Pay Online:* ${upiUrl}\n_UPI ID: 7418831122@superyes_`;
+                const bizCfg = require('../services/business-config');
+                const upi = await bizCfg.getUpiConfig(pool);
+                const upiUrl = bizCfg.buildUpiUrl(upi, amount, `EST-${estRows[0].estimate_number}`);
+                upiLine = `\n\n💳 *Pay Online:* ${upiUrl}\n_UPI ID: ${upi.vpa}_`;
             }
         }
 
@@ -212,7 +214,9 @@ router.get('/public/:token/upi-qr', async (req, res) => {
 
         const est = shares[0];
         const amount = parseFloat(est.grand_total) || 0;
-        const upiUrl = `upi://pay?pa=7418831122@superyes&pn=Quality Colours&am=${amount.toFixed(2)}&cu=INR&tn=EST-${est.estimate_number}`;
+        const bizCfg = require('../services/business-config');
+        const upi = await bizCfg.getUpiConfig(pool);
+        const upiUrl = bizCfg.buildUpiUrl(upi, amount, `EST-${est.estimate_number}`);
 
         const QRCode = require('qrcode');
         const qrDataUrl = await QRCode.toDataURL(upiUrl, { width: 200, margin: 1 });

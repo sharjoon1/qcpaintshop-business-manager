@@ -4356,7 +4356,8 @@ server.listen(PORT, () => {
         waCampaignEngine.start();
         console.log('Zoho services started: sync-scheduler, whatsapp-processor, whatsapp-sessions, wa-campaign-engine');
     } else {
-        console.log('ZOHO_ORGANIZATION_ID missing - Zoho sync/whatsapp skipped; non-Zoho schedulers started');
+        // KN-P1-5: make the skip LOUD and name exactly which schedulers did not start.
+        console.warn('[startup] ZOHO_ORGANIZATION_ID not set — SKIPPING Zoho schedulers: sync-scheduler, whatsapp-processor, whatsapp-sessions, wa-campaign-engine. Non-Zoho schedulers started normally.');
     }
 });
 
