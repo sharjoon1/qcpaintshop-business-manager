@@ -533,9 +533,11 @@
         let otpId = null;
         let countdownInterval = null;
 
+        function escHtml(s){ if(s==null) return ''; const d=document.createElement('div'); d.textContent=String(s); return d.innerHTML; }
+
         function showAlert(message, type = 'info') {
             const alertContainer = document.getElementById('alertContainer');
-            alertContainer.innerHTML = `<div class="alert alert-${type}">${message}</div>`;
+            alertContainer.innerHTML = `<div class="alert alert-${type}">${escHtml(message)}</div>`;
             setTimeout(() => { alertContainer.innerHTML = ''; }, 5000);
         }
 

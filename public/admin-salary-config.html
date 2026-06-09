@@ -615,8 +615,8 @@
             const tbody = document.getElementById('configTableBody');
             tbody.innerHTML = configs.map(config => `
                 <tr>
-                    <td>${config.staff_name}</td>
-                    <td>${config.branch_name}</td>
+                    <td>${escapeVis(config.staff_name)}</td>
+                    <td>${escapeVis(config.branch_name)}</td>
                     <td class="money">₹${parseFloat(config.monthly_salary).toLocaleString('en-IN', {minimumFractionDigits: 2})}</td>
                     <td class="money">₹${parseFloat(config.hourly_rate).toLocaleString('en-IN', {minimumFractionDigits: 2})}</td>
                     <td>${config.overtime_multiplier}x</td>

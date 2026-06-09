@@ -223,6 +223,11 @@
         return d.innerHTML;
     }
 
+    function escAttr(s) {
+        if (s == null) return '';
+        return String(s).replace(/&/g, '&amp;').replace(/"/g, '&quot;');
+    }
+
     function fmtPrice(n) {
         return n != null ? '₹' + Number(n).toLocaleString('en-IN') : '';
     }
@@ -372,6 +377,8 @@
             const typeLabel = p.product_type === 'area_wise' ? 'Area' : 'Unit';
             const typeBg = p.product_type === 'area_wise' ? 'background:#dbeafe;color:#1d4ed8' : 'background:#d1fae5;color:#065f46';
 
+            const safeImg = /^(https?:\/\/|\/)/.test(p.image_url || '') ? p.image_url : '';
+
             return `
             <div class="product-card flex-row items-stretch gap-3">
                 <div class="flex-1 min-w-0 flex flex-col gap-1.5">
@@ -405,8 +412,8 @@
                     </div>
                     <div class="flex flex-wrap gap-1 mt-0.5">${p.pack_sizes.map(ps => stockBadge(ps.stock)).filter((v,i,a) => a.indexOf(v) === i).join('')}</div>
                 </div>
-                ${p.image_url
-                    ? '<img src="' + p.image_url + '" class="product-img" onerror="this.onerror=null; this.src=\'/images/product-placeholder.png\';">'
+                ${safeImg
+                    ? '<img src="' + escAttr(safeImg) + '" class="product-img" onerror="this.onerror=null; this.src=\'/images/product-placeholder.png\';">'
                     : ''
                 }
             </div>`;

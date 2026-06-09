@@ -500,7 +500,7 @@ function renderLeads(leadsData) {
              onclick="window.location.href='/staff-leads.html?highlight=${lead.id}'">
             <div class="flex-shrink-0">
                 <div class="w-10 h-10 rounded-full ${isOverdue ? 'bg-red-100' : 'bg-amber-100'} flex items-center justify-center">
-                    <span class="text-sm font-bold ${isOverdue ? 'text-red-600' : 'text-amber-600'}">${lead.name.charAt(0).toUpperCase()}</span>
+                    <span class="text-sm font-bold ${isOverdue ? 'text-red-600' : 'text-amber-600'}">${escHtml(lead.name.charAt(0).toUpperCase())}</span>
                 </div>
             </div>
             <div class="flex-1 min-w-0">
@@ -514,7 +514,7 @@ function renderLeads(leadsData) {
                     ${lead.estimated_budget ? `<span class="text-[9px] text-gray-400">₹${formatNum(lead.estimated_budget)}</span>` : ''}
                 </div>
             </div>
-            <a href="tel:${lead.phone}" onclick="event.stopPropagation()" class="flex-shrink-0 w-8 h-8 rounded-full bg-green-50 flex items-center justify-center hover:bg-green-100 transition">
+            <a href="tel:${String(lead.phone || '').replace(/[^0-9+]/g, '')}" onclick="event.stopPropagation()" class="flex-shrink-0 w-8 h-8 rounded-full bg-green-50 flex items-center justify-center hover:bg-green-100 transition">
                 <svg class="w-4 h-4 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z"/></svg>
             </a>
         </div>`;
@@ -556,7 +556,7 @@ function renderOutstanding(outstanding) {
                 </div>
             </div>
             ${cust.phone ? `
-            <a href="tel:${cust.phone}" class="flex-shrink-0 w-8 h-8 rounded-full bg-blue-50 flex items-center justify-center hover:bg-blue-100 transition">
+            <a href="tel:${String(cust.phone || '').replace(/[^0-9+]/g, '')}" class="flex-shrink-0 w-8 h-8 rounded-full bg-blue-50 flex items-center justify-center hover:bg-blue-100 transition">
                 <svg class="w-4 h-4 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z"/></svg>
             </a>` : ''}
         </div>`;

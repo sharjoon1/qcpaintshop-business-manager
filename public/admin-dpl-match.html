@@ -162,7 +162,7 @@ async function loadData() {
         content.classList.remove('hidden');
         showToast('Loaded ' + allItems.length + ' items', 'success');
     } catch(e) {
-        loading.innerHTML = '<p class="text-red-500">❌ ' + e.message + '</p><button onclick="loadData()" class="mt-3 px-4 py-2 bg-indigo-500 text-white rounded-lg text-sm">Retry</button>';
+        loading.innerHTML = '<p class="text-red-500">❌ ' + esc(e.message) + '</p><button onclick="loadData()" class="mt-3 px-4 py-2 bg-indigo-500 text-white rounded-lg text-sm">Retry</button>';
         showToast('Error: ' + e.message, 'error');
     }
     icon.textContent = '🔄';
@@ -297,13 +297,13 @@ function renderTable() {
         
         html += `<tr class="${isMatched ? 'row-matched' : 'row-unmatched'}">
             <td class="text-gray-400 text-xs">${i + 1}</td>
-            <td class="text-xs">${item.zoho_brand || '-'}</td>
-            <td class="font-mono text-xs font-semibold text-indigo-700">${item.zoho_sku || '-'}</td>
-            <td class="text-xs max-w-xs truncate" title="${(item.zoho_item_name || '').replace(/"/g, '&quot;')}">${item.zoho_item_name || '-'}</td>
+            <td class="text-xs">${esc(item.zoho_brand) || '-'}</td>
+            <td class="font-mono text-xs font-semibold text-indigo-700">${esc(item.zoho_sku) || '-'}</td>
+            <td class="text-xs max-w-xs truncate" title="${esc(item.zoho_item_name || '')}">${esc(item.zoho_item_name) || '-'}</td>
             <td class="text-right text-xs font-mono">${rate}</td>
             <td class="text-right text-xs font-mono">${dpl}</td>
             <td><span class="badge ${isMatched ? 'badge-matched' : 'badge-unmatched'}">${isMatched ? '✅ Matched' : '⚠️ Unmatched'}</span></td>
-            <td class="text-xs ${isMatched ? 'text-gray-700' : 'text-gray-400 italic'}">${item.product_name || (isMatched ? '-' : 'Not mapped')}</td>
+            <td class="text-xs ${isMatched ? 'text-gray-700' : 'text-gray-400 italic'}">${esc(item.product_name) || (isMatched ? '-' : 'Not mapped')}</td>
         </tr>`;
     }
     if (filteredItems.length > 500) {
@@ -324,16 +324,16 @@ function renderMobileCards() {
         html += `<div class="mb-2 p-3 rounded-lg border ${isMatched ? 'bg-green-50 border-green-200' : 'bg-amber-50 border-amber-200'}">
             <div class="flex justify-between items-start">
                 <div class="flex-1 min-w-0">
-                    <div class="text-xs font-mono font-bold text-indigo-700">${item.zoho_sku || '-'}</div>
-                    <div class="text-sm font-medium text-gray-800 truncate">${item.zoho_item_name || '-'}</div>
-                    <div class="text-xs text-gray-500 mt-1">${item.zoho_brand || '-'}</div>
+                    <div class="text-xs font-mono font-bold text-indigo-700">${esc(item.zoho_sku) || '-'}</div>
+                    <div class="text-sm font-medium text-gray-800 truncate">${esc(item.zoho_item_name) || '-'}</div>
+                    <div class="text-xs text-gray-500 mt-1">${esc(item.zoho_brand) || '-'}</div>
                 </div>
                 <div class="text-right ml-3">
                     <div class="text-sm font-bold">${rate}</div>
                     <span class="badge ${isMatched ? 'badge-matched' : 'badge-unmatched'} mt-1">${isMatched ? '✅' : '⚠️'}</span>
                 </div>
             </div>
-            ${isMatched ? '<div class="text-xs text-green-700 mt-1">→ ' + (item.product_name || '-') + '</div>' : '<div class="text-xs text-amber-700 mt-1 italic">Not mapped to any product</div>'}
+            ${isMatched ? '<div class="text-xs text-green-700 mt-1">→ ' + (esc(item.product_name) || '-') + '</div>' : '<div class="text-xs text-amber-700 mt-1 italic">Not mapped to any product</div>'}
         </div>`;
     }
     if (filteredItems.length > 200) {

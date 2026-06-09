@@ -314,10 +314,10 @@
                 <tr class="border-b border-gray-100 hover:bg-gray-50">
                     <td class="px-3 py-3 font-semibold text-gray-600">${t.sort_order}</td>
                     <td class="px-3 py-3">
-                        <span class="badge" style="background:#eff6ff;color:#2563eb;">${t.section}</span>
+                        <span class="badge" style="background:#eff6ff;color:#2563eb;">${escapeHtml(t.section)}</span>
                     </td>
                     <td class="px-3 py-3 font-semibold text-gray-900">${escapeHtml(t.title)}</td>
-                    <td class="px-3 py-3 text-gray-600">${typeLabels[t.task_type] || t.task_type}</td>
+                    <td class="px-3 py-3 text-gray-600">${typeLabels[t.task_type] || escapeHtml(t.task_type)}</td>
                     <td class="px-3 py-3 text-gray-600">${(t.roles || []).join(', ')}</td>
                     <td class="px-3 py-3">${t.photo_required ? '<span style="color:#10b981;">Yes</span>' : '<span style="color:#9ca3af;">No</span>'}</td>
                     <td class="px-3 py-3">
@@ -340,8 +340,8 @@
                         <span class="badge ${t.is_active ? 'badge-active' : 'badge-inactive'}">${t.is_active ? 'Active' : 'Inactive'}</span>
                     </div>
                     <div class="template-card-meta">
-                        <span class="badge" style="background:#eff6ff;color:#2563eb;">${t.section}</span>
-                        <span class="badge" style="background:#f3f4f6;color:#374151;">${typeLabels[t.task_type] || t.task_type}</span>
+                        <span class="badge" style="background:#eff6ff;color:#2563eb;">${escapeHtml(t.section)}</span>
+                        <span class="badge" style="background:#f3f4f6;color:#374151;">${typeLabels[t.task_type] || escapeHtml(t.task_type)}</span>
                         ${t.photo_required ? '<span class="badge" style="background:#d1fae5;color:#065f46;">Photo</span>' : ''}
                         <span class="badge" style="background:#faf5ff;color:#7c3aed;">#${t.sort_order}</span>
                     </div>
@@ -537,7 +537,7 @@
                         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
                             <div>
                                 <span style="font-weight:600;color:#374151;">${escapeHtml(r.template_title)}</span>
-                                <span class="badge" style="background:#f3f4f6;color:#6b7280;margin-left:6px;">${r.section}</span>
+                                <span class="badge" style="background:#f3f4f6;color:#6b7280;margin-left:6px;">${escapeHtml(r.section)}</span>
                             </div>
                             <span class="badge ${r.answer === 'yes' ? 'badge-yes' : r.answer === 'no' ? 'badge-no' : 'badge-pending'}">
                                 ${r.answer ? r.answer.toUpperCase() : 'Pending'}
@@ -553,7 +553,7 @@
                     if (Object.keys(details).length > 0) {
                         html += `<div style="background:#f0fdf4;padding:8px 12px;border-radius:8px;font-size:13px;margin-bottom:6px;">`;
                         for (const [key, val] of Object.entries(details)) {
-                            html += `<div><strong>${key.replace(/_/g, ' ')}:</strong> ${escapeHtml(val || '-')}</div>`;
+                            html += `<div><strong>${escapeHtml(String(key).replace(/_/g, ' '))}:</strong> ${escapeHtml(val || '-')}</div>`;
                         }
                         html += `</div>`;
                     }
@@ -561,7 +561,7 @@
                     if (photos.length > 0) {
                         html += `<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:6px;">`;
                         photos.forEach(p => {
-                            html += `<img src="${p}" class="photo-thumb" onclick="showPhoto('${p}')">`;
+                            html += `<img src="${escapeHtml(p)}" class="photo-thumb" data-photo="${escapeHtml(p)}" onclick="showPhoto(this.dataset.photo)">`;
                         });
                         html += `</div>`;
                     }
@@ -571,7 +571,7 @@
                             <span style="font-size:12px;font-weight:700;color:#6b7280;">Materials Received:</span>`;
                         mats.forEach(m => {
                             html += `<div style="background:#f9fafb;padding:8px;border-radius:8px;margin-top:4px;display:flex;align-items:center;gap:8px;">
-                                ${m.photo_url ? `<img src="${m.photo_url}" class="photo-thumb" style="width:50px;height:50px;" onclick="showPhoto('${m.photo_url}')">` : ''}
+                                ${m.photo_url ? `<img src="${escapeHtml(m.photo_url)}" class="photo-thumb" style="width:50px;height:50px;" data-photo="${escapeHtml(m.photo_url)}" onclick="showPhoto(this.dataset.photo)">` : ''}
                                 <div>
                                     <div style="font-weight:600;font-size:13px;">${escapeHtml(m.vendor_name)}</div>
                                     <div style="font-size:11px;color:#6b7280;">${m.bill_on_zoho ? 'Bill on Zoho' : 'No Zoho bill'}</div>

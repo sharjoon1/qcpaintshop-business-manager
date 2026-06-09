@@ -651,7 +651,7 @@
                     totals.total += total;
 
                     tbody.innerHTML += buildTableRow([
-                        name, formatCurrency(current), formatCurrency(d15), formatCurrency(d30),
+                        esc(name), formatCurrency(current), formatCurrency(d15), formatCurrency(d30),
                         formatCurrency(d45), formatCurrency(d45plus), formatCurrency(total)
                     ], false);
                 });

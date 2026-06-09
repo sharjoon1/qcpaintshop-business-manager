@@ -286,6 +286,8 @@
     </div>
 
     <script>
+        function escHtml(s){ if(s==null) return ''; const d=document.createElement('div'); d.textContent=String(s); return d.innerHTML; }
+
         let requestType = 'available';
         let allBrands = [];
         let allCategories = [];
@@ -325,7 +327,7 @@
                 const visibleBrands = allBrands.filter(b => b.is_active !== false && b.is_active !== 0);
 
                 document.getElementById('brandSelect').innerHTML = '<option value="">-- Select Brand --</option>' +
-                    visibleBrands.map(b => `<option value="${b.id}">${b.name}</option>`).join('');
+                    visibleBrands.map(b => `<option value="${b.id}">${escHtml(b.name)}</option>`).join('');
 
             } catch (error) {
                 console.error('Error loading products:', error);
@@ -345,7 +347,7 @@
             const visibleCats = allCategories.filter(c => catsWithProducts.includes(c.id));
             
             document.getElementById('categorySelect').innerHTML = '<option value="">-- Select Category --</option>' +
-                visibleCats.map(c => `<option value="${c.id}">${c.name}</option>`).join('');
+                visibleCats.map(c => `<option value="${c.id}">${escHtml(c.name)}</option>`).join('');
         }
 
         // Load products for selected brand + category
@@ -361,7 +363,7 @@
             const filteredProducts = allProducts.filter(p => p.brand_id === brandId && p.category_id === categoryId);
             
             document.getElementById('productSelect').innerHTML = '<option value="">-- Select Product --</option>' +
-                filteredProducts.map(p => `<option value="${p.id}" data-product='${JSON.stringify(p).replace(/'/g, "&apos;")}'>${p.name}</option>`).join('');
+                filteredProducts.map(p => `<option value="${p.id}" data-product='${JSON.stringify(p).replace(/'/g, "&apos;")}'>${escHtml(p.name)}</option>`).join('');
         }
 
         // Load product details
@@ -486,10 +488,10 @@
             tbody.innerHTML = guestProducts.map((p, idx) => `
                 <tr class="border-t">
                     <td class="px-4 py-3 text-sm">${idx + 1}</td>
-                    <td class="px-4 py-3 text-sm font-semibold">${p.product_name}</td>
-                    <td class="px-4 py-3 text-sm">${p.brand_name}</td>
+                    <td class="px-4 py-3 text-sm font-semibold">${escHtml(p.product_name)}</td>
+                    <td class="px-4 py-3 text-sm">${escHtml(p.brand_name)}</td>
                     <td class="px-4 py-3 text-sm">${p.type === 'unit' ? 'Unit' : 'Area'}</td>
-                    <td class="px-4 py-3 text-sm">${p.details}</td>
+                    <td class="px-4 py-3 text-sm">${escHtml(p.details)}</td>
                     <td class="px-4 py-3 text-center">
                         <button type="button" onclick="removeGuestProduct(${p.id})" class="text-red-600 hover:text-red-800 text-sm">Remove</button>
                     </td>

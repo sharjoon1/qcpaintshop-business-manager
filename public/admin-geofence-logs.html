@@ -176,8 +176,8 @@
                 const typeLabel = v.violation_type === 'left_area' ? 'Left Area' : 'Returned';
 
                 return `<tr class="border-t hover:bg-gray-50">
-                    <td class="px-4 py-3 font-medium">${v.staff_name || v.username}</td>
-                    <td class="px-4 py-3">${v.branch_name}</td>
+                    <td class="px-4 py-3 font-medium">${esc(v.staff_name || v.username)}</td>
+                    <td class="px-4 py-3">${esc(v.branch_name)}</td>
                     <td class="px-4 py-3">${dt.toLocaleDateString()} ${dt.toLocaleTimeString([], {hour: '2-digit', minute: '2-digit'})}</td>
                     <td class="px-4 py-3 font-semibold">${v.distance_from_fence}m</td>
                     <td class="px-4 py-3">${v.fence_radius}m</td>

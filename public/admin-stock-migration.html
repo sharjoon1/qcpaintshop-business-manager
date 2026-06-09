@@ -381,7 +381,7 @@ function addLog(msg, type) {
     section.style.display = '';
     const list = document.getElementById('logList');
     const time = new Date().toLocaleTimeString();
-    list.innerHTML += `<div class="log-entry log-${type}">[${time}] ${msg}</div>`;
+    list.innerHTML += `<div class="log-entry log-${esc(type)}">[${esc(time)}] ${esc(msg)}</div>`;
     list.scrollTop = list.scrollHeight;
 }
 

@@ -91,6 +91,8 @@ let allPermissions = {};
 let rolePermissions = [];
 let selectedPermissions = new Set();
 
+function escHtml(s){ if(s==null) return ''; const d=document.createElement('div'); d.textContent=String(s); return d.innerHTML; }
+
 // Module icons
 const moduleIcons = {
     'estimates': '📝', 'products': '📦', 'customers': '👥',
@@ -123,10 +125,10 @@ async function showRoleSelector() {
         document.getElementById('roleCards').innerHTML = roles.map(role => `
             <button onclick="selectRole(${role.id})" class="text-left border-2 border-gray-200 rounded-lg p-4 hover:border-purple-500 hover:shadow-lg transition ${role.is_system_role ? 'bg-blue-50 border-blue-200' : ''}">
                 <div class="flex justify-between items-start mb-1">
-                    <h3 class="font-bold text-gray-800">${role.display_name}</h3>
-                    <span class="px-2 py-0.5 text-xs rounded ${role.user_type === 'staff' ? 'bg-purple-100 text-purple-700' : 'bg-green-100 text-green-700'}">${role.user_type}</span>
+                    <h3 class="font-bold text-gray-800">${escHtml(role.display_name)}</h3>
+                    <span class="px-2 py-0.5 text-xs rounded ${role.user_type === 'staff' ? 'bg-purple-100 text-purple-700' : 'bg-green-100 text-green-700'}">${escHtml(role.user_type)}</span>
                 </div>
-                <p class="text-sm text-gray-600">${role.description || role.name}</p>
+                <p class="text-sm text-gray-600">${escHtml(role.description || role.name)}</p>
             </button>
         `).join('');
     } catch (error) {
@@ -207,12 +209,12 @@ function displayPermissions() {
         const moduleName = moduleNames[module] || (module.charAt(0).toUpperCase() + module.slice(1).replace(/_/g, ' '));
 
         return `
-            <div class="bg-white rounded-lg shadow-md overflow-hidden module-section" data-module="${module}">
+            <div class="bg-white rounded-lg shadow-md overflow-hidden module-section" data-module="${escHtml(module)}">
                 <div class="bg-gradient-to-r from-purple-50 to-indigo-50 p-4 border-b border-purple-200">
                     <div class="flex items-center justify-between">
                         <h3 class="text-lg font-bold text-gray-800 flex items-center gap-2">
                             <span>${icon}</span>
-                            <span>${moduleName}</span>
+                            <span>${escHtml(moduleName)}</span>
                             <span class="text-sm font-normal text-gray-600">(${permissions.length} permissions)</span>
                         </h3>
                         <div class="flex gap-2">
@@ -232,16 +234,16 @@ function displayPermissions() {
                         const desc = perm.display_name ? (perm.description || '') : '';
                         const searchText = (displayName + ' ' + (perm.description || '') + ' ' + perm.action).toLowerCase();
                         return `
-                        <label class="flex items-start gap-3 p-3 rounded-lg hover:bg-gray-50 cursor-pointer permission-item" data-permission-id="${perm.id}" data-search-text="${searchText}">
+                        <label class="flex items-start gap-3 p-3 rounded-lg hover:bg-gray-50 cursor-pointer permission-item" data-permission-id="${perm.id}" data-search-text="${escHtml(searchText)}">
                             <input type="checkbox"
                                    class="permission-checkbox mt-1"
                                    data-permission-id="${perm.id}"
-                                   data-module="${module}"
+                                   data-module="${escHtml(module)}"
                                    ${selectedPermissions.has(perm.id) ? 'checked' : ''}
                                    onchange="togglePermission(${perm.id}, this.checked)">
                             <div class="flex-1">
-                                <p class="font-semibold text-gray-800 text-sm">${displayName}</p>
-                                ${desc ? `<p class="text-xs text-gray-600 mt-1">${desc}</p>` : ''}
+                                <p class="font-semibold text-gray-800 text-sm">${escHtml(displayName)}</p>
+                                ${desc ? `<p class="text-xs text-gray-600 mt-1">${escHtml(desc)}</p>` : ''}
                             </div>
                         </label>
                     `;}).join('')}

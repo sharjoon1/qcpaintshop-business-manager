@@ -159,6 +159,8 @@
     let cnCurrentPage = 1;
     let currentTab = 'expenses';
 
+    function escHtml(s){ if(s==null) return ''; const d=document.createElement('div'); d.textContent=String(s); return d.innerHTML; }
+
     function formatCurrency(amount) {
         const n = parseFloat(amount) || 0;
         return '₹' + n.toLocaleString('en-IN', { minimumFractionDigits: 0, maximumFractionDigits: 2 });
@@ -211,9 +213,9 @@
             tbody.innerHTML = data.expenses.map(e => `
                 <tr class="hover:bg-gray-50">
                     <td class="px-3 py-2 whitespace-nowrap text-gray-700">${e.date || '-'}</td>
-                    <td class="px-3 py-2 text-gray-800 max-w-[120px] truncate">${e.vendor_name || '-'}</td>
-                    <td class="px-3 py-2 text-gray-600 hidden sm:table-cell max-w-[120px] truncate">${e.account_name || '-'}</td>
-                    <td class="px-3 py-2 text-gray-500 hidden sm:table-cell">${e.reference_number || '-'}</td>
+                    <td class="px-3 py-2 text-gray-800 max-w-[120px] truncate">${escHtml(e.vendor_name) || '-'}</td>
+                    <td class="px-3 py-2 text-gray-600 hidden sm:table-cell max-w-[120px] truncate">${escHtml(e.account_name) || '-'}</td>
+                    <td class="px-3 py-2 text-gray-500 hidden sm:table-cell">${escHtml(e.reference_number) || '-'}</td>
                     <td class="px-3 py-2 text-right font-medium text-gray-800">${formatCurrency(e.total)}</td>
                     <td class="px-3 py-2 text-right text-gray-500 hidden sm:table-cell">${formatCurrency(e.tax_amount)}</td>
                     <td class="px-3 py-2 text-center">${statusBadge(e.status)}</td>
@@ -248,8 +250,8 @@
             tbody.innerHTML = data.creditnotes.map(cn => `
                 <tr class="hover:bg-gray-50">
                     <td class="px-3 py-2 whitespace-nowrap text-gray-700">${cn.date || '-'}</td>
-                    <td class="px-3 py-2 font-medium text-indigo-700">${cn.creditnote_number || '-'}</td>
-                    <td class="px-3 py-2 text-gray-700 hidden sm:table-cell">${cn.customer_name || '-'}</td>
+                    <td class="px-3 py-2 font-medium text-indigo-700">${escHtml(cn.creditnote_number) || '-'}</td>
+                    <td class="px-3 py-2 text-gray-700 hidden sm:table-cell">${escHtml(cn.customer_name) || '-'}</td>
                     <td class="px-3 py-2 text-right font-medium">${formatCurrency(cn.total)}</td>
                     <td class="px-3 py-2 text-right text-blue-700 font-medium">${formatCurrency(cn.balance)}</td>
                     <td class="px-3 py-2 text-center">${statusBadge(cn.status)}</td>

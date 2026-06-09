@@ -145,6 +145,8 @@
 const token = localStorage.getItem('auth_token');
 let allStaff = [];
 
+function escHtml(s){ if(s==null) return ''; const d=document.createElement('div'); d.textContent=String(s); return d.innerHTML; }
+
 async function loadStats() {
     const res = await fetch('/api/agreements/admin/stats', { headers: { Authorization: `Bearer ${token}` } });
     const data = await res.json();
@@ -171,13 +173,14 @@ function renderTable(staff) {
         const status = s.agreement_status || 'none';
         const badgeClass = { none:'badge-none', pending:'badge-pending', viewed:'badge-viewed', uploaded:'badge-uploaded' }[status] || 'badge-none';
         const badgeLabel = { none:'Not Assigned', pending:'Pending', viewed:'Viewed', uploaded:'Signed ✅' }[status] || status;
+        const safeDoc = /^(https?:\/\/|\/)/i.test(s.signed_document || '') ? s.signed_document : '#';
         const docLink = s.signed_document
-            ? `<a href="${s.signed_document}" target="_blank" class="btn-sm btn-view">View</a>`
+            ? `<a href="${escHtml(safeDoc)}" target="_blank" class="btn-sm btn-view">View</a>`
             : '—';
-        return `<tr data-name="${(s.full_name||'').toLowerCase()}" data-branch="${(s.branch_name||'').toLowerCase()}">
-            <td style="font-weight:600;">${s.full_name || '—'}</td>
-            <td style="color:#6b7280;">${s.role || '—'}</td>
-            <td>${s.branch_name || '—'}</td>
+        return `<tr data-name="${escHtml((s.full_name||'').toLowerCase())}" data-branch="${escHtml((s.branch_name||'').toLowerCase())}">
+            <td style="font-weight:600;">${escHtml(s.full_name) || '—'}</td>
+            <td style="color:#6b7280;">${escHtml(s.role) || '—'}</td>
+            <td>${escHtml(s.branch_name) || '—'}</td>
             <td><span class="badge ${badgeClass}">${badgeLabel}</span></td>
             <td style="color:#6b7280;font-size:12px;">${fmtDate(s.viewed_at)}</td>
             <td style="color:#6b7280;font-size:12px;">${fmtDate(s.uploaded_at)}</td>

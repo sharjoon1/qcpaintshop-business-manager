@@ -148,6 +148,8 @@
         let branches = [];
         let editingBranchId = null;
 
+        function escHtml(s){ if(s==null) return ''; const d=document.createElement('div'); d.textContent=String(s); return d.innerHTML; }
+
         // Get auth headers
         function getAuthHeaders() {
             const token = localStorage.getItem('auth_token');
@@ -188,12 +190,12 @@
             tbody.innerHTML = branches.map(branch => `
                 <tr class="hover:bg-gray-50">
                     <td class="px-6 py-4 text-sm font-semibold text-gray-900 hidden sm:table-cell">${branch.id}</td>
-                    <td class="px-6 py-4 text-sm font-semibold text-gray-900">${branch.name}</td>
+                    <td class="px-6 py-4 text-sm font-semibold text-gray-900">${escHtml(branch.name)}</td>
                     <td class="px-6 py-4 text-sm">
-                        <span class="px-3 py-1 bg-purple-100 text-purple-800 rounded-full font-semibold">${branch.code}</span>
+                        <span class="px-3 py-1 bg-purple-100 text-purple-800 rounded-full font-semibold">${escHtml(branch.code)}</span>
                     </td>
-                    <td class="px-6 py-4 text-sm text-gray-700 hidden sm:table-cell">${branch.city || '-'}</td>
-                    <td class="px-6 py-4 text-sm text-gray-700">${branch.phone || '-'}</td>
+                    <td class="px-6 py-4 text-sm text-gray-700 hidden sm:table-cell">${escHtml(branch.city) || '-'}</td>
+                    <td class="px-6 py-4 text-sm text-gray-700">${escHtml(branch.phone) || '-'}</td>
                     <td class="px-6 py-4 text-sm text-gray-700 hidden sm:table-cell">${branch.opened_date ? new Date(branch.opened_date).toLocaleDateString() : '-'}</td>
                     <td class="px-6 py-4">
                         <span class="px-3 py-1 text-xs font-semibold rounded-full ${

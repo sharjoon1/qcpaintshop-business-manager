@@ -340,8 +340,8 @@
             tbody.innerHTML = allStaff.map(staff => {
                 const assignedBranches = staff.assigned_branches || [];
                 const branchDisplay = assignedBranches.length > 0
-                    ? assignedBranches.map(ab => ab.is_primary ? `<strong>${ab.branch_name}</strong>` : ab.branch_name).join(', ')
-                    : (branches.find(b => b.id == staff.branch_id)?.name || 'N/A');
+                    ? assignedBranches.map(ab => ab.is_primary ? `<strong>${esc(ab.branch_name)}</strong>` : esc(ab.branch_name)).join(', ')
+                    : (esc(branches.find(b => b.id == staff.branch_id)?.name) || 'N/A');
                 const geoEnabled = staff.geo_fence_enabled !== undefined ? staff.geo_fence_enabled : true;
                 const roleObj = roles.find(r => (r.name || '').toLowerCase() === (staff.role || '').toLowerCase());
                 const roleLabel = roleObj ? (roleObj.display_name || roleObj.name) : (staff.role || 'N/A');
@@ -428,7 +428,7 @@
             container.innerHTML = branches.map(b => `
                 <label class="flex items-center gap-2 cursor-pointer">
                     <input type="checkbox" value="${b.id}" onchange="updatePrimaryBranchSelect()" class="w-4 h-4 text-purple-600 border-gray-300 rounded focus:ring-purple-500">
-                    <span class="text-sm text-gray-700">${b.name}</span>
+                    <span class="text-sm text-gray-700">${esc(b.name)}</span>
                 </label>
             `).join('');
         }
@@ -441,7 +441,7 @@
             const select = document.getElementById('primaryBranch');
             const currentVal = select.value;
             select.innerHTML = '<option value="">-- Select Primary Branch --</option>' +
-                branches.filter(b => checkedIds.includes(b.id)).map(b => `<option value="${b.id}">${b.name}</option>`).join('');
+                branches.filter(b => checkedIds.includes(b.id)).map(b => `<option value="${b.id}">${esc(b.name)}</option>`).join('');
             // Restore selection if still valid
             if (checkedIds.includes(parseInt(currentVal))) {
                 select.value = currentVal;

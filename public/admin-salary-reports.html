@@ -504,7 +504,7 @@
                 const paymentPct = b.total_salary > 0 ? ((b.total_paid / b.total_salary) * 100).toFixed(1) : 0;
                 return `
                     <tr>
-                        <td><strong>${b.branch_name}</strong></td>
+                        <td><strong>${esc(b.branch_name)}</strong></td>
                         <td>${b.staff_count}</td>
                         <td class="money">₹${parseFloat(b.total_salary || 0).toLocaleString('en-IN', {minimumFractionDigits: 2})}</td>
                         <td class="money">₹${parseFloat(b.total_paid || 0).toLocaleString('en-IN', {minimumFractionDigits: 2})}</td>
@@ -525,8 +525,8 @@
             const staffTbody = document.getElementById('staffTableBody');
             staffTbody.innerHTML = data.staff.map(s => `
                 <tr>
-                    <td>${s.staff_name}</td>
-                    <td>${s.branch_name}</td>
+                    <td>${esc(s.staff_name)}</td>
+                    <td>${esc(s.branch_name)}</td>
                     <td>${s.total_present_days || 0}</td>
                     <td>${parseFloat(s.total_standard_hours || 0).toFixed(1)}</td>
                     <td>${parseFloat(s.total_overtime_hours || 0).toFixed(1)}</td>

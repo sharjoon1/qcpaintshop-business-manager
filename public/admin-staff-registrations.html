@@ -664,7 +664,7 @@
                         <td class="px-4 py-3">
                             <div class="font-medium text-gray-900 text-sm">${escapeHtml(r.full_name)}</div>
                         </td>
-                        <td class="px-4 py-3 text-sm text-gray-600 hidden sm:table-cell">${r.phone}</td>
+                        <td class="px-4 py-3 text-sm text-gray-600 hidden sm:table-cell">${escapeHtml(r.phone)}</td>
                         <td class="px-4 py-3 text-sm text-gray-600 hidden md:table-cell">${escapeHtml(r.email)}</td>
                         <td class="px-4 py-3 text-sm text-gray-600 hidden lg:table-cell">${escapeHtml(r.city || '-')}</td>
                         <td class="px-4 py-3 text-sm text-gray-500 hidden md:table-cell">${date}</td>
@@ -1073,7 +1073,7 @@
             const aadharSection = data.aadhar_proof_url ? `
                 <div style="margin-top:20px;padding:12px;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:8px;text-align:center;">
                     <p style="font-size:9pt;color:#15803d;margin:0 0 4px;">Aadhar proof attached as Page 3 of PDF</p>
-                    ${data.aadhar_number ? `<p style="font-size:8pt;color:#6b7280;margin:0;">Aadhar No: ${data.aadhar_number.replace(/(\d{4})/g, '$1 ').trim()}</p>` : ''}
+                    ${data.aadhar_number ? `<p style="font-size:8pt;color:#6b7280;margin:0;">Aadhar No: ${escapeHtml(data.aadhar_number.replace(/(\d{4})/g, '$1 ').trim())}</p>` : ''}
                 </div>` : '';
 
             document.getElementById('offerPreviewContent').innerHTML = `

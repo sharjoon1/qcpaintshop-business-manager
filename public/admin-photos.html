@@ -206,6 +206,8 @@ const API = '/api/photos';
 const token = localStorage.getItem('auth_token');
 const headers = { 'Authorization': 'Bearer ' + token };
 
+function escHtml(s){ if(s==null) return ''; const d=document.createElement('div'); d.textContent=String(s); return d.innerHTML; }
+
 let categories = [];
 let currentCat = '';
 let currentPhotos = [];
@@ -253,13 +255,13 @@ async function loadCategories() {
         let html = '<span class="group-label">Attendance</span>';
         categories.filter(c => c.group === 'attendance').forEach(c => {
             html += `<button class="cat-pill" data-cat="${c.key}" onclick="selectCat('${c.key}')">
-                ${c.label} <span class="count">${c.count}</span>
+                ${escHtml(c.label)} <span class="count">${c.count}</span>
             </button>`;
         });
         html += '<div class="group-sep"></div><span class="group-label">Other</span>';
         categories.filter(c => c.group === 'other').forEach(c => {
             html += `<button class="cat-pill" data-cat="${c.key}" onclick="selectCat('${c.key}')">
-                ${c.label} <span class="count">${c.count}</span>
+                ${escHtml(c.label)} <span class="count">${c.count}</span>
             </button>`;
         });
         document.getElementById('catBar').innerHTML = html;
@@ -329,9 +331,9 @@ async function loadPhotos() {
 
             const timeStr = fmtTime(photo.mtime);
             card.innerHTML = `
-                <img src="${photo.url}" alt="${photo.filename}" loading="lazy" onerror="this.src='data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><rect fill=%22%23f1f5f9%22 width=%22100%22 height=%22100%22/><text x=%2250%22 y=%2255%22 text-anchor=%22middle%22 fill=%22%2394a3b8%22 font-size=%2212%22>No preview</text></svg>'">
+                <img src="${photo.url}" alt="${escHtml(photo.filename)}" loading="lazy" onerror="this.src='data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><rect fill=%22%23f1f5f9%22 width=%22100%22 height=%22100%22/><text x=%2250%22 y=%2255%22 text-anchor=%22middle%22 fill=%22%2394a3b8%22 font-size=%2212%22>No preview</text></svg>'">
                 <div class="info">
-                    <div class="name">${photo.userName || 'Unknown'}</div>
+                    <div class="name">${escHtml(photo.userName || 'Unknown')}</div>
                     <div class="meta">${timeStr} &bull; ${photo.sizeMB} MB</div>
                 </div>
             `;
@@ -376,8 +378,8 @@ function showLightboxPhoto() {
     if (!photo) return;
     document.getElementById('lbImg').src = photo.url;
     document.getElementById('lbInfo').innerHTML =
-        `<strong>${photo.userName || 'Unknown'}</strong> &bull; ${fmtTime(photo.mtime)} &bull; ${photo.sizeMB} MB<br>
-        <span style="opacity:0.6; font-size:11px;">${photo.filename}</span>`;
+        `<strong>${escHtml(photo.userName || 'Unknown')}</strong> &bull; ${fmtTime(photo.mtime)} &bull; ${photo.sizeMB} MB<br>
+        <span style="opacity:0.6; font-size:11px;">${escHtml(photo.filename)}</span>`;
 }
 
 // Keyboard nav

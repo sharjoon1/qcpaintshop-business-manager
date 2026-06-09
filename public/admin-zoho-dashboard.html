@@ -1297,6 +1297,8 @@
 </div>
 
 <script>
+    function escHtml(s){ if(s==null) return ''; const d=document.createElement('div'); d.textContent=String(s); return d.innerHTML; }
+
     // Currency formatting helper
     function formatCurrency(amount) {
         const num = parseFloat(amount || 0);
@@ -1927,8 +1929,8 @@
                 result.data.forEach(function(inv) {
                     const row = document.createElement('tr');
                     row.className = 'border-b border-gray-100 hover:bg-gray-50 transition';
-                    row.innerHTML = '<td class="py-3 pr-3 font-medium text-indigo-700">' + (inv.invoice_number || '--') + '</td>' +
-                        '<td class="py-3 pr-3 text-gray-700 max-w-[150px] truncate">' + (inv.customer_name || '--') + '</td>' +
+                    row.innerHTML = '<td class="py-3 pr-3 font-medium text-indigo-700">' + (escHtml(inv.invoice_number) || '--') + '</td>' +
+                        '<td class="py-3 pr-3 text-gray-700 max-w-[150px] truncate">' + (escHtml(inv.customer_name) || '--') + '</td>' +
                         '<td class="py-3 pr-3 text-gray-500 hidden sm:table-cell">' + formatDate(inv.invoice_date || inv.date) + '</td>' +
                         '<td class="py-3 pr-3 text-right font-medium text-gray-800">' + formatCurrency(inv.total || inv.amount) + '</td>' +
                         '<td class="py-3 pr-3 text-right text-gray-600 hidden sm:table-cell">' + formatCurrency(inv.balance) + '</td>' +
@@ -2497,16 +2499,16 @@
             var cells = '';
 
             if (isPayment) {
-                cells += '<td class="link-cell"><a href="#" onclick="openPreview(\'payment\',' + row.id + ',\'' + (row.zoho_payment_id || '') + '\');return false;" style="cursor:pointer;text-decoration:none;color:#667eea;" title="Click to preview">' + (row.payment_number || '--') + '</a></td>';
-                cells += '<td style="max-width:180px" class="truncate">' + (row.customer_name || '--') + '</td>';
+                cells += '<td class="link-cell"><a href="#" onclick="openPreview(\'payment\',' + row.id + ',\'' + (row.zoho_payment_id || '') + '\');return false;" style="cursor:pointer;text-decoration:none;color:#667eea;" title="Click to preview">' + (escHtml(row.payment_number) || '--') + '</a></td>';
+                cells += '<td style="max-width:180px" class="truncate">' + (escHtml(row.customer_name) || '--') + '</td>';
                 cells += '<td>' + formatDate(row.payment_date) + '</td>';
                 cells += '<td class="text-right" style="font-weight:600">' + formatCurrency(row.amount) + '</td>';
                 cells += '<td>' + getPaymentModeBadge(row.payment_mode) + '</td>';
-                cells += '<td>' + (row.reference_number || '--') + '</td>';
+                cells += '<td>' + (escHtml(row.reference_number) || '--') + '</td>';
                 cells += '<td>' + getZohoLink(row.zoho_payment_id, 'payments') + '</td>';
             } else {
-                cells += '<td class="link-cell"><a href="#" onclick="openPreview(\'invoice\',' + row.id + ',\'' + (row.zoho_invoice_id || '') + '\');return false;" style="cursor:pointer;text-decoration:none;color:#667eea;" title="Click to preview">' + (row.invoice_number || '--') + '</a></td>';
-                cells += '<td style="max-width:180px" class="truncate">' + (row.customer_name || '--') + '</td>';
+                cells += '<td class="link-cell"><a href="#" onclick="openPreview(\'invoice\',' + row.id + ',\'' + (row.zoho_invoice_id || '') + '\');return false;" style="cursor:pointer;text-decoration:none;color:#667eea;" title="Click to preview">' + (escHtml(row.invoice_number) || '--') + '</a></td>';
+                cells += '<td style="max-width:180px" class="truncate">' + (escHtml(row.customer_name) || '--') + '</td>';
                 cells += '<td>' + formatDate(row.invoice_date) + '</td>';
                 var dueDateClass = row.status === 'overdue' ? ' overdue-date' : '';
                 cells += '<td class="' + dueDateClass + '">' + formatDate(row.due_date) + '</td>';
@@ -2750,7 +2752,7 @@
         html += '<div class="preview-section">';
         html += '<div class="preview-section-title">Transaction Info</div>';
         html += '<div class="preview-grid">';
-        html += '<div class="preview-field"><div class="preview-field-label">Invoice #</div><div class="preview-field-value">' + (data.invoice_number || '--') + '</div></div>';
+        html += '<div class="preview-field"><div class="preview-field-label">Invoice #</div><div class="preview-field-value">' + (escHtml(data.invoice_number) || '--') + '</div></div>';
         html += '<div class="preview-field"><div class="preview-field-label">Status</div><div class="preview-field-value">' + getStatusBadge(data.status) + '</div></div>';
         html += '<div class="preview-field"><div class="preview-field-label">Invoice Date</div><div class="preview-field-value">' + formatDate(data.invoice_date) + '</div></div>';
         var dueDateVal = formatDate(data.due_date);
@@ -2763,9 +2765,9 @@
         html += '<div class="preview-section">';
         html += '<div class="preview-section-title">Customer</div>';
         html += '<div class="preview-grid">';
-        html += '<div class="preview-field full"><div class="preview-field-label">Customer Name</div><div class="preview-field-value">' + (data.customer_name || '--') + '</div></div>';
+        html += '<div class="preview-field full"><div class="preview-field-label">Customer Name</div><div class="preview-field-value">' + (escHtml(data.customer_name) || '--') + '</div></div>';
         if (data.reference_number) {
-            html += '<div class="preview-field full"><div class="preview-field-label">Reference #</div><div class="preview-field-value">' + data.reference_number + '</div></div>';
+            html += '<div class="preview-field full"><div class="preview-field-label">Reference #</div><div class="preview-field-value">' + escHtml(data.reference_number) + '</div></div>';
         }
         html += '</div>';
         html += '</div>';
@@ -2839,7 +2841,7 @@
         html += '<div class="preview-section">';
         html += '<div class="preview-section-title">Payment Info</div>';
         html += '<div class="preview-grid">';
-        html += '<div class="preview-field"><div class="preview-field-label">Payment #</div><div class="preview-field-value">' + (data.payment_number || '--') + '</div></div>';
+        html += '<div class="preview-field"><div class="preview-field-label">Payment #</div><div class="preview-field-value">' + (escHtml(data.payment_number) || '--') + '</div></div>';
         html += '<div class="preview-field"><div class="preview-field-label">Payment Date</div><div class="preview-field-value">' + formatDate(data.payment_date) + '</div></div>';
         html += '<div class="preview-field"><div class="preview-field-label">Amount</div><div class="preview-field-value amount">' + formatCurrencyFull(data.amount) + '</div></div>';
         html += '<div class="preview-field"><div class="preview-field-label">Payment Mode</div><div class="preview-field-value">' + getPaymentModeBadge(data.payment_mode) + '</div></div>';
@@ -2850,9 +2852,9 @@
         html += '<div class="preview-section">';
         html += '<div class="preview-section-title">Customer</div>';
         html += '<div class="preview-grid">';
-        html += '<div class="preview-field full"><div class="preview-field-label">Customer Name</div><div class="preview-field-value">' + (data.customer_name || '--') + '</div></div>';
+        html += '<div class="preview-field full"><div class="preview-field-label">Customer Name</div><div class="preview-field-value">' + (escHtml(data.customer_name) || '--') + '</div></div>';
         if (data.reference_number) {
-            html += '<div class="preview-field full"><div class="preview-field-label">Reference #</div><div class="preview-field-value">' + data.reference_number + '</div></div>';
+            html += '<div class="preview-field full"><div class="preview-field-label">Reference #</div><div class="preview-field-value">' + escHtml(data.reference_number) + '</div></div>';
         }
         html += '</div>';
         html += '</div>';
@@ -2876,7 +2878,7 @@
             html += '<div class="preview-section">';
             html += '<div class="preview-section-title">Related Invoice</div>';
             html += '<div class="preview-grid">';
-            html += '<div class="preview-field"><div class="preview-field-label">Invoice #</div><div class="preview-field-value">' + (inv.invoice_number || '--') + '</div></div>';
+            html += '<div class="preview-field"><div class="preview-field-label">Invoice #</div><div class="preview-field-value">' + (escHtml(inv.invoice_number) || '--') + '</div></div>';
             html += '<div class="preview-field"><div class="preview-field-label">Status</div><div class="preview-field-value">' + getStatusBadge(inv.status) + '</div></div>';
             html += '<div class="preview-field"><div class="preview-field-label">Invoice Total</div><div class="preview-field-value">' + formatCurrencyFull(inv.total) + '</div></div>';
             html += '<div class="preview-field"><div class="preview-field-label">Balance</div><div class="preview-field-value">' + formatCurrencyFull(inv.balance) + '</div></div>';

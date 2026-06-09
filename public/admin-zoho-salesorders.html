@@ -141,6 +141,8 @@
     let currentPage = 1;
     let allRows = [];
 
+    function escHtml(s){ if(s==null) return ''; const d=document.createElement('div'); d.textContent=String(s); return d.innerHTML; }
+
     function formatCurrency(amount) {
         const n = parseFloat(amount) || 0;
         return '₹' + n.toLocaleString('en-IN', { minimumFractionDigits: 0, maximumFractionDigits: 2 });
@@ -181,9 +183,9 @@
             }
             tbody.innerHTML = allRows.map(so => `
                 <tr class="hover:bg-gray-50 cursor-pointer" onclick="openSOModal('${so.transaction_id}', '${(so.so_number||'').replace(/'/g,"\\'")}')">
-                    <td class="px-3 py-2 font-medium text-indigo-700 whitespace-nowrap">${so.so_number || so.transaction_id || '-'}</td>
+                    <td class="px-3 py-2 font-medium text-indigo-700 whitespace-nowrap">${escHtml(so.so_number || so.transaction_id) || '-'}</td>
                     <td class="px-3 py-2 whitespace-nowrap text-gray-700">${so.date || '-'}</td>
-                    <td class="px-3 py-2 text-gray-800 max-w-[140px] truncate">${so.customer_name || '-'}</td>
+                    <td class="px-3 py-2 text-gray-800 max-w-[140px] truncate">${escHtml(so.customer_name) || '-'}</td>
                     <td class="px-3 py-2 text-gray-500 hidden md:table-cell">${so.location_id || '-'}</td>
                     <td class="px-3 py-2 text-right font-medium text-gray-800">${formatCurrency(so.total)}</td>
                     <td class="px-3 py-2 text-center">${statusBadge(so.status)}</td>
@@ -222,10 +224,10 @@
             document.getElementById('modalContent').innerHTML = `
                 <div class="space-y-3">
                     <div class="grid grid-cols-2 gap-3 text-sm">
-                        <div><span class="text-gray-500">SO Number</span><br><strong>${so.salesorder_number || '-'}</strong></div>
+                        <div><span class="text-gray-500">SO Number</span><br><strong>${escHtml(so.salesorder_number) || '-'}</strong></div>
                         <div><span class="text-gray-500">Date</span><br><strong>${so.date || '-'}</strong></div>
-                        <div><span class="text-gray-500">Customer</span><br><strong>${so.customer_name || '-'}</strong></div>
-                        <div><span class="text-gray-500">Salesperson</span><br><strong>${so.salesperson_name || '-'}</strong></div>
+                        <div><span class="text-gray-500">Customer</span><br><strong>${escHtml(so.customer_name) || '-'}</strong></div>
+                        <div><span class="text-gray-500">Salesperson</span><br><strong>${escHtml(so.salesperson_name) || '-'}</strong></div>
                     </div>
                     ${items.length ? `
                     <div class="border rounded-lg overflow-hidden">
@@ -238,7 +240,7 @@
                             </tr></thead>
                             <tbody class="divide-y divide-gray-100">
                                 ${items.map(it => `<tr>
-                                    <td class="px-3 py-2">${it.name || it.item_name || '-'}</td>
+                                    <td class="px-3 py-2">${escHtml(it.name || it.item_name) || '-'}</td>
                                     <td class="px-3 py-2 text-right">${it.quantity || '-'}</td>
                                     <td class="px-3 py-2 text-right">${formatCurrency(it.rate)}</td>
                                     <td class="px-3 py-2 text-right font-medium">${formatCurrency(it.item_total)}</td>

@@ -449,6 +449,8 @@
         let otpTimer = null;
         let resendCountdown = 60;
 
+        function escHtml(s){ if(s==null) return ''; const d=document.createElement('div'); d.textContent=String(s); return d.innerHTML; }
+
         // ── Step Navigation ──
         function goToStep(step) {
             // Validate before going forward
@@ -477,7 +479,7 @@
         // ── Alerts ──
         function showAlert(msg, type = 'error') {
             document.getElementById('alertContainer').innerHTML =
-                `<div class="alert alert-${type}">${msg}</div>`;
+                `<div class="alert alert-${type}">${escHtml(msg)}</div>`;
         }
         function clearAlert() {
             document.getElementById('alertContainer').innerHTML = '';
@@ -529,7 +531,7 @@
                 if (data.success) {
                     otpId = data.data.otp_id;
                     document.getElementById('otpSentMsg').innerHTML =
-                        `Verification code sent to <strong>${phone}</strong> via SMS. Check your messages.`;
+                        `Verification code sent to <strong>${escHtml(phone)}</strong> via SMS. Check your messages.`;
                     goToStep(2);
                     startResendTimer();
                 } else {

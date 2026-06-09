@@ -219,7 +219,7 @@ function renderCategoryChart(byType) {
     categoryChart = new Chart(ctx, {
         type: 'doughnut',
         data: {
-            labels: byType.map(t => t.anomaly_type.replace('_', ' ')),
+            labels: byType.map(t => escHtml(t.anomaly_type.replace('_', ' '))),
             datasets: [{
                 data: byType.map(t => t.count),
                 backgroundColor: byType.map(t => colors[t.anomaly_type] || '#94a3b8')
@@ -280,7 +280,7 @@ function renderAnomalyRow(a) {
                     </div>
                     <p class="text-xs text-gray-500 line-clamp-2">${escHtml(a.description || '')}</p>
                     <div class="flex items-center gap-3 mt-2 text-xs text-gray-400">
-                        <span>${a.anomaly_type.replace('_', ' ')}</span>
+                        <span>${escHtml(a.anomaly_type.replace('_', ' '))}</span>
                         ${a.deviation_pct ? '<span>Deviation: ' + a.deviation_pct + '%</span>' : ''}
                         ${a.z_score ? '<span>Z: ' + parseFloat(a.z_score).toFixed(2) + '</span>' : ''}
                         <span class="ml-auto">${timeAgo}</span>
@@ -343,17 +343,17 @@ async function openDetail(id) {
             '<h2 class="text-lg font-bold text-gray-800">' + escHtml(a.title) + '</h2>' +
             '<p class="text-sm text-gray-600 mt-2">' + escHtml(a.description || '') + '</p></div>' +
             '<div class="grid grid-cols-2 gap-3 mb-4">' +
-            '<div class="bg-gray-50 rounded-lg p-3"><div class="text-xs text-gray-400">Type</div><div class="text-sm font-medium">' + a.anomaly_type.replace('_', ' ') + '</div></div>' +
+            '<div class="bg-gray-50 rounded-lg p-3"><div class="text-xs text-gray-400">Type</div><div class="text-sm font-medium">' + escHtml(a.anomaly_type.replace('_', ' ')) + '</div></div>' +
             '<div class="bg-gray-50 rounded-lg p-3"><div class="text-xs text-gray-400">Detected</div><div class="text-sm font-medium">' + new Date(a.detected_at).toLocaleString('en-IN') + '</div></div>';
         if (a.expected_value != null) html += '<div class="bg-gray-50 rounded-lg p-3"><div class="text-xs text-gray-400">Expected</div><div class="text-sm font-medium">' + Number(a.expected_value).toLocaleString('en-IN') + '</div></div>';
         if (a.actual_value != null) html += '<div class="bg-gray-50 rounded-lg p-3"><div class="text-xs text-gray-400">Actual</div><div class="text-sm font-medium">' + Number(a.actual_value).toLocaleString('en-IN') + '</div></div>';
         if (a.deviation_pct != null) html += '<div class="bg-gray-50 rounded-lg p-3"><div class="text-xs text-gray-400">Deviation</div><div class="text-sm font-medium">' + a.deviation_pct + '%</div></div>';
         if (a.z_score != null) html += '<div class="bg-gray-50 rounded-lg p-3"><div class="text-xs text-gray-400">Z-Score</div><div class="text-sm font-medium">' + parseFloat(a.z_score).toFixed(2) + '</div></div>';
-        if (a.entity_type) html += '<div class="bg-gray-50 rounded-lg p-3"><div class="text-xs text-gray-400">Entity</div><div class="text-sm font-medium">' + a.entity_type + ': ' + (a.entity_id || '-') + '</div></div>';
+        if (a.entity_type) html += '<div class="bg-gray-50 rounded-lg p-3"><div class="text-xs text-gray-400">Entity</div><div class="text-sm font-medium">' + escHtml(a.entity_type) + ': ' + escHtml(String(a.entity_id || '-')) + '</div></div>';
         if (a.branch_id) html += '<div class="bg-gray-50 rounded-lg p-3"><div class="text-xs text-gray-400">Branch ID</div><div class="text-sm font-medium">' + a.branch_id + '</div></div>';
         html += '</div>';
         if (Object.keys(meta).length > 0) {
-            html += '<div class="mb-4"><div class="text-xs text-gray-400 mb-1">Metadata</div><pre class="bg-gray-50 rounded-lg p-3 text-xs overflow-x-auto">' + JSON.stringify(meta, null, 2) + '</pre></div>';
+            html += '<div class="mb-4"><div class="text-xs text-gray-400 mb-1">Metadata</div><pre class="bg-gray-50 rounded-lg p-3 text-xs overflow-x-auto">' + escHtml(JSON.stringify(meta, null, 2)) + '</pre></div>';
         }
         if (a.resolved_at) {
             html += '<div class="mb-4 bg-green-50 rounded-lg p-3"><div class="text-xs text-green-700 font-medium">Resolved ' + new Date(a.resolved_at).toLocaleString('en-IN') + ' by ' + escHtml(a.resolved_by_name || 'System') + '</div>';

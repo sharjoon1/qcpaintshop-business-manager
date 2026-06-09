@@ -1016,7 +1016,7 @@
                     <div class="flex items-center gap-2 mb-1 flex-wrap">
                         <h3 class="font-semibold text-gray-800 text-sm sm:text-base truncate">${escapeHtml(lead.name)}</h3>
                         <span class="flex-shrink-0 px-2 py-0.5 rounded-full text-[10px] font-semibold ${sc.bg} ${sc.text}">${sc.label}</span>
-                        ${lead.lead_type ? `<span class="flex-shrink-0 px-2 py-0.5 rounded-full text-[10px] font-semibold ${lead.lead_type === 'painter' ? 'bg-green-100 text-green-700' : lead.lead_type === 'engineer' ? 'bg-amber-100 text-amber-700' : 'bg-blue-100 text-blue-700'}">${lead.lead_type.charAt(0).toUpperCase() + lead.lead_type.slice(1)}</span>` : ''}
+                        ${lead.lead_type ? `<span class="flex-shrink-0 px-2 py-0.5 rounded-full text-[10px] font-semibold ${lead.lead_type === 'painter' ? 'bg-green-100 text-green-700' : lead.lead_type === 'engineer' ? 'bg-amber-100 text-amber-700' : 'bg-blue-100 text-blue-700'}">${escapeHtml(lead.lead_type.charAt(0).toUpperCase() + lead.lead_type.slice(1))}</span>` : ''}
                         ${aiHtml}
                     </div>
                     <div class="flex items-center gap-2 text-xs text-gray-500 mb-1.5 flex-wrap">
