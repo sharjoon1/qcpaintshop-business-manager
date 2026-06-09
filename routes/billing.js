@@ -1056,8 +1056,8 @@ router.get('/payments',
 // ═══════════════════════════════════════════
 
 router.post('/invoices/:id/push-zoho',
-    idempotent('billing.invoice.zohoPush'),
     requirePermission('billing', 'zoho_push'),
+    idempotent('billing.invoice.zohoPush'),
     validateParams(idParamSchema),
     async (req, res) => {
         try {

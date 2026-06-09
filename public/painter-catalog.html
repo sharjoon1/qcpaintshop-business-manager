@@ -307,8 +307,8 @@
         // ── Offer badge text ──
         function getOfferBadgeHtml(offer) {
             if (!offer) return '';
-            if (offer.offer_type === 'multiplier' && offer.bonus_multiplier) {
-                return `<span class="badge badge-offer-fire">&#128293; ${offer.bonus_multiplier}x</span>`;
+            if (offer.offer_type === 'multiplier' && offer.multiplier_value) {
+                return `<span class="badge badge-offer-fire">&#128293; ${offer.multiplier_value}x</span>`;
             }
             if (offer.offer_type === 'bonus_points' && offer.bonus_points) {
                 return `<span class="badge badge-offer">+${offer.bonus_points}pts</span>`;
@@ -576,7 +576,7 @@
 
                 // Offer type label
                 let typeLabel = '';
-                if (o.offer_type === 'multiplier' && o.bonus_multiplier) typeLabel = `${o.bonus_multiplier}x Points`;
+                if (o.offer_type === 'multiplier' && o.multiplier_value) typeLabel = `${o.multiplier_value}x Points`;
                 else if (o.offer_type === 'bonus_points' && o.bonus_points) typeLabel = `+${o.bonus_points} Bonus Pts`;
                 else if (o.offer_type === 'discount') typeLabel = 'Discount';
                 else if (o.offer_type === 'free_product') typeLabel = 'Free Product';
@@ -666,7 +666,7 @@
             if (bestOffer) {
                 const offerTitle = (lang === 'ta' && bestOffer.title_ta) ? bestOffer.title_ta : bestOffer.title;
                 let offerDesc = '';
-                if (bestOffer.offer_type === 'multiplier' && bestOffer.bonus_multiplier) offerDesc = `${bestOffer.bonus_multiplier}x points`;
+                if (bestOffer.offer_type === 'multiplier' && bestOffer.multiplier_value) offerDesc = `${bestOffer.multiplier_value}x points`;
                 else if (bestOffer.offer_type === 'bonus_points' && bestOffer.bonus_points) offerDesc = `+${bestOffer.bonus_points} bonus pts`;
                 else if (bestOffer.offer_type === 'discount') offerDesc = 'Discount available';
                 else if (bestOffer.offer_type === 'free_product') offerDesc = 'Free product included';

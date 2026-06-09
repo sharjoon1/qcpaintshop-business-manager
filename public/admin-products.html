@@ -879,9 +879,9 @@
                             : `<div class="w-10 h-10 bg-gray-100 rounded border-2 border-dashed border-gray-300 flex items-center justify-center cursor-pointer hover:border-purple-400 hover:bg-purple-50 transition" onclick="triggerProductImageUpload(${product.id})" title="Upload image"><svg class="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"/></svg></div>`
                         }
                     </td>
-                    <td class="px-4 py-3 text-sm font-semibold text-gray-900">${product.name}</td>
-                    <td class="px-4 py-3 text-sm text-gray-600">${product.brand_name || 'N/A'}</td>
-                    <td class="px-4 py-3 text-sm text-gray-600">${product.category_name || 'N/A'}</td>
+                    <td class="px-4 py-3 text-sm font-semibold text-gray-900">${escHtml(product.name)}</td>
+                    <td class="px-4 py-3 text-sm text-gray-600">${escHtml(product.brand_name) || 'N/A'}</td>
+                    <td class="px-4 py-3 text-sm text-gray-600">${escHtml(product.category_name) || 'N/A'}</td>
                     <td class="px-4 py-3 text-sm">
                         <span class="badge ${
                             product.product_type === 'area_wise' ? 'badge-primary' : 'badge-success'

@@ -2185,7 +2185,7 @@
         } catch (err) {
             showToast('Push error: ' + err.message, 'error');
         } finally {
-            sp.classList.add('hidden');
+            btn.disabled = false; sp.classList.add('hidden');
         }
     }
 

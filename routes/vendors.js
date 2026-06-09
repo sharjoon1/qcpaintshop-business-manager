@@ -580,8 +580,8 @@ router.post('/bills/:id/submit',
 
 // Push bill to Zoho
 router.post('/bills/:id/push-zoho',
-    idempotent('vendor.bill.zohoPush'),
     poPerm,
+    idempotent('vendor.bill.zohoPush'),
     validateParams(idParamSchema),
     async (req, res) => {
         try {
@@ -832,8 +832,8 @@ router.post('/purchase-orders/:id/send',
 
 // Push PO to Zoho
 router.post('/purchase-orders/:id/push-zoho',
-    idempotent('vendor.po.zohoPush'),
     poPerm,
+    idempotent('vendor.po.zohoPush'),
     validateParams(idParamSchema),
     async (req, res) => {
         try {

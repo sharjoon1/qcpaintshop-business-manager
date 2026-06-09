@@ -563,7 +563,7 @@ async function initReconcileAdmin() {
         if (brSel && dest) {
             const opts = Array.from(brSel.options)
                 .filter(o => o.value)
-                .map(o => `<option value="${o.value}">${o.textContent}</option>`)
+                .map(o => `<option value="${escDiscHtml(o.value)}">${escDiscHtml(o.textContent)}</option>`)
                 .join('');
             dest.innerHTML = '<option value="">All</option>' + opts;
         }
@@ -1189,9 +1189,9 @@ async function loadReviewList() {
                     const submittedLabel = `${a.submitted_count || 0}/${a.item_count}` + (adjCount > 0 ? ` <span class="text-purple-600">(${adjCount} adj)</span>` : '');
                     return `<tr>
                         <td>${a.id}</td>
-                        <td>${a.branch_name || '-'}</td>
-                        <td class="text-xs">${a.location_name || '-'}</td>
-                        <td>${a.staff_name || '-'}</td>
+                        <td>${escDiscHtml(a.branch_name) || '-'}</td>
+                        <td class="text-xs">${escDiscHtml(a.location_name) || '-'}</td>
+                        <td>${escDiscHtml(a.staff_name) || '-'}</td>
                         <td>${a.request_type === 'self_requested' ? '<span class="badge-self">Self</span>' : '<span class="text-xs text-gray-400">Assigned</span>'}</td>
                         <td>${a.check_date ? a.check_date.split('T')[0] : '-'}</td>
                         <td><span class="font-medium">${submittedLabel}</span></td>
@@ -1276,15 +1276,15 @@ async function openReview(id) {
                     const currentQty = item.current_system_qty !== null && item.current_system_qty !== undefined ? item.current_system_qty : item.system_qty;
                     const stockChanged = item.current_system_qty !== null && item.current_system_qty !== undefined && parseFloat(item.current_system_qty) !== parseFloat(item.system_qty);
                     return `<tr class="review-item-row" data-item-status="${itemSt}" style="${showDefault ? '' : 'display:none'}${stockChanged ? ';background:rgba(245,158,11,0.08)' : ''}">
-                        <td><div class="font-medium">${item.item_name}</div><div class="text-xs text-gray-400">${item.item_sku || ''}</div></td>
+                        <td><div class="font-medium">${escDiscHtml(item.item_name)}</div><div class="text-xs text-gray-400">${escDiscHtml(item.item_sku) || ''}</div></td>
                         <td>${itemStatusBadge(itemSt)}</td>
                         <td class="text-xs text-gray-400">${item.system_qty}</td>
                         <td class="font-semibold${stockChanged ? ' text-amber-600' : ''}">${currentQty}${stockChanged ? ' <span class="text-xs">⚠</span>' : ''}</td>
                         <td>${item.reported_qty !== null ? item.reported_qty : '<span class="text-gray-300">-</span>'}</td>
                         <td class="${diffClass}">${diffStr}</td>
                         <td class="text-xs ${varPct !== null && Math.abs(varPct) > 10 ? 'text-red-600 font-semibold' : 'text-gray-500'}">${varPct !== null ? varPct + '%' : '-'}</td>
-                        <td>${item.photo_url ? '<img src="' + item.photo_url + '" class="photo-thumb" onclick="showPhoto(\'' + item.photo_url + '\')">' : '<span class="text-gray-300">-</span>'}</td>
-                        <td class="text-xs text-gray-500 max-w-[120px] truncate">${item.notes || '-'}</td>
+                        <td>${item.photo_url ? '<img src="' + escDiscHtml(item.photo_url) + '" class="photo-thumb" data-photo="' + escDiscHtml(item.photo_url) + '" onclick="showPhoto(this.dataset.photo)">' : '<span class="text-gray-300">-</span>'}</td>
+                        <td class="text-xs text-gray-500 max-w-[120px] truncate">${escDiscHtml(item.notes) || '-'}</td>
                     </tr>`;
                 }).join('')}
             </tbody>
@@ -1472,7 +1472,7 @@ async function loadDashboard() {
             <thead><tr><th>Branch</th><th>Total</th><th>Pending</th><th>Submitted</th><th>Reviewed</th><th>Adjusted</th></tr></thead>
             <tbody>
                 ${branches.map(b => `<tr>
-                    <td class="font-medium">${b.branch_name}</td>
+                    <td class="font-medium">${escDiscHtml(b.branch_name)}</td>
                     <td>${b.total_assignments || 0}</td>
                     <td>${b.pending_count ? '<span class="status-badge status-pending">' + b.pending_count + '</span>' : '0'}</td>
                     <td>${b.submitted_count ? '<span class="status-badge status-submitted">' + b.submitted_count + '</span>' : '0'}</td>
@@ -1502,8 +1502,8 @@ async function loadSuggestions() {
             <thead><tr><th>Item</th><th>SKU</th><th>System Qty</th><th>Last Checked</th></tr></thead>
             <tbody>
                 ${res.data.map(item => `<tr>
-                    <td class="font-medium">${item.item_name}</td>
-                    <td class="text-xs text-gray-400">${item.sku || '-'}</td>
+                    <td class="font-medium">${escDiscHtml(item.item_name)}</td>
+                    <td class="text-xs text-gray-400">${escDiscHtml(item.sku) || '-'}</td>
                     <td>${item.stock_on_hand}</td>
                     <td>${daysAgoLabel(item.last_checked)}</td>
                 </tr>`).join('')}
@@ -1550,15 +1550,15 @@ async function loadHistory(page) {
                         : '<span class="status-badge status-' + a.status + '">' + a.status + '</span>';
                     return `<tr>
                     <td>${a.id}</td>
-                    <td>${a.branch_name || '-'}</td>
-                    <td class="text-xs">${a.location_name || '-'}</td>
-                    <td>${a.staff_name || '-'}</td>
+                    <td>${escDiscHtml(a.branch_name) || '-'}</td>
+                    <td class="text-xs">${escDiscHtml(a.location_name) || '-'}</td>
+                    <td>${escDiscHtml(a.staff_name) || '-'}</td>
                     <td>${a.request_type === 'self_requested' ? '<span class="badge-self">Self</span>' : '<span class="text-xs text-gray-400">Assigned</span>'}</td>
                     <td>${a.check_date ? a.check_date.split('T')[0] : '-'}</td>
                     <td>${a.item_count}</td>
                     <td>${a.discrepancy_count > 0 ? '<span class="diff-negative">' + a.discrepancy_count + '</span>' : '0'}</td>
                     <td>${statusHtml}</td>
-                    <td class="text-xs text-gray-500">${a.created_by_name || '-'}</td>
+                    <td class="text-xs text-gray-500">${escDiscHtml(a.created_by_name) || '-'}</td>
                     <td>
                         ${a.status === 'pending' && !hasAdjusted ? '<button onclick="deleteAssignment(' + a.id + ')" class="text-xs text-red-500 hover:text-red-700">Delete</button>' : ''}
                         ${a.status === 'submitted' || isPartial ? '<button onclick="openReview(' + a.id + ')" class="text-xs text-indigo-600 hover:text-indigo-800">Review</button>' : ''}

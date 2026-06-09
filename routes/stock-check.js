@@ -867,7 +867,7 @@ router.get('/review/:id', requirePermission('zoho', 'stock_check'), async (req, 
 // ========================================
 
 /** POST /api/stock-check/adjust/:id — Push discrepancies to Zoho as inventory adjustment */
-router.post('/adjust/:id', idempotent('stockcheck.adjust'), requirePermission('zoho', 'stock_check'), async (req, res) => {
+router.post('/adjust/:id', requirePermission('zoho', 'stock_check'), idempotent('stockcheck.adjust'), async (req, res) => {
     try {
         const [rows] = await pool.query(
             `SELECT a.*, DATE_FORMAT(a.check_date, '%Y-%m-%d') as check_date,

@@ -128,7 +128,7 @@
     </div>
 
 <script>
-function esc(s){ if(s===null||s===undefined) return ''; const d=document.createElement('div'); d.textContent=String(s); return d.innerHTML; }
+function esc(s){ if(s===null||s===undefined) return ''; const d=document.createElement('div'); d.textContent=String(s); return d.innerHTML.replace(/"/g,'&quot;').replace(/'/g,'&#39;'); }
 
 let allItems = [];
 let filteredItems = [];
