@@ -4998,9 +4998,11 @@ async function sendAdminNotification() {
         }
 
         btn.textContent = 'Sending...';
+        // RT-046: per-click Idempotency-Key so a double-submit can't broadcast twice.
+        const idemKey = (window.crypto && crypto.randomUUID) ? crypto.randomUUID() : (Date.now() + '-' + Math.random());
         const r = await fetch('/api/admin-notifications', {
             method: 'POST',
-            headers: authHeaders(),
+            headers: { ...authHeaders(), 'Idempotency-Key': idemKey },
             body: JSON.stringify({
                 title, body,
                 imageUrl: notifSelectedImageUrl || undefined,

@@ -265,8 +265,10 @@ router.post('/send-otp', otpLimiter, async (req, res) => {
 
         const painter = painters[0];
 
-        // Play Store test account — fixed OTP bypass, never honored in production
-        const allowTestBypass = process.env.NODE_ENV !== 'production';
+        // Play Store test account — fixed OTP bypass, never honored in production.
+        // KN-P2-3: fail-closed — requires BOTH non-prod NODE_ENV AND an explicit
+        // ALLOW_TEST_OTP=true flag, so a single NODE_ENV misconfig cannot open it.
+        const allowTestBypass = process.env.NODE_ENV !== 'production' && process.env.ALLOW_TEST_OTP === 'true';
         const isTestAccount = allowTestBypass && (phone === '9999999999' || phone === '+919999999999');
         const otp = isTestAccount ? '123456' : String(crypto.randomInt(100000, 1000000));
         const token = crypto.randomBytes(32).toString('hex');

@@ -804,7 +804,8 @@ app.post('/api/auth/forgot-password', authLimiter, async (req, res) => {
                 host: process.env.SMTP_HOST,
                 port: parseInt(process.env.SMTP_PORT || '587'),
                 secure: parseInt(process.env.SMTP_PORT || '587') === 465 || process.env.SMTP_SECURE === 'true',
-                tls: { rejectUnauthorized: false },
+                // SVC-035: validate cert by default; SMTP_INSECURE_TLS=true only for the loopback relay.
+                tls: { rejectUnauthorized: process.env.SMTP_INSECURE_TLS !== 'true' },
             };
             if (process.env.SMTP_USER) _smtpCfg.auth = { user: process.env.SMTP_USER, pass: process.env.SMTP_PASSWORD };
             const transporter = nodemailer.createTransport(_smtpCfg);

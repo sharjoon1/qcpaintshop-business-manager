@@ -8,6 +8,7 @@ const multer = require('multer');
 const sharp = require('sharp');
 const path = require('path');
 const { requirePermission } = require('../middleware/permissionMiddleware');
+const { idempotent } = require('../middleware/idempotency');
 const fcmAdmin = require('../services/fcm-admin');
 
 let pool;
@@ -121,7 +122,8 @@ router.get('/', requirePermission('painters', 'manage'), async (req, res) => {
 });
 
 // POST / — send notification
-router.post('/', requirePermission('painters', 'manage'), async (req, res) => {
+// RT-046: idempotent so a double-submit can't broadcast twice to the whole painter audience.
+router.post('/', requirePermission('painters', 'manage'), idempotent('painterBroadcast.create'), async (req, res) => {
     try {
         const { title, body, imageUrl, type = 'info', offerUrl, audienceType = 'all', audienceValue } = req.body;
 

@@ -321,7 +321,10 @@
             + '</tr></thead><tbody>'
             + v.map(function (x, idx) {
               var disc = x.discount_pct > 0;
-              var dot = x.color_code ? '<span style="display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:6px;background:' + EP.escapeHTML(x.color_code) + ';border:1px solid rgba(0,0,0,0.1);vertical-align:middle;"></span>' : '';
+              // PAGE-307: color_code goes into a CSS value, not HTML — escapeHTML is the wrong
+              // escaper there. Allowlist hex / named colors; drop anything else (no CSS injection).
+              var cc = (function (c) { c = String(c == null ? '' : c).trim(); return (/^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/.test(c) || /^[a-zA-Z]{1,20}$/.test(c)) ? c : ''; })(x.color_code);
+              var dot = cc ? '<span style="display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:6px;background:' + cc + ';border:1px solid rgba(0,0,0,0.1);vertical-align:middle;"></span>' : '';
               return '<tr data-variant-idx="' + idx + '">'
                 + '<td>' + dot + '<b>' + EP.escapeHTML(x.size_label || x.zoho_item_name || '—') + '</b>' + (x.color_name ? ' <small>' + EP.escapeHTML(x.color_name) + '</small>' : '') + '</td>'
                 + '<td class="mono">' + EP.escapeHTML(x.zoho_item_id || '') + '</td>'

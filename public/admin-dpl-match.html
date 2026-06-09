@@ -343,20 +343,27 @@ function renderMobileCards() {
 }
 
 function exportCSV() {
+    // PAGE-197: RFC-4180 escaping + CSV/Excel formula-injection guard for every cell.
+    const csvCell = (v) => {
+        let s = (v == null ? '' : String(v));
+        if (/^[=+\-@\t\r]/.test(s)) s = "'" + s;            // neutralize leading formula chars
+        if (/[",\r\n]/.test(s)) s = '"' + s.replace(/"/g, '""') + '"';
+        return s;
+    };
     const rows = [['#', 'Brand', 'SKU', 'Zoho Item Name', 'Rate', 'DPL', 'Status', 'Mapped Product']];
     filteredItems.forEach((item, i) => {
         rows.push([
             i + 1,
             item.zoho_brand || '',
             item.zoho_sku || '',
-            (item.zoho_item_name || '').replace(/,/g, ' '),
+            item.zoho_item_name || '',
             item.zoho_rate || '',
             item.zoho_cf_dpl || '',
             item.status,
-            (item.product_name || '').replace(/,/g, ' ')
+            item.product_name || ''
         ]);
     });
-    const csv = rows.map(r => r.join(',')).join('\n');
+    const csv = rows.map(r => r.map(csvCell).join(',')).join('\r\n');
     const blob = new Blob([csv], { type: 'text/csv' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
