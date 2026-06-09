@@ -12,7 +12,7 @@
     <title>My Dashboard - Quality Colours</title>
     <script>
     // FIX-8: Simplified auth check — token presence is the single source of truth
-    if (!localStorage.getItem('customer_token')) { window.location.href = '/customer-login.html'; return; }
+    if (!localStorage.getItem('customer_token')) { window.location.href = '/customer-login.html'; }
     </script>
     <link rel="stylesheet" href="/css/tailwind.css">
     <style>

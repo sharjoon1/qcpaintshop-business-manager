@@ -8,7 +8,7 @@ const router = express.Router();
 const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
-const { requireAuth } = require('../middleware/permissionMiddleware');
+const { requireAuth, requireRole } = require('../middleware/permissionMiddleware');
 
 let pool;
 function setPool(dbPool) { pool = dbPool; }
@@ -135,11 +135,8 @@ router.post('/upload', requireAuth, upload.single('document'), async (req, res) 
  * GET /api/agreements/admin/staff-list
  * Returns all active staff with their agreement status.
  */
-router.get('/admin/staff-list', requireAuth, async (req, res) => {
+router.get('/admin/staff-list', requireRole('admin', 'manager'), async (req, res) => {
     try {
-        if (!['admin', 'manager'].includes(req.user.role)) {
-            return res.status(403).json({ success: false, message: 'Access denied' });
-        }
         const [rows] = await pool.query(
             `SELECT u.id, u.full_name, u.role, u.phone, u.status,
                     b.name AS branch_name,
@@ -161,11 +158,8 @@ router.get('/admin/staff-list', requireAuth, async (req, res) => {
  * POST /api/agreements/admin/assign-all
  * Creates pending agreement records for all active staff who don't have one yet.
  */
-router.post('/admin/assign-all', requireAuth, async (req, res) => {
+router.post('/admin/assign-all', requireRole('admin', 'manager'), async (req, res) => {
     try {
-        if (!['admin', 'manager'].includes(req.user.role)) {
-            return res.status(403).json({ success: false, message: 'Access denied' });
-        }
         const [agr] = await pool.query('SELECT id FROM staff_agreements WHERE is_active = 1 ORDER BY id DESC LIMIT 1');
         if (!agr.length) return res.status(400).json({ success: false, message: 'No active agreement' });
         const agreementId = agr[0].id;
@@ -193,11 +187,8 @@ router.post('/admin/assign-all', requireAuth, async (req, res) => {
 /**
  * GET /api/agreements/admin/stats
  */
-router.get('/admin/stats', requireAuth, async (req, res) => {
+router.get('/admin/stats', requireRole('admin', 'manager'), async (req, res) => {
     try {
-        if (!['admin', 'manager'].includes(req.user.role)) {
-            return res.status(403).json({ success: false, message: 'Access denied' });
-        }
         const [total] = await pool.query(
             `SELECT COUNT(*) as c FROM users WHERE role NOT IN ('admin','customer','guest','retail_customer') AND status='active'`
         );

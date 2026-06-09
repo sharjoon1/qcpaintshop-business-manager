@@ -477,6 +477,11 @@ app.post('/api/auth/login', authLimiter, async (req, res) => {
         );
 
         if (users.length === 0) {
+            // SYS-009: audit failed login (unknown account) — req.user unset → actor 'system'
+            require('./services/audit-log').record(req, {
+                action: 'LOGIN_FAILED', entity_type: 'user', entity_id: null,
+                after: { username, reason: 'user_not_found' }
+            });
             return res.status(401).json({ success: false, message: 'Invalid credentials' });
         }
 
@@ -484,6 +489,11 @@ app.post('/api/auth/login', authLimiter, async (req, res) => {
 
         const passwordMatch = await bcrypt.compare(password, user.password_hash);
         if (!passwordMatch) {
+            // SYS-009: audit failed login (bad password)
+            require('./services/audit-log').record(req, {
+                action: 'LOGIN_FAILED', entity_type: 'user', entity_id: user.id,
+                after: { username: user.username, reason: 'bad_password' }
+            });
             return res.status(401).json({ success: false, message: 'Invalid credentials' });
         }
 
@@ -504,6 +514,12 @@ app.post('/api/auth/login', authLimiter, async (req, res) => {
         );
 
         await pool.query('UPDATE users SET last_login = NOW() WHERE id = ?', [user.id]);
+
+        // SYS-009: audit successful login
+        require('./services/audit-log').record(req, {
+            action: 'LOGIN_SUCCESS', entity_type: 'user', entity_id: user.id,
+            after: { username: user.username, role: user.role }
+        });
 
         res.json({
             success: true,
@@ -547,7 +563,14 @@ app.post('/api/auth/login-2fa', authLimiter, async (req, res) => {
         if (!user.totp_enabled) return res.status(400).json({ success: false, message: '2FA not enabled for this user' });
 
         const valid = totpSvc.verifyToken(user.totp_secret, token);
-        if (!valid) return res.status(401).json({ success: false, message: 'Invalid 2FA token' });
+        if (!valid) {
+            // SYS-009: audit failed 2FA challenge
+            require('./services/audit-log').record(req, {
+                action: 'LOGIN_FAILED', entity_type: 'user', entity_id: user.id,
+                after: { username: user.username, reason: 'bad_2fa_token' }
+            });
+            return res.status(401).json({ success: false, message: 'Invalid 2FA token' });
+        }
 
         const sessionToken = crypto.randomBytes(32).toString('hex');
         const sessionTokenHash = crypto.createHash('sha256').update(sessionToken).digest('hex');
@@ -559,6 +582,12 @@ app.post('/api/auth/login-2fa', authLimiter, async (req, res) => {
             [user.id, sessionToken, sessionTokenHash, req.ip, req.get('User-Agent'), expiresAt]
         );
         await pool.query('UPDATE users SET last_login = NOW() WHERE id = ?', [user.id]);
+
+        // SYS-009: audit successful login (via 2FA)
+        require('./services/audit-log').record(req, {
+            action: 'LOGIN_SUCCESS', entity_type: 'user', entity_id: user.id,
+            after: { username: user.username, role: user.role, via: '2fa' }
+        });
 
         res.json({
             success: true,

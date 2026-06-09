@@ -5,13 +5,40 @@
 
 const express = require('express');
 const router = express.Router();
-const { requirePermission, requireAuth } = require('../middleware/permissionMiddleware');
+const { requirePermission, requireAuth, isFullAdmin, FULL_ADMIN_ROLES } = require('../middleware/permissionMiddleware');
 const audit = require('../services/audit-log');
 
 let pool;
 
 function setPool(dbPool) {
     pool = dbPool;
+}
+
+/**
+ * Guard against privilege escalation via permission edits (RT-026).
+ * A non-full-admin holder of roles.manage must not be able to rewrite the
+ * permission set of a system/admin role, nor of their OWN role (which would
+ * let them grant themselves every permission). Full admins bypass this.
+ * Returns { ok: true, target } when the edit is allowed, otherwise
+ * { status, body } describing the response to send.
+ */
+async function roleEditGuard(req, roleId) {
+    const [rows] = await pool.query('SELECT id, name, is_system_role FROM roles WHERE id = ?', [roleId]);
+    if (rows.length === 0) {
+        return { status: 404, body: { success: false, error: 'Role not found' } };
+    }
+    const target = rows[0];
+    if (isFullAdmin(req.user && req.user.role)) {
+        return { ok: true, target };
+    }
+    const targetName = String(target.name || '').toLowerCase();
+    if (target.is_system_role || FULL_ADMIN_ROLES.includes(targetName)) {
+        return { status: 403, body: { success: false, error: 'Cannot modify permissions of a system or administrator role', code: 'ROLE_PROTECTED' } };
+    }
+    if (targetName === String((req.user && req.user.role) || '').toLowerCase()) {
+        return { status: 403, body: { success: false, error: 'Cannot modify permissions of your own role', code: 'SELF_ESCALATION_BLOCKED' } };
+    }
+    return { ok: true, target };
 }
 
 // ==================== ROLES MANAGEMENT ====================
@@ -412,12 +439,9 @@ router.put('/:id/permissions', requirePermission('roles', 'manage'), async (req,
             });
         }
 
-        const [roles] = await pool.query('SELECT id FROM roles WHERE id = ?', [id]);
-        if (roles.length === 0) {
-            return res.status(404).json({
-                success: false,
-                error: 'Role not found'
-            });
+        const guard = await roleEditGuard(req, id);
+        if (!guard.ok) {
+            return res.status(guard.status).json(guard.body);
         }
 
         const [beforePerms] = await pool.query(
@@ -485,6 +509,11 @@ router.post('/:id/permissions', requirePermission('roles', 'manage'), async (req
                 success: false,
                 error: 'permission_id is required'
             });
+        }
+
+        const guard = await roleEditGuard(req, id);
+        if (!guard.ok) {
+            return res.status(guard.status).json(guard.body);
         }
 
         const [r] = await pool.query(

@@ -913,9 +913,21 @@
         }
 
         // ── Offer letter actions ──
-        function downloadOfferLetter() {
+        async function downloadOfferLetter() {
+            // PAGE-116: fetch with Authorization header (not ?token= in URL) so the bearer
+            // token for this PII document never lands in history/logs/Referer.
             const token = localStorage.getItem('auth_token');
-            window.open(`/api/staff-registration/registrations/${currentRegId}/offer-letter?token=${token}`, '_blank');
+            try {
+                const r = await fetch(`/api/staff-registration/registrations/${currentRegId}/offer-letter`, {
+                    headers: { Authorization: 'Bearer ' + token }
+                });
+                if (!r.ok) { alert('Failed to download offer letter.'); return; }
+                const url = URL.createObjectURL(await r.blob());
+                window.open(url, '_blank');
+                setTimeout(() => URL.revokeObjectURL(url), 60000);
+            } catch (e) {
+                alert('Network error downloading offer letter.');
+            }
         }
 
         async function sendOfferLetter() {
@@ -1247,9 +1259,20 @@
             btn.textContent = 'Save & Regenerate PDF';
         }
 
-        function downloadOfferLetterFromEditor() {
+        async function downloadOfferLetterFromEditor() {
+            // PAGE-116: same blob-fetch pattern as downloadOfferLetter — keep token out of the URL.
             const token = localStorage.getItem('auth_token');
-            window.open(`/api/staff-registration/registrations/${currentRegId}/offer-letter?token=${token}`, '_blank');
+            try {
+                const r = await fetch(`/api/staff-registration/registrations/${currentRegId}/offer-letter`, {
+                    headers: { Authorization: 'Bearer ' + token }
+                });
+                if (!r.ok) { alert('Failed to download offer letter.'); return; }
+                const url = URL.createObjectURL(await r.blob());
+                window.open(url, '_blank');
+                setTimeout(() => URL.revokeObjectURL(url), 60000);
+            } catch (e) {
+                alert('Network error downloading offer letter.');
+            }
         }
 
         async function sendOfferLetterFromEditor() {

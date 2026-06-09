@@ -1659,7 +1659,7 @@ router.get('/oauth/url', requirePermission('zoho', 'manage'), async (req, res) =
  */
 router.get('/oauth/callback', async (req, res) => {
     try {
-        const { code, error: oauthError } = req.query;
+        const { code, state, error: oauthError } = req.query;
 
         if (oauthError) {
             return res.status(400).send(`
@@ -1673,6 +1673,18 @@ router.get('/oauth/callback', async (req, res) => {
 
         if (!code) {
             return res.status(400).send('Authorization code missing');
+        }
+
+        // RT-064: reject callbacks whose state param is missing/forged/expired (CSRF guard).
+        // The state is HMAC-signed by getAuthorizationUrl(); an attacker cannot forge one.
+        if (!zohoOAuth.verifyOAuthState(state)) {
+            return res.status(400).send(`
+                <html><body style="font-family:sans-serif;text-align:center;padding:50px">
+                <h2 style="color:#ef4444">Invalid or expired authorization request</h2>
+                <p>Please start the Zoho connection again from Settings.</p>
+                <a href="/admin-zoho-settings.html">Back to Settings</a>
+                </body></html>
+            `);
         }
 
         await zohoOAuth.generateTokenFromCode(code);

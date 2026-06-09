@@ -14,6 +14,7 @@
  */
 
 const https = require('https');
+const crypto = require('crypto');
 const querystring = require('querystring');
 
 let pool;
@@ -196,6 +197,53 @@ async function generateTokenFromCode(authCode) {
 }
 
 /**
+ * Secret used to sign OAuth CSRF state tokens. Derived from the Zoho client
+ * secret (always set when OAuth is in use); falls back to SESSION_SECRET.
+ */
+function oauthStateSecret() {
+    return process.env.ZOHO_CLIENT_SECRET || process.env.SESSION_SECRET || 'zoho-oauth-state-fallback';
+}
+
+/**
+ * Build a stateless, HMAC-signed CSRF state token for the OAuth flow (RT-064).
+ * Format: <nonceHex>.<timestampMs>.<hmacHex>. No server-side storage is needed
+ * (cluster-safe under PM2); the signature is unforgeable without the Zoho
+ * client secret, which is what blocks an attacker-crafted /oauth/callback.
+ */
+function generateOAuthState() {
+    const nonce = crypto.randomBytes(16).toString('hex');
+    const ts = Date.now();
+    const payload = `${nonce}.${ts}`;
+    const sig = crypto.createHmac('sha256', oauthStateSecret()).update(payload).digest('hex');
+    return `${payload}.${sig}`;
+}
+
+/**
+ * Verify an OAuth state token: signature must match (timing-safe) and the
+ * token must be within maxAgeMs (default 10 min) and not far in the future.
+ */
+function verifyOAuthState(state, maxAgeMs = 10 * 60 * 1000) {
+    if (!state || typeof state !== 'string') return false;
+    const parts = state.split('.');
+    if (parts.length !== 3) return false;
+    const [nonce, ts, sig] = parts;
+    const expected = crypto.createHmac('sha256', oauthStateSecret()).update(`${nonce}.${ts}`).digest('hex');
+    let sigBuf, expBuf;
+    try {
+        sigBuf = Buffer.from(sig, 'hex');
+        expBuf = Buffer.from(expected, 'hex');
+    } catch (e) {
+        return false;
+    }
+    if (sigBuf.length !== expBuf.length || !crypto.timingSafeEqual(sigBuf, expBuf)) return false;
+    const tsNum = Number(ts);
+    if (!Number.isFinite(tsNum)) return false;
+    const age = Date.now() - tsNum;
+    if (age > maxAgeMs || age < -60000) return false; // expired, or implausibly far-future
+    return true;
+}
+
+/**
  * Get OAuth authorization URL for initial setup
  */
 function getAuthorizationUrl() {
@@ -208,7 +256,8 @@ function getAuthorizationUrl() {
         response_type: 'code',
         redirect_uri: redirectUri,
         access_type: 'offline',
-        prompt: 'consent'
+        prompt: 'consent',
+        state: generateOAuthState()
     });
 
     return `${ZOHO_ACCOUNTS_URL}/oauth/v2/auth?${params}`;
@@ -329,6 +378,8 @@ module.exports = {
     refreshAccessToken,
     generateTokenFromCode,
     getAuthorizationUrl,
+    generateOAuthState,
+    verifyOAuthState,
     getTokenStatus,
     revokeToken
 };

@@ -5,6 +5,7 @@
  */
 
 let pool;
+const audit = require('../services/audit-log');
 
 /**
  * Initialize middleware with shared database pool
@@ -92,6 +93,12 @@ function requirePermission(module, action) {
                 return next();
             }
 
+            // SYS-009: audit the denied access attempt (req.user is populated here)
+            audit.record(req, {
+                action: 'PERMISSION_DENIED', entity_type: 'permission',
+                entity_id: `${module}.${action}`,
+                after: { role: req.user && req.user.role, module, action }
+            });
             return res.status(403).json({
                 success: false,
                 message: `Access denied. Required permission: ${module}.${action}`,
@@ -186,6 +193,12 @@ function requireAnyPermission(permissionsNeeded) {
                 }
             }
 
+            // SYS-009: audit the denied access attempt (req.user is populated here)
+            audit.record(req, {
+                action: 'PERMISSION_DENIED', entity_type: 'permission',
+                entity_id: (permissionsNeeded || []).map(p => `${p.module}.${p.action}`).join(','),
+                after: { role: req.user && req.user.role, required: permissionsNeeded }
+            });
             return res.status(403).json({
                 success: false,
                 message: 'Access denied. Insufficient permissions',

@@ -290,7 +290,7 @@ router.put('/me', requireEngineerSession, async (req, res) => {
 // Submit a new B2B quote request for the logged-in engineer.
 // Pre-fills customer_name + phone from the engineer record, maps to the
 // existing estimate_requests table so the staff workflow stays unified.
-router.post('/me/quotes', requireEngineerSession, async (req, res) => {
+router.post('/me/quotes', requireEngineerAuth, async (req, res) => {
   try {
     const PROJECT_TYPES = ['interior','exterior','both','commercial','renovation','new_construction'];
     const PROPERTY_TYPES = ['house','apartment','villa','office','shop','warehouse','other'];
@@ -634,7 +634,7 @@ router.get('/me/catalog/:productId', requireEngineerAuth, async (req, res) => {
 // Engineer builds a cart of catalogue items in the browser, then submits
 // it as a single quotation requisition tagged with all line items in
 // estimate_requests.products_json.
-router.post('/me/orders', requireEngineerSession, async (req, res) => {
+router.post('/me/orders', requireEngineerAuth, async (req, res) => {
   try {
     const items = Array.isArray(req.body.items) ? req.body.items : [];
     if (!items.length) {
