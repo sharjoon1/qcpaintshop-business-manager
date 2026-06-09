@@ -10,7 +10,7 @@ const multer = require('multer');
 const sharp = require('sharp');
 const path = require('path');
 const fs = require('fs');
-const { requirePermission, requireAuth } = require('../middleware/permissionMiddleware');
+const { requirePermission, requireAuth, isFullAdmin } = require('../middleware/permissionMiddleware');
 const notificationService = require('../services/notification-service');
 const { idempotent, setPool: setIdempotencyPool } = require('../middleware/idempotency');
 
@@ -214,8 +214,12 @@ router.get('/assignments/:id', requireAuth, async (req, res) => {
 
         const assignment = rows[0];
 
-        // Staff can only see their own assignments
-        if (req.user.role === 'staff' && assignment.staff_id !== req.user.id) {
+        // IDOR fix: only full admins and branch managers may view ANY assignment's
+        // detail (the review flow). Everyone else — staff and any other assignable
+        // role — can only see their OWN. (Was role==='staff' only, so other non-admin
+        // roles could read any assignment's system_qty/photos/notes by id.)
+        const canSeeAll = isFullAdmin(req.user.role) || (req.user.role || '').toLowerCase() === 'manager';
+        if (!canSeeAll && assignment.staff_id !== req.user.id) {
             return res.status(403).json({ success: false, message: 'Access denied' });
         }
 

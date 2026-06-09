@@ -20,11 +20,11 @@ async function branchScope(req, res, next) {
             return next();
         }
         if (role === 'manager') {
-            const [rows] = await pool.query(
-                `SELECT id FROM branches WHERE manager_id = ? AND is_active = 1 LIMIT 1`,
-                [req.user.id]
-            );
-            req.branchScope = { branchId: rows[0]?.id || null };
+            // Managers are scoped to their assigned branch (users.branch_id, already on
+            // req.user). The previous `branches.manager_id` lookup matched no such column,
+            // so branchScope silently returned null and managers saw ALL-branch data —
+            // branch isolation was off. Use the manager's own branch_id.
+            req.branchScope = { branchId: req.user.branch_id || null };
             return next();
         }
         req.branchScope = { branchId: null };
