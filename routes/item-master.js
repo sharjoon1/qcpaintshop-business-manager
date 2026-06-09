@@ -8,7 +8,7 @@ const router = express.Router();
 const { requireAuth, requirePermission } = require('../middleware/permissionMiddleware');
 const { validate, validateQuery } = require('../middleware/validate');
 const { z } = require('zod');
-const { exec } = require('child_process');
+const { execFile } = require('child_process');
 const { uploadDplPdf, uploadPriceList } = require('../config/uploads');
 
 let pool;
@@ -43,7 +43,10 @@ function padSize(size) {
 }
 
 function calculateSalesPrice(dpl) {
-    return Math.ceil(dpl * 1.298);
+    // §6: canonical DPL → sales-price rule = ceil(DPL × 1.18 × 1.10) (18% GST × 10% markup),
+    // matching services/price-list-parser.js + dpl-catalog. (Was ceil(dpl*1.298), which
+    // float-diverges by ₹1 on some values e.g. 1500/2500/3000 and under-charged vs catalog.)
+    return Math.ceil(dpl * 1.18 * 1.10);
 }
 
 // ─── Zod Schemas ────────────────────────────────────────────────────────
@@ -589,20 +592,18 @@ router.post('/dpl-notebooklm', requireAuth, validate(notebookLmSchema), async (r
     try {
         const { notebook_id, query } = req.body;
 
-        // First select the notebook
-        const useCmd = `notebooklm use ${notebook_id}`;
+        // Security (RCE fix): pass args via execFile (no shell) so notebook_id/query
+        // can never be interpreted as shell metacharacters. Previously these were
+        // string-interpolated into exec(), allowing command injection.
         await new Promise((resolve, reject) => {
-            exec(useCmd, { timeout: 10000 }, (err) => {
+            execFile('notebooklm', ['use', String(notebook_id)], { timeout: 10000 }, (err) => {
                 if (err) reject(err);
                 else resolve();
             });
         });
 
-        // Then ask the query
-        const safeQuery = query.replace(/"/g, '\\"');
-        const askCmd = `notebooklm ask "${safeQuery}"`;
         const result = await new Promise((resolve, reject) => {
-            exec(askCmd, { timeout: 30000 }, (err, stdout, stderr) => {
+            execFile('notebooklm', ['ask', String(query)], { timeout: 30000 }, (err, stdout) => {
                 if (err) reject(err);
                 else resolve(stdout);
             });
@@ -752,4 +753,4 @@ router.get('/health-check', requireAuth, async (req, res) => {
     }
 });
 
-module.exports = { router, setPool };
+module.exports = { router, setPool, calculateSalesPrice };

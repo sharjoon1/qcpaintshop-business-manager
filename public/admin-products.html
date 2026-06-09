@@ -2134,7 +2134,10 @@
             btn.disabled = true; btn.textContent = 'Saving...';
 
             try {
-                const packSizesData = packSizes.map(ps => ({
+                // P0 data-loss fix: the Edit Review modal operates on editReviewProduct.pack_sizes
+                // (aliased as p). Reading the module-level `packSizes` global here saved empty/stale
+                // variants from the unrelated Add/Edit modal, wiping prices + zoho_item_id mappings.
+                const packSizesData = (p.pack_sizes || []).map(ps => ({
                     size: ps.size,
                     unit: ps.unit || 'L',
                     base_price: ps.base_price,
