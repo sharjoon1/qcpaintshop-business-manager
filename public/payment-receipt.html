@@ -70,7 +70,6 @@
             .bill-to-name { font-size: 14px !important; }
             thead { display: table-header-group; }
             tr { page-break-inside: avoid; }
-            #upiSection { display: block !important; }
         }
 
         .company-logo {
@@ -526,23 +525,6 @@
             } catch {}
         }
 
-        // ========================================
-        // UPI QR
-        // ========================================
-        async function loadUpiQr(estId) {
-            try {
-                const resp = await fetch(`/api/estimates/${estId}/upi-qr`, {
-                    headers: { 'Authorization': 'Bearer ' + getToken() }
-                });
-                const data = await resp.json();
-                if (data.success && data.data) {
-                    document.getElementById('upiQrImage').src = data.data.qr_image;
-                    document.getElementById('upiSection').style.display = 'block';
-                }
-            } catch (err) {
-                console.error('UPI QR load error:', err);
-            }
-        }
     </script>
 </body>
 </html>
