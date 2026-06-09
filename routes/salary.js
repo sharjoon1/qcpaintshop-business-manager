@@ -588,9 +588,13 @@ async function calculateSalaryForUser(userId, month, calculatedBy) {
     const dailyRate = hourlyRate * WEEKDAY_HOURS_PER_DAY; // daily rate based on 10-hr day
     const standardHoursPay = parseFloat(att.standard_hours) * hourlyRate;
     const sundayHoursPay = (parseFloat(att.sunday_hours) / SUNDAY_HOURS_PER_DAY) * dailyRate;
-    // Weekday approved OT + Sunday OT (auto-paid, already in equivalent hours)
+    // Weekday approved OT + Sunday OT.
+    // RT-039: sunday_overtime_hours already carries the ×2 double-time premium from
+    // SQL ((mins-300)*2). Owner policy (2026-06-09): Sunday OT is double-time (2×),
+    // so it is NOT multiplied again by overtimeMultiplier — that double-counted it
+    // into 3× (2 × 1.5). Weekday approved OT keeps the overtimeMultiplier.
     const weekdayOvertimePay = parseFloat(att.approved_overtime_hours) * hourlyRate * overtimeMultiplier;
-    const sundayOvertimePay = parseFloat(att.sunday_overtime_hours) * hourlyRate * overtimeMultiplier;
+    const sundayOvertimePay = parseFloat(att.sunday_overtime_hours) * hourlyRate;
     const overtimePay = weekdayOvertimePay + sundayOvertimePay;
 
     // Allowances from config
@@ -605,13 +609,18 @@ async function calculateSalaryForUser(userId, month, calculatedBy) {
         lateDeduction = parseInt(att.late_days) * parseFloat(config.late_deduction_per_hour);
     }
 
+    // RT-040: a standard day is always WEEKDAY_HOURS_PER_DAY (10h), matching the
+    // hourlyRate basis (monthly/260 = monthly/(26×10)). Owner policy (2026-06-09):
+    // one absence/excess-leave deducts exactly one full day's pay. Previously these
+    // used config.standard_daily_hours, which diverged from the /260 rate basis
+    // whenever standard_daily_hours != 10.
     let absenceDeduction = 0;
     if (config.enable_absence_deduction && parseInt(att.absent_days) > 0) {
-        absenceDeduction = parseInt(att.absent_days) * hourlyRate * parseFloat(config.standard_daily_hours);
+        absenceDeduction = parseInt(att.absent_days) * hourlyRate * WEEKDAY_HOURS_PER_DAY;
     }
 
     // Leave deduction: excess leaves beyond free quota
-    const leaveDeduction = excessLeaves * hourlyRate * parseFloat(config.standard_daily_hours);
+    const leaveDeduction = excessLeaves * hourlyRate * WEEKDAY_HOURS_PER_DAY;
 
     const totalDeductions = lateDeduction + absenceDeduction + leaveDeduction;
 
@@ -2222,5 +2231,6 @@ router.post('/incentives/request', requireAuth, async (req, res) => {
 
 module.exports = {
     router,
-    setPool
+    setPool,
+    calculateSalaryForUser
 };
