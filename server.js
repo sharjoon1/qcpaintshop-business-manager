@@ -266,6 +266,18 @@ app.use(['/uploads/aadhar', '/uploads/documents'], async (req, res, next) => {
     }
 });
 
+// KN-P2-5: never let user-uploaded content render inline. Force a download and
+// block MIME sniffing on everything served under /uploads (covers both
+// public/uploads/* and the top-level uploads/* roots). Embedded <img>/<video>
+// still display — browsers ignore Content-Disposition for subresource loads;
+// only direct navigation to an upload URL downloads, so a spoofed HTML/SVG
+// cannot execute in our origin.
+app.use('/uploads', (req, res, next) => {
+    res.setHeader('Content-Disposition', 'attachment');
+    res.setHeader('X-Content-Type-Options', 'nosniff');
+    next();
+});
+
 app.use(express.static('public'));
 app.use('/uploads', express.static('uploads'));
 

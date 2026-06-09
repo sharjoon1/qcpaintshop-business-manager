@@ -59,14 +59,20 @@ const storage = multer.diskStorage({
         cb(null, `campaign_${Date.now()}${ext}`);
     }
 });
+// KN-P2-5: accept a marketing media file only when BOTH the extension AND the
+// MIME type are in the allow-list. The old filter accepted ext OR mime and
+// blanket-allowed any application/* — letting e.g. application/x-msdownload
+// through on a renamed file.
+const WA_ALLOWED_EXT = /\.(jpe?g|png|gif|webp|pdf|docx?|xlsx?)$/i;
+const WA_ALLOWED_MIME = /^(image\/(jpe?g|png|gif|webp)|application\/(pdf|msword|vnd\.openxmlformats-officedocument\.(wordprocessingml\.document|spreadsheetml\.sheet)|vnd\.ms-excel))$/i;
+function isAllowedMarketingUpload(originalname, mimetype) {
+    return WA_ALLOWED_EXT.test(String(originalname || '')) && WA_ALLOWED_MIME.test(String(mimetype || ''));
+}
 const upload = multer({
     storage,
     limits: { fileSize: 16 * 1024 * 1024 }, // 16MB
     fileFilter: (req, file, cb) => {
-        const allowed = /jpeg|jpg|png|gif|webp|pdf|doc|docx|xls|xlsx/;
-        const ext = allowed.test(path.extname(file.originalname).toLowerCase());
-        const mime = allowed.test(file.mimetype) || file.mimetype.startsWith('image/') || file.mimetype.startsWith('application/');
-        cb(null, ext || mime);
+        cb(null, isAllowedMarketingUpload(file.originalname, file.mimetype));
     }
 });
 
@@ -1091,5 +1097,6 @@ module.exports = {
     setPool,
     setCampaignEngine,
     setSessionManager,
-    setIO
+    setIO,
+    isAllowedMarketingUpload
 };
