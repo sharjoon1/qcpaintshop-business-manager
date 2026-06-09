@@ -133,3 +133,50 @@ describe('deductPoints', () => {
         expect(pool.conn.commit).not.toHaveBeenCalled();
     });
 });
+
+describe('processInvoice daily-bonus cap (KN-P1-4)', () => {
+    // Drives processInvoice down the daily-bonus path and captures the cap query.
+    function makeBonusPool(captured) {
+        const conn = makeConn({ regular_points: '0', annual_points: '0' });
+        return {
+            conn,
+            query: jest.fn(async (sql, params) => {
+                if (/INSERT IGNORE INTO painter_invoices_processed/i.test(sql)) return [{ affectedRows: 1, insertId: 1 }];
+                if (/FROM painter_product_point_rates/i.test(sql)) {
+                    return [[{ item_id: 'ITM1', regular_points_per_unit: '10', annual_eligible: 0, annual_pct: 0 }]];
+                }
+                if (/FROM ai_config/i.test(sql)) {
+                    return [[
+                        { config_key: 'painter_daily_bonus_product_id', config_value: 'PROD-BONUS' },
+                        { config_key: 'painter_daily_bonus_multiplier', config_value: '2' },
+                        { config_key: 'painter_daily_bonus_cap', config_value: '500' },
+                    ]];
+                }
+                if (/FROM zoho_items_map/i.test(sql)) return [[{ product_id: 'PROD-BONUS' }]];
+                if (/COALESCE\(SUM\(amount\)/i.test(sql) && /daily_bonus/i.test(sql)) {
+                    captured.sql = sql;
+                    captured.params = params;
+                    return [[{ total: 0 }]];
+                }
+                return [[]];
+            }),
+            getConnection: jest.fn(async () => conn),
+        };
+    }
+
+    it("counts today's daily-bonus rows by the painter's IST day (converts created_at to +05:30)", async () => {
+        const captured = {};
+        engine.setPool(makeBonusPool(captured));
+        await engine.processInvoice(1, {
+            invoice_id: 'INV1', invoice_number: 'INV-1', total: 1000,
+            line_items: [{ item_id: 'ITM1', quantity: 1, item_total: 1000 }],
+        }, 'customer', null);
+
+        expect(captured.sql).toBeTruthy();
+        // created_at is stored in UTC (DB session is forced to +00:00). A bare
+        // DATE(created_at) leaks the per-day cap across the IST midnight boundary
+        // (00:00–05:30 IST rows fall under the previous UTC date). The fix converts
+        // created_at to IST before truncating to a calendar date.
+        expect(captured.sql).toMatch(/CONVERT_TZ\(\s*created_at\s*,\s*'\+00:00'\s*,\s*'\+05:30'\s*\)/i);
+    });
+});

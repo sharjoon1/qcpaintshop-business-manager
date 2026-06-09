@@ -230,13 +230,17 @@ async function processInvoice(painterId, invoice, billingType, createdBy) {
                 );
                 if (mapped.length) {
                     const bonusExtra = Math.round(totalRegularPoints * (bonusMultiplier - 1) * 100) / 100;
-                    // Check how much bonus already earned today
-                    // Use IST date to match server-stored dates
+                    // Check how much bonus already earned today. created_at is stored in
+                    // UTC (DB session is forced to +00:00 on an IST host), so we convert
+                    // it to IST before truncating to a date — otherwise the per-day cap
+                    // leaks across the IST midnight boundary (00:00–05:30 IST rows would
+                    // fall under the previous UTC date). todayStr is the IST calendar day. (KN-P1-4)
                     const now = new Date();
                     const todayStr = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}`;
                     const [todayBonus] = await pool.query(
                         `SELECT COALESCE(SUM(amount), 0) as total FROM painter_point_transactions
-                         WHERE painter_id = ? AND source = 'daily_bonus' AND DATE(created_at) = ?`,
+                         WHERE painter_id = ? AND source = 'daily_bonus'
+                           AND DATE(CONVERT_TZ(created_at, '+00:00', '+05:30')) = ?`,
                         [painterId, todayStr]
                     );
                     const alreadyEarned = parseFloat(todayBonus[0].total);
