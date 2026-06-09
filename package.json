@@ -13,7 +13,7 @@
     "test:coverage": "jest --coverage",
     "test:e2e": "playwright test",
     "test:e2e:smoke": "playwright test login.smoke",
-    "build:css": "tailwindcss -i ./src/tailwind-input.css -o ./public/css/tailwind.css --minify",
+    "build:css": "tailwindcss -i ./src/tailwind-input.css -o ./public/css/tailwind.css --minify && node scripts/stamp-css-version.js",
     "watch:css": "tailwindcss -i ./src/tailwind-input.css -o ./public/css/tailwind.css --watch",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
