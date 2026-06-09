@@ -57,7 +57,7 @@ const itemsQuerySchema = z.object({
     brand: z.string().optional(),
     category: z.string().optional(),
     search: z.string().optional(),
-    status: z.enum(['all', 'missing_dpl', 'no_sku', 'bad_name']).optional().default('all'),
+    status: z.enum(['all', 'missing_dpl', 'no_sku', 'bad_name', 'dpl_set']).optional().default('all'),
     sort: z.string().optional().default('zoho_item_name'),
     order: z.enum(['asc', 'desc']).optional().default('asc')
 });
@@ -70,7 +70,9 @@ const bulkEditSchema = z.object({
         zoho_cf_dpl: z.number().optional(),
         zoho_rate: z.number().optional(),
         zoho_purchase_rate: z.number().optional(),
-        zoho_description: z.string().optional()
+        zoho_description: z.string().optional(),
+        zoho_brand: z.string().optional(),
+        zoho_category_name: z.string().optional()
     })).min(1).max(100)
 });
 
@@ -214,6 +216,8 @@ router.get('/items', requireAuth, validateQuery(itemsQuerySchema), async (req, r
         }
         if (status === 'missing_dpl') {
             where.push('(zoho_cf_dpl IS NULL OR zoho_cf_dpl = 0)');
+        } else if (status === 'dpl_set') {
+            where.push('(zoho_cf_dpl IS NOT NULL AND zoho_cf_dpl > 0)');
         } else if (status === 'no_sku') {
             where.push("(zoho_sku IS NULL OR zoho_sku = '')");
         } else if (status === 'bad_name') {
@@ -323,6 +327,8 @@ router.post('/items/bulk-edit', requireAuth, validate(bulkEditSchema), async (re
             if (item.zoho_rate !== undefined) { fields.push('zoho_rate = ?'); values.push(item.zoho_rate); }
             if (item.zoho_purchase_rate !== undefined) { fields.push('zoho_purchase_rate = ?'); values.push(item.zoho_purchase_rate); }
             if (item.zoho_description !== undefined) { fields.push('zoho_description = ?'); values.push(item.zoho_description); }
+            if (item.zoho_brand !== undefined) { fields.push('zoho_brand = ?'); values.push(item.zoho_brand); }
+            if (item.zoho_category_name !== undefined) { fields.push('zoho_category_name = ?'); values.push(item.zoho_category_name); }
 
             if (fields.length > 0) {
                 values.push(item.zoho_item_id);

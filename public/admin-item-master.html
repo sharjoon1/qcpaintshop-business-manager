@@ -83,7 +83,7 @@
                     </select>
                     <select id="filterStatus" onchange="applyFilter('status', this.value)" class="px-2 py-1.5 border border-gray-300 rounded-lg text-xs focus:border-indigo-500 focus:outline-none min-w-[110px]">
                         <option value="all">All Status</option>
-                        <option value="complete">Complete</option>
+                        <option value="dpl_set">DPL Set</option>
                         <option value="missing_dpl">Missing DPL</option>
                         <option value="no_sku">No SKU</option>
                         <option value="bad_name">Bad Name</option>
@@ -102,7 +102,7 @@
                     <div class="text-2xl font-bold" style="color: #667eea;" id="statTotal">-</div>
                     <div class="text-[10px] text-gray-500 font-medium">Total Items</div>
                 </div>
-                <div class="summary-card rounded-lg shadow-sm p-3 text-center border-l-4 border-green-400" style="background: #f0fdf4;" onclick="applyFilter('status','complete')">
+                <div class="summary-card rounded-lg shadow-sm p-3 text-center border-l-4 border-green-400" style="background: #f0fdf4;" onclick="applyFilter('status','dpl_set')">
                     <div class="text-2xl font-bold text-green-700" id="statDplSet">-</div>
                     <div class="text-[10px] text-gray-500 font-medium">DPL Set</div>
                 </div>
@@ -703,7 +703,7 @@
             document.getElementById('statDplSet').textContent = (summaryData.dplSet || 0).toLocaleString();
             document.getElementById('statMissingDpl').textContent = (summaryData.missingDpl || 0).toLocaleString();
             document.getElementById('statNoSku').textContent = (summaryData.noSku || 0).toLocaleString();
-            document.getElementById('statBrands').textContent = (summaryData.brands || 0).toLocaleString();
+            document.getElementById('statBrands').textContent = ((summaryData.brands || []).length).toLocaleString();
         } catch (err) {
             console.error('loadSummary error:', err);
         }
@@ -808,6 +808,11 @@
         }
     }
 
+    // API (zoho_items_map) has no base/size columns — derive from the item name,
+    // matching the backend's extractBase/extractSize regexes.
+    function imSize(n){ var m = String(n || '').match(/(\d+(?:\.\d+)?)\s*(?:L|LTR|LITRE|KG|ML)\b/i); return m ? m[1] : ''; }
+    function imBase(n){ var m = String(n || '').match(/\bBASE\s*(\d+)/i); return m ? m[1] : ''; }
+
     function renderTable() {
         var html = '';
         allItems.forEach(function(item) {
@@ -815,15 +820,15 @@
             var rowClass = statusInfo.rowClass;
             html += '<tr class="' + rowClass + '" onclick="openEditPanel(this)" data-item=\'' + esc(JSON.stringify(item)).replace(/'/g, '&#39;') + '\'>';
             html += '<td class="text-center" onclick="event.stopPropagation()"><input type="checkbox" class="item-cb rounded" value="' + esc(item.zoho_item_id) + '" onchange="updateBulkBar()"></td>';
-            html += '<td class="font-medium" style="max-width:220px"><div class="truncate" title="' + esc(item.item_name) + '">' + esc(item.item_name) + '</div></td>';
-            html += '<td><span class="font-mono text-blue-600 text-[10px]">' + esc(item.sku || '-') + '</span></td>';
-            html += '<td>' + renderBrandBadge(item.brand) + '</td>';
-            html += '<td class="text-gray-600">' + esc(item.category || '-') + '</td>';
-            html += '<td class="text-gray-500">' + esc(item.base || '-') + '</td>';
-            html += '<td class="text-gray-500">' + esc(item.size || '-') + '</td>';
-            html += '<td class="text-right font-semibold">' + formatINR(item.dpl) + '</td>';
-            html += '<td class="text-right text-gray-500">' + formatINR(item.purchase_rate) + '</td>';
-            html += '<td class="text-right text-gray-500">' + formatINR(item.sales_rate) + '</td>';
+            html += '<td class="font-medium" style="max-width:220px"><div class="truncate" title="' + esc(item.zoho_item_name) + '">' + esc(item.zoho_item_name) + '</div></td>';
+            html += '<td><span class="font-mono text-blue-600 text-[10px]">' + esc(item.zoho_sku || '-') + '</span></td>';
+            html += '<td>' + renderBrandBadge(item.zoho_brand) + '</td>';
+            html += '<td class="text-gray-600">' + esc(item.zoho_category_name || '-') + '</td>';
+            html += '<td class="text-gray-500">' + esc(imBase(item.zoho_item_name) || '-') + '</td>';
+            html += '<td class="text-gray-500">' + esc(imSize(item.zoho_item_name) || '-') + '</td>';
+            html += '<td class="text-right font-semibold">' + formatINR(item.zoho_cf_dpl) + '</td>';
+            html += '<td class="text-right text-gray-500">' + formatINR(item.zoho_purchase_rate) + '</td>';
+            html += '<td class="text-right text-gray-500">' + formatINR(item.zoho_rate) + '</td>';
             html += '<td class="text-center">' + statusInfo.badge + '</td>';
             html += '</tr>';
         });
@@ -832,9 +837,10 @@
     }
 
     function getItemStatus(item) {
-        if (!item.sku) return { rowClass: 'row-no-sku', badge: '<span class="px-1.5 py-0.5 rounded-full text-[10px] font-bold bg-red-100 text-red-700">No SKU</span>' };
-        if (item.bad_name) return { rowClass: 'row-bad-name', badge: '<span class="px-1.5 py-0.5 rounded-full text-[10px] font-bold bg-red-100 text-red-700">Bad Name</span>' };
-        if (!item.dpl || parseFloat(item.dpl) === 0) return { rowClass: 'row-missing-dpl', badge: '<span class="px-1.5 py-0.5 rounded-full text-[10px] font-bold bg-yellow-100 text-yellow-700">No DPL</span>' };
+        if (!item.zoho_sku) return { rowClass: 'row-no-sku', badge: '<span class="px-1.5 py-0.5 rounded-full text-[10px] font-bold bg-red-100 text-red-700">No SKU</span>' };
+        var badName = item.zoho_item_name && !/^[A-Z]{2}[0-9]{2}\s/.test(item.zoho_item_name);
+        if (badName) return { rowClass: 'row-bad-name', badge: '<span class="px-1.5 py-0.5 rounded-full text-[10px] font-bold bg-red-100 text-red-700">Bad Name</span>' };
+        if (!item.zoho_cf_dpl || parseFloat(item.zoho_cf_dpl) === 0) return { rowClass: 'row-missing-dpl', badge: '<span class="px-1.5 py-0.5 rounded-full text-[10px] font-bold bg-yellow-100 text-yellow-700">No DPL</span>' };
         return { rowClass: '', badge: '<span class="px-1.5 py-0.5 rounded-full text-[10px] font-bold bg-green-100 text-green-700">Complete</span>' };
     }
 
@@ -854,7 +860,7 @@
 
         var total = pag.total || 0;
         var page = pag.page || 1;
-        var totalPages = pag.totalPages || 1;
+        var totalPages = pag.pages || pag.totalPages || 1;
         var start = (page - 1) * ITEMS_PER_PAGE + 1;
         var end = Math.min(page * ITEMS_PER_PAGE, total);
 
@@ -915,13 +921,13 @@
         try { item = JSON.parse(rowEl.getAttribute('data-item')); } catch (e) { return; }
 
         document.getElementById('editZohoItemId').value = item.zoho_item_id;
-        document.getElementById('editItemName').value = item.item_name || '';
-        document.getElementById('editDescription').value = item.description || '';
-        document.getElementById('editSku').value = item.sku || '';
-        document.getElementById('editBase').value = item.base || '';
-        document.getElementById('editBrand').value = item.brand || '';
-        document.getElementById('editCategory').value = item.category || '';
-        document.getElementById('editDpl').value = item.dpl || '';
+        document.getElementById('editItemName').value = item.zoho_item_name || '';
+        document.getElementById('editDescription').value = item.zoho_description || '';
+        document.getElementById('editSku').value = item.zoho_sku || '';
+        document.getElementById('editBase').value = imBase(item.zoho_item_name) || '';
+        document.getElementById('editBrand').value = item.zoho_brand || '';
+        document.getElementById('editCategory').value = item.zoho_category_name || '';
+        document.getElementById('editDpl').value = item.zoho_cf_dpl || '';
 
         updatePriceCalc();
 
@@ -940,7 +946,7 @@
         if (dpl > 0) {
             box.classList.remove('hidden');
             document.getElementById('calcPurchase').textContent = formatINR(dpl);
-            document.getElementById('calcSales').textContent = formatINR(Math.ceil(dpl * 1.298));
+            document.getElementById('calcSales').textContent = formatINR(Math.ceil(dpl * 1.18 * 1.10));
         } else {
             box.classList.add('hidden');
         }
@@ -952,13 +958,12 @@
 
         var changes = {
             zoho_item_id: zohoItemId,
-            item_name: document.getElementById('editItemName').value.trim(),
-            description: document.getElementById('editDescription').value.trim(),
-            sku: document.getElementById('editSku').value.trim(),
-            base: document.getElementById('editBase').value.trim(),
-            brand: document.getElementById('editBrand').value,
-            category: document.getElementById('editCategory').value,
-            cf_dpl: parseFloat(document.getElementById('editDpl').value) || 0
+            zoho_item_name: document.getElementById('editItemName').value.trim(),
+            zoho_description: document.getElementById('editDescription').value.trim(),
+            zoho_sku: document.getElementById('editSku').value.trim(),
+            zoho_brand: document.getElementById('editBrand').value,
+            zoho_category_name: document.getElementById('editCategory').value,
+            zoho_cf_dpl: parseFloat(document.getElementById('editDpl').value) || 0
         };
 
         var btn = document.getElementById('editSaveBtn');
@@ -1011,8 +1016,8 @@
 
         var items = ids.map(function(id) {
             var changes = { zoho_item_id: id };
-            if (brand) changes.brand = brand;
-            if (category) changes.category = category;
+            if (brand) changes.zoho_brand = brand;
+            if (category) changes.zoho_category_name = category;
             return changes;
         });
 
@@ -1908,7 +1913,7 @@
 
         var total = pag.total || 0;
         var page = pag.page || 1;
-        var totalPages = pag.totalPages || 1;
+        var totalPages = pag.pages || pag.totalPages || 1;
         var start = (page - 1) * HISTORY_PER_PAGE + 1;
         var end = Math.min(page * HISTORY_PER_PAGE, total);
 
