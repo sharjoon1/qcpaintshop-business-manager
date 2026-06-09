@@ -518,7 +518,10 @@ async function apiFetch(url) {
 }
 
 async function apiPost(url, body) {
-    const res = await fetch(url, { method: 'POST', headers: { ...headers(), 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+    // RT-027: attach an Idempotency-Key so a retried stock-adjust push to Zoho
+    // is replayed (not re-applied) by the server's idempotent() middleware.
+    const idemKey = (window.crypto && crypto.randomUUID) ? crypto.randomUUID() : (Date.now() + '-' + Math.random());
+    const res = await fetch(url, { method: 'POST', headers: { ...headers(), 'Content-Type': 'application/json', 'Idempotency-Key': idemKey }, body: JSON.stringify(body) });
     return res.json();
 }
 

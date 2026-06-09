@@ -12,9 +12,10 @@ const path = require('path');
 const fs = require('fs');
 const { requirePermission, requireAuth } = require('../middleware/permissionMiddleware');
 const notificationService = require('../services/notification-service');
+const { idempotent, setPool: setIdempotencyPool } = require('../middleware/idempotency');
 
 let pool;
-function setPool(dbPool) { pool = dbPool; }
+function setPool(dbPool) { pool = dbPool; setIdempotencyPool(dbPool); }
 
 // Photo upload via memory storage (compressed with sharp before saving)
 const upload = multer({
@@ -866,7 +867,7 @@ router.get('/review/:id', requirePermission('zoho', 'stock_check'), async (req, 
 // ========================================
 
 /** POST /api/stock-check/adjust/:id — Push discrepancies to Zoho as inventory adjustment */
-router.post('/adjust/:id', requirePermission('zoho', 'stock_check'), async (req, res) => {
+router.post('/adjust/:id', idempotent('stockcheck.adjust'), requirePermission('zoho', 'stock_check'), async (req, res) => {
     try {
         const [rows] = await pool.query(
             `SELECT a.*, DATE_FORMAT(a.check_date, '%Y-%m-%d') as check_date,

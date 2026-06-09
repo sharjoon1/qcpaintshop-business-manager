@@ -728,7 +728,8 @@ async function editInvoice(id) {
 async function pushToZoho(invoiceId) {
     if (!confirm('Push this invoice to Zoho? This will create a Zoho invoice.')) return;
     try {
-        const res = await fetch(`${API}/invoices/${invoiceId}/push-zoho`, { method: 'POST', headers });
+        const idemKey = (window.crypto && crypto.randomUUID) ? crypto.randomUUID() : (Date.now() + '-' + Math.random());
+        const res = await fetch(`${API}/invoices/${invoiceId}/push-zoho`, { method: 'POST', headers: { ...headers, 'Idempotency-Key': idemKey } });
         const data = await res.json();
         if (!data.success) throw new Error(data.message);
         showToast('Invoice pushed to Zoho', 'success');

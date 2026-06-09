@@ -1199,7 +1199,8 @@ async function submitBill() {
 async function pushBillToZoho(billId) {
     if (!confirm('Push this bill to Zoho?')) return;
     try {
-        const res = await fetch(`${API}/bills/${billId}/push-zoho`, { method: 'POST', headers });
+        const idemKey = (window.crypto && crypto.randomUUID) ? crypto.randomUUID() : (Date.now() + '-' + Math.random());
+        const res = await fetch(`${API}/bills/${billId}/push-zoho`, { method: 'POST', headers: { ...headers, 'Idempotency-Key': idemKey } });
         const data = await res.json();
         if (!data.success) throw new Error(data.message);
         showToast(data.message || 'Bill pushed to Zoho', 'success');
@@ -1452,7 +1453,8 @@ async function sendPo(poId) {
 async function pushPoToZoho(poId) {
     if (!confirm('Push this PO to Zoho?')) return;
     try {
-        const res = await fetch(`${API}/purchase-orders/${poId}/push-zoho`, { method: 'POST', headers });
+        const idemKey = (window.crypto && crypto.randomUUID) ? crypto.randomUUID() : (Date.now() + '-' + Math.random());
+        const res = await fetch(`${API}/purchase-orders/${poId}/push-zoho`, { method: 'POST', headers: { ...headers, 'Idempotency-Key': idemKey } });
         const data = await res.json();
         if (!data.success) throw new Error(data.message);
         showToast(data.message || 'PO pushed to Zoho', 'success');
