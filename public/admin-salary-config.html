@@ -617,10 +617,10 @@
                 <tr>
                     <td>${escapeVis(config.staff_name)}</td>
                     <td>${escapeVis(config.branch_name)}</td>
-                    <td class="money">₹${parseFloat(config.monthly_salary).toLocaleString('en-IN', {minimumFractionDigits: 2})}</td>
-                    <td class="money">₹${parseFloat(config.hourly_rate).toLocaleString('en-IN', {minimumFractionDigits: 2})}</td>
+                    <td class="money">₹${(parseFloat(config.monthly_salary) || 0).toLocaleString('en-IN', {minimumFractionDigits: 2})}</td>
+                    <td class="money">₹${(parseFloat(config.hourly_rate) || 0).toLocaleString('en-IN', {minimumFractionDigits: 2})}</td>
                     <td>${config.overtime_multiplier}x</td>
-                    <td class="money">₹${(parseFloat(config.transport_allowance) + parseFloat(config.food_allowance) + parseFloat(config.other_allowance)).toLocaleString('en-IN', {minimumFractionDigits: 2})}</td>
+                    <td class="money">₹${((parseFloat(config.transport_allowance) || 0) + (parseFloat(config.food_allowance) || 0) + (parseFloat(config.other_allowance) || 0)).toLocaleString('en-IN', {minimumFractionDigits: 2})}</td>
                     <td>${new Date(config.effective_from).toLocaleDateString('en-IN')}</td>
                     <td>
                         <span class="badge ${config.is_active ? 'badge-success' : 'badge-secondary'}">

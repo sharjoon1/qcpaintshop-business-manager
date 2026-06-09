@@ -274,7 +274,9 @@
         btn.disabled = true; btn.textContent = 'Submitting…';
         try {
           var data = await EP.cart.submit({ project_name: project, location: location, additional_notes: notes });
-          if (!data) return;
+          // PAGE-310: cart.submit returns null on a swallowed 401/403 (e.g. pending/suspended engineer).
+          // Don't bail silently — tell the user why nothing happened.
+          if (!data) { EP.toast('Could not submit — your engineer account may be pending approval, or your session expired. Please sign in again.', 'err'); return; }
           document.getElementById('cartView').style.display = 'none';
           document.getElementById('emptyState').style.display = 'none';
           document.getElementById('successRef').textContent = data.request_number || '—';

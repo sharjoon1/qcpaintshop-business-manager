@@ -225,6 +225,8 @@
 
     <script>
         function esc(s){ if(s===null||s===undefined) return ''; const d=document.createElement('div'); d.textContent=String(s); return d.innerHTML; }
+        // PAGE-174: tolerate malformed/empty products_json so a bad row can't break the whole detail render.
+        function safeItems(j){ try { const p = JSON.parse(j); return (p && Array.isArray(p.items)) ? p.items : []; } catch(e){ return []; } }
 
         const API_BASE = '/api';
         let currentRequest = null;
@@ -455,7 +457,7 @@
                         ` : ''}
 
                         <!-- Selected Products (if product-based request) -->
-                        ${req.products_json ? `
+                        ${safeItems(req.products_json).length ? `
                         <div>
                             <h4 class="text-lg font-semibold text-gray-800 mb-3">🎨 Selected Products</h4>
                             <div class="bg-blue-50 border border-blue-200 rounded-lg p-4">
@@ -463,7 +465,7 @@
                                     <p class="text-sm font-semibold text-blue-900">
                                         Request Method: ${req.request_method === 'product_available' ? '✓ Currently Available Products' : req.request_method === 'product_custom' ? '⚙️ Custom/Should Produce' : 'Product-Based'}
                                     </p>
-                                    <span class="text-xs bg-blue-200 text-blue-800 px-2 py-1 rounded">${JSON.parse(req.products_json).items.length} products</span>
+                                    <span class="text-xs bg-blue-200 text-blue-800 px-2 py-1 rounded">${safeItems(req.products_json).length} products</span>
                                 </div>
                                 <div class="overflow-x-auto">
                                     <table class="w-full text-sm">
@@ -477,7 +479,7 @@
                                             </tr>
                                         </thead>
                                         <tbody class="bg-white">
-                                            ${JSON.parse(req.products_json).items.map((item, idx) => `
+                                            ${safeItems(req.products_json).map((item, idx) => `
                                                 <tr class="border-t border-blue-200">
                                                     <td class="px-3 py-2">${idx + 1}</td>
                                                     <td class="px-3 py-2 font-medium text-gray-900">${esc(item.product_name)}</td>

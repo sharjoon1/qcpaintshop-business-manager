@@ -719,7 +719,7 @@
 
             document.getElementById('regularBalance').textContent = b.regular.toFixed(2);
             document.getElementById('annualBalance').textContent = b.annual.toFixed(2);
-            document.getElementById('totalEarned').textContent = (b.totalEarnedRegular + b.totalEarnedAnnual).toFixed(0);
+            document.getElementById('totalEarned').textContent = ((parseFloat(b.totalEarnedRegular) || 0) + (parseFloat(b.totalEarnedAnnual) || 0)).toFixed(0);
             document.getElementById('referralCount').textContent = data.dashboard.referralCount;
             document.getElementById('referralCode').textContent = data.dashboard.referralCode || '---';
 
