@@ -4,7 +4,8 @@ module.exports = {
     collectCoverageFrom: [
         'middleware/**/*.js',
         'config/**/*.js',
-        'services/anomaly-detector.js'
+        'routes/**/*.js',
+        'services/**/*.js'
     ],
     coverageDirectory: 'coverage',
     verbose: true,

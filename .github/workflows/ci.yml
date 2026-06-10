@@ -1,0 +1,37 @@
+# CI: lint + unit tests + CSS build on every push/PR to master.
+#
+# Notes:
+# - `npm install` (not `npm ci`): package-lock.json is gitignored in this repo.
+# - Unit tests only: tests/integration/ requires a real MySQL DB from .env and
+#   does not self-skip; it stays a local/dev concern until a CI DB is set up.
+# - postinstall already runs build:css non-fatally; the explicit step below
+#   makes a Tailwind build failure FAIL the pipeline instead of being swallowed.
+name: CI
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: '.nvmrc'
+
+      - name: Install dependencies
+        run: npm install --no-audit --no-fund
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Unit tests
+        run: npx jest tests/unit --ci
+
+      - name: Build CSS
+        run: npm run build:css
