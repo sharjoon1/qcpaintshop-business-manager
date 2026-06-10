@@ -41,29 +41,6 @@ async function getBalance(painterId) {
 async function addPoints(painterId, pointPool, amount, source, refId, refType, description, createdBy) {
     if (amount <= 0) return;
 
-    // Net out pending clawbacks first (regular pool only)
-    if (pointPool === 'regular' && amount > 0) {
-        const [pending] = await pool.query(
-            'SELECT id, amount FROM painter_clawback_pending WHERE painter_id=? AND settled_at IS NULL ORDER BY created_at',
-            [painterId]
-        );
-        let remaining = amount;
-        for (const row of pending) {
-            if (remaining <= 0) break;
-            const deduct = Math.min(remaining, row.amount);
-            if (deduct === row.amount) {
-                await pool.query('UPDATE painter_clawback_pending SET settled_at=NOW() WHERE id=?', [row.id]);
-            } else {
-                await pool.query('UPDATE painter_clawback_pending SET amount = amount - ? WHERE id=?', [deduct, row.id]);
-            }
-            remaining -= deduct;
-        }
-        if (remaining <= 0) {
-            return 0; // entire credit absorbed by clawbacks
-        }
-        amount = remaining;
-    }
-
     const conn = await pool.getConnection();
     try {
         await conn.beginTransaction();
@@ -73,16 +50,70 @@ async function addPoints(painterId, pointPool, amount, source, refId, refType, d
         if (!painter.length) throw new Error('Painter not found');
 
         const currentBalance = parseFloat(painter[0][`${pointPool}_points`]);
-        const newBalance = currentBalance + amount;
+        const earnBalance = currentBalance + amount;
 
-        // Insert ledger entry
+        // Ledger entry for the full earn (always visible, even when clawbacks
+        // absorb part or all of it — M2/Q-B2).
         await conn.query(
             `INSERT INTO painter_point_transactions (painter_id, pool, type, amount, balance_after, source, reference_id, reference_type, description, created_by)
              VALUES (?, ?, 'earn', ?, ?, ?, ?, ?, ?, ?)`,
-            [painterId, pointPool, amount, newBalance, source, refId || null, refType || null, description || null, createdBy || null]
+            [painterId, pointPool, amount, earnBalance, source, refId || null, refType || null, description || null, createdBy || null]
         );
 
-        // Update cached balance
+        // Net out pending clawbacks (regular pool only) — inside the same
+        // transaction (the old out-of-txn netting could race a concurrent award)
+        // and with a visible 'clawback' ledger entry instead of silently
+        // shrinking the earn (M2/Q-B2). settled_ledger_id links each settled
+        // pending row to the debit entry that consumed it.
+        let absorbed = 0;
+        if (pointPool === 'regular') {
+            const [pending] = await conn.query(
+                'SELECT id, amount FROM painter_clawback_pending WHERE painter_id=? AND settled_at IS NULL ORDER BY created_at FOR UPDATE',
+                [painterId]
+            );
+            let remaining = amount;
+            const settledIds = [];
+            let partial = null; // { id, deduct }
+            for (const row of pending) {
+                if (remaining <= 0) break;
+                const rowAmount = parseFloat(row.amount);
+                const deduct = Math.min(remaining, rowAmount);
+                if (deduct >= rowAmount) {
+                    settledIds.push(row.id);
+                } else {
+                    partial = { id: row.id, deduct };
+                }
+                remaining -= deduct;
+                absorbed += deduct;
+            }
+
+            if (absorbed > 0) {
+                const [clawIns] = await conn.query(
+                    `INSERT INTO painter_point_transactions (painter_id, pool, type, amount, balance_after, source, reference_id, reference_type, description, created_by)
+                     VALUES (?, 'regular', 'debit', ?, ?, 'clawback', ?, ?, ?, NULL)`,
+                    [painterId, -absorbed, earnBalance - absorbed, refId || null, refType || null,
+                     'Clawback settlement (netted against earn)']
+                );
+                const ledgerId = clawIns.insertId || null;
+                if (settledIds.length) {
+                    await conn.query(
+                        'UPDATE painter_clawback_pending SET settled_at=NOW(), settled_ledger_id=? WHERE id IN (?)',
+                        [ledgerId, settledIds]
+                    );
+                }
+                if (partial) {
+                    await conn.query(
+                        'UPDATE painter_clawback_pending SET amount = amount - ? WHERE id=?',
+                        [partial.deduct, partial.id]
+                    );
+                }
+            }
+        }
+
+        // Update cached balance. total_earned counts the FULL earn (the painter
+        // did earn it; the clawback settles an earlier over-award whose own
+        // total_earned contribution was never reversed).
+        const newBalance = earnBalance - absorbed;
         const poolCol = `${pointPool}_points`;
         const totalCol = `total_earned_${pointPool}`;
         await conn.query(
@@ -154,6 +185,20 @@ async function getLedger(painterId, pointPool, limit = 50, offset = 0) {
 // INVOICE PROCESSING
 // ═══════════════════════════════════════════
 
+/**
+ * True when an 'earn' ledger entry already exists for this painter/pool/source/
+ * invoice — makes each award step idempotent so a retried invoice (after a
+ * mid-processing failure, M1) never double-awards the parts that committed.
+ */
+async function invoiceAwardExists(painterId, pointPool, source, invoiceId) {
+    const [rows] = await pool.query(
+        `SELECT id FROM painter_point_transactions
+         WHERE painter_id = ? AND pool = ? AND source = ? AND reference_id = ? AND type = 'earn' LIMIT 1`,
+        [painterId, pointPool, source, String(invoiceId)]
+    );
+    return rows.length > 0;
+}
+
 async function processInvoice(painterId, invoice, billingType, createdBy) {
     // Atomically claim this invoice via INSERT IGNORE against the
     // UNIQUE (painter_id, invoice_id, attribution_type) constraint. If
@@ -161,17 +206,39 @@ async function processInvoice(painterId, invoice, billingType, createdBy) {
     // out — preventing the previous read-then-insert race where two
     // concurrent calls both passed the SELECT, both ran addPoints, and
     // double-awarded points before the late INSERT collision.
+    // zoho_invoice_id (optional) links the row to zoho_invoices so the credit
+    // overdue check (M3) can see its paid/unpaid state — callers that already
+    // know the Zoho invoice id (billing module, estimate push-to-Zoho) pass it.
     const [claimResult] = await pool.query(
         `INSERT IGNORE INTO painter_invoices_processed
-           (painter_id, invoice_id, invoice_number, invoice_date, invoice_total, billing_type, regular_points, annual_points, referral_points)
-         VALUES (?, ?, ?, ?, ?, ?, 0, 0, 0)`,
+           (painter_id, invoice_id, invoice_number, invoice_date, invoice_total, billing_type, zoho_invoice_id, regular_points, annual_points, referral_points)
+         VALUES (?, ?, ?, ?, ?, ?, ?, 0, 0, 0)`,
         [painterId, invoice.invoice_id, invoice.invoice_number || null, invoice.date || null,
-         parseFloat(invoice.total) || 0, billingType]
+         parseFloat(invoice.total) || 0, billingType, invoice.zoho_invoice_id || null]
     );
     if (claimResult.affectedRows === 0) {
         return { success: false, message: 'Invoice already processed', alreadyProcessed: true };
     }
     const claimedRowId = claimResult.insertId;
+
+    // M1: everything after the claim is fallible. On error, release the claim
+    // (compensating delete) so a retry can re-process; the per-award
+    // invoiceAwardExists guards make any committed parts of THIS attempt
+    // idempotent on that retry.
+    try {
+        return await _awardInvoicePoints(painterId, invoice, billingType, createdBy, claimedRowId);
+    } catch (err) {
+        try {
+            await pool.query('DELETE FROM painter_invoices_processed WHERE id = ?', [claimedRowId]);
+        } catch (cleanupErr) {
+            console.error(`[Points] CRITICAL: failed to release claim row ${claimedRowId} for invoice ${invoice.invoice_id} — manual retry needed:`, cleanupErr.message);
+        }
+        throw err;
+    }
+}
+
+async function _awardInvoicePoints(painterId, invoice, billingType, createdBy, claimedRowId) {
+    const billingSource = billingType === 'self' ? 'self_billing' : 'customer_billing';
 
     // Get product point rates
     const [rates] = await pool.query('SELECT * FROM painter_product_point_rates WHERE is_active = 1');
@@ -254,18 +321,20 @@ async function processInvoice(painterId, invoice, billingType, createdBy) {
         console.error('[Points] Daily bonus check failed:', e.message);
     }
 
-    // Award points (with level multiplier)
-    if (totalRegularPoints > 0) {
-        await addPointsWithMultiplier(painterId, 'regular', totalRegularPoints, billingType === 'self' ? 'self_billing' : 'customer_billing',
+    // Award points (with level multiplier). Each step is guarded by a ledger
+    // existence check (M1) so a retry after a partial failure skips the parts
+    // that already committed.
+    if (totalRegularPoints > 0 && !(await invoiceAwardExists(painterId, 'regular', billingSource, invoice.invoice_id))) {
+        await addPointsWithMultiplier(painterId, 'regular', totalRegularPoints, billingSource,
             invoice.invoice_id, 'invoice', `Invoice ${invoice.invoice_number || invoice.invoice_id}`, createdBy);
     }
-    if (totalAnnualPoints > 0) {
-        await addPointsWithMultiplier(painterId, 'annual', totalAnnualPoints, billingType === 'self' ? 'self_billing' : 'customer_billing',
+    if (totalAnnualPoints > 0 && !(await invoiceAwardExists(painterId, 'annual', billingSource, invoice.invoice_id))) {
+        await addPointsWithMultiplier(painterId, 'annual', totalAnnualPoints, billingSource,
             invoice.invoice_id, 'invoice', `Invoice ${invoice.invoice_number || invoice.invoice_id}`, createdBy);
     }
 
     // Award daily bonus points if applicable (apply level multiplier so Gold/Diamond painters keep their tier bonus)
-    if (dailyBonusPoints > 0) {
+    if (dailyBonusPoints > 0 && !(await invoiceAwardExists(painterId, 'regular', 'daily_bonus', invoice.invoice_id))) {
         await addPointsWithMultiplier(painterId, 'regular', dailyBonusPoints, 'daily_bonus',
             invoice.invoice_id, 'invoice', 'Daily bonus product multiplier', createdBy);
     }
@@ -278,22 +347,40 @@ async function processInvoice(painterId, invoice, billingType, createdBy) {
     );
     if (referral.length > 0) {
         const ref = referral[0];
-        const newBills = ref.total_bills + 1;
-        const tierPct = getReferralTier(newBills);
-        const invoiceTotal = parseFloat(invoice.total) || 0;
-        const refPoints = Math.round(invoiceTotal * (tierPct / 100) * 100) / 100;
-
-        if (refPoints > 0) {
-            await addPoints(ref.referrer_id, 'regular', refPoints, 'referral',
-                invoice.invoice_id, 'invoice', `Referral from painter #${painterId} - Invoice ${invoice.invoice_number || ''}`, createdBy);
-            totalReferralPoints = refPoints;
+        // M1: the referral award AND the total_bills increment are guarded
+        // together — a retried invoice must not bump the tier counter twice.
+        // Residual window (accepted): addPoints commits its own transaction, so
+        // if the painter_referrals UPDATE below fails right after it, the retry
+        // skips both and this bill never bumps total_bills.
+        const alreadyReferred = await invoiceAwardExists(ref.referrer_id, 'regular', 'referral', invoice.invoice_id);
+        if (alreadyReferred) {
+            // Retry after the award committed: surface the already-awarded
+            // amount so the re-inserted claim row doesn't record 0.
+            const [prior] = await pool.query(
+                `SELECT amount FROM painter_point_transactions
+                 WHERE painter_id = ? AND pool = 'regular' AND source = 'referral' AND reference_id = ? AND type = 'earn' LIMIT 1`,
+                [ref.referrer_id, String(invoice.invoice_id)]
+            );
+            if (prior.length) totalReferralPoints = parseFloat(prior[0].amount);
         }
+        if (!alreadyReferred) {
+            const newBills = ref.total_bills + 1;
+            const tierPct = getReferralTier(newBills);
+            const invoiceTotal = parseFloat(invoice.total) || 0;
+            const refPoints = Math.round(invoiceTotal * (tierPct / 100) * 100) / 100;
 
-        // Update referral record
-        await pool.query(
-            'UPDATE painter_referrals SET total_bills = ?, current_tier_pct = ?, total_referral_points = total_referral_points + ? WHERE id = ?',
-            [newBills, tierPct, refPoints, ref.id]
-        );
+            if (refPoints > 0) {
+                await addPoints(ref.referrer_id, 'regular', refPoints, 'referral',
+                    invoice.invoice_id, 'invoice', `Referral from painter #${painterId} - Invoice ${invoice.invoice_number || ''}`, createdBy);
+                totalReferralPoints = refPoints;
+            }
+
+            // Update referral record
+            await pool.query(
+                'UPDATE painter_referrals SET total_bills = ?, current_tier_pct = ?, total_referral_points = total_referral_points + ? WHERE id = ?',
+                [newBills, tierPct, refPoints, ref.id]
+            );
+        }
     }
 
     // Update the claim row with the computed point totals. The row was
@@ -363,9 +450,20 @@ async function _evaluateSlabs(periodType, periodLabel, periodStart, periodEnd) {
         );
         if (existing.length > 0) continue;
 
-        // Sum purchase total for this period
+        // Sum purchase total for this period. The same underlying Zoho invoice
+        // may appear as TWO rows for one painter (direct_billing + salesperson
+        // attribution — distinct invoice_id strings like ZINV-X-direct /
+        // ZINV-X-salesperson but the same zoho_invoice_id), so count each
+        // invoice once (M9/Q-B3). Rows without a zoho_invoice_id (EST-* estimate
+        // rows) are already unique per invoice_id.
         const [totals] = await pool.query(
-            'SELECT COALESCE(SUM(invoice_total), 0) as total FROM painter_invoices_processed WHERE painter_id = ? AND invoice_date BETWEEN ? AND ?',
+            `SELECT COALESCE(SUM(t.invoice_total), 0) AS total
+             FROM (
+                 SELECT MAX(invoice_total) AS invoice_total
+                 FROM painter_invoices_processed
+                 WHERE painter_id = ? AND invoice_date BETWEEN ? AND ?
+                 GROUP BY COALESCE(NULLIF(zoho_invoice_id, ''), invoice_id)
+             ) t`,
             [painter.id, periodStart, periodEnd]
         );
         const totalPurchase = parseFloat(totals[0].total);
@@ -417,15 +515,28 @@ async function checkOverdueCredits() {
 
     let processed = 0;
     for (const painter of painters) {
-        // Check oldest unpaid self-billing invoice
+        // Oldest UNPAID self-billing invoice (M3/Q-B1). Payment state lives on
+        // the linked Zoho invoice (zoho_invoices.balance). The Zoho link is
+        // pip.zoho_invoice_id where stamped (backfill rows, credit-flow
+        // estimate pushes), falling back to pip.invoice_id — the billing
+        // module passes the raw Zoho invoice id AS invoice_id. Rows with no
+        // resolvable link never count: confirm-payment EST-* rows are paid by
+        // definition (points only awarded after payment is recorded).
         const [oldest] = await pool.query(
-            `SELECT invoice_date, DATEDIFF(CURDATE(), invoice_date) as days_overdue
-             FROM painter_invoices_processed
-             WHERE painter_id = ? AND billing_type = 'self'
-             ORDER BY invoice_date ASC LIMIT 1`,
+            `SELECT pip.invoice_date, DATEDIFF(CURDATE(), pip.invoice_date) as days_overdue
+             FROM painter_invoices_processed pip
+             JOIN zoho_invoices zi
+               ON zi.zoho_invoice_id = COALESCE(NULLIF(pip.zoho_invoice_id, ''), pip.invoice_id)
+             WHERE pip.painter_id = ? AND pip.billing_type = 'self'
+               AND zi.balance > 0 AND zi.status NOT IN ('void', 'draft')
+             ORDER BY pip.invoice_date ASC LIMIT 1`,
             [painter.id]
         );
-        if (!oldest.length) continue;
+        if (!oldest.length) {
+            // Nothing unpaid — clear any stale overdue counter from earlier runs.
+            await pool.query('UPDATE painters SET credit_overdue_days = 0 WHERE id = ? AND credit_overdue_days <> 0', [painter.id]);
+            continue;
+        }
 
         const daysOverdue = oldest[0].days_overdue;
         await pool.query('UPDATE painters SET credit_overdue_days = ? WHERE id = ?', [daysOverdue, painter.id]);
@@ -458,11 +569,60 @@ async function checkOverdueCredits() {
                 }
             }
 
+            // M3/Q-B1: reduce credit_used by what was actually debited so the
+            // daily cron doesn't re-debit the same exposure tomorrow.
+            const debited = Math.round((amountToDebit - remaining) * 100) / 100;
+            if (debited > 0) {
+                await pool.query(
+                    'UPDATE painters SET credit_used = GREATEST(0, credit_used - ?) WHERE id = ?',
+                    [debited, painter.id]
+                );
+            }
+
             processed++;
         }
     }
 
     return { processed };
+}
+
+// ═══════════════════════════════════════════
+// BALANCE DRIFT CHECK (M5)
+// ═══════════════════════════════════════════
+
+/**
+ * Compares each painter's denormalized balances (painters.regular_points /
+ * annual_points) against the SUM of their ledger entries. A mismatch beyond a
+ * rounding epsilon means some write path skipped the ledger (or vice versa) —
+ * report it, never auto-fix.
+ */
+async function checkPointsDrift() {
+    const [drifted] = await pool.query(
+        `SELECT * FROM (
+             SELECT p.id, p.full_name,
+                    p.regular_points, p.annual_points,
+                    COALESCE(l.ledger_regular, 0) AS ledger_regular,
+                    COALESCE(l.ledger_annual, 0) AS ledger_annual
+             FROM painters p
+             LEFT JOIN (
+                 SELECT painter_id,
+                        SUM(CASE WHEN pool = 'regular' THEN amount ELSE 0 END) AS ledger_regular,
+                        SUM(CASE WHEN pool = 'annual' THEN amount ELSE 0 END) AS ledger_annual
+                 FROM painter_point_transactions
+                 GROUP BY painter_id
+             ) l ON l.painter_id = p.id
+         ) x
+         WHERE ABS(x.regular_points - x.ledger_regular) > 0.01
+            OR ABS(x.annual_points - x.ledger_annual) > 0.01`
+    );
+    for (const p of drifted) {
+        console.error(
+            `[Points] DRIFT painter ${p.id} (${p.full_name}): ` +
+            `regular ${p.regular_points} vs ledger ${p.ledger_regular}; ` +
+            `annual ${p.annual_points} vs ledger ${p.ledger_annual}`
+        );
+    }
+    return { drifted: drifted.length, painters: drifted };
 }
 
 // ═══════════════════════════════════════════
@@ -630,6 +790,7 @@ module.exports = {
     evaluateMonthlySlabs,
     evaluateQuarterlySlabs,
     checkOverdueCredits,
+    checkPointsDrift,
     requestWithdrawal,
     processWithdrawal,
     awardAttendancePoints,

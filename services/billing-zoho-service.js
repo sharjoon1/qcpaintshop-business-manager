@@ -164,6 +164,7 @@ async function pushInvoiceToZoho(invoiceId, userId) {
             const invoiceForPoints = {
                 invoice_id: zohoInvoiceId,
                 invoice_number: zohoInvoiceNumber,
+                zoho_invoice_id: zohoInvoiceId, // explicit Zoho link for the credit overdue check (M3)
                 date: invoiceDate,
                 total: parseFloat(invoice.grand_total),
                 line_items: items.map(item => ({

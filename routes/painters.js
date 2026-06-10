@@ -4935,6 +4935,10 @@ router.post('/estimates/:estimateId/push-zoho', requirePermission('painters', 'e
                     // can't double-award points if confirm-payment partially succeeded.
                     invoice_id: `EST-${estimate.id}`,
                     invoice_number: invoiceNumber || estimate.estimate_number || `EST-${estimate.id}`,
+                    // Points at push time = credit purchase (not yet paid) — link
+                    // the Zoho invoice so the credit overdue check (M3) can track
+                    // its balance until it's actually paid.
+                    zoho_invoice_id: invoiceId !== 'unknown' ? invoiceId : null,
                     date: new Date().toISOString().split('T')[0],
                     total: parseFloat(estimate.grand_total),
                     line_items: items.map(i => ({
