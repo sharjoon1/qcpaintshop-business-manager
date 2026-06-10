@@ -326,8 +326,17 @@ async function remindUnclaimed(monthKey) {
 }
 
 async function forfeitAndPurge(monthKey, purgeMonthKey) {
+    // Only forfeit windows that have actually CLOSED. A window opened late by
+    // the M4 startup catch-up may still be open when the 8th-of-month cron (or
+    // a catch-up forfeit) fires — cutting it short would eat the painter's AP;
+    // claimMonth enforces closes_at, so leaving it open leaks nothing. The
+    // month_key <= ? sweep also forfeits expired stragglers from earlier
+    // months (e.g. a late window that was still open on its own forfeit day).
+    // NULL closes_at (legacy rows) is treated as closed.
     const [unclaimed] = await pool.query(
-        "SELECT id, painter_id FROM painter_attendance_monthly WHERE month_key=? AND claim_status='available'",
+        `SELECT id, painter_id, month_key FROM painter_attendance_monthly
+         WHERE month_key <= ? AND claim_status='available'
+           AND (claim_window_closes_at IS NULL OR claim_window_closes_at <= NOW())`,
         [monthKey]
     );
     for (const m of unclaimed) {
@@ -338,7 +347,7 @@ async function forfeitAndPurge(monthKey, purgeMonthKey) {
         await pool.query(
             `INSERT INTO painter_attendance_ledger (painter_id, month_key, type, ap_delta, reason)
              VALUES (?, ?, 'forfeit', 0, 'Claim window closed unclaimed')`,
-            [m.painter_id, monthKey]
+            [m.painter_id, m.month_key]
         );
     }
 
