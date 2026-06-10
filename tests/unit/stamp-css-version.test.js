@@ -58,3 +58,46 @@ describe('stampHtml (SYS-007)', () => {
         expect(stampHtml(once, V)).toBe(once);
     });
 });
+
+// F2 — JS cache-busting: same content-hash scheme for local script src links.
+const VJ = {
+    ...V,
+    '/js/auth-helper.js': 'dddd4444',
+    '/js/qc-ui.js': 'eeee5555',
+    '/universal-nav-loader.js': 'ffff6666',
+};
+
+describe('stampHtml — JS script src (F2)', () => {
+    test('stamps an unversioned local /js/ script src', () => {
+        expect(stampHtml('<script src="/js/auth-helper.js"></script>', VJ))
+            .toBe('<script src="/js/auth-helper.js?v=dddd4444"></script>');
+    });
+
+    test('re-stamps an already-versioned script without doubling', () => {
+        expect(stampHtml('<script src="/js/auth-helper.js?v=deadbeef"></script>', VJ))
+            .toBe('<script src="/js/auth-helper.js?v=dddd4444"></script>');
+    });
+
+    test('stamps a known root-level script (universal-nav-loader)', () => {
+        expect(stampHtml('<script src="/universal-nav-loader.js"></script>', VJ))
+            .toBe('<script src="/universal-nav-loader.js?v=ffff6666"></script>');
+    });
+
+    test('leaves external CDN and unknown-path scripts untouched', () => {
+        const cdn = '<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.min.js"></script>';
+        const sio = '<script src="/socket.io/socket.io.js"></script>';
+        expect(stampHtml(cdn, VJ)).toBe(cdn);
+        expect(stampHtml(sio, VJ)).toBe(sio);
+    });
+
+    test('stamps css href and js src together in one document', () => {
+        const inp = '<link href="/css/tailwind.css"><script src="/js/qc-ui.js"></script>';
+        expect(stampHtml(inp, VJ))
+            .toBe('<link href="/css/tailwind.css?v=aaaa1111"><script src="/js/qc-ui.js?v=eeee5555"></script>');
+    });
+
+    test('a css-only map still leaves js src untouched (backward compatible)', () => {
+        const inp = '<script src="/js/auth-helper.js"></script>';
+        expect(stampHtml(inp, V)).toBe(inp);
+    });
+});
