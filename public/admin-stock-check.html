@@ -18,6 +18,7 @@
     <script src="/universal-nav-loader.js?v=fb16cb40"></script>
     <script src="/js/auth-helper.js?v=7101c516"></script>
     <script src="/js/stock-filters.js?v=c951d5f4"></script>
+    <script src="/js/qc-escape.js?v=32133ff2"></script>
     <script>requireAdminOrRedirect();</script>
     <style>
         body { background: #f9fafb; }
@@ -688,7 +689,7 @@ async function init() {
     // Load branches for assign + history
     const brRes = await apiFetch('/api/branches/list');
     if (brRes.success) {
-        const opts = brRes.data.map(b => `<option value="${b.id}">${b.name}</option>`).join('');
+        const opts = brRes.data.map(b => `<option value="${b.id}">${escDiscHtml(b.name)}</option>`).join('');
         document.getElementById('assignBranch').innerHTML = '<option value="">Select Branch</option>' + opts;
         document.getElementById('histBranch').innerHTML = '<option value="">All</option>' + opts;
         document.getElementById('suggestBranch').innerHTML = '<option value="">Select Branch</option>' + opts;
@@ -733,12 +734,12 @@ async function loadBranchData() {
 
     if (staffRes.success && staffRes.data && staffRes.data.staff) {
         staffSel.innerHTML = '<option value="">Select Staff</option>' +
-            staffRes.data.staff.map(s => `<option value="${s.id}">${s.full_name}</option>`).join('');
+            staffRes.data.staff.map(s => `<option value="${s.id}">${escDiscHtml(s.full_name)}</option>`).join('');
     }
 
     if (locRes.success && locRes.data && locRes.data.length) {
         locSel.innerHTML = '<option value="">Select Location</option>' +
-            locRes.data.map(l => `<option value="${l.zoho_location_id}">${l.zoho_location_name}</option>`).join('');
+            locRes.data.map(l => `<option value="${escDiscHtml(l.zoho_location_id)}">${escDiscHtml(l.zoho_location_name)}</option>`).join('');
         // Auto-select if only one location
         if (locRes.data.length === 1) locSel.value = locRes.data[0].zoho_location_id;
     } else {
@@ -767,10 +768,10 @@ function searchProducts() {
             container.innerHTML = res.data
                 .filter(item => !selectedItems.find(s => s.zoho_item_id === item.zoho_item_id))
                 .map(item => `
-                    <div class="product-search-item" onclick="addProduct('${item.zoho_item_id}', '${(item.item_name || '').replace(/'/g, "\\'")}', '${(item.sku || '').replace(/'/g, "\\'")}', ${item.stock_on_hand || 0})">
+                    <div class="product-search-item" onclick="addProduct('${escAttr(escJS(item.zoho_item_id))}', '${escAttr(escJS(item.item_name || ''))}', '${escAttr(escJS(item.sku || ''))}', ${Number(item.stock_on_hand) || 0})">
                         <div style="display:flex; justify-content:space-between; width:100%;">
-                            <span>${item.item_name} <span class="text-gray-400">${item.sku || ''}</span></span>
-                            <span class="text-xs text-gray-500">Qty: ${item.stock_on_hand || 0}</span>
+                            <span>${escDiscHtml(item.item_name)} <span class="text-gray-400">${escDiscHtml(item.sku || '')}</span></span>
+                            <span class="text-xs text-gray-500">Qty: ${Number(item.stock_on_hand) || 0}</span>
                         </div>
                         <div style="margin-top:2px;">${daysAgoLabel(item.last_checked)}</div>
                     </div>
@@ -804,10 +805,10 @@ function renderSelectedProducts() {
     if (!selectedItems.length) { el.innerHTML = '<p class="text-xs text-gray-400">No products selected</p>'; return; }
     el.innerHTML = selectedItems.map(item => `
         <div class="selected-item">
-            <span>${item.item_name} <span class="text-gray-400 text-xs">${item.sku || ''}</span></span>
+            <span>${escDiscHtml(item.item_name)} <span class="text-gray-400 text-xs">${escDiscHtml(item.sku || '')}</span></span>
             <div class="flex items-center gap-2">
-                <span class="text-xs text-gray-500">Sys: ${item.stock_on_hand}</span>
-                <button class="remove-btn" onclick="removeProduct('${item.zoho_item_id}')">&times;</button>
+                <span class="text-xs text-gray-500">Sys: ${escDiscHtml(item.stock_on_hand)}</span>
+                <button class="remove-btn" onclick="removeProduct('${escAttr(escJS(item.zoho_item_id))}')">&times;</button>
             </div>
         </div>
     `).join('');
@@ -998,16 +999,16 @@ function renderInventory() {
         const invMeta = [it.brand, it.category].filter(Boolean).join(' · ');
         return `<tr class="${isAdded ? 'inv-row-added' : ''}">
             <td><input type="checkbox" class="w-3.5 h-3.5 rounded border-gray-300 text-indigo-600 inv-chk"
-                 data-id="${it.zoho_item_id}" ${isChecked ? 'checked' : ''} ${isAdded ? 'disabled' : ''}
-                 onchange="toggleInvCheck('${it.zoho_item_id}')"></td>
-            <td class="font-medium">${it.item_name || '-'}${invMeta ? '<div class="item-meta">' + invMeta + '</div>' : ''}</td>
-            <td class="text-xs text-gray-400">${it.sku || '-'}</td>
+                 data-id="${escAttr(it.zoho_item_id)}" ${isChecked ? 'checked' : ''} ${isAdded ? 'disabled' : ''}
+                 onchange="toggleInvCheck('${escAttr(escJS(it.zoho_item_id))}')"></td>
+            <td class="font-medium">${escDiscHtml(it.item_name || '-')}${invMeta ? '<div class="item-meta">' + escDiscHtml(invMeta) + '</div>' : ''}</td>
+            <td class="text-xs text-gray-400">${escDiscHtml(it.sku || '-')}</td>
             <td class="text-xs">₹${(it.price || 0).toLocaleString('en-IN')}</td>
-            <td>${it.stock_on_hand ?? 0}</td>
+            <td>${escDiscHtml(it.stock_on_hand ?? 0)}</td>
             <td>${daysAgoLabel(it.last_checked)}</td>
             <td>${isAdded
                 ? '<span class="text-xs text-gray-400 font-medium">Added</span>'
-                : '<button onclick="addFromInventory(\'' + it.zoho_item_id + '\')" class="text-xs text-indigo-600 hover:text-indigo-800 font-medium">+ Add</button>'
+                : '<button onclick="addFromInventory(\'' + escAttr(escJS(it.zoho_item_id)) + '\')" class="text-xs text-indigo-600 hover:text-indigo-800 font-medium">+ Add</button>'
             }</td>
         </tr>`;
     }).join('');
@@ -1198,7 +1199,7 @@ async function loadReviewList() {
                         <td>${a.discrepancy_count > 0 ? '<span class="diff-negative">' + a.discrepancy_count + '</span>' : '<span class="diff-zero">0</span>'}</td>
                         <td>${isPartial
                             ? '<span class="status-badge" style="background:#fff7ed;color:#c2410c;">Partial</span>'
-                            : '<span class="status-badge status-' + a.status + '">' + a.status + '</span>'}</td>
+                            : '<span class="status-badge status-' + escDiscHtml(a.status) + '">' + escDiscHtml(a.status) + '</span>'}</td>
                         <td class="text-xs text-gray-500">${a.submitted_at ? new Date(a.submitted_at).toLocaleString() : '-'}</td>
                         <td><button onclick="openReview(${a.id})" class="px-2 py-1 bg-indigo-50 text-indigo-700 rounded text-xs font-medium hover:bg-indigo-100">Review</button></td>
                     </tr>`;
@@ -1238,13 +1239,13 @@ async function openReview(id) {
 
     let html = `
         <div class="mb-3">
-            <span class="text-xs text-gray-500">Staff: <strong>${d.staff_name || '-'}</strong></span>
+            <span class="text-xs text-gray-500">Staff: <strong>${escDiscHtml(d.staff_name || '-')}</strong></span>
             <span class="mx-2 text-gray-300">|</span>
-            <span class="text-xs text-gray-500">Location: <strong>${d.location_name || '-'}</strong></span>
+            <span class="text-xs text-gray-500">Location: <strong>${escDiscHtml(d.location_name || '-')}</strong></span>
             <span class="mx-2 text-gray-300">|</span>
-            <span class="text-xs text-gray-500">Status: <span class="status-badge status-${d.status}">${d.status}</span></span>
+            <span class="text-xs text-gray-500">Status: <span class="status-badge status-${escDiscHtml(d.status)}">${escDiscHtml(d.status)}</span></span>
             ${d.request_type === 'self_requested' ? '<span class="mx-2 text-gray-300">|</span><span class="badge-self">Self-Requested</span>' : ''}
-            ${d.requested_reason ? '<div class="mt-2 text-xs text-gray-600 bg-amber-50 rounded px-2 py-1"><strong>Reason:</strong> ' + d.requested_reason + '</div>' : ''}
+            ${d.requested_reason ? '<div class="mt-2 text-xs text-gray-600 bg-amber-50 rounded px-2 py-1"><strong>Reason:</strong> ' + escDiscHtml(d.requested_reason) + '</div>' : ''}
         </div>
 
         <div class="grid grid-cols-3 sm:grid-cols-6 gap-2 mb-4">
@@ -1299,7 +1300,7 @@ async function openReview(id) {
     if (d.status === 'cancelled') {
         html += `
             <div class="flex gap-2 mt-4 pt-3 border-t border-gray-200 items-center">
-                <span class="text-xs text-red-600 font-medium">Cancelled${d.cancel_reason ? ': ' + d.cancel_reason : ''}</span>
+                <span class="text-xs text-red-600 font-medium">Cancelled${d.cancel_reason ? ': ' + escDiscHtml(d.cancel_reason) : ''}</span>
                 ${reopenBtn}
             </div>
         `;
@@ -1547,7 +1548,7 @@ async function loadHistory(page) {
                     const isPartial = a.status === 'pending' && hasAdjusted;
                     const statusHtml = isPartial
                         ? '<span class="status-badge" style="background:#f3e8ff;color:#7c3aed;">Partial (' + a.adjusted_count + '/' + a.item_count + ')</span>'
-                        : '<span class="status-badge status-' + a.status + '">' + a.status + '</span>';
+                        : '<span class="status-badge status-' + escDiscHtml(a.status) + '">' + escDiscHtml(a.status) + '</span>';
                     return `<tr>
                     <td>${a.id}</td>
                     <td>${escDiscHtml(a.branch_name) || '-'}</td>

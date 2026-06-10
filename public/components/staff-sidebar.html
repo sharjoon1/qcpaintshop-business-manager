@@ -1058,7 +1058,14 @@ function loadSidebarUserInfo() {
     const initialEl = document.getElementById('sidebarInitial');
 
     if (user.profile_image_url) {
-        avatarEl.innerHTML = `<img src="${user.profile_image_url}" alt="Profile">`;
+        // Escape for the attribute context (F1). Always use this local strict
+        // escaper: some host pages define a window.escHtml that doesn't encode
+        // quotes (textContent→innerHTML trick) — unsafe inside a double-quoted
+        // attribute, so never delegate to the host's helper here.
+        const escSafe = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({
+            '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+        }[c]));
+        avatarEl.innerHTML = `<img src="${escSafe(user.profile_image_url)}" alt="Profile">`;
     } else if (user.full_name && initialEl) {
         initialEl.textContent = user.full_name.charAt(0).toUpperCase();
     }

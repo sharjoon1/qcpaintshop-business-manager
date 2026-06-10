@@ -71,6 +71,7 @@
         </div>
     </div>
 
+    <script src="/js/qc-escape.js?v=32133ff2"></script>
     <script>
     const API = '/api/painters';
 
@@ -223,8 +224,8 @@
         const colors = { warning: 'bg-yellow-50 text-yellow-800', error: 'bg-red-50 text-red-800', success: 'bg-green-50 text-green-800' };
         document.getElementById('statusContent').innerHTML = `
             <div class="status-card ${colors[type]}">
-                <h3 class="text-lg font-semibold mb-2">${title}</h3>
-                <p class="text-sm">${message}</p>
+                <h3 class="text-lg font-semibold mb-2">${escHtml(title)}</h3>
+                <p class="text-sm">${escHtml(message)}</p>
             </div>
         `;
     }

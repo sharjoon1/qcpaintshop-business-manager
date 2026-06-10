@@ -80,6 +80,7 @@
     </div>
 </div>
 
+<script src="/js/qc-escape.js?v=32133ff2"></script>
 <script>
 const token = window.location.pathname.split('/').pop();
 
@@ -101,7 +102,7 @@ async function loadSharedDesignRequest() {
         const statusMap = { 'new': 'New', 'contacted': 'Under Review', 'quote_sent': 'Quote Sent', 'accepted': 'Accepted', 'rejected': 'Rejected', 'completed': 'Completed' };
         const statusColors = { 'new': 'bg-blue-100 text-blue-800', 'contacted': 'bg-yellow-100 text-yellow-800', 'quote_sent': 'bg-purple-100 text-purple-800', 'accepted': 'bg-green-100 text-green-800', 'completed': 'bg-green-100 text-green-800' };
         const status = resource.status || 'new';
-        document.getElementById('drStatus').innerHTML = `<span class="px-3 py-1 rounded-full text-xs font-semibold ${statusColors[status] || 'bg-gray-100 text-gray-800'}">${statusMap[status] || status}</span>`;
+        document.getElementById('drStatus').innerHTML = `<span class="px-3 py-1 rounded-full text-xs font-semibold ${statusColors[status] || 'bg-gray-100 text-gray-800'}">${escHtml(statusMap[status] || status)}</span>`;
 
         // Photos
         const photos = resource.photos || resource.photo_urls;
@@ -110,8 +111,9 @@ async function loadSharedDesignRequest() {
             try { photoArr = typeof photos === 'string' ? JSON.parse(photos) : photos; } catch {}
             if (photoArr.length > 0) {
                 document.getElementById('photosGrid').innerHTML = photoArr.map(url => {
-                    const safeUrl = url.replace(/"/g, '&quot;').replace(/'/g, '&#39;');
-                    return `<img src="${safeUrl}" class="w-full h-40 object-cover rounded-lg shadow" onclick="window.open('${safeUrl}', '_blank')" style="cursor: pointer;">`;
+                    const srcAttr = escAttr(url);
+                    const openArg = escAttr(escJS(url)); // JS string inside an HTML attribute
+                    return `<img src="${srcAttr}" class="w-full h-40 object-cover rounded-lg shadow" onclick="window.open('${openArg}', '_blank')" style="cursor: pointer;">`;
                 }).join('');
                 document.getElementById('photosSection').style.display = 'block';
             }

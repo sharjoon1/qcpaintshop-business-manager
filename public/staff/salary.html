@@ -11,6 +11,7 @@
     <link rel="apple-touch-icon" href="/icons/icon-192x192.png">
     <title>My Salary - Quality Colours</title>
     <script src="/js/auth-helper.js?v=7101c516"></script>
+    <script src="/js/qc-escape.js?v=32133ff2"></script>
     <script>checkAuthOrRedirect();</script>
     <link rel="stylesheet" href="/css/tailwind.css?v=849f1b5c">
     <link rel="stylesheet" href="/css/design-system.css?v=876c7d73">
@@ -192,7 +193,7 @@
                 unpaid: 'badge-warning',
                 partial: 'badge-warning'
             };
-            return `<span class="badge ${map[status] || 'badge-info'}">${status}</span>`;
+            return `<span class="badge ${map[status] || 'badge-info'}">${escHtml(status)}</span>`;
         }
 
         async function loadLeaveBalance() {
@@ -266,10 +267,10 @@
                     const c = data.data;
                     document.getElementById('configContent').innerHTML = `
                         <div class="info-row"><span style="color:#6b7280;">Base Salary</span><span class="amount">${formatCurrency(c.monthly_salary)}</span></div>
-                        <div class="info-row"><span style="color:#6b7280;">Branch</span><span style="font-weight:600;">${c.branch_name}</span></div>
-                        <div class="info-row"><span style="color:#6b7280;">Daily Hours</span><span style="font-weight:600;">${c.standard_daily_hours}h</span></div>
-                        <div class="info-row"><span style="color:#6b7280;">Sunday Hours</span><span style="font-weight:600;">${c.sunday_hours}h</span></div>
-                        <div class="info-row"><span style="color:#6b7280;">OT Multiplier</span><span style="font-weight:600;">${c.overtime_multiplier}x</span></div>
+                        <div class="info-row"><span style="color:#6b7280;">Branch</span><span style="font-weight:600;">${escHtml(c.branch_name)}</span></div>
+                        <div class="info-row"><span style="color:#6b7280;">Daily Hours</span><span style="font-weight:600;">${escHtml(c.standard_daily_hours)}h</span></div>
+                        <div class="info-row"><span style="color:#6b7280;">Sunday Hours</span><span style="font-weight:600;">${escHtml(c.sunday_hours)}h</span></div>
+                        <div class="info-row"><span style="color:#6b7280;">OT Multiplier</span><span style="font-weight:600;">${escHtml(c.overtime_multiplier)}x</span></div>
                         <div class="info-row"><span style="color:#6b7280;">Transport</span><span style="font-weight:600;">${formatCurrency(c.transport_allowance)}</span></div>
                         <div class="info-row"><span style="color:#6b7280;">Food</span><span style="font-weight:600;">${formatCurrency(c.food_allowance)}</span></div>
                         <div class="info-row"><span style="color:#6b7280;">Effective From</span><span style="font-weight:600;">${new Date(c.effective_from).toLocaleDateString()}</span></div>
@@ -301,7 +302,7 @@
                             <div class="amount" style="font-size:32px;">${formatCurrency(netSalary)}</div>
                             <div style="color:#6b7280;font-size:13px;margin-top:4px;">Net Salary ${statusBadge(s.payment_status || s.status)}</div>
                         </div>
-                        <div class="info-row"><span style="color:#6b7280;">Working Days</span><span style="font-weight:600;">${s.total_present_days || 0} / ${s.total_working_days || 0}</span></div>
+                        <div class="info-row"><span style="color:#6b7280;">Working Days</span><span style="font-weight:600;">${escHtml(s.total_present_days || 0)} / ${escHtml(s.total_working_days || 0)}</span></div>
                         <div class="info-row"><span style="color:#6b7280;">Standard Hours</span><span style="font-weight:600;">${parseFloat(s.total_standard_hours || 0).toFixed(1)}h</span></div>
                         <div class="info-row"><span style="color:#6b7280;">Sunday Hours</span><span style="font-weight:600;">${parseFloat(s.total_sunday_hours || 0).toFixed(1)}h</span></div>
                         <div class="info-row"><span style="color:#6b7280;">Overtime Hours</span><span style="font-weight:600;">${parseFloat(s.total_overtime_hours || 0).toFixed(1)}h</span></div>
@@ -312,7 +313,7 @@
                         <div class="info-row"><span style="color:#6b7280;">Sunday Pay</span><span style="font-weight:600;">${formatCurrency(s.sunday_hours_pay)}</span></div>
                         <div class="info-row"><span style="color:#6b7280;">Overtime Pay</span><span style="font-weight:600;">${formatCurrency(s.overtime_pay)}</span></div>
                         <div class="info-row"><span style="color:#6b7280;">Allowances</span><span style="font-weight:600;color:#10b981;">+${formatCurrency(s.total_allowances)}</span></div>
-                        ${parseFloat(s.leave_deduction || 0) > 0 ? `<div class="info-row"><span style="color:#6b7280;">Leave Deduction (${s.excess_leaves || 0} days)</span><span style="font-weight:600;color:#ef4444;">-${formatCurrency(s.leave_deduction)}</span></div>` : ''}
+                        ${parseFloat(s.leave_deduction || 0) > 0 ? `<div class="info-row"><span style="color:#6b7280;">Leave Deduction (${escHtml(s.excess_leaves || 0)} days)</span><span style="font-weight:600;color:#ef4444;">-${formatCurrency(s.leave_deduction)}</span></div>` : ''}
                         <div class="info-row"><span style="color:#6b7280;">Total Deductions</span><span style="font-weight:600;color:#ef4444;">-${formatCurrency(s.total_deductions)}</span></div>
                         <div class="info-row"><span style="color:#6b7280;">Paid Amount</span><span style="font-weight:600;">${formatCurrency(s.paid_amount)}</span></div>
                     `;
@@ -344,7 +345,7 @@
                             <div style="display:flex;justify-content:space-between;align-items:center;padding:12px 0;border-bottom:1px solid #f3f4f6;">
                                 <div>
                                     <div style="font-weight:600;color:#1f2937;">${formatMonth(s.salary_month)}</div>
-                                    <div style="font-size:12px;color:#6b7280;">${s.total_present_days || 0} days worked</div>
+                                    <div style="font-size:12px;color:#6b7280;">${escHtml(s.total_present_days || 0)} days worked</div>
                                 </div>
                                 <div style="text-align:right;">
                                     <div style="font-weight:700;color:#1f2937;">${formatCurrency(net)}</div>
@@ -371,11 +372,11 @@
                         <div style="display:flex;justify-content:space-between;align-items:center;padding:12px 0;border-bottom:1px solid #f3f4f6;">
                             <div>
                                 <div style="font-weight:600;color:#1f2937;">${formatCurrency(p.amount_paid)}</div>
-                                <div style="font-size:12px;color:#6b7280;">${p.salary_month} - ${p.payment_method || 'N/A'}</div>
+                                <div style="font-size:12px;color:#6b7280;">${escHtml(p.salary_month)} - ${escHtml(p.payment_method || 'N/A')}</div>
                             </div>
                             <div style="text-align:right;">
                                 <div style="font-size:13px;color:#6b7280;">${new Date(p.payment_date).toLocaleDateString()}</div>
-                                ${p.paid_by_name ? `<div style="font-size:11px;color:#9ca3af;">by ${p.paid_by_name}</div>` : ''}
+                                ${p.paid_by_name ? `<div style="font-size:11px;color:#9ca3af;">by ${escHtml(p.paid_by_name)}</div>` : ''}
                             </div>
                         </div>
                     `).join('');

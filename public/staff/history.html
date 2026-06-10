@@ -12,6 +12,7 @@
     <meta name="apple-mobile-web-app-capable" content="yes">
     <title>Attendance History - Quality Colours</title>
     <script src="/js/auth-helper.js?v=7101c516"></script>
+    <script src="/js/qc-escape.js?v=32133ff2"></script>
     <script>checkAuthOrRedirect();</script>
     <link rel="stylesheet" href="/css/tailwind.css?v=849f1b5c">
     <link rel="stylesheet" href="/css/design-system.css?v=876c7d73">
@@ -339,7 +340,7 @@
                         <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 12px;">
                             <div>
                                 <div style="font-size: 18px; font-weight: 700; color: #1f2937;">${dayName}, ${dateStr}</div>
-                                <div style="font-size: 12px; color: #6b7280; margin-top: 4px;">${record.branch_name || 'Branch'}</div>
+                                <div style="font-size: 12px; color: #6b7280; margin-top: 4px;">${escHtml(record.branch_name || 'Branch')}</div>
                             </div>
                             <div style="text-align: right;">
                                 ${statusBadge}
@@ -365,7 +366,7 @@
                                 <span style="font-size: 16px; font-weight: 700; color: #1B5E3B; margin-left: 8px;">${workingHours}h</span>
                             </div>
                             <div style="font-size: 12px; color: #6b7280;">
-                                Expected: ${expectedHours}h
+                                Expected: ${escHtml(expectedHours)}h
                             </div>
                         </div>
                     </div>
