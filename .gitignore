@@ -16,6 +16,9 @@ storage/framework/views/*
 /playwright-report/
 /blob-report/
 /playwright/.cache/
+
+# Jest coverage output
+/coverage/
 composer.lock
 package-lock.json
 

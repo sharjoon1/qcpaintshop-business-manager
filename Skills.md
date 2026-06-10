@@ -622,7 +622,7 @@ Quality Colours Business Manager is a **multi-branch paint shop management platf
 
 **Salary Configuration**
 - Per-user salary config: monthly_salary, hourly_rate (generated: monthly_salary/260), overtime_multiplier (default 1.5x)
-- Work hours: standard_daily_hours (10h), sunday_hours (5h)
+- Work hours: standard_daily_hours (10h), sunday_hours (5h) — **LOCKED (M6, 2026-06-10)**: the calc always uses a fixed 10h day on the /260 basis (RT-040); these columns are read-only in the UI and rejected by POST/PUT `/config`
 - Deductions: enable_late_deduction, late_deduction_per_hour, enable_absence_deduction
 - Allowances: transport_allowance, food_allowance, other_allowance
 - Effective date range (effective_from, effective_until), is_active flag
@@ -634,7 +634,8 @@ Quality Colours Business Manager is a **multi-branch paint shop management platf
 - Attendance data from `staff_attendance`: present/absent/half_day/on_leave days, standard/sunday/overtime hours
 - **Leave deduction**: queries `attendance_permissions` (type='leave', status='approved'), splits Sunday vs weekday leaves
 - **Leave policy**: 1 paid Sunday leave + 1 paid weekday leave per month; excess deducted at `hourly_rate × standard_daily_hours`
-- Pay components: standard_hours_pay, sunday_hours_pay, overtime_pay (approved OT only)
+- Pay components: standard_hours_pay, sunday_hours_pay, overtime_pay (approved weekday OT × multiplier + Sunday OT at 2× — RT-039)
+- **OT display split (M6, 2026-06-10)**: `monthly_salaries.approved_overtime_hours` / `unapproved_overtime_hours` stamped at calc time (display-only — pay math unchanged); admin detail modal + staff salary page show "approved (paid) vs unapproved (unpaid)" rows when present (NULL = pre-migration row, old combined display). Migration: `migrations/20260610_salary_ot_split.js`
 - Deductions: late_deduction, absence_deduction, **leave_deduction**, other_deduction
 - `gross_salary` and `net_salary` are GENERATED ALWAYS AS (STORED) columns
 - Individual (`POST /calculate`) and bulk (`POST /calculate-all`) calculation with per-staff error reporting
@@ -2742,6 +2743,16 @@ Loyalty program for painters who buy or recommend Quality Colours paint products
 - **Attendance**: Configurable points per visit (default 5 → Regular pool)
 - **Value slabs**: Monthly/quarterly purchase volume → bonus points (→ Annual pool)
 - **Credit**: Self-billing painters get credit limits with auto-debit on overdue
+
+### Money-path hardening (Phase 2, 2026-06-10)
+- **Retry-safe invoice processing (M1)**: `processInvoice` releases its claim row (compensating DELETE) if awarding fails; every award step is guarded by an `invoiceAwardExists` ledger check so retries never double-award (including the referral `total_bills` tier bump).
+- **Visible clawback netting (M2/Q-B2)**: netting runs inside the award transaction; the full earn is always a ledger row plus a separate `source='clawback'` debit row; `painter_clawback_pending.settled_ledger_id` links each settled row to its debit entry. Cached balance nets the clawback; `total_earned` counts the full earn.
+- **Credit overdue (M3/Q-B1)**: only UNPAID self-billing invoices count (`pip.zoho_invoice_id` JOIN `zoho_invoices` with `balance > 0`; `EST-*` rows are paid by definition — created at confirm-payment). After auto-debit, `credit_used` is reduced by the debited amount (no repeat daily re-debits).
+- **Cron catch-up (M4)**: `job_runs(job_name, period_label)` markers + `runStartupCatchup()` in `painter-scheduler.js` re-run a missed monthly/quarterly slab eval or AP open/forfeit on startup. Runners accept a period-label override (string-guarded; cron registrations wrapped in arrows because node-cron v4 passes a context arg). `forfeitAndPurge` only forfeits windows whose `claim_window_closes_at` has passed and sweeps older expired stragglers.
+- **Drift check (M5)**: `checkPointsDrift()` compares ledger SUM vs `painters.regular_points/annual_points` (daily 03:00 IST, report-only).
+- **Slab dedup (M9/Q-B3)**: `_evaluateSlabs` groups by `COALESCE(NULLIF(zoho_invoice_id,''), invoice_id)` — dual-attribution backfill rows (`ZINV-X-direct` / `ZINV-X-salesperson`) count once.
+- Migration: `migrations/20260610_painter_points_phase2.js` (ENUM += daily_bonus/clawback — daily_bonus was a latent bug, inserted since Mar 2026 but never in the ENUM; + `job_runs`; + repairs corrupted `source=''` rows).
+- Locked by `tests/unit/painter-points-engine.test.js` + `tests/unit/painter-scheduler-catchup.test.js`.
 
 ### Key Files
 - `migrations/migrate-painters.js` — 10 tables + settings seeds + permissions
