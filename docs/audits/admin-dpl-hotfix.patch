@@ -1,0 +1,168 @@
+diff --git a/public/admin-dpl.html b/public/admin-dpl.html
+index 6b16816..d22600b 100644
+--- a/public/admin-dpl.html
++++ b/public/admin-dpl.html
+@@ -1556,9 +1556,14 @@
+                     serverMatchId = ''; // reject White↔non-White base mismatch
+                 }
+                 if (serverMatchId && serverZoho &&
+-                    /\bSHINE\b/i.test(row.product) !== /\bSHINE\b/i.test(serverZoho.name)) {
++                    /\bSHINE\b|\bSHINEGUARD\b|HI[\s-]*SHINE/i.test(row.product) !== /\bSHINE\b|\bSHINEGUARD\b|HI[\s-]*SHINE/i.test(serverZoho.name)) {
+                     serverMatchId = ''; // reject SHINE↔non-SHINE mismatch
+                 }
++                if (serverMatchId && serverZoho && row.packSize) {
++                    if (!aiPackSizeInName(row.packSize, serverZoho.name)) {
++                        serverMatchId = ''; // reject pack-size mismatch
++                    }
++                }
+             }
+             row._matchedZohoId = serverMatchId;
+             row._selected = !!row._matchedZohoId;
+@@ -1604,12 +1609,11 @@
+ 
+     // ============ CLIENT-SIDE FUZZY MATCH ============
+     // Noise = brand names + generic filler words that don't distinguish products
+-    // PRIMER/ENAMEL/EMULSION = product TYPE words, not product-name words — don't use for matching
++    // PRIMER/ENAMEL/EMULSION are product-TYPE words and MUST stay in to distinguish products
+     var AI_NOISE = new Set(['BIRLA','OPUS','ASIAN','BERGER','NIPPON','JSW','GEM','ASTRAL',
+         'PAINT','PAINTS','BRAND','PREMIUM','LUXURY','ULTRA','PROFESSIONAL',
+         'COLOUR','COLOR','COLOURS','COLORS','THE','AND','WITH','FOR','PER','NEW',
+-        'COAT','FINISH','BASE','GRADE','PRODUCT','SERIES','RANGE','TYPE',
+-        'PRIMER','ENAMEL','EMULSION']);
++        'COAT','FINISH','BASE','GRADE','PRODUCT','SERIES','RANGE','TYPE']);
+ 
+     function aiWords(text) {
+         return String(text||'').toUpperCase().replace(/[-\/–]/g,' ').split(/[\s,]+/)
+@@ -1622,8 +1626,13 @@
+         var p = pdfCat.toUpperCase();
+         var z = zohoCat.toUpperCase();
+         if (p === z) return true;
+-        // Product-line code in category (3+ digits like "936003") — can't gate reliably
+-        if (/\d{3,}/.test(p)) return true;
++        // Product-line code in category (3+ digits like "936003") — try alphabetic segments first
++        if (/\d{3,}/.test(p)) {
++            var alphaSegs = p.match(/[A-Z]{3,}/g);
++            if (!alphaSegs || alphaSegs.length === 0) return true; // no alpha keywords — can't gate
++            // Fall through: use extracted alpha segments as pWordSet below
++            p = alphaSegs.join(' ');
++        }
+         var pIsIntExtCat = /\b(INTERIOR|EXTERIOR)\s+CATEGORY\b/.test(p);
+         // Word-set match to prevent "WALLNROOF" triggering "WALL" check
+         var pWordSet = {};
+@@ -1642,7 +1651,7 @@
+         return pWords.some(function(pw){ return zWords.indexOf(pw) !== -1; });
+     }
+ 
+-    // Normalize Birla Opus near-equivalent pack sizes: 0.9L≈1L, 9L≈10L, 18L≈20L, 3.6L≈4L
++    // Normalize Birla Opus near-equivalent pack sizes: 0.9L≈1L, 3.6L≈4L, 9L≈10L, 18L≈20L
+     function normalizeBirlaPackSize(sz) {
+         var s = String(sz||'').replace(/\s/g,'').toUpperCase();
+         var ml = s.match(/^(\d+(?:\.\d+)?)ML$/);
+@@ -1651,8 +1660,8 @@
+         if (lt) {
+             var n = parseFloat(lt[1]);
+             if (n >= 0.8 && n <= 1.05) return '1L';
+-            if (n > 3.0 && n < 4.5) return '4L';
+-            if (n > 8.0 && n < 11.0) return '10L';
++            if (n >= 3.5 && n <= 4.1)  return '4L';
++            if (n >= 9.0 && n <= 10.5) return '10L';
+             if (n > 16.0 && n <= 20.0) return '20L';
+         }
+         return sz;
+@@ -1685,21 +1694,28 @@
+ 
+     // Exact base-variant gate for emulsion products.
+     // Maps PDF base name → Zoho SKU base key, then requires them to match exactly.
+-    // White→"WT", Pastel→"1", Mid Tone→"2", Clear→"99", Organic Yellow→"5", Organic Red→"6"
++    // White→"WT", Pastel/Group A/Light Base→"1", Mid Tone/Group B→"2",
++    // Deep Tone/Group C→"3", Dark→"4", Clear→"99", Yellow→"5", Red→"6"
+     function aiBaseVariantCompatible(pdfProduct, pdfCategory, zohoItem) {
+-        // Gate on recognised base suffix regardless of category text — exterior products
+-        // also use base variants but their category may not contain "Emulsion".
+         var variantM = String(pdfProduct||'').match(/\s*-\s*(.+)$/);
+         if (!variantM) return true;
+         var v = variantM[1].toUpperCase();
+         var pdfBase =
+-            /\bWHITE\b/.test(v)               ? 'WT' :
+-            /\bPASTEL\b/.test(v)              ? '1'  :
+-            /\bMID[\s-]*TONE\b/.test(v)       ? '2'  :
+-            /\bCLEAR\b/.test(v)               ? '99' :
+-            /ORGANIC[\s-]*YELLOW|\bYELLOW\b/.test(v) ? '5' :
+-            /ORGANIC[\s-]*RED|\bRED\b/.test(v)        ? '6' : null;
+-        if (!pdfBase) return true; // unrecognised variant — no gating
++            /\bWHITE\b/.test(v)                          ? 'WT' :
++            /\bPASTEL\b|\bGROUP[\s-]*A\b|\bLIGHT[\s-]*BASE\b/.test(v) ? '1' :
++            /\bMID[\s-]*TONE\b|\bGROUP[\s-]*B\b/.test(v) ? '2'  :
++            /\bDEEP[\s-]*TONE\b|\bGROUP[\s-]*C\b/.test(v) ? '3' :
++            /\bDARK\b/.test(v)                            ? '4'  :
++            /\bCLEAR\b/.test(v)                           ? '99' :
++            /ORGANIC[\s-]*YELLOW|\bYELLOW\b/.test(v)     ? '5'  :
++            /ORGANIC[\s-]*RED|\bRED\b/.test(v)            ? '6'  : null;
++        if (!pdfBase) {
++            // Warn if variant text looks like a base indicator we might not know
++            if (/\b(BASE|TONE|GROUP)\b/.test(v)) {
++                console.warn('[aiBaseVariantCompatible] Unrecognised base-variant indicator:', v, '— allowing match (no gate)');
++            }
++            return true;
++        }
+         var s = String(zohoItem.sku || zohoItem.zoho_sku || '').toUpperCase();
+         var zohoBase =
+             /^[A-Z]{2,5}WT\d{2}$/.test(s) ? 'WT' :
+@@ -1746,27 +1762,41 @@
+                     // Fallback: approximate numeric match within 25% handles L↔KG unit mismatch.
+                     if (pdfPack && !aiPackSizeInName(pdfPack, z.name)) {
+                         var pNum = parseFloat(pdfPack) || 0;
+-                        var zNM = z.name.match(/\b(\d+(?:\.\d+)?)\s*(?:KGS?|L\b|LT\b|LTR\b|ML\b)/i);
++                        var pUnitM = pdfPack.match(/[A-Z]+$/i);
++                        var pUnit = pUnitM ? pUnitM[0].toUpperCase() : '';
++                        var zNM = z.name.match(/\b(\d+(?:\.\d+)?)\s*(KGS?|L\b|LT\b|LTR\b|ML\b)/i);
+                         var zNum = zNM ? parseFloat(zNM[1]) : 0;
+-                        var approxOk = pNum > 0 && zNum > 0 && Math.abs(pNum - zNum) / Math.max(pNum, zNum) <= 0.25;
++                        var zUnit = zNM ? zNM[2].toUpperCase() : '';
++                        // Only allow numeric tolerance when units are same family
++                        var litreFam = /^(L|LT|LTR|LITRE|LITRES)$/;
++                        var sameUnit = (pUnit === zUnit) ||
++                            (litreFam.test(pUnit) && litreFam.test(zUnit));
++                        var approxOk = sameUnit && pNum > 0 && zNum > 0 &&
++                            Math.abs(pNum - zNum) / Math.max(pNum, zNum) <= 0.25;
+                         if (!approxOk) return;
+                     }
+                     // BASE VARIANT GATE: White emulsion must not match digit-base; non-White must not match WT
+                     if (!aiBaseVariantCompatible(row.product, pdfCat, z)) return;
+                     // SHINE GATE: "Product X" must not match "Product X Shine" and vice versa
+-                    if (/\bSHINE\b/i.test(row.product) !== /\bSHINE\b/i.test(z.name)) return;
++                    if (/\bSHINE\b|\bSHINEGUARD\b|HI[\s-]*SHINE/i.test(row.product) !== /\bSHINE\b|\bSHINEGUARD\b|HI[\s-]*SHINE/i.test(z.name)) return;
+                     if (!scores[z.zoho_item_id]) scores[z.zoho_item_id] = { z: z, hits: 0 };
+                     scores[z.zoho_item_id].hits++;
+                 });
+             });
+ 
+-            // Require ≥2 word hits
++            // Proportional threshold: at least half of PDF words must hit (min 2)
++            var minHits = Math.max(2, Math.ceil(pdfWords.length * 0.5));
+             var best = null, bestScore = 0;
+             Object.keys(scores).forEach(function(id) {
+                 var e = scores[id];
+-                if (e.hits < 2) return;
++                if (e.hits < minHits) return;
++                var coverage = e.hits / pdfWords.length; // 0–1
+                 var catExact = pdfCat && (e.z.category||'').toUpperCase() === pdfCat;
+-                var score = e.hits * 10 + (catExact ? 5 : 0);
++                var catPartial = !catExact && aiCatCompatible(pdfCat, e.z.category);
++                var packMatch = pdfPack ? aiPackSizeInName(pdfPack, e.z.name) : false;
++                var score = Math.round(coverage * 100) * 10 +
++                    (catExact ? 50 : catPartial ? 20 : 0) +
++                    (packMatch ? 10 : 0);
+                 if (score > bestScore) { bestScore = score; best = e.z; }
+             });
+ 
+@@ -2945,6 +2975,9 @@
+             if (r && r.auto_match && r.auto_match.zoho_item_id) {
+                 matchedIds.add(r.auto_match.zoho_item_id);
+             }
++            if (r && r._matchedZohoId) {
++                matchedIds.add(r._matchedZohoId);
++            }
+         });
+         return (zohoItems || []).filter(function(z) {
+             return !matchedIds.has(z.zoho_item_id);
