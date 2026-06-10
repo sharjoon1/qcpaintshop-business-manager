@@ -10,9 +10,10 @@ the actual codebase.
 
 Internal business-management platform for a paint retail/dealer business
 (`act.qcpaintshop.com`). Handles staff/attendance/salary, leads & collections,
-estimates & billing, a painter loyalty program, Zoho Books/CRM sync, WhatsApp
+estimates & billing, a painter loyalty program, an engineer quotation portal,
+Zoho Books sync (Books only — there is no Zoho CRM integration), WhatsApp
 marketing, and an AI dashboard. There is also a separate **Android app** repo at
-`..\qcpaintshop-android\` (local only, no git remote) — not in this repo.
+`..\qcpaintshop-android\` (sibling git repo) — not in this repo.
 
 ## 2. Tech stack & key paths
 
@@ -21,18 +22,21 @@ marketing, and an AI dashboard. There is also a separate **Android app** repo at
   Pool (20 conns) created in `config/database.js`; **session timezone forced to
   `+00:00` (UTC)** — the server clock is IST, so this offset is load-bearing.
 - **Frontend:** static HTML + vanilla JS + Tailwind (JIT) in `public/`.
-- **Entry point:** `server.js` (~4,350 lines). Routes in `routes/`, business
+- **Entry point:** `server.js` (~4,400 lines). Routes in `routes/`, business
   logic in `services/`, cross-cutting in `middleware/`, env in `config/`.
-- **Schema:** incremental only — `migrations/` (118 files) run by `migrate.js`.
-  There is **no single schema.sql**; read migrations to learn tables.
+- **Schema:** incremental only — `migrations/` (120 files: 119 `.js` + 1 dead
+  `.sql` the runner never executes) run by `migrate.js`. There is **no single
+  schema.sql**; read migrations to learn tables (core `zoho_*` map tables have
+  no DDL in the repo at all — created manually on prod).
 - **Docs:** `Skills.md` is the comprehensive living system doc — update it after
-  substantial changes. `COMPLETION_STATUS.md` is the latest audit.
+  substantial changes. `docs/PROJECT-REPORT-2026-06-10.md` is the latest
+  comprehensive code-verified survey; `COMPLETION_STATUS.md` is an older audit.
 
 ### Common commands
 ```bash
 npm start                 # node server.js
 npm test                  # jest (tests/unit + tests/integration)
-npm run test:coverage     # coverage (currently only middleware/config/anomaly)
+npm run test:coverage     # coverage (middleware/config/routes/services)
 node migrate.js --status  # NOTE: prod _migrations only tracks Apr 30+ → over-reports pending
 node migrate.js           # run pending migrations
 npm run lint              # eslint
@@ -42,24 +46,28 @@ npm run build:css         # tailwind → public/css/tailwind.css
 ## 3. How the app is wired
 
 - One pool is created in `server.js` and injected everywhere via
-  `routeModule.setPool(pool)` (`server.js:273-376`). New route files must follow
+  `routeModule.setPool(pool)` (`server.js:~284-393`). New route files must follow
   this pattern — do **not** create a second pool.
-- Routes mounted at `server.js:394-438` under `/api/*`.
+- Routes mounted at `server.js:~406-450` under `/api/*`.
 - Global middleware: helmet (CSP currently allows `unsafe-inline`/`unsafe-eval`),
   CORS (env whitelist via `CORS_ORIGIN`, no `*`), compression, 3-tier rate
   limiting (global 100/min, auth 10/min, OTP 5/min), PII gate on
   `/uploads/aadhar` + `/uploads/documents` (`server.js:249-267`).
-- **Background schedulers** (sync, geofence auto-clockout, anomaly scan, lead
-  auto-assign, painter/AI/WhatsApp) only start if **`ZOHO_ORGANIZATION_ID`** is
-  set (`server.js:~4298`). Keep this in mind when something "doesn't run".
+- **Background schedulers:** only the Zoho-dependent services (sync scheduler,
+  WhatsApp processor + session init, campaign engine, PNTR marketing crons)
+  require **`ZOHO_ORGANIZATION_ID`** (`server.js:~4341-4374`, SVC-001/007 fix);
+  everything else (AI, painter, retention, lead auto-assign, health, monitor)
+  always starts. All schedulers gate on `isClusterPrimary()`
+  (`services/cluster-guard.js` — single pm2 fork instance assumed).
 
-## 4. Auth model (three separate systems)
+## 4. Auth model (four separate systems)
 
 | Actor | Header / flow | Middleware | Store |
 |-------|---------------|------------|-------|
 | Staff/Admin | `Authorization: Bearer <token>`, password+bcrypt, optional TOTP | `requireAuth`, `requirePermission(module,action)`, `requireRole` in `middleware/permissionMiddleware.js` | `user_sessions` |
 | Customer | Bearer, phone OTP | `requireCustomerAuth` (`middleware/customerAuth.js`) | `customer_sessions` |
 | Painter | `X-Painter-Token`, phone OTP | `requirePainterAuth` (approved) / `requirePainterSession` (pending+approved) in `routes/painters.js` | `painter_sessions` |
+| Engineer | `X-Engineer-Token`, phone OTP | `requireEngineerAuth` / `requireEngineerSession` defined in `routes/engineers.js` | `engineer_sessions` |
 
 - Tokens are opaque `crypto.randomBytes(32)`, stored as `LOWER(SHA2(token,256))`.
   Lookups compare the hash — keep that exact form.
@@ -72,7 +80,7 @@ npm run build:css         # tailwind → public/css/tailwind.css
   build an array of `?` clauses + a separate `params` array (see
   `routes/estimates.js`). **Never** interpolate user input into SQL strings.
 - **Money:** native JS floats with `Math.round(x*100)/100`; money rounded up to
-  ₹10 via `r10 = n => Math.ceil(n/10)*10`. (Known defects — see §6.)
+  ₹10 via `r10 = n => Math.ceil(n/10)*10`. (Owner-confirmed policies — see §6.)
 - **Frontend XSS:** escape before `innerHTML`. Helpers exist but names are
   inconsistent (`escHtml` / `escapeHtml` / `esc`) — reuse the one already in the
   page you're editing.
@@ -88,16 +96,22 @@ npm run build:css         # tailwind → public/css/tailwind.css
 These are money/correctness paths. Write a characterization test that locks the
 current behavior **before** editing, then change deliberately.
 
-- **Estimate pricing engine** — `routes/estimates.js:46-131`
-  (`calculateItemPricing`, `calculateEstimateTotals`). Known issues:
-  double ₹10 rounding (line 95-97) and `gst_amount: 0` hardcoded (line 128).
-  **The GST=0 may be intentional (Zoho prices are GST-inclusive) — confirm
-  business intent before "fixing".**
+- **Estimate pricing engine** — `routes/estimates.js:46-135`
+  (`calculateItemPricing`, `calculateEstimateTotals`). Owner-confirmed policies
+  (2026-06-04): **GST is price-inclusive — `gst_amount: 0` is correct, never add
+  18% on top**; line totals **single-round** up to ₹10 then `unit = line/qty`
+  (the historical double-rounding bug was fixed in `663e4d4` and is locked by
+  `tests/unit/estimate-pricing.test.js` — do not re-"fix"). Estimate↔Zoho
+  sub-rupee drift is formally accepted (NIT-1).
 - **Painter points engine** — `services/painter-points-engine.js` (regular vs
   annual pools, level multipliers, daily-bonus cap, clawback). Tier thresholds:
   bronze 0 / silver 5K / gold 25K / diamond 100K (no platinum).
-- **Salary calc** — `routes/salary.js` (hourly-rate basis, Sunday OT, leave
-  deductions). Has basis-inconsistency bugs noted in the audit.
+- **Salary calc** — `routes/salary.js`. Owner-confirmed policies (RT-039/RT-040,
+  commit `47147f7`): **Sunday OT ×2 in SQL is the entire double-time premium**
+  (never also apply `overtime_multiplier`); **a standard day is always 10h** on
+  the `/260` hourly basis for absence/leave deductions
+  (`standard_daily_hours`/`sunday_hours` config columns are intentionally unused
+  by the deduction math). Locked by `tests/unit/salary-calc.test.js`.
 - **DPL pricing** — `services/price-list-parser.js` → `services/dpl-catalog.js`
   → `routes/item-master.js`. Rate formula: `ceil(dpl * 1.18 * 1.10)`
   (18% GST × 10% markup).
@@ -133,9 +147,15 @@ current behavior **before** editing, then change deliberately.
 - Commit message footer:
   `Co-Authored-By: Claude Opus 4.8 (1M context) <noreply@anthropic.com>`
 
-## 10. Known gaps (see COMPLETION_STATUS.md for full list)
+## 10. Known gaps (see docs/PROJECT-REPORT-2026-06-10.md §13 for the full backlog)
 
-- ~15% test coverage; estimates/painter-points/auth/leads/zoho-sync untested.
-- No auth-event audit logging; session IP/UA captured but never validated.
+- Money paths have characterization tests (estimate-pricing, painter-points,
+  salary, DPL); the **auth stack, leads, and Zoho sync core remain untested**.
+- Staff logins/failures + permission denials are audited (SYS-009); customer/
+  painter/engineer OTP logins are **not** audited. Session IP/UA captured but
+  never validated.
 - Uploads validated by extension/mimetype only (no magic-byte check).
-- UPI id hardcoded in `routes/estimates.js` / `routes/share.js`.
+- UPI VPA centralized in `services/business-config.js` (`ai_config` keys
+  `business_upi_vpa`/`business_upi_payee`); a hardcoded fallback literal remains.
+- Raw session tokens still dual-written (`user_sessions.session_token`,
+  `painter_sessions.token`); painters have no logout endpoint.

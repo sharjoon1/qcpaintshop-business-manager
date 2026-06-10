@@ -440,9 +440,7 @@ router.post('/items/dpl-catalog/:brand/push', requirePermission('zoho', 'manage'
             console.error('DPL catalog push: markPushed failed (non-fatal):', stampErr.message);
         }
 
-        // Log price history (best-effort). NOTE: the real column is `dpl_version_id`
-        // (verified on prod) — routes/item-master.js uses `version_id` here, which is a
-        // latent bug (Unknown column) that its own try/catch-less path silently 500s on.
+        // Log price history (best-effort). The column is `dpl_version_id`.
         for (const it of items) {
             try {
                 await pool.query(
