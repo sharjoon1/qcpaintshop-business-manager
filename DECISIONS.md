@@ -15,12 +15,12 @@ Captured as they arrive; every phase that depends on a question must check here 
 | 2026-06-10 | **Q-B1**: painter credit overdue auto-debit basis | Owner delegated to executor recommendation: overdue check considers **only unpaid** self-billing invoices; after an auto-debit, **`credit_used` is reduced by the debited amount** (no repeat daily re-debits). | Phase 2 / M3 |
 | 2026-06-10 | **Q-B2**: clawback visibility | Owner delegated to executor recommendation: **yes — absorbed clawbacks get a ledger entry** (`painter_point_transactions`), and netting runs inside the award transaction. | Phase 2 / M2 |
 | 2026-06-10 | **Q-B3**: slab basis with dual attribution | Owner delegated to executor recommendation: **each invoice counts once per painter per period** (dedupe by invoice_id across direct/salesperson rows); basis otherwise unchanged (both billing types). | Phase 2 / M9 |
+| 2026-06-11 | **Q-P2**: exact prod DDL of the no-DDL Zoho tables | Answered by D1: read-only `mysqldump --no-data` snapshot committed at `docs/schema/prod-schema-2026-06-11.sql` (226 tables incl. all `zoho_*`). | Phase 3 / D1 |
 
 ## Pending (asked at the phase that needs them)
 
 | ID | Question | Needed by |
 |---|---|---|
-| Q-P2 | Exact prod DDL of the no-DDL Zoho tables (read-only `SHOW CREATE TABLE`)? | Phase 3 / D1 |
 | Q-B7 | Make 2FA mandatory for admin/manager? | Phase 4 / S6 |
 | Q-B5/Q-B6 | Extend DPL catalog to other brands? Pending non-standard SKU links? | Phase 6 / X1 |
 | Q-B8 | Backfill `estimates.branch_id`? | Phase 6 / D7 |
