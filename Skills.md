@@ -2107,6 +2107,14 @@ Full spec + plan under `docs/superpowers/specs/` + `docs/superpowers/plans/`. De
 - Tests: anomaly-detector (17), validate (12), rateLimiter (3), config (6)
 - npm scripts: `npm test`, `npm run test:watch`, `npm run test:coverage`
 
+### 2026-06-11 - Phase 3 Structural (A1/A2/D1-D3/T2-T4/F1)
+1. **A1: server.js endpoint extraction** — 46 inline endpoints moved verbatim into 4 new route modules: `routes/auth.js` (14: `/api/auth/*` + `/api/otp/*`), `routes/paint-colors.js` (6: `/api/paint-colors/*` + design-request visualize/auto-visualize, incl. the paint-catalog cache + auto-viz helpers), `routes/products.js` (16: `/api/products/*` — static paths registered before `/:id`, order load-bearing), `routes/customer-portal.js` (10: `/api/customer/auth/*` + `/api/customer/me/*`). Each mounts `app.use('/api', x.router)` at the exact original inline position so Express matching order is unchanged; route inventory verified identical (100 method+path pairs) before/after. server.js ~4,430 → ~2,360 lines.
+2. **A2: auth LRU cache** — `middleware/permissionMiddleware.js`: single `resolveStaffSession()` (was copy-pasted 5×) + 45s/500-entry caches for sessions (keyed sha256(token)) and role-permission verdicts. Immediate invalidation hooks: logout → `invalidateSessionToken`, password reset/deactivation → `invalidateUser`, role-permission edits (`routes/roles.js`) → `clearPermissionCache`. Misses never cached.
+3. **D1: prod schema snapshot** — `docs/schema/prod-schema-2026-06-11.sql` (226 tables, reference-only, regen instructions in header). **D3**: prod `_migrations` audited backfill → `migrate.js --status` = 122 applied / 0 pending. **D2**: the 11 side-effects-on-require migration files normalized to `exports.up(pool)`.
+4. **T2/T3/T4: tests** — auth stack first coverage (`tests/unit/auth-middleware.test.js`, 31 cases incl. cache behavior); 4 mirror tests de-mirrored to real-module imports (test-only exports in billing/vendors/painters); Zoho cf_* wrap + rate-limiter math + lead auto-assign round-robin characterized (`zoho-api-cf-wrap`, `zoho-rate-limiter`, `leads-logic` test files).
+5. **F1: shared escaper** — `public/js/qc-escape.js` (`escHtml`/`escAttr`/`escJS`, non-clobbering); 7 escaper-less pages wired (incl. fixing a bypassable onclick-string escape in `share/design-request.html` and JS-arg escaping in `admin-stock-check.html`).
+6. **Known follow-up (NOT fixed)**: `services/vendor-bill-ai-service.js` `verifyBillItems` reads `staff.rate`/`staff.amount` but `routes/vendors.js` feeds DB rows with `unit_price` — rate comparison sees 0 and can false-flag mismatches. Needs its own test-first fix.
+
 ### 2026-02-25 - BMAD Sprint 1: Technical Foundation
 Implemented foundational infrastructure improvements as part of the BMAD (Breakthrough Method for Agile AI-Driven Development) initiative:
 
@@ -3487,13 +3495,13 @@ Full location pipeline: painter app → backend → admin fleet map.
 **Backend** (`routes/painters.js`):
 - `POST /me/location-report` — painter auth, 25s per-painter rate-limit (prevents GPS spam), validates lat/lng/accuracy, inserts `painter_location_events`, emits `painter:location` on Socket.io `admin-location` room. Body: `{ lat, lng, accuracy }`.
 - `GET /locations/live` — admin auth (`painters.view`), returns all painters with their latest location event in the last 2 minutes (online) or last known (offline). Response: `{ online: [...], offline: [...] }`. Each entry: `id, full_name, lat, lng, accuracy, recorded_at, status`.
-- `GET /:id/locations/history` — admin auth, query params `date` (IST date string, defaults today), returns time-ordered events for route replay. Includes `totalRouteMeters` (sum of haversine distances between consecutive points).
+- `GET /:id/locations/history` — admin auth, query params `date` (IST date string, defaults today), returns time-ordered events for route replay. (Note: the route-distance sum is computed FRONTEND-side in `admin-painters.html` from the returned points — the API does not return a `totalRouteMeters` field.)
 
 **Socket.io**: Server joins socket to `admin-location` room on `join-admin-location` event (requires valid session token check). Painter location pushes go to `admin-location` room via `io.to('admin-location').emit('painter:location', { painterId, lat, lng, accuracy, recorded_at })`.
 
 **Nightly cron** (`services/painter-scheduler.js`): `0 2 * * *` IST — `DELETE FROM painter_location_events WHERE recorded_at < DATE_SUB(NOW(), INTERVAL 30 DAY)`.
 
-**Unit tests** (`tests/unit/painter-location.test.js`): 7 tests covering IST date helper (today/custom/format) + haversine `totalRouteMeters` (zero points, one point, two points, multi-point, null coords).
+**Unit tests** (`tests/unit/painter-location.test.js`): de-mirrored (T2, 2026-06-11) — imports the real `toISTDateString` from `routes/painters.js` and the real `haversineMeters` from `services/painter-attendance-service.js`; route-total summation glue documented in the test.
 
 **Admin UI** (`public/admin-painters.html` — Location → Attendance tab):
 - **Fleet map** (Leaflet.js CDN, `leaflet@1.9.4`): Shows all painters on map. Online painters = green marker (circle), offline = grey. Popup: name, status (XSS-escaped with `escH()`), last seen time. Auto-refresh every 30s. `initFleetMap()` / `refreshFleetMap()`.
