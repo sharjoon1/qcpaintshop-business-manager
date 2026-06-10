@@ -5,7 +5,7 @@
 
 const express = require('express');
 const router = express.Router();
-const { requirePermission, requireAuth, isFullAdmin, FULL_ADMIN_ROLES } = require('../middleware/permissionMiddleware');
+const { requirePermission, requireAuth, isFullAdmin, FULL_ADMIN_ROLES, clearPermissionCache } = require('../middleware/permissionMiddleware');
 const audit = require('../services/audit-log');
 
 let pool;
@@ -367,6 +367,7 @@ router.delete('/:id', requirePermission('roles', 'manage'), async (req, res) => 
         // Delete role permissions first, then role
         await pool.query('DELETE FROM role_permissions WHERE role_id = ?', [id]);
         await pool.query('DELETE FROM roles WHERE id = ?', [id]);
+        clearPermissionCache(); // A2: drop cached verdicts for the deleted role
 
         await audit.record(req, {
             action: 'role.delete',
@@ -466,6 +467,7 @@ router.put('/:id/permissions', requirePermission('roles', 'manage'), async (req,
 
             await connection.commit();
             connection.release();
+            clearPermissionCache(); // A2: permission set changed
 
             await audit.record(req, {
                 action: 'role.permissions.replace',
@@ -557,6 +559,7 @@ router.delete('/:id/permissions/:permission_id', requirePermission('roles', 'man
             'DELETE FROM role_permissions WHERE role_id = ? AND permission_id = ?',
             [id, permission_id]
         );
+        if (r.affectedRows > 0) clearPermissionCache(); // A2: permission revoked
 
         if (r.affectedRows > 0) {
             await audit.record(req, {

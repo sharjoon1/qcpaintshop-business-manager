@@ -22,7 +22,7 @@ require('dotenv').config();
 const { Server: SocketIO } = require('socket.io');
 
 // Import middleware
-const { initPool, requirePermission, requireAnyPermission, requireAuth, requireRole, getUserPermissions, isFullAdmin, FULL_ADMIN_ROLES } = require('./middleware/permissionMiddleware');
+const { initPool, requirePermission, requireAnyPermission, requireAuth, requireRole, getUserPermissions, isFullAdmin, FULL_ADMIN_ROLES, invalidateSessionToken, invalidateUser } = require('./middleware/permissionMiddleware');
 
 // Import route modules
 const attendanceRoutes = require('./routes/attendance');
@@ -750,6 +750,7 @@ app.post('/api/auth/logout', async (req, res) => {
         const token = req.headers.authorization?.replace('Bearer ', '');
         if (token) {
             await pool.query('DELETE FROM user_sessions WHERE token_hash = LOWER(SHA2(?, 256))', [token]);
+            invalidateSessionToken(token); // drop from the A2 auth cache immediately
         }
         res.json({ success: true });
     } catch (error) {
@@ -892,6 +893,7 @@ app.post('/api/auth/forgot-password-mobile', authLimiter, async (req, res) => {
         // Sign every existing session out — the assumption is whoever just
         // requested a reset wants stale sessions invalidated.
         await pool.query('DELETE FROM user_sessions WHERE user_id = ?', [users[0].id]);
+        invalidateUser(users[0].id);
 
         res.json({ success: true, message: 'Password reset successful. Please login with your new password.' });
     } catch (error) {
@@ -957,6 +959,7 @@ app.post('/api/auth/reset-password', authLimiter, async (req, res) => {
             await conn.query('DELETE FROM user_sessions WHERE user_id = ?', [userId]);
 
             await conn.commit();
+            invalidateUser(userId);
             res.json({ success: true, message: 'Password reset successfully. Please log in with your new password.' });
         } catch (err) {
             await conn.rollback();
@@ -2705,6 +2708,7 @@ app.delete('/api/users/:id', requirePermission('staff', 'delete'), async (req, r
         // Soft delete instead of hard delete
         await pool.query('UPDATE users SET status = ? WHERE id = ?', ['inactive', userId]);
         await pool.query('DELETE FROM user_sessions WHERE user_id = ?', [userId]);
+        invalidateUser(parseInt(userId, 10));
 
         res.json({ success: true, message: 'User deactivated successfully' });
     } catch (err) {

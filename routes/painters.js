@@ -6804,4 +6804,6 @@ router.put('/admin/catalog/painters/:id/overrides/:level', requireAuth, requireP
     }
 });
 
-module.exports = { router, setPool, setIO, setSessionManager };
+// requirePainterAuth/requirePainterSession exported for unit testing only
+// (tests/unit/auth-middleware.test.js) — routes still use them directly.
+module.exports = { router, setPool, setIO, setSessionManager, requirePainterAuth, requirePainterSession };

@@ -5,6 +5,7 @@
  */
 
 let pool;
+const crypto = require('crypto');
 const audit = require('../services/audit-log');
 
 /**
@@ -12,6 +13,124 @@ const audit = require('../services/audit-log');
  */
 function initPool(dbPool) {
     pool = dbPool;
+}
+
+// ── A2: short-TTL LRU cache for the hottest queries in the app ──────────────
+// The staff session lookup runs on EVERY authenticated request (it was
+// copy-pasted in 4 middlewares — now shared via resolveStaffSession), and the
+// role-permission check right behind it. Entries live ≤45s; revocation paths
+// (logout, password reset, user deactivation, role-permission edits) call the
+// invalidate*/clear* hooks below so a killed session or changed permission
+// dies immediately, not at TTL.
+// Keys are sha256(token) hex — the same value as the SQL's
+// LOWER(SHA2(?,256)) — so raw tokens are never held in memory.
+const AUTH_CACHE_TTL_MS = 45 * 1000;
+const AUTH_CACHE_MAX = 500;
+const sessionCache = new Map(); // sha256(token) -> { value: user, expiresAt }
+const permCache = new Map();    // `${role}|${module}.${action}` -> { value: boolean, expiresAt }
+
+function cacheGet(map, key) {
+    const entry = map.get(key);
+    if (!entry) return undefined;
+    if (entry.expiresAt <= Date.now()) {
+        map.delete(key);
+        return undefined;
+    }
+    // refresh recency (Map preserves insertion order → first key is oldest)
+    map.delete(key);
+    map.set(key, entry);
+    return entry.value;
+}
+
+function cacheSet(map, key, value) {
+    if (map.size >= AUTH_CACHE_MAX) {
+        map.delete(map.keys().next().value);
+    }
+    map.set(key, { value, expiresAt: Date.now() + AUTH_CACHE_TTL_MS });
+}
+
+function tokenCacheKey(token) {
+    return crypto.createHash('sha256').update(token).digest('hex');
+}
+
+/**
+ * Resolve a staff Bearer token to the req.user shape (or null).
+ * Single source of truth for the session lookup; cached ≤45s.
+ * Misses are NOT cached — an invalid token re-hits the DB (rate limiters
+ * bound that), so a just-created session is never blocked by a stale miss.
+ */
+async function resolveStaffSession(token) {
+    const key = tokenCacheKey(token);
+    const cached = cacheGet(sessionCache, key);
+    if (cached) return cached;
+
+    const [sessions] = await pool.query(
+        `SELECT s.*, u.id as user_id, u.username, u.role, u.full_name, u.email, u.branch_id
+         FROM user_sessions s
+         JOIN users u ON s.user_id = u.id
+         WHERE s.token_hash = LOWER(SHA2(?, 256)) AND s.expires_at > NOW() AND u.status = 'active'`,
+        [token]
+    );
+    if (sessions.length === 0) return null;
+
+    const u = sessions[0];
+    const user = {
+        id: u.user_id,
+        username: u.username,
+        role: u.role,
+        full_name: u.full_name,
+        email: u.email,
+        branch_id: u.branch_id || null
+    };
+    cacheSet(sessionCache, key, user);
+    return user;
+}
+
+/**
+ * Cached role→permission check (both grants and denials cached ≤45s;
+ * role-permission edits call clearPermissionCache()).
+ */
+async function hasRolePermission(role, module, action) {
+    const key = `${role}|${module}.${action}`;
+    const cached = cacheGet(permCache, key);
+    if (cached !== undefined) return cached;
+
+    const [permissions] = await pool.query(
+        `SELECT rp.id
+         FROM role_permissions rp
+         JOIN permissions p ON rp.permission_id = p.id
+         JOIN roles r ON rp.role_id = r.id
+         WHERE r.name = ?
+         AND p.module = ?
+         AND p.action = ?`,
+        [role, module, action]
+    );
+    const allowed = permissions.length > 0;
+    cacheSet(permCache, key, allowed);
+    return allowed;
+}
+
+/** Drop one session from the cache (logout). */
+function invalidateSessionToken(token) {
+    if (token) sessionCache.delete(tokenCacheKey(token));
+}
+
+/** Drop every cached session of a user (password reset, deactivation). */
+function invalidateUser(userId) {
+    for (const [key, entry] of sessionCache) {
+        if (entry.value && entry.value.id === userId) sessionCache.delete(key);
+    }
+}
+
+/** Drop all cached role-permission verdicts (role-permission edits). */
+function clearPermissionCache() {
+    permCache.clear();
+}
+
+/** Test hook + emergency reset. */
+function clearAuthCache() {
+    sessionCache.clear();
+    permCache.clear();
 }
 
 /**
@@ -45,15 +164,8 @@ function requirePermission(module, action) {
                 });
             }
 
-            const [sessions] = await pool.query(
-                `SELECT s.*, u.id as user_id, u.username, u.role, u.full_name, u.email, u.branch_id
-                 FROM user_sessions s
-                 JOIN users u ON s.user_id = u.id
-                 WHERE s.token_hash = LOWER(SHA2(?, 256)) AND s.expires_at > NOW() AND u.status = 'active'`,
-                [token]
-            );
-
-            if (sessions.length === 0) {
+            const user = await resolveStaffSession(token);
+            if (!user) {
                 return res.status(401).json({
                     success: false,
                     message: 'Invalid or expired session',
@@ -61,35 +173,14 @@ function requirePermission(module, action) {
                 });
             }
 
-            const user = sessions[0];
-
-            req.user = {
-                id: user.user_id,
-                username: user.username,
-                role: user.role,
-                full_name: user.full_name,
-                email: user.email,
-                branch_id: user.branch_id || null
-            };
+            req.user = user;
 
             // Admin / administrator / super_admin always have all permissions
             if (isFullAdmin(user.role)) {
                 return next();
             }
 
-            // Check role_permissions table using parameterized queries
-            const [permissions] = await pool.query(
-                `SELECT rp.id
-                 FROM role_permissions rp
-                 JOIN permissions p ON rp.permission_id = p.id
-                 JOIN roles r ON rp.role_id = r.id
-                 WHERE r.name = ?
-                 AND p.module = ?
-                 AND p.action = ?`,
-                [user.role, module, action]
-            );
-
-            if (permissions.length > 0) {
+            if (await hasRolePermission(user.role, module, action)) {
                 return next();
             }
 
@@ -134,15 +225,8 @@ function requireAnyPermission(permissionsNeeded) {
                 });
             }
 
-            const [sessions] = await pool.query(
-                `SELECT s.*, u.id as user_id, u.username, u.role, u.full_name, u.email, u.branch_id
-                 FROM user_sessions s
-                 JOIN users u ON s.user_id = u.id
-                 WHERE s.token_hash = LOWER(SHA2(?, 256)) AND s.expires_at > NOW() AND u.status = 'active'`,
-                [token]
-            );
-
-            if (sessions.length === 0) {
+            const user = await resolveStaffSession(token);
+            if (!user) {
                 return res.status(401).json({
                     success: false,
                     message: 'Invalid or expired session',
@@ -150,45 +234,17 @@ function requireAnyPermission(permissionsNeeded) {
                 });
             }
 
-            const user = sessions[0];
-            req.user = {
-                id: user.user_id,
-                username: user.username,
-                role: user.role,
-                full_name: user.full_name,
-                email: user.email,
-                branch_id: user.branch_id || null
-            };
+            req.user = user;
 
             // Admin / administrator / super_admin always have all permissions
             if (isFullAdmin(user.role)) {
                 return next();
             }
 
-            // Check role_permissions using parameterized queries
-            const [roleInfo] = await pool.query(
-                'SELECT id FROM roles WHERE name = ? LIMIT 1',
-                [user.role]
-            );
-
-            if (roleInfo.length > 0) {
-                // Build parameterized query for multiple permission checks
-                const placeholders = permissionsNeeded.map(() => '(p.module = ? AND p.action = ?)').join(' OR ');
-                const params = [roleInfo[0].id];
-                permissionsNeeded.forEach(p => {
-                    params.push(p.module, p.action);
-                });
-
-                const [userPermissions] = await pool.query(
-                    `SELECT rp.id
-                     FROM role_permissions rp
-                     JOIN permissions p ON rp.permission_id = p.id
-                     WHERE rp.role_id = ?
-                     AND (${placeholders})`,
-                    params
-                );
-
-                if (userPermissions.length > 0) {
+            // Any one matching permission passes (per-pair, so each verdict
+            // lands in the shared cache instead of one throwaway OR query)
+            for (const p of permissionsNeeded || []) {
+                if (await hasRolePermission(user.role, p.module, p.action)) {
                     return next();
                 }
             }
@@ -232,15 +288,8 @@ async function requireAuth(req, res, next) {
             });
         }
 
-        const [sessions] = await pool.query(
-            `SELECT s.*, u.id as user_id, u.username, u.role, u.full_name, u.email, u.branch_id
-             FROM user_sessions s
-             JOIN users u ON s.user_id = u.id
-             WHERE s.token_hash = LOWER(SHA2(?, 256)) AND s.expires_at > NOW() AND u.status = 'active'`,
-            [token]
-        );
-
-        if (sessions.length === 0) {
+        const user = await resolveStaffSession(token);
+        if (!user) {
             return res.status(401).json({
                 success: false,
                 message: 'Invalid or expired session',
@@ -248,16 +297,7 @@ async function requireAuth(req, res, next) {
             });
         }
 
-        const user = sessions[0];
-        req.user = {
-            id: user.user_id,
-            username: user.username,
-            role: user.role,
-            branch_id: user.branch_id || null,
-            full_name: user.full_name,
-            email: user.email
-        };
-
+        req.user = user;
         next();
 
     } catch (error) {
@@ -295,15 +335,8 @@ function requireRole(...roles) {
                 });
             }
 
-            const [sessions] = await pool.query(
-                `SELECT s.*, u.id as user_id, u.username, u.role, u.full_name, u.email, u.branch_id
-                 FROM user_sessions s
-                 JOIN users u ON s.user_id = u.id
-                 WHERE s.token_hash = LOWER(SHA2(?, 256)) AND s.expires_at > NOW() AND u.status = 'active'`,
-                [token]
-            );
-
-            if (sessions.length === 0) {
+            const user = await resolveStaffSession(token);
+            if (!user) {
                 return res.status(401).json({
                     success: false,
                     message: 'Invalid or expired session',
@@ -311,15 +344,7 @@ function requireRole(...roles) {
                 });
             }
 
-            const user = sessions[0];
-            req.user = {
-                id: user.user_id,
-                username: user.username,
-                role: user.role,
-                full_name: user.full_name,
-                email: user.email,
-                branch_id: user.branch_id || null
-            };
+            req.user = user;
 
             if (!flatRoles.includes(String(user.role || '').toLowerCase())) {
                 return res.status(403).json({
@@ -356,22 +381,16 @@ async function getUserPermissions(req, res) {
             });
         }
 
-        const [sessions] = await pool.query(
-            `SELECT s.*, u.id as user_id, u.role, u.full_name
-             FROM user_sessions s
-             JOIN users u ON s.user_id = u.id
-             WHERE s.token_hash = LOWER(SHA2(?, 256)) AND s.expires_at > NOW()`,
-            [token]
-        );
-
-        if (sessions.length === 0) {
+        // Shared resolver (A2). Note: unlike the old inline lookup here, this
+        // also requires u.status = 'active' — an intentional tightening so a
+        // deactivated user can't list permissions.
+        const user = await resolveStaffSession(token);
+        if (!user) {
             return res.status(401).json({
                 success: false,
                 message: 'Invalid or expired session'
             });
         }
-
-        const user = sessions[0];
 
         // Admin / administrator / super_admin have all permissions
         if (isFullAdmin(user.role)) {
@@ -443,5 +462,11 @@ module.exports = {
     requireRole,
     getUserPermissions,
     isFullAdmin,
-    FULL_ADMIN_ROLES
+    FULL_ADMIN_ROLES,
+    // A2 cache hooks
+    resolveStaffSession,
+    invalidateSessionToken,
+    invalidateUser,
+    clearPermissionCache,
+    clearAuthCache
 };
