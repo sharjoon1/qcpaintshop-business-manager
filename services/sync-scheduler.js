@@ -289,6 +289,15 @@ async function executeBulkJobProcessor() {
 }
 
 /**
+ * Local-calendar date string (YYYY-MM-DD). The server clock is IST;
+ * toISOString() is UTC and rolls back to the previous day between
+ * 00:00–05:30 IST, shifting report ranges off by one (M8).
+ */
+function localDateStr(d) {
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+
+/**
  * Execute daily report generation
  */
 async function executeDailyReport() {
@@ -308,7 +317,7 @@ async function executeDailyReport() {
         const fyStart = today.getMonth() >= 3
             ? `${today.getFullYear()}-04-01`
             : `${today.getFullYear() - 1}-04-01`;
-        const todayStr = today.toISOString().split('T')[0];
+        const todayStr = localDateStr(today);
 
         // Generate and cache P&L report
         const plReport = await zohoAPI.getProfitAndLoss(fyStart, todayStr);
@@ -333,7 +342,7 @@ async function executeDailyReport() {
         try {
             const yesterday = new Date();
             yesterday.setDate(yesterday.getDate() - 1);
-            const yesterdayStr = yesterday.toISOString().split('T')[0];
+            const yesterdayStr = localDateStr(yesterday);
             await zohoAPI.generateDailyTransactionReport(yesterdayStr, yesterdayStr, null);
             console.log('[Scheduler] Yesterday\'s transaction report generated');
         } catch (txErr) {
@@ -673,5 +682,6 @@ module.exports = {
     restart,
     getStatus,
     executeSyncCycle,
-    loadConfig
+    loadConfig,
+    localDateStr
 };

@@ -74,6 +74,18 @@ describe('calculateItemPricing', () => {
         expect(r.line_total).toBe(130);
         expect(r.unit_price).toBe(130);
     });
+
+    // --- M7 FIXED: stored base_price agrees with the input ---
+    it('returns the input base_price un-ceiled (₹10 rounding applies to the line, not the base)', () => {
+        // The stored base_price is what the user typed — editing an estimate
+        // must round-trip it unchanged (the old r10() here made every edit
+        // recompute from an inflated base: 95 → 100 → ...).
+        expect(calculateItemPricing({ base_price: 121, quantity: 1 }).base_price).toBe(121);
+        expect(calculateItemPricing({ base_price: 127.5, quantity: 5 }).base_price).toBe(127.5);
+        expect(calculateItemPricing({ unit_price: 250, quantity: 1 }).base_price).toBe(250);
+        // line/unit math is untouched by this — still single-rounded from the raw base
+        expect(calculateItemPricing({ base_price: 121, quantity: 1 }).line_total).toBe(130);
+    });
 });
 
 describe('calculateEstimateTotals', () => {

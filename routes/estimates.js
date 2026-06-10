@@ -101,7 +101,10 @@ function calculateItemPricing(item) {
     const unitPrice = Math.round((lineTotal / safeQty) * 100) / 100;
 
     return {
-        base_price: r10(basePrice),
+        // The stored base_price must agree with the input — ₹10 rounding applies
+        // to the payable line, never to the base (M7; r10 here made every
+        // edit/reload recompute from an inflated base).
+        base_price: Math.round(basePrice * 100) / 100,
         markup_amount: Math.round(markupAmount * 100) / 100,
         price_after_markup: Math.round(priceAfterMarkup * 100) / 100,
         discount_amount: Math.round(discountAmount * 100) / 100,
