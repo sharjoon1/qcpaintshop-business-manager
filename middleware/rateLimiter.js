@@ -72,4 +72,17 @@ const leadSubmitLimiter = rateLimit({
     validate: { xForwardedForHeader: false, keyGeneratorIpFallback: false }
 });
 
-module.exports = { globalLimiter, authLimiter, otpLimiter, leadSubmitLimiter };
+// ─── Public-upload Limiter (anonymous design-request POST; 10/hour per IP) ───
+// Runs BEFORE multer so abusive uploads are rejected without touching disk;
+// multipart bodies are unparsed at that point, so the key is IP-only.
+
+const publicUploadLimiter = rateLimit({
+    windowMs: 60 * 60 * 1000, // 1 hour
+    max: 10,
+    standardHeaders: true,
+    legacyHeaders: false,
+    handler: rateLimitHandler,
+    validate: { xForwardedForHeader: false }
+});
+
+module.exports = { globalLimiter, authLimiter, otpLimiter, leadSubmitLimiter, publicUploadLimiter };

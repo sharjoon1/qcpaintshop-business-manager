@@ -74,7 +74,7 @@ const appMetadataCollector = require('./services/app-metadata-collector');
 const systemRoutes = require('./routes/system');
 const creditLimitRoutes = require('./routes/credit-limits');
 const errorHandlerMw = require('./middleware/errorHandler');
-const { globalLimiter, authLimiter, otpLimiter } = require('./middleware/rateLimiter');
+const { globalLimiter, authLimiter, otpLimiter, publicUploadLimiter } = require('./middleware/rateLimiter');
 const customerAuthService = require('./services/customer-auth');
 const { requireCustomerAuth } = require('./middleware/customerAuth');
 const smsService = require('./services/sms-service');
@@ -1265,7 +1265,7 @@ app.post('/api/otp/resend', otpLimiter, async (req, res) => {
 });
 
 // Register
-app.post('/api/auth/register', async (req, res) => {
+app.post('/api/auth/register', authLimiter, async (req, res) => {
     try {
         const { mobile, otp_id, customer_name, email, password, password_confirm, whatsapp_opt_in } = req.body;
 
@@ -1495,7 +1495,8 @@ app.get('/api/public/site-info', async (req, res) => {
         rows.forEach(r => { info[r.setting_key] = r.setting_value; });
         res.json({ success: true, data: info });
     } catch (err) {
-        res.status(500).json({ success: false, error: err.message });
+        console.error('public site-info error:', err);
+        res.status(500).json({ success: false, error: 'Server error' });
     }
 });
 
@@ -1507,7 +1508,8 @@ app.get('/api/public/branches', async (req, res) => {
         );
         res.json({ success: true, data: rows });
     } catch (err) {
-        res.status(500).json({ success: false, error: err.message });
+        console.error('public branches error:', err);
+        res.status(500).json({ success: false, error: 'Server error' });
     }
 });
 
@@ -1519,11 +1521,12 @@ app.get('/api/public/brands', async (req, res) => {
         );
         res.json({ success: true, data: rows });
     } catch (err) {
-        res.status(500).json({ success: false, error: err.message });
+        console.error('public brands error:', err);
+        res.status(500).json({ success: false, error: 'Server error' });
     }
 });
 
-app.post('/api/public/design-requests', designRequestUpload.single('photo'), async (req, res) => {
+app.post('/api/public/design-requests', publicUploadLimiter, designRequestUpload.single('photo'), async (req, res) => {
     try {
         const { name, mobile, city } = req.body;
 
@@ -3898,7 +3901,8 @@ app.get('/api/test', async (req, res) => {
         const [rows] = await pool.query('SELECT 1 as test');
         res.json({ status: 'Database connected', result: rows[0] });
     } catch (err) {
-        res.status(500).json({ error: 'Database connection failed', message: err.message });
+        console.error('/api/test DB ping failed:', err);
+        res.status(500).json({ error: 'Database connection failed' });
     }
 });
 
@@ -4114,16 +4118,22 @@ io.on('connection', async (socket) => {
         }
     });
 
-    // Painter room for real-time notifications
+    // Painter room for real-time notifications — staff sockets may watch a
+    // painter's events only with admin/manager role (S11: was open to all staff,
+    // leaking painter notifications/locations).
     socket.on('join_painter_room', (painterId) => {
-        if (painterId) {
+        const role = String(socket.user.role || '').toLowerCase();
+        if (painterId && (isFullAdmin(socket.user.role) || role === 'manager')) {
             socket.join(`painter_${painterId}`);
         }
     });
 
-    // Admin painters live map room
+    // Admin painters live map room (S11: role-gated like the whatsapp_* rooms)
     socket.on('join_admin_painters_live', () => {
-        socket.join('admin_painters_live');
+        const role = String(socket.user.role || '').toLowerCase();
+        if (isFullAdmin(socket.user.role) || role === 'manager') {
+            socket.join('admin_painters_live');
+        }
     });
 
     // Join all conversations the user is part of

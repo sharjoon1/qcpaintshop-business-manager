@@ -1021,7 +1021,10 @@ router.get('/pay-order/:link_id', async (req, res) => {
             return res.json({ success: false, error: 'This payment link has expired.' });
         }
         res.json({ success: true, order: link });
-    } catch (e) { res.status(500).json({ success: false, error: e.message }); }
+    } catch (e) {
+        console.error('pay-order lookup error:', e);
+        res.status(500).json({ success: false, error: 'Server error' });
+    }
 });
 
 module.exports = { router, setPool };
