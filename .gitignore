@@ -41,6 +41,7 @@ test_output.txt
 
 # Local Claude Code / superpowers state
 .claude/
+.claude-notes/
 .superpowers/
 
 # Firebase service account key (contains private key)
