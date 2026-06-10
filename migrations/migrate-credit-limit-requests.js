@@ -1,26 +1,15 @@
 /**
  * Migration: Credit Limit Requests table
  * Enables staff-to-admin credit limit request workflow
+ * Normalized to exports.up(pool) (D2, 2026-06-11) — requiring this file no longer runs it.
  */
-const mysql = require('mysql2/promise');
-require('dotenv').config({ path: require('path').join(__dirname, '..', '.env') });
 
-async function migrate() {
-    const pool = mysql.createPool({
-        host: process.env.DB_HOST,
-        user: process.env.DB_USER,
-        password: process.env.DB_PASSWORD,
-        database: process.env.DB_NAME,
-        waitForConnections: true,
-        connectionLimit: 5
-    });
-
+exports.up = async function up(pool) {
     console.log('=== Credit Limit Requests Migration ===\n');
 
-    try {
-        // Create credit_limit_requests table
-        console.log('Creating credit_limit_requests table...');
-        await pool.query(`
+    // Create credit_limit_requests table
+    console.log('Creating credit_limit_requests table...');
+    await pool.query(`
             CREATE TABLE IF NOT EXISTS credit_limit_requests (
                 id INT AUTO_INCREMENT PRIMARY KEY,
                 branch_id INT NOT NULL,
@@ -42,18 +31,34 @@ async function migrate() {
                 INDEX idx_requested_by (requested_by)
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
         `);
-        console.log('  credit_limit_requests table created');
+    console.log('  credit_limit_requests table created');
 
-        // Verify
-        const [cols] = await pool.query('DESCRIBE credit_limit_requests');
-        console.log(`  Verified: ${cols.length} columns`);
+    // Verify
+    const [cols] = await pool.query('DESCRIBE credit_limit_requests');
+    console.log(`  Verified: ${cols.length} columns`);
 
-        console.log('\n=== Migration Complete ===');
-    } catch (error) {
-        console.error('Migration error:', error.message);
-    } finally {
-        await pool.end();
-    }
+    console.log('\n=== Migration Complete ===');
+};
+
+// Direct-run support (legacy usage: node migrations/migrate-credit-limit-requests.js)
+if (require.main === module) {
+    (async () => {
+        require('dotenv').config();
+        const mysql = require('mysql2/promise');
+        const pool = mysql.createPool({
+            host: process.env.DB_HOST || 'localhost',
+            user: process.env.DB_USER || 'root',
+            password: process.env.DB_PASSWORD || '',
+            database: process.env.DB_NAME || 'business_manager',
+            port: parseInt(process.env.DB_PORT, 10) || 3306
+        });
+        try {
+            await exports.up(pool);
+            console.log('Done.');
+            process.exit(0);
+        } catch (err) {
+            console.error('Migration failed:', err.message);
+            process.exit(1);
+        }
+    })();
 }
-
-migrate();

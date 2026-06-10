@@ -13,21 +13,10 @@
 // Item-level overrides win over brand/category (applied in this priority: item > brand > category).
 //
 // Idempotent.
+// Normalized to exports.up(pool) (D2, 2026-06-11) — requiring this file no longer runs it.
 
-require('dotenv').config();
-const mysql = require('mysql2/promise');
-
-(async () => {
-    const pool = await mysql.createPool({
-        host: process.env.DB_HOST,
-        user: process.env.DB_USER,
-        password: process.env.DB_PASSWORD,
-        database: process.env.DB_NAME,
-        connectionLimit: 2,
-    });
-
-    try {
-        await pool.query(`
+exports.up = async function up(pool) {
+    await pool.query(`
             CREATE TABLE IF NOT EXISTS painter_custom_rates (
                 id INT AUTO_INCREMENT PRIMARY KEY,
                 painter_id INT NOT NULL,
@@ -48,11 +37,28 @@ const mysql = require('mysql2/promise');
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
         `);
 
-        console.log('  ✓ painter_custom_rates table ready');
-    } catch (err) {
-        console.error('❌ Migration failed:', err.message);
-        process.exitCode = 1;
-    } finally {
-        await pool.end();
-    }
-})();
+    console.log('  ✓ painter_custom_rates table ready');
+};
+
+// Direct-run support (legacy usage: node migrations/migrate-painter-custom-rates.js)
+if (require.main === module) {
+    (async () => {
+        require('dotenv').config();
+        const mysql = require('mysql2/promise');
+        const pool = mysql.createPool({
+            host: process.env.DB_HOST || 'localhost',
+            user: process.env.DB_USER || 'root',
+            password: process.env.DB_PASSWORD || '',
+            database: process.env.DB_NAME || 'business_manager',
+            port: parseInt(process.env.DB_PORT, 10) || 3306
+        });
+        try {
+            await exports.up(pool);
+            console.log('Done.');
+            process.exit(0);
+        } catch (err) {
+            console.error('Migration failed:', err.message);
+            process.exit(1);
+        }
+    })();
+}

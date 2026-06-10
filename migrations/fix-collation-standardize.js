@@ -7,76 +7,80 @@
  * Solution: Convert all utf8mb4_general_ci tables to utf8mb4_unicode_ci
  *
  * Run: node migrations/fix-collation-standardize.js
+ *
+ * Normalized to exports.up(pool) (D2, 2026-06-11) — requiring this file no longer runs it.
  */
 
-require('dotenv').config();
-const mysql = require('mysql2/promise');
+exports.up = async function up(pool) {
+    console.log('=== Collation Standardization Migration ===\n');
 
-async function migrate() {
-    const pool = mysql.createPool({
-        host: process.env.DB_HOST,
-        user: process.env.DB_USER,
-        password: process.env.DB_PASSWORD,
-        database: process.env.DB_NAME,
-        waitForConnections: true,
-        connectionLimit: 2
-    });
+    // Find all tables with utf8mb4_general_ci
+    const [tables] = await pool.query(
+        `SELECT TABLE_NAME FROM information_schema.TABLES
+         WHERE TABLE_SCHEMA = DATABASE() AND TABLE_COLLATION = 'utf8mb4_general_ci'
+         ORDER BY TABLE_NAME`
+    );
 
-    try {
-        console.log('=== Collation Standardization Migration ===\n');
+    console.log(`Found ${tables.length} tables with utf8mb4_general_ci to convert:\n`);
+    tables.forEach(t => console.log(`  - ${t.TABLE_NAME}`));
+    console.log('');
 
-        // Find all tables with utf8mb4_general_ci
-        const [tables] = await pool.query(
-            `SELECT TABLE_NAME FROM information_schema.TABLES
-             WHERE TABLE_SCHEMA = DATABASE() AND TABLE_COLLATION = 'utf8mb4_general_ci'
-             ORDER BY TABLE_NAME`
-        );
+    let converted = 0;
+    let failed = 0;
 
-        console.log(`Found ${tables.length} tables with utf8mb4_general_ci to convert:\n`);
-        tables.forEach(t => console.log(`  - ${t.TABLE_NAME}`));
-        console.log('');
-
-        let converted = 0;
-        let failed = 0;
-
-        for (const table of tables) {
-            const name = table.TABLE_NAME;
-            try {
-                await pool.query(
-                    `ALTER TABLE \`${name}\` CONVERT TO CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci`
-                );
-                console.log(`  ✓ ${name}`);
-                converted++;
-            } catch (err) {
-                console.error(`  ✗ ${name}: ${err.message}`);
-                failed++;
-            }
+    for (const table of tables) {
+        const name = table.TABLE_NAME;
+        try {
+            await pool.query(
+                `ALTER TABLE \`${name}\` CONVERT TO CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci`
+            );
+            console.log(`  ✓ ${name}`);
+            converted++;
+        } catch (err) {
+            console.error(`  ✗ ${name}: ${err.message}`);
+            failed++;
         }
-
-        // Also set the database default collation
-        const [dbInfo] = await pool.query('SELECT DATABASE() as db');
-        await pool.query(
-            `ALTER DATABASE \`${dbInfo[0].db}\` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci`
-        );
-        console.log(`\n  ✓ Database default collation set to utf8mb4_unicode_ci`);
-
-        console.log(`\n=== Results ===`);
-        console.log(`Converted: ${converted}`);
-        console.log(`Failed: ${failed}`);
-        console.log(`Total: ${tables.length}`);
-
-        // Verify
-        const [remaining] = await pool.query(
-            `SELECT COUNT(*) as cnt FROM information_schema.TABLES
-             WHERE TABLE_SCHEMA = DATABASE() AND TABLE_COLLATION != 'utf8mb4_unicode_ci'`
-        );
-        console.log(`\nRemaining non-unicode_ci tables: ${remaining[0].cnt}`);
-
-    } catch (err) {
-        console.error('Migration failed:', err.message);
-    } finally {
-        await pool.end();
     }
-}
 
-migrate();
+    // Also set the database default collation
+    const [dbInfo] = await pool.query('SELECT DATABASE() as db');
+    await pool.query(
+        `ALTER DATABASE \`${dbInfo[0].db}\` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci`
+    );
+    console.log(`\n  ✓ Database default collation set to utf8mb4_unicode_ci`);
+
+    console.log(`\n=== Results ===`);
+    console.log(`Converted: ${converted}`);
+    console.log(`Failed: ${failed}`);
+    console.log(`Total: ${tables.length}`);
+
+    // Verify
+    const [remaining] = await pool.query(
+        `SELECT COUNT(*) as cnt FROM information_schema.TABLES
+         WHERE TABLE_SCHEMA = DATABASE() AND TABLE_COLLATION != 'utf8mb4_unicode_ci'`
+    );
+    console.log(`\nRemaining non-unicode_ci tables: ${remaining[0].cnt}`);
+};
+
+// Direct-run support (legacy usage: node migrations/fix-collation-standardize.js)
+if (require.main === module) {
+    (async () => {
+        require('dotenv').config();
+        const mysql = require('mysql2/promise');
+        const pool = mysql.createPool({
+            host: process.env.DB_HOST || 'localhost',
+            user: process.env.DB_USER || 'root',
+            password: process.env.DB_PASSWORD || '',
+            database: process.env.DB_NAME || 'business_manager',
+            port: parseInt(process.env.DB_PORT, 10) || 3306
+        });
+        try {
+            await exports.up(pool);
+            console.log('Done.');
+            process.exit(0);
+        } catch (err) {
+            console.error('Migration failed:', err.message);
+            process.exit(1);
+        }
+    })();
+}
