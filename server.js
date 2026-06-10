@@ -3470,6 +3470,11 @@ app.post('/api/customer/auth/verify-otp', otpLimiter, async (req, res) => {
         }
 
         if (stored.otp !== otp) {
+            // S4: audit failed customer login
+            require('./services/audit-log').record(req, {
+                action: 'CUSTOMER_LOGIN_FAILED', entity_type: 'customer', entity_id: null,
+                after: { phone, reason: 'wrong_otp' }
+            });
             return res.status(400).json({ success: false, message: 'Invalid OTP. Please try again.' });
         }
 
@@ -3495,6 +3500,12 @@ app.post('/api/customer/auth/verify-otp', otpLimiter, async (req, res) => {
             phone,
             ip: req.ip,
             userAgent: req.get('User-Agent')
+        });
+
+        // S4: audit successful customer login
+        require('./services/audit-log').record(req, {
+            action: 'CUSTOMER_LOGIN_SUCCESS', entity_type: 'customer', entity_id: customerId,
+            after: { phone }
         });
 
         res.json({

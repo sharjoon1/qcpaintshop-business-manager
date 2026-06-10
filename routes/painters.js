@@ -328,10 +328,23 @@ router.post('/verify-otp', otpLimiter, async (req, res) => {
             [phone, otp]
         );
 
-        if (!sessions.length) return res.status(400).json({ success: false, message: 'Invalid or expired OTP' });
+        if (!sessions.length) {
+            // S4: audit failed painter login (actor unauthenticated → 'system')
+            audit.record(req, {
+                action: 'PAINTER_LOGIN_FAILED', entity_type: 'painter', entity_id: null,
+                after: { phone, reason: 'invalid_or_expired_otp' }
+            });
+            return res.status(400).json({ success: false, message: 'Invalid or expired OTP' });
+        }
 
         const session = sessions[0];
         await pool.query('UPDATE painter_sessions SET otp = NULL, otp_expires_at = NULL WHERE id = ?', [session.id]);
+
+        // S4: audit successful painter login
+        audit.record(req, {
+            action: 'PAINTER_LOGIN_SUCCESS', entity_type: 'painter', entity_id: session.painter_id,
+            after: { phone: session.phone, status: session.status }
+        });
 
         res.json({
             success: true, token: session.token,
@@ -348,6 +361,37 @@ router.post('/verify-otp', otpLimiter, async (req, res) => {
     } catch (error) {
         console.error('Verify OTP error:', error);
         res.status(500).json({ success: false, message: 'Verification failed' });
+    }
+});
+
+// S3: painter logout — revoke the presented session (engineers.js parity;
+// painters previously had NO way to invalidate a 30-day token).
+router.post('/logout', requirePainterSession, async (req, res) => {
+    try {
+        const token = req.headers['x-painter-token'];
+        await pool.query('DELETE FROM painter_sessions WHERE token_hash = LOWER(SHA2(?, 256))', [token]);
+        res.json({ success: true });
+    } catch (error) {
+        console.error('Painter logout error:', error);
+        res.status(500).json({ success: false, message: 'Logout failed' });
+    }
+});
+
+// S3: admin kill switch — revoke every session for a painter (stolen device,
+// offboarding). Audited.
+router.post('/:id/revoke-sessions', requirePermission('painters', 'manage'), async (req, res) => {
+    try {
+        const painterId = parseInt(req.params.id, 10);
+        if (!painterId) return res.status(400).json({ success: false, message: 'Invalid painter id' });
+        const [result] = await pool.query('DELETE FROM painter_sessions WHERE painter_id = ?', [painterId]);
+        audit.record(req, {
+            action: 'PAINTER_SESSIONS_REVOKED', entity_type: 'painter', entity_id: painterId,
+            after: { revoked_sessions: result.affectedRows }
+        });
+        res.json({ success: true, revoked: result.affectedRows });
+    } catch (error) {
+        console.error('Painter revoke-sessions error:', error);
+        res.status(500).json({ success: false, message: 'Failed to revoke sessions' });
     }
 });
 

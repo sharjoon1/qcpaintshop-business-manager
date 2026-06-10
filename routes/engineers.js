@@ -17,6 +17,7 @@ const smsService = require('../services/sms-service');
 const { requirePermission } = require('../middleware/permissionMiddleware');
 const { otpLimiter } = require('../middleware/rateLimiter');
 const notificationService = require('../services/notification-service');
+const audit = require('../services/audit-log');
 
 let pool;
 let sessionManager;
@@ -189,10 +190,23 @@ router.post('/verify-otp', otpLimiter, async (req, res) => {
         ORDER BY s.id DESC LIMIT 1`,
       [phone, otp]
     );
-    if (!rows.length) return res.status(400).json({ success: false, message: 'Invalid or expired OTP' });
+    if (!rows.length) {
+      // S4: audit failed engineer login
+      audit.record(req, {
+        action: 'ENGINEER_LOGIN_FAILED', entity_type: 'engineer', entity_id: null,
+        after: { phone, reason: 'invalid_or_expired_otp' }
+      });
+      return res.status(400).json({ success: false, message: 'Invalid or expired OTP' });
+    }
 
     const session = rows[0];
     await pool.query('UPDATE engineer_sessions SET otp = NULL, otp_expires_at = NULL WHERE id = ?', [session.id]);
+
+    // S4: audit successful engineer login
+    audit.record(req, {
+      action: 'ENGINEER_LOGIN_SUCCESS', entity_type: 'engineer', entity_id: session.engineer_id,
+      after: { phone: session.phone, status: session.status }
+    });
 
     res.json({
       success: true,
