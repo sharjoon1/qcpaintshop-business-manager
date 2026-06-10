@@ -24,6 +24,7 @@ const attendanceService = require('../services/painter-attendance-service');
 const { idempotent, setPool: setIdempotencyPool } = require('../middleware/idempotency');
 const { otpLimiter } = require('../middleware/rateLimiter');
 const audit = require('../services/audit-log');
+const { hashOtp, otpMatches, MAX_OTP_ATTEMPTS } = require('../services/otp-utils');
 
 let pool;
 let io;
@@ -276,10 +277,11 @@ router.post('/send-otp', otpLimiter, async (req, res) => {
         await pool.query('DELETE FROM painter_sessions WHERE painter_id = ? AND expires_at < NOW()', [painter.id]);
 
         // Dual-write raw token + hash so a code rollback can still find this row; reads use hash.
+        // S2: only the OTP's sha256 hash is stored.
         const tokenHash = crypto.createHash('sha256').update(token).digest('hex');
         await pool.query(
             'INSERT INTO painter_sessions (painter_id, token, token_hash, otp, otp_expires_at, expires_at) VALUES (?, ?, ?, ?, DATE_ADD(NOW(), INTERVAL 10 MINUTE), DATE_ADD(NOW(), INTERVAL 30 DAY))',
-            [painter.id, token, tokenHash, otp]
+            [painter.id, token, tokenHash, hashOtp(otp)]
         );
 
         // Send OTP via SMS (primary) + WhatsApp (secondary)
@@ -320,12 +322,15 @@ router.post('/verify-otp', otpLimiter, async (req, res) => {
         const { phone, otp } = req.body;
         if (!phone || !otp) return res.status(400).json({ success: false, message: 'Phone and OTP are required' });
 
+        // S2: fetch the latest pending OTP session for the phone, compare the
+        // hash in Node, and cap wrong guesses per issued code.
         const [sessions] = await pool.query(
-            `SELECT ps.id, ps.token, ps.painter_id, p.status, p.full_name, p.phone, p.profile_photo, p.level, p.referral_code
+            `SELECT ps.id, ps.token, ps.painter_id, ps.otp AS otp_hash, ps.otp_attempts,
+                    p.status, p.full_name, p.phone, p.profile_photo, p.level, p.referral_code
              FROM painter_sessions ps JOIN painters p ON ps.painter_id = p.id
-             WHERE p.phone = ? AND ps.otp = ? AND ps.otp_expires_at > NOW()
+             WHERE p.phone = ? AND ps.otp IS NOT NULL AND ps.otp_expires_at > NOW()
              ORDER BY ps.id DESC LIMIT 1`,
-            [phone, otp]
+            [phone]
         );
 
         if (!sessions.length) {
@@ -338,6 +343,20 @@ router.post('/verify-otp', otpLimiter, async (req, res) => {
         }
 
         const session = sessions[0];
+
+        if (session.otp_attempts >= MAX_OTP_ATTEMPTS) {
+            await pool.query('UPDATE painter_sessions SET otp = NULL, otp_expires_at = NULL WHERE id = ?', [session.id]);
+            return res.status(400).json({ success: false, message: 'Too many wrong attempts. Request a new OTP.' });
+        }
+        if (!otpMatches(session.otp_hash, otp)) {
+            await pool.query('UPDATE painter_sessions SET otp_attempts = otp_attempts + 1 WHERE id = ?', [session.id]);
+            audit.record(req, {
+                action: 'PAINTER_LOGIN_FAILED', entity_type: 'painter', entity_id: session.painter_id,
+                after: { phone, reason: 'wrong_otp' }
+            });
+            return res.status(400).json({ success: false, message: 'Invalid or expired OTP' });
+        }
+
         await pool.query('UPDATE painter_sessions SET otp = NULL, otp_expires_at = NULL WHERE id = ?', [session.id]);
 
         // S4: audit successful painter login

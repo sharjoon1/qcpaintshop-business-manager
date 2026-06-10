@@ -18,6 +18,7 @@ const { requirePermission } = require('../middleware/permissionMiddleware');
 const { otpLimiter } = require('../middleware/rateLimiter');
 const notificationService = require('../services/notification-service');
 const audit = require('../services/audit-log');
+const { hashOtp, otpMatches, MAX_OTP_ATTEMPTS } = require('../services/otp-utils');
 
 let pool;
 let sessionManager;
@@ -145,10 +146,11 @@ router.post('/send-otp', otpLimiter, async (req, res) => {
 
     await pool.query('DELETE FROM engineer_sessions WHERE engineer_id = ? AND expires_at < NOW()', [eng.id]);
 
+    // S2: only the OTP's sha256 hash is stored.
     await pool.query(
       `INSERT INTO engineer_sessions (engineer_id, token, token_hash, otp, otp_expires_at, expires_at)
        VALUES (?, ?, ?, ?, DATE_ADD(NOW(), INTERVAL 10 MINUTE), DATE_ADD(NOW(), INTERVAL 30 DAY))`,
-      [eng.id, token, tokenHash, otp]
+      [eng.id, token, tokenHash, hashOtp(otp)]
     );
 
     if (process.env.NODE_ENV !== 'production') console.log(`[Engineer OTP] ${phone} → ${otp}`);
@@ -182,13 +184,16 @@ router.post('/verify-otp', otpLimiter, async (req, res) => {
     const otp = String(req.body.otp || '').trim();
     if (!phone || !otp) return res.status(400).json({ success: false, message: 'Phone and OTP are required' });
 
+    // S2: fetch the latest pending OTP session, compare the hash in Node,
+    // and cap wrong guesses per issued code.
     const [rows] = await pool.query(
-      `SELECT s.id, s.token, s.engineer_id, e.status, e.full_name, e.phone, e.profile_photo, e.company_name
+      `SELECT s.id, s.token, s.engineer_id, s.otp AS otp_hash, s.otp_attempts,
+              e.status, e.full_name, e.phone, e.profile_photo, e.company_name
          FROM engineer_sessions s
          JOIN engineers e ON s.engineer_id = e.id
-        WHERE e.phone = ? AND s.otp = ? AND s.otp_expires_at > NOW()
+        WHERE e.phone = ? AND s.otp IS NOT NULL AND s.otp_expires_at > NOW()
         ORDER BY s.id DESC LIMIT 1`,
-      [phone, otp]
+      [phone]
     );
     if (!rows.length) {
       // S4: audit failed engineer login
@@ -200,6 +205,20 @@ router.post('/verify-otp', otpLimiter, async (req, res) => {
     }
 
     const session = rows[0];
+
+    if (session.otp_attempts >= MAX_OTP_ATTEMPTS) {
+      await pool.query('UPDATE engineer_sessions SET otp = NULL, otp_expires_at = NULL WHERE id = ?', [session.id]);
+      return res.status(400).json({ success: false, message: 'Too many wrong attempts. Request a new OTP.' });
+    }
+    if (!otpMatches(session.otp_hash, otp)) {
+      await pool.query('UPDATE engineer_sessions SET otp_attempts = otp_attempts + 1 WHERE id = ?', [session.id]);
+      audit.record(req, {
+        action: 'ENGINEER_LOGIN_FAILED', entity_type: 'engineer', entity_id: session.engineer_id,
+        after: { phone, reason: 'wrong_otp' }
+      });
+      return res.status(400).json({ success: false, message: 'Invalid or expired OTP' });
+    }
+
     await pool.query('UPDATE engineer_sessions SET otp = NULL, otp_expires_at = NULL WHERE id = ?', [session.id]);
 
     // S4: audit successful engineer login

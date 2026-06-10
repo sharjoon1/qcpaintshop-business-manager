@@ -75,6 +75,7 @@ const systemRoutes = require('./routes/system');
 const creditLimitRoutes = require('./routes/credit-limits');
 const errorHandlerMw = require('./middleware/errorHandler');
 const { globalLimiter, authLimiter, otpLimiter, publicUploadLimiter } = require('./middleware/rateLimiter');
+const { hashOtp, otpMatches, MAX_OTP_ATTEMPTS } = require('./services/otp-utils');
 const customerAuthService = require('./services/customer-auth');
 const { requireCustomerAuth } = require('./middleware/customerAuth');
 const smsService = require('./services/sms-service');
@@ -1054,7 +1055,7 @@ app.post('/api/otp/send', otpLimiter, async (req, res) => {
 
         const [result] = await pool.query(
             'INSERT INTO otp_verifications (phone, otp, purpose, expires_at) VALUES (?, ?, ?, ?)',
-            [mobile, otpCode, purpose, expiresAt]
+            [mobile, hashOtp(otpCode), purpose, expiresAt]
         );
 
         // Send SMS via configured provider (DLT-registered templates)
@@ -1141,7 +1142,13 @@ app.post('/api/otp/verify', otpLimiter, async (req, res) => {
             return res.status(400).json({ success: false, error: 'Invalid or expired OTP', code: 'OTP_INVALID' });
         }
 
-        if (otps[0].otp !== otp_code) {
+        // S2: OTPs are stored hashed; cap wrong guesses per issued code.
+        if (otps[0].attempts >= MAX_OTP_ATTEMPTS) {
+            await pool.query('UPDATE otp_verifications SET verified = 1 WHERE id = ?', [otps[0].id]);
+            return res.status(400).json({ success: false, error: 'Too many wrong attempts. Request a new OTP.', code: 'OTP_INVALID' });
+        }
+        if (!otpMatches(otps[0].otp, otp_code)) {
+            await pool.query('UPDATE otp_verifications SET attempts = attempts + 1 WHERE id = ?', [otps[0].id]);
             return res.status(400).json({ success: false, error: 'Invalid OTP code', code: 'OTP_MISMATCH' });
         }
 
@@ -1204,7 +1211,7 @@ app.post('/api/otp/resend', otpLimiter, async (req, res) => {
 
         const [result] = await pool.query(
             'INSERT INTO otp_verifications (phone, otp, purpose, expires_at) VALUES (?, ?, ?, ?)',
-            [mobile, otpCode, purpose, expiresAt]
+            [mobile, hashOtp(otpCode), purpose, expiresAt]
         );
 
         // Send SMS (DLT-registered templates)
@@ -3422,16 +3429,15 @@ app.post('/api/customer/auth/send-otp', otpLimiter, async (req, res) => {
             [phone, 'login']
         );
 
-        // Generate 6-digit OTP and store in DB
+        // Generate 6-digit OTP; store only its hash (S2). The console.log that
+        // printed every customer OTP to prod pm2 logs is removed (Q-B10: owner
+        // confirmed no support workflow reads it).
         const otp = String(crypto.randomInt(100000, 1000000));
         const expiresAt = new Date(Date.now() + 5 * 60 * 1000);
         await pool.query(
             'INSERT INTO otp_verifications (phone, otp, purpose, expires_at) VALUES (?, ?, ?, ?)',
-            [phone, otp, 'login', expiresAt]
+            [phone, hashOtp(otp), 'login', expiresAt]
         );
-
-        // Send OTP via SMS
-        console.log(`[Customer OTP] Phone: ${phone}, OTP: ${otp}`);
 
         {
             const message = `Your verification OTP for Quality Colours registration is ${otp}. Please enter this code at https://qcpaintshop.com/ to complete setup. - QUALITY COLOURS.`;
@@ -3454,7 +3460,7 @@ app.post('/api/customer/auth/verify-otp', otpLimiter, async (req, res) => {
 
         // Find the latest unverified OTP from DB
         const [otpRows] = await pool.query(
-            'SELECT id, otp, expires_at FROM otp_verifications WHERE phone = ? AND purpose = ? AND verified = 0 ORDER BY id DESC LIMIT 1',
+            'SELECT id, otp, attempts, expires_at FROM otp_verifications WHERE phone = ? AND purpose = ? AND verified = 0 ORDER BY id DESC LIMIT 1',
             [phone, 'login']
         );
 
@@ -3469,7 +3475,13 @@ app.post('/api/customer/auth/verify-otp', otpLimiter, async (req, res) => {
             return res.status(400).json({ success: false, message: 'OTP expired. Please request a new one.' });
         }
 
-        if (stored.otp !== otp) {
+        // S2: hashed compare + wrong-guess cap per issued code.
+        if (stored.attempts >= MAX_OTP_ATTEMPTS) {
+            await pool.query('UPDATE otp_verifications SET verified = 1 WHERE id = ?', [stored.id]);
+            return res.status(400).json({ success: false, message: 'Too many wrong attempts. Request a new OTP.' });
+        }
+        if (!otpMatches(stored.otp, otp)) {
+            await pool.query('UPDATE otp_verifications SET attempts = attempts + 1 WHERE id = ?', [stored.id]);
             // S4: audit failed customer login
             require('./services/audit-log').record(req, {
                 action: 'CUSTOMER_LOGIN_FAILED', entity_type: 'customer', entity_id: null,
