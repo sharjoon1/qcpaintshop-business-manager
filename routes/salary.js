@@ -370,13 +370,15 @@ router.get('/config/:id', requireRole('admin', 'manager', 'accountant'), require
  */
 router.post('/config', requireAuth, requirePermission('salary', 'manage'), async (req, res) => {
     try {
+        // standard_daily_hours / sunday_hours are intentionally NOT accepted:
+        // the salary math always uses a fixed 10h day on the /260 hourly basis
+        // (RT-040, owner policy 2026-06-09). The columns keep their DB defaults
+        // so the stored config can never silently diverge from the math (M6).
         const {
             user_id,
             branch_id,
             monthly_salary,
             overtime_multiplier = 1.50,
-            standard_daily_hours = 10.00,
-            sunday_hours = 5.00,
             enable_late_deduction = 1,
             late_deduction_per_hour = 0,
             enable_absence_deduction = 1,
@@ -419,14 +421,12 @@ router.post('/config', requireAuth, requirePermission('salary', 'manage'), async
         const [result] = await pool.query(`
             INSERT INTO staff_salary_config (
                 user_id, branch_id, monthly_salary, overtime_multiplier,
-                standard_daily_hours, sunday_hours,
                 enable_late_deduction, late_deduction_per_hour, enable_absence_deduction,
                 transport_allowance, food_allowance, other_allowance, allowance_notes,
                 effective_from, effective_until, is_active, created_by
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?)
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?)
         `, [
             user_id, branch_id, monthly_salary, overtime_multiplier,
-            standard_daily_hours, sunday_hours,
             enable_late_deduction, late_deduction_per_hour, enable_absence_deduction,
             transport_allowance, food_allowance, other_allowance, allowance_notes,
             effective_from, effective_until, req.user.id
@@ -455,8 +455,10 @@ router.post('/config', requireAuth, requirePermission('salary', 'manage'), async
 router.put('/config/:id', requireAuth, requirePermission('salary', 'manage'), async (req, res) => {
     try {
         const updates = req.body;
+        // standard_daily_hours / sunday_hours are locked (RT-040 / M6): the
+        // salary math ignores them by design — see calculateSalaryForUser.
         const allowedFields = [
-            'monthly_salary', 'overtime_multiplier', 'standard_daily_hours', 'sunday_hours',
+            'monthly_salary', 'overtime_multiplier',
             'enable_late_deduction', 'late_deduction_per_hour', 'enable_absence_deduction',
             'transport_allowance', 'food_allowance', 'other_allowance', 'allowance_notes',
             'effective_until', 'is_active'
@@ -597,6 +599,12 @@ async function calculateSalaryForUser(userId, month, calculatedBy) {
     const sundayOvertimePay = parseFloat(att.sunday_overtime_hours) * hourlyRate;
     const overtimePay = weekdayOvertimePay + sundayOvertimePay;
 
+    // M6 (display-only): split the weekday OT hours into approved (paid) vs
+    // unapproved (worked but not paid) so the UI can reconcile hours with
+    // overtime_pay. No pay math reads these.
+    const approvedOtHours = parseFloat(att.approved_overtime_hours) || 0;
+    const unapprovedOtHours = Math.max(0, (parseFloat(att.overtime_hours) || 0) - approvedOtHours);
+
     // Allowances from config
     const transportAllowance = parseFloat(config.transport_allowance) || 0;
     const foodAllowance = parseFloat(config.food_allowance) || 0;
@@ -641,13 +649,14 @@ async function calculateSalaryForUser(userId, month, calculatedBy) {
             total_working_days, total_present_days, total_absent_days,
             total_half_days, total_sundays_worked, total_leaves,
             paid_sunday_leaves, paid_weekday_leaves, excess_leaves,
-            total_standard_hours, total_sunday_hours, total_overtime_hours, total_worked_hours,
+            total_standard_hours, total_sunday_hours, total_overtime_hours,
+            approved_overtime_hours, unapproved_overtime_hours, total_worked_hours,
             standard_hours_pay, sunday_hours_pay, overtime_pay,
             transport_allowance, food_allowance, other_allowance, total_allowances,
             incentive_amount,
             late_deduction, absence_deduction, leave_deduction, total_deductions,
             status, calculation_date, calculated_by
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'calculated', NOW(), ?)
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'calculated', NOW(), ?)
         ON DUPLICATE KEY UPDATE
             branch_id = VALUES(branch_id), from_date = VALUES(from_date), to_date = VALUES(to_date),
             base_salary = VALUES(base_salary),
@@ -657,7 +666,10 @@ async function calculateSalaryForUser(userId, month, calculatedBy) {
             paid_sunday_leaves = VALUES(paid_sunday_leaves), paid_weekday_leaves = VALUES(paid_weekday_leaves),
             excess_leaves = VALUES(excess_leaves),
             total_standard_hours = VALUES(total_standard_hours), total_sunday_hours = VALUES(total_sunday_hours),
-            total_overtime_hours = VALUES(total_overtime_hours), total_worked_hours = VALUES(total_worked_hours),
+            total_overtime_hours = VALUES(total_overtime_hours),
+            approved_overtime_hours = VALUES(approved_overtime_hours),
+            unapproved_overtime_hours = VALUES(unapproved_overtime_hours),
+            total_worked_hours = VALUES(total_worked_hours),
             standard_hours_pay = VALUES(standard_hours_pay), sunday_hours_pay = VALUES(sunday_hours_pay),
             overtime_pay = VALUES(overtime_pay),
             transport_allowance = VALUES(transport_allowance), food_allowance = VALUES(food_allowance),
@@ -673,6 +685,7 @@ async function calculateSalaryForUser(userId, month, calculatedBy) {
             paidSundayLeaves, paidWeekdayLeaves, excessLeaves,
             parseFloat(att.standard_hours), parseFloat(att.sunday_hours),
             parseFloat(att.overtime_hours) + parseFloat(att.sunday_overtime_hours),
+            approvedOtHours, unapprovedOtHours,
             parseFloat(att.standard_hours) + parseFloat(att.sunday_hours) + parseFloat(att.overtime_hours) + parseFloat(att.sunday_overtime_hours),
             standardHoursPay, sundayHoursPay, overtimePay,
             transportAllowance, foodAllowance, otherAllowance, totalAllowances,

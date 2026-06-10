@@ -30,7 +30,11 @@ function makeSalaryPool({ config, att, leaves }) {
 }
 
 // Positions in the monthly_salaries upsert param array (routes/salary.js).
-const IDX = { overtimePay: 21, absenceDeduction: 28, leaveDeduction: 29, totalDeductions: 30 };
+// M6 inserted approved/unapproved OT hour columns at 18/19, shifting everything after.
+const IDX = {
+    approvedOt: 18, unapprovedOt: 19,
+    overtimePay: 23, absenceDeduction: 30, leaveDeduction: 31, totalDeductions: 32,
+};
 
 describe('calculateSalaryForUser money components (RT-039, RT-040)', () => {
     // monthly 26000 → hourlyRate = 26000/260 = 100 (exact).
@@ -59,6 +63,18 @@ describe('calculateSalaryForUser money components (RT-039, RT-040)', () => {
         // sunday_overtime_hours already carries the ×2 premium (4 equiv hrs for 2 actual).
         // 2×: 4 × hourlyRate(100) = 400.  (Bug was 3×: 4 × 100 × 1.5 = 600.)
         expect(pool.captured.params[IDX.overtimePay]).toBe(400);
+    });
+
+    it('M6: stamps the weekday OT split (approved paid vs unapproved unpaid) without touching pay', async () => {
+        // 5h weekday OT worked, 2h approved → split 2 / 3; pay only from the 2 approved.
+        const attSplit = { ...att, overtime_hours: '5', approved_overtime_hours: '2', sunday_overtime_hours: '0' };
+        const pool = makeSalaryPool({ config, att: attSplit, leaves });
+        salary.setPool(pool);
+        await salary.calculateSalaryForUser(7, '2026-05', 1);
+        expect(pool.captured.params[IDX.approvedOt]).toBe(2);
+        expect(pool.captured.params[IDX.unapprovedOt]).toBe(3);
+        // pay = approved 2h × 100 × 1.5 = 300 — unapproved hours earn nothing
+        expect(pool.captured.params[IDX.overtimePay]).toBe(300);
     });
 
     it('RT-040: absence/leave deductions use a fixed 10-hr day, not config.standard_daily_hours', async () => {

@@ -305,6 +305,9 @@
                         <div class="info-row"><span style="color:#6b7280;">Standard Hours</span><span style="font-weight:600;">${parseFloat(s.total_standard_hours || 0).toFixed(1)}h</span></div>
                         <div class="info-row"><span style="color:#6b7280;">Sunday Hours</span><span style="font-weight:600;">${parseFloat(s.total_sunday_hours || 0).toFixed(1)}h</span></div>
                         <div class="info-row"><span style="color:#6b7280;">Overtime Hours</span><span style="font-weight:600;">${parseFloat(s.total_overtime_hours || 0).toFixed(1)}h</span></div>
+                        ${s.approved_overtime_hours != null ? `
+                        <div class="info-row"><span style="color:#6b7280;padding-left:12px;">↳ Approved OT (paid)</span><span style="font-weight:600;">${parseFloat(s.approved_overtime_hours).toFixed(1)}h</span></div>
+                        ${parseFloat(s.unapproved_overtime_hours || 0) > 0 ? `<div class="info-row"><span style="color:#6b7280;padding-left:12px;">↳ Unapproved OT (not paid)</span><span style="font-weight:600;color:#ef4444;">${parseFloat(s.unapproved_overtime_hours).toFixed(1)}h</span></div>` : ''}` : ''}
                         <div class="info-row"><span style="color:#6b7280;">Standard Pay</span><span style="font-weight:600;">${formatCurrency(s.standard_hours_pay)}</span></div>
                         <div class="info-row"><span style="color:#6b7280;">Sunday Pay</span><span style="font-weight:600;">${formatCurrency(s.sunday_hours_pay)}</span></div>
                         <div class="info-row"><span style="color:#6b7280;">Overtime Pay</span><span style="font-weight:600;">${formatCurrency(s.overtime_pay)}</span></div>

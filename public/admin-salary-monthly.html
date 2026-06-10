@@ -893,6 +893,8 @@ function renderSalaryDetails(data) {
                 <div class="detail-row"><span>Standard Days:</span><strong>${stdDays.toFixed(1)} <small style="color:#888">(${parseFloat(s.total_standard_hours||0).toFixed(1)} hrs)</small></strong></div>
                 <div class="detail-row"><span>Sunday Days:</span><strong>${sunDays.toFixed(1)} <small style="color:#888">(${parseFloat(s.total_sunday_hours||0).toFixed(1)} hrs)</small></strong></div>
                 <div class="detail-row"><span>Overtime Days:</span><strong>${otDays.toFixed(1)} <small style="color:#888">(${parseFloat(s.total_overtime_hours||0).toFixed(1)} hrs)</small></strong></div>
+                ${s.approved_overtime_hours != null ? `
+                <div class="detail-row"><span style="padding-left:12px">↳ Weekday OT split:</span><strong style="font-weight:500">${parseFloat(s.approved_overtime_hours).toFixed(1)}h approved (paid)${parseFloat(s.unapproved_overtime_hours||0)>0?` · <span style="color:#dc3545">${parseFloat(s.unapproved_overtime_hours).toFixed(1)}h unapproved (unpaid)</span>`:''}</strong></div>` : ''}
                 <div class="detail-row total"><span>Total Days:</span><strong>${totalDays.toFixed(1)} days</strong></div>
             </div>
             <div class="detail-section">
