@@ -22,7 +22,7 @@ require('dotenv').config();
 const { Server: SocketIO } = require('socket.io');
 
 // Import middleware
-const { initPool, requirePermission, requireAnyPermission, requireAuth, requireRole, getUserPermissions, isFullAdmin } = require('./middleware/permissionMiddleware');
+const { initPool, requirePermission, requireAnyPermission, requireAuth, requireRole, getUserPermissions, isFullAdmin, FULL_ADMIN_ROLES } = require('./middleware/permissionMiddleware');
 
 // Import route modules
 const attendanceRoutes = require('./routes/attendance');
@@ -241,14 +241,17 @@ const pool = createPool();
 
 // ── PII upload gate (must sit BEFORE express.static so it intercepts) ──
 // /uploads/aadhar and /uploads/documents hold Aadhar scans and offer
-// letter PDFs. Block direct URL access; only privileged admin/manager/hr
-// roles can read these files via the static path. The dedicated API
-// routes (e.g. GET /api/staff/registrations/:id/offer-letter) handle
+// letter PDFs. Block direct URL access; only privileged roles can read
+// these files via the static path. The dedicated API routes
+// (e.g. GET /api/staff/registrations/:id/offer-letter) handle
 // owner-can-read-their-own logic separately.
-const PII_PRIVILEGED_ROLES = new Set(['admin', 'manager', 'hr']);
+// S5: roles aligned with FULL_ADMIN_ROLES (super_admin/administrator were
+// 403'd before) + manager/hr; Bearer header ONLY — ?token= support dropped
+// (bearer tokens were landing in access logs; no page used it — verified).
+const PII_PRIVILEGED_ROLES = new Set([...FULL_ADMIN_ROLES, 'manager', 'hr']);
 app.use(['/uploads/aadhar', '/uploads/documents'], async (req, res, next) => {
     try {
-        const token = req.headers.authorization?.replace('Bearer ', '') || req.query.token;
+        const token = req.headers.authorization?.replace('Bearer ', '');
         if (!token) return res.status(401).send('Unauthorized');
         const [sessions] = await pool.query(
             `SELECT u.role FROM user_sessions s JOIN users u ON s.user_id = u.id
@@ -256,7 +259,7 @@ app.use(['/uploads/aadhar', '/uploads/documents'], async (req, res, next) => {
             [token]
         );
         if (sessions.length === 0) return res.status(401).send('Unauthorized');
-        if (!PII_PRIVILEGED_ROLES.has(sessions[0].role)) {
+        if (!PII_PRIVILEGED_ROLES.has(String(sessions[0].role).toLowerCase())) {
             return res.status(403).send('Forbidden');
         }
         next();
