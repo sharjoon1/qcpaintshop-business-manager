@@ -1028,4 +1028,6 @@ router.get('/:id',
     }
 );
 
-module.exports = { router, setPool };
+// Zod schemas exported for unit testing only (tests/unit/vendors.test.js) —
+// routes still use them directly via validate().
+module.exports = { router, setPool, createVendorSchema, createBillSchema, recordPaymentSchema };

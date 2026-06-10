@@ -130,6 +130,12 @@ async function logEstimateStatusChange(estimateId, oldStatus, newStatus, changed
     }
 }
 
+// ─── IST date string (YYYY-MM-DD) for a given Date ───────────
+function toISTDateString(date) {
+    const ist = new Date(date.getTime() + 5.5 * 60 * 60 * 1000);
+    return `${ist.getFullYear()}-${String(ist.getMonth() + 1).padStart(2, '0')}-${String(ist.getDate()).padStart(2, '0')}`;
+}
+
 // ─── Haversine Distance (meters) ─────────────────────────────
 function haversineDistance(lat1, lon1, lat2, lon2) {
     const R = 6371000; // Earth radius in meters
@@ -6038,9 +6044,7 @@ router.get('/:id/locations/history', requireAuth, requirePermission('painters', 
             return res.status(400).json({ success: false, message: 'Invalid date format, use YYYY-MM-DD' });
         }
         if (!dateStr) {
-            const now = new Date();
-            const ist = new Date(now.getTime() + 5.5 * 60 * 60 * 1000);
-            dateStr = `${ist.getFullYear()}-${String(ist.getMonth() + 1).padStart(2, '0')}-${String(ist.getDate()).padStart(2, '0')}`;
+            dateStr = toISTDateString(new Date());
         }
 
         const [points] = await pool.query(
@@ -6806,4 +6810,5 @@ router.put('/admin/catalog/painters/:id/overrides/:level', requireAuth, requireP
 
 // requirePainterAuth/requirePainterSession exported for unit testing only
 // (tests/unit/auth-middleware.test.js) — routes still use them directly.
-module.exports = { router, setPool, setIO, setSessionManager, requirePainterAuth, requirePainterSession };
+// toISTDateString exported for unit testing only (tests/unit/painter-location.test.js).
+module.exports = { router, setPool, setIO, setSessionManager, requirePainterAuth, requirePainterSession, toISTDateString };

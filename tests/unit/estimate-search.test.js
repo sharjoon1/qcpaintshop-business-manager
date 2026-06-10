@@ -1,27 +1,32 @@
-// Unit tests for estimate search helpers
-// Tests the pure calculatePackCombo() function used in area mode
+// Unit tests for estimate area-mode pack combination.
+//
+// T2: tests the REAL calculatePackCombo() — the production implementation
+// lives in the inline <script> of public/estimate-create-new.html (frontend
+// only; there is no server-side copy). Previously this file re-implemented a
+// mirrored copy. We extract the actual function source from the page and
+// evaluate it, so the assertions run against production code.
+const fs = require('fs');
+const path = require('path');
+const vm = require('vm');
 
-function calculatePackCombo(litersNeeded, packSizes) {
-    if (!packSizes || packSizes.length === 0) return [];
-    const sorted = [...packSizes].sort((a, b) => b.size - a.size);
-    const result = [];
-    let remaining = litersNeeded;
-    for (const pack of sorted) {
-        if (remaining <= 0.001) break;
-        const count = Math.floor(remaining / pack.size);
-        if (count > 0) {
-            result.push({ zoho_item_id: pack.zoho_item_id, name: pack.name, size: pack.size, rate: pack.rate, quantity: count });
-            remaining -= count * pack.size;
-        }
+function loadCalculatePackCombo() {
+    const html = fs.readFileSync(
+        path.join(__dirname, '..', '..', 'public', 'estimate-create-new.html'), 'utf8'
+    );
+    const start = html.indexOf('function calculatePackCombo');
+    if (start === -1) throw new Error('calculatePackCombo not found in estimate-create-new.html');
+    let depth = 0, end = -1;
+    for (let i = html.indexOf('{', start); i < html.length; i++) {
+        if (html[i] === '{') depth++;
+        else if (html[i] === '}') { depth--; if (depth === 0) { end = i + 1; break; } }
     }
-    if (remaining > 0.001) {
-        const smallest = sorted[sorted.length - 1];
-        const existing = result.find(r => r.zoho_item_id === smallest.zoho_item_id);
-        if (existing) existing.quantity += 1;
-        else result.push({ zoho_item_id: smallest.zoho_item_id, name: smallest.name, size: smallest.size, rate: smallest.rate, quantity: 1 });
-    }
-    return result;
+    if (end === -1) throw new Error('calculatePackCombo: unbalanced braces');
+    const sandbox = {};
+    vm.runInNewContext(`${html.slice(start, end)}; __fn = calculatePackCombo;`, sandbox);
+    return sandbox.__fn;
 }
+
+const calculatePackCombo = loadCalculatePackCombo();
 
 describe('calculatePackCombo', () => {
     const packs = [

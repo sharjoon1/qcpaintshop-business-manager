@@ -1,21 +1,19 @@
 // tests/unit/painter-location.test.js
+//
+// T2: tests the REAL modules — toISTDateString from routes/painters.js (used
+// by GET /:id/locations/history to default the date) and haversineMeters from
+// services/painter-attendance-service.js (the canonical segment-distance
+// implementation; the admin route-replay total in public/admin-painters.html
+// inlines the same formula with the same per-segment Math.round). Previously
+// this file re-implemented mirrored copies of both.
 'use strict';
 
-// Pure helper used inside the history endpoint to compute IST date string
-function toISTDateString(date) {
-    const ist = new Date(date.getTime() + 5.5 * 60 * 60 * 1000);
-    return `${ist.getFullYear()}-${String(ist.getMonth() + 1).padStart(2, '0')}-${String(ist.getDate()).padStart(2, '0')}`;
-}
+const { toISTDateString } = require('../../routes/painters');
+const { haversineMeters } = require('../../services/painter-attendance-service');
 
-// Pure helper to sum haversine distances over an ordered array of {latitude, longitude} points
-const EARTH_RADIUS_M = 6371000;
-function toRad(deg) { return deg * Math.PI / 180; }
-function haversineMeters(lat1, lng1, lat2, lng2) {
-    const dLat = toRad(lat2 - lat1);
-    const dLng = toRad(lng2 - lng1);
-    const a = Math.sin(dLat / 2) ** 2 + Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLng / 2) ** 2;
-    return Math.round(EARTH_RADIUS_M * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a)));
-}
+// Test glue only: route-replay total = sum of real haversineMeters over
+// consecutive points (mirrors the loop at public/admin-painters.html
+// "loc-stat-dist"; the distance math itself is the real export above).
 function totalRouteMeters(points) {
     let total = 0;
     for (let i = 1; i < points.length; i++) {

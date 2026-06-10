@@ -2,7 +2,8 @@
  * Billing Routes
  * Estimates, invoices, payments, Zoho push, product search, dashboard stats.
  *
- * Exports: { router, setPool, setPointsEngine }
+ * Exports: { router, setPool, setPointsEngine } + calculateTotals,
+ * createEstimateSchema, recordPaymentSchema (the latter for unit testing only).
  */
 
 const express = require('express');
@@ -60,6 +61,16 @@ async function generateNumber(prefix, table, column) {
     }
 
     return `${prefix}-${dateStr}-${String(seq).padStart(3, '0')}`;
+}
+
+/**
+ * Compute estimate/invoice money totals (shared by the four create/edit endpoints).
+ * No rounding here — values are stored as computed; grand total floors at 0.
+ */
+function calculateTotals(items, discountAmount = 0) {
+    const subtotal = items.reduce((sum, item) => sum + item.quantity * item.unit_price, 0);
+    const grandTotal = Math.max(0, subtotal - discountAmount);
+    return { subtotal, grandTotal };
 }
 
 // ═══════════════════════════════════════════
@@ -285,8 +296,7 @@ router.post('/estimates',
             const data = req.body;
             const estimateNumber = await generateNumber('BE', 'billing_estimates', 'estimate_number');
 
-            const subtotal = data.items.reduce((sum, item) => sum + item.quantity * item.unit_price, 0);
-            const grandTotal = Math.max(0, subtotal - data.discount_amount);
+            const { subtotal, grandTotal } = calculateTotals(data.items, data.discount_amount);
 
             const [result] = await pool.query(
                 `INSERT INTO billing_estimates
@@ -447,8 +457,7 @@ router.put('/estimates/:id',
                 return res.status(400).json({ success: false, message: 'Only draft or sent estimates can be edited' });
             }
 
-            const subtotal = data.items.reduce((sum, item) => sum + item.quantity * item.unit_price, 0);
-            const grandTotal = Math.max(0, subtotal - data.discount_amount);
+            const { subtotal, grandTotal } = calculateTotals(data.items, data.discount_amount);
 
             await pool.query(
                 `UPDATE billing_estimates SET
@@ -666,8 +675,7 @@ router.post('/invoices',
             const data = req.body;
             const invoiceNumber = await generateNumber('BI', 'billing_invoices', 'invoice_number');
 
-            const subtotal = data.items.reduce((sum, item) => sum + item.quantity * item.unit_price, 0);
-            const grandTotal = Math.max(0, subtotal - data.discount_amount);
+            const { subtotal, grandTotal } = calculateTotals(data.items, data.discount_amount);
 
             await connection.beginTransaction();
 
@@ -850,8 +858,7 @@ router.put('/invoices/:id',
                 return res.status(400).json({ success: false, message: 'Cannot edit an invoice already pushed to Zoho' });
             }
 
-            const subtotal = data.items.reduce((sum, item) => sum + item.quantity * item.unit_price, 0);
-            const grandTotal = Math.max(0, subtotal - data.discount_amount);
+            const { subtotal, grandTotal } = calculateTotals(data.items, data.discount_amount);
 
             // Preserve any existing payments when recalculating balance_due
             const [paySum] = await pool.query(
@@ -1079,4 +1086,6 @@ router.post('/invoices/:id/push-zoho',
 
 // ═══════════════════════════════════════════
 
-module.exports = { router, setPool, setPointsEngine };
+// calculateTotals + schemas exported for unit testing only
+// (tests/unit/billing.test.js) — routes still use them directly.
+module.exports = { router, setPool, setPointsEngine, calculateTotals, createEstimateSchema, recordPaymentSchema };

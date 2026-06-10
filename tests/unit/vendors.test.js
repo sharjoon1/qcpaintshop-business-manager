@@ -1,46 +1,20 @@
 // tests/unit/vendors.test.js
-const { z } = require('zod');
+//
+// T2: tests the REAL modules — Zod schemas from routes/vendors.js and
+// verifyBillItems from services/vendor-bill-ai-service.js. Previously this
+// file re-implemented mirrored copies of both.
+//
+// NOTE (T2 finding, not fixed here): the real verifyBillItems reads
+// staff.rate / staff.amount, but POST /bills/:id/verify feeds it
+// vendor_bill_items rows whose columns are unit_price / amount — so in
+// production the rate comparison always sees staffRate=0. The mirror used
+// unit_price and per-index difference field names (item_1_quantity); the real
+// function uses 'quantity'/'rate' field names. Tests below characterize the
+// real function via its own contract.
+const { createVendorSchema, createBillSchema, recordPaymentSchema } = require('../../routes/vendors');
+const { verifyBillItems } = require('../../services/vendor-bill-ai-service');
 
 describe('Vendor System', () => {
-    const createVendorSchema = z.object({
-        vendor_name: z.string().min(1),
-        contact_person: z.string().optional().default(''),
-        phone: z.string().optional().default(''),
-        email: z.string().optional().default(''),
-        address: z.string().optional().default(''),
-        gst_number: z.string().optional().default(''),
-        payment_terms: z.number().int().min(0).optional().default(30),
-        notes: z.string().optional().default(''),
-    });
-
-    const billItemSchema = z.object({
-        zoho_item_id: z.string().optional().nullable().default(null),
-        item_name: z.string().min(1),
-        quantity: z.number().positive(),
-        unit_price: z.number().min(0),
-        ai_matched: z.boolean().optional().default(false),
-        ai_confidence: z.number().min(0).max(1).optional().default(0),
-    });
-
-    const createBillSchema = z.object({
-        vendor_id: z.number().int().positive(),
-        bill_number: z.string().optional().default(''),
-        bill_date: z.string().optional().nullable(),
-        due_date: z.string().optional().nullable(),
-        items: z.array(billItemSchema).min(1),
-        tax_amount: z.number().min(0).optional().default(0),
-        notes: z.string().optional().default(''),
-    });
-
-    const recordPaymentSchema = z.object({
-        vendor_id: z.number().int().positive(),
-        bill_id: z.number().int().positive().optional().nullable(),
-        amount: z.number().positive(),
-        payment_method: z.enum(['bank_transfer', 'cheque', 'upi', 'cash']),
-        payment_reference: z.string().optional().default(''),
-        payment_date: z.string().min(1),
-        notes: z.string().optional().default(''),
-    });
 
     describe('Vendor Schema', () => {
         it('should accept valid vendor', () => {
@@ -106,65 +80,42 @@ describe('Vendor System', () => {
     });
 
     describe('Bill Verification Logic', () => {
-        function verifyBillItems(staffItems, aiExtractedData) {
-            if (!aiExtractedData || !aiExtractedData.items) {
-                return { status: 'verified', differences: [] };
-            }
-            const differences = [];
-            const aiItems = aiExtractedData.items;
-
-            if (staffItems.length !== aiItems.length) {
-                differences.push({ field: 'item_count', expected: aiItems.length, actual: staffItems.length });
-            }
-
-            const maxLen = Math.min(staffItems.length, aiItems.length);
-            for (let i = 0; i < maxLen; i++) {
-                if (aiItems[i].quantity != null && Math.abs(parseFloat(staffItems[i].quantity) - aiItems[i].quantity) > 0.01) {
-                    differences.push({ field: `item_${i + 1}_quantity`, expected: aiItems[i].quantity, actual: parseFloat(staffItems[i].quantity) });
-                }
-                if (aiItems[i].rate != null && Math.abs(parseFloat(staffItems[i].unit_price) - aiItems[i].rate) > 0.01) {
-                    differences.push({ field: `item_${i + 1}_rate`, expected: aiItems[i].rate, actual: parseFloat(staffItems[i].unit_price) });
-                }
-            }
-
-            return { status: differences.length === 0 ? 'verified' : 'mismatch', differences };
-        }
-
+        // Staff items shaped per the real function's contract: quantity/rate/amount.
         it('should verify matching items', () => {
-            const staff = [{ quantity: 5, unit_price: 2000, line_total: 10000 }];
-            const ai = { items: [{ name: 'Paint', quantity: 5, rate: 2000 }] };
+            const staff = [{ item_name: 'Paint', quantity: 5, rate: 2000, amount: 10000 }];
+            const ai = { items: [{ name: 'Paint', quantity: 5, rate: 2000 }], total: 10000 };
             const result = verifyBillItems(staff, ai);
             expect(result.status).toBe('verified');
             expect(result.differences).toHaveLength(0);
         });
 
         it('should detect quantity mismatch', () => {
-            const staff = [{ quantity: 10, unit_price: 500, line_total: 5000 }];
-            const ai = { items: [{ name: 'Paint', quantity: 5, rate: 500 }] };
+            const staff = [{ item_name: 'Paint', quantity: 10, rate: 500, amount: 5000 }];
+            const ai = { items: [{ name: 'Paint', quantity: 5, rate: 500 }], total: 5000 };
             const result = verifyBillItems(staff, ai);
             expect(result.status).toBe('mismatch');
-            expect(result.differences[0].field).toBe('item_1_quantity');
+            expect(result.differences[0].field).toBe('quantity');
         });
 
         it('should detect rate mismatch', () => {
-            const staff = [{ quantity: 5, unit_price: 600, line_total: 3000 }];
-            const ai = { items: [{ name: 'Paint', quantity: 5, rate: 500 }] };
+            const staff = [{ item_name: 'Paint', quantity: 5, rate: 600, amount: 3000 }];
+            const ai = { items: [{ name: 'Paint', quantity: 5, rate: 500 }], total: 3000 };
             const result = verifyBillItems(staff, ai);
             expect(result.status).toBe('mismatch');
         });
 
         it('should verify when no AI data', () => {
-            const staff = [{ quantity: 5, unit_price: 500, line_total: 2500 }];
+            const staff = [{ item_name: 'Paint', quantity: 5, rate: 500, amount: 2500 }];
             const result = verifyBillItems(staff, null);
             expect(result.status).toBe('verified');
         });
 
         it('should detect item count mismatch', () => {
             const staff = [
-                { quantity: 5, unit_price: 500, line_total: 2500 },
-                { quantity: 3, unit_price: 200, line_total: 600 }
+                { item_name: 'Paint', quantity: 5, rate: 500, amount: 2500 },
+                { item_name: 'Brush', quantity: 3, rate: 200, amount: 600 }
             ];
-            const ai = { items: [{ name: 'Paint', quantity: 5, rate: 500 }] };
+            const ai = { items: [{ name: 'Paint', quantity: 5, rate: 500 }], total: 3100 };
             const result = verifyBillItems(staff, ai);
             expect(result.status).toBe('mismatch');
         });
