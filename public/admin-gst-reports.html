@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>GST Reports — QC Business Manager</title>
 <script src="/js/qc-escape.js?v=32133ff2"></script>
+<script src="/universal-nav-loader.js?v=fb16cb40"></script>
 <style>
 :root { --primary:#667eea; --primary2:#764ba2; }
 * { box-sizing:border-box; margin:0; padding:0; font-family:'Segoe UI',system-ui,sans-serif; }
@@ -40,7 +41,7 @@ td.num, th.num { text-align:right; font-variant-numeric:tabular-nums; }
 @media (max-width:640px){ .header h1{font-size:16px} td,th{padding:6px 7px;font-size:12px} }
 </style>
 </head>
-<body>
+<body data-page="gst-reports">
 <div class="header">
     <a href="/dashboard.html">←</a>
     <h1>📊 GST Reports</h1>
@@ -113,24 +114,46 @@ async function loadActive() {
     document.getElementById('loading').style.display = 'none';
 }
 
+let b2bCustomerFilter = '';
+function filteredB2B() {
+    const d = cache.filing;
+    return b2bCustomerFilter ? d.b2b.filter(i => i.customer_name === b2bCustomerFilter) : d.b2b;
+}
+
 async function loadFiling(month) {
     const d = await api('/api/gst-reports/filing?month=' + month);
     cache.filing = d;
+    b2bCustomerFilter = '';
+    renderFiling();
+}
+
+function renderFiling() {
+    const d = cache.filing;
+    const month = d.month;
+    const b2bRows = filteredB2B();
+    const customers = [...new Set(d.b2b.map(i => i.customer_name))].sort();
     const el = document.getElementById('tab-filing');
     el.innerHTML = `
         <div class="banner-info">Actual sale values for <b>${escHtml(month)}</b> — this is the report for your auditor / GSTR-1. Every non-void invoice is included at its real value.</div>
         ${d.tax_note ? `<div class="banner-info" style="background:#fffbeb;border-color:#f59e0b;color:#92400e">ⓘ ${escHtml(d.tax_note)}</div>` : ''}
         <div class="cards">
             <div class="card"><div class="lbl">Invoices</div><div class="val">${d.totals.invoice_count}</div></div>
+            <div class="card"><div class="lbl">Invoice number range</div><div class="val" style="font-size:15px">${d.invoice_range && d.invoice_range.first ? escHtml(d.invoice_range.first) + ' → ' + escHtml(d.invoice_range.last) : '—'}</div><div class="muted">${d.invoice_range ? d.invoice_range.count + ' invoices' : ''}</div></div>
             <div class="card"><div class="lbl">Taxable (sub total)</div><div class="val">${fmtINR(d.totals.sub_total)}</div></div>
             <div class="card"><div class="lbl">GST (tax total)</div><div class="val">${fmtINR(d.totals.tax_total)}</div></div>
             <div class="card"><div class="lbl">Grand total</div><div class="val">${fmtINR(d.totals.total)}</div></div>
         </div>
-        <div class="section-title">B2B — GST invoices (${d.b2b.length})
-            <button class="btn" onclick="exportB2B()">⬇ CSV</button></div>
+        <div class="section-title">B2B — GST invoices (${b2bRows.length}${b2bCustomerFilter ? ' of ' + d.b2b.length : ''})
+            <select id="b2bCustomer" onchange="b2bCustomerFilter=this.value; renderFiling()" style="padding:6px 10px;border:1px solid #d1d5db;border-radius:8px;font-size:13px;max-width:240px">
+                <option value="">All customers</option>
+                ${customers.map(c => `<option value="${escAttr(c)}" ${c === b2bCustomerFilter ? 'selected' : ''}>${escHtml(c)}</option>`).join('')}
+            </select>
+            <button class="btn" onclick="exportB2B()">⬇ Invoices CSV</button>
+            <button class="btn" onclick="loadB2BItems()">📦 Item-wise (HSN)</button></div>
         <div class="tbl-scroll"><table><thead><tr><th>Date</th><th>Invoice #</th><th>Customer</th><th>GSTIN</th><th class="num">Taxable</th><th class="num">GST</th><th class="num">Total</th></tr></thead><tbody>
-        ${d.b2b.map(i => `<tr><td>${escHtml(String(i.invoice_date).slice(0, 10))}</td><td>${escHtml(i.invoice_number)}</td><td>${escHtml(i.customer_name)}</td><td>${escHtml(i.gstin)}</td><td class="num">${fmtINR(i.sub_total)}</td><td class="num">${fmtINR(i.tax_total)}</td><td class="num">${fmtINR(i.total)}</td></tr>`).join('') || '<tr><td colspan="7" class="muted">No B2B invoices this month</td></tr>'}
+        ${b2bRows.map(i => `<tr><td>${escHtml(String(i.invoice_date).slice(0, 10))}</td><td>${escHtml(i.invoice_number)}</td><td>${escHtml(i.customer_name)}</td><td>${escHtml(i.gstin)}</td><td class="num">${fmtINR(i.sub_total)}</td><td class="num">${fmtINR(i.tax_total)}</td><td class="num">${fmtINR(i.total)}</td></tr>`).join('') || '<tr><td colspan="7" class="muted">No B2B invoices this month</td></tr>'}
         </tbody></table></div>
+        <div id="b2bItems"></div>
         <div class="section-title">B2C — consolidated</div>
         <div class="cards">
             <div class="card"><div class="lbl">B2C invoices</div><div class="val">${d.b2c.invoice_count}</div></div>
@@ -146,9 +169,46 @@ async function loadFiling(month) {
 
 function exportB2B() {
     const d = cache.filing;
-    csvDownload(`gst-filing-b2b-${d.month}.csv`,
+    const suffix = b2bCustomerFilter ? '-' + b2bCustomerFilter.replace(/[^\w]+/g, '_').slice(0, 30) : '';
+    csvDownload(`gst-filing-b2b-${d.month}${suffix}.csv`,
         ['Invoice Date', 'Invoice Number', 'Customer', 'GSTIN', 'Taxable Value', 'GST', 'Total'],
-        d.b2b.map(i => [String(i.invoice_date).slice(0, 10), i.invoice_number, i.customer_name, i.gstin, i.sub_total, i.tax_total, i.total]));
+        filteredB2B().map(i => [String(i.invoice_date).slice(0, 10), i.invoice_number, i.customer_name, i.gstin, i.sub_total, i.tax_total, i.total]));
+}
+
+async function loadB2BItems() {
+    const month = cache.filing.month;
+    const box = document.getElementById('b2bItems');
+    box.innerHTML = '<div class="muted" style="padding:14px">Loading item-wise detail… (first load fetches lines from Zoho — may take a minute)</div>';
+    try {
+        const q = '/api/gst-reports/b2b-items?month=' + month + (b2bCustomerFilter ? '&customer=' + encodeURIComponent(b2bCustomerFilter) : '');
+        const d = await api(q);
+        cache.b2bItems = d;
+        box.innerHTML = `
+            <div class="section-title">Item-wise detail with HSN (${d.invoices.length} invoices)
+                <button class="btn" onclick="exportB2BItems()">⬇ Item-wise CSV</button>
+                ${d.fetched_from_zoho ? `<span class="muted">${d.fetched_from_zoho} fetched from Zoho & cached</span>` : ''}</div>
+            ${d.invoices.map(inv => `
+                <div style="margin-bottom:12px">
+                    <div style="font-weight:600;font-size:13px;padding:6px 2px">${escHtml(inv.invoice_number)} · ${escHtml(String(inv.invoice_date).slice(0, 10))} · ${escHtml(inv.customer_name)} <span class="muted">${escHtml(inv.gstin)}</span> · ${fmtINR(inv.total)}</div>
+                    ${inv.fetch_error ? `<div class="banner-warn">${escHtml(inv.fetch_error)}</div>` : `
+                    <div class="tbl-scroll"><table><thead><tr><th>Item</th><th>HSN</th><th class="num">Qty</th><th class="num">Rate</th><th class="num">Amount</th></tr></thead><tbody>
+                    ${inv.items.map(it => `<tr><td>${escHtml(it.name)}</td><td>${escHtml(it.hsn || '—')}</td><td class="num">${it.quantity}</td><td class="num">${fmtINR(it.rate)}</td><td class="num">${fmtINR(it.item_total)}</td></tr>`).join('')}
+                    </tbody></table></div>`}
+                </div>`).join('')}`;
+    } catch (e) {
+        box.innerHTML = '<div class="banner-warn">' + escHtml(e.message) + '</div>';
+    }
+}
+
+function exportB2BItems() {
+    const d = cache.b2bItems;
+    const suffix = b2bCustomerFilter ? '-' + b2bCustomerFilter.replace(/[^\w]+/g, '_').slice(0, 30) : '';
+    const rows = [];
+    for (const inv of d.invoices) for (const it of inv.items) {
+        rows.push([String(inv.invoice_date).slice(0, 10), inv.invoice_number, inv.customer_name, inv.gstin, it.name, it.hsn, it.quantity, it.rate, it.item_total]);
+    }
+    csvDownload(`gst-filing-b2b-items-${d.month}${suffix}.csv`,
+        ['Invoice Date', 'Invoice Number', 'Customer', 'GSTIN', 'Item', 'HSN', 'Qty', 'Rate', 'Amount'], rows);
 }
 function exportHSN() {
     const d = cache.filing;

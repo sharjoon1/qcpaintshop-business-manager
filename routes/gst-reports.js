@@ -21,6 +21,7 @@
 const express = require('express');
 const router = express.Router();
 const { requirePermission } = require('../middleware/permissionMiddleware');
+const zohoAPI = require('../services/zoho-api');
 
 let pool;
 function setPool(p) { pool = p; }
@@ -41,6 +42,25 @@ function monthRange(month) {
 /** GSTIN present (after trimming) → B2B. */
 function isB2B(gstin) {
     return !!(gstin && String(gstin).trim() !== '');
+}
+
+/**
+ * Auditor's invoice-number range for the month: first/last by the numeric
+ * part of the invoice number (falls back to lexical when non-numeric).
+ */
+function invoiceNumberRange(numbers) {
+    const list = (numbers || []).filter(n => n != null && String(n).trim() !== '');
+    if (!list.length) return { first: null, last: null, count: 0 };
+    const numeric = list.map(n => {
+        const m = String(n).match(/(\d+)\s*$/);
+        return { n, key: m ? parseInt(m[1], 10) : null };
+    });
+    if (numeric.every(x => x.key != null)) {
+        numeric.sort((a, b) => a.key - b.key);
+    } else {
+        numeric.sort((a, b) => String(a.n).localeCompare(String(b.n)));
+    }
+    return { first: numeric[0].n, last: numeric[numeric.length - 1].n, count: list.length };
 }
 
 /**
@@ -144,12 +164,93 @@ router.get('/filing', requirePermission('zoho', 'view'), async (req, res) => {
 
         res.json({
             success: true, month: req.query.month, totals, b2b, b2c, hsn,
+            invoice_range: invoiceNumberRange(invoices.map(i => i.invoice_number)),
             tax_note: anyDerived
                 ? 'Taxable/GST split derived from the GST-inclusive total at a uniform 18% (Zoho line-level tax is not synced). Cross-check totals against Zoho Books’ own GSTR-1 before filing.'
                 : null,
         });
     } catch (err) {
         console.error('GST filing report error:', err);
+        res.status(400).json({ success: false, message: err.message });
+    }
+});
+
+// ── B2B ITEM-LEVEL DETAIL (HSN-wise, for GSTR-1 invoice annexure) ───────────
+// Per-invoice line items live only in Zoho (the header sync never stores
+// them) — fetched on demand via the Zoho API and cached into
+// zoho_invoices.line_items, so each invoice costs one API call ever.
+
+router.get('/b2b-items', requirePermission('zoho', 'view'), async (req, res) => {
+    try {
+        const [from, to] = monthRange(req.query.month);
+        const params = [from, to];
+        let customerSql = '';
+        if (req.query.customer) { customerSql = ' AND zi.customer_name = ?'; params.push(req.query.customer); }
+
+        const [invoices] = await pool.query(
+            `SELECT zi.zoho_invoice_id, zi.invoice_number, zi.invoice_date, zi.customer_name,
+                    zi.total, zi.line_items, TRIM(COALESCE(zcm.zoho_gst_no, '')) AS gstin
+             FROM zoho_invoices zi
+             JOIN zoho_customers_map zcm ON zcm.zoho_contact_id = zi.zoho_customer_id
+             WHERE zi.invoice_date BETWEEN ? AND ? AND zi.status <> 'void'
+               AND TRIM(COALESCE(zcm.zoho_gst_no, '')) <> ''${customerSql}
+             ORDER BY zi.invoice_date, zi.invoice_number
+             LIMIT 300`,
+            params
+        );
+
+        const out = [];
+        let fetchedFromZoho = 0;
+        for (const inv of invoices) {
+            let lines = null;
+            if (inv.line_items) {
+                try { lines = JSON.parse(inv.line_items); } catch (e) { lines = null; }
+            }
+            if (!lines) {
+                try {
+                    const resp = await zohoAPI.getInvoice(inv.zoho_invoice_id, { caller: 'gst-b2b-items', priority: 'high' });
+                    lines = (resp && resp.invoice && resp.invoice.line_items) || [];
+                    fetchedFromZoho++;
+                    await pool.query('UPDATE zoho_invoices SET line_items = ? WHERE zoho_invoice_id = ?',
+                        [JSON.stringify(lines), inv.zoho_invoice_id]);
+                } catch (e) {
+                    out.push({
+                        invoice_number: inv.invoice_number, invoice_date: inv.invoice_date,
+                        customer_name: inv.customer_name, gstin: inv.gstin, total: inv.total,
+                        items: [], fetch_error: 'Zoho fetch failed: ' + e.message,
+                    });
+                    continue;
+                }
+            }
+            out.push({
+                invoice_number: inv.invoice_number, invoice_date: inv.invoice_date,
+                customer_name: inv.customer_name, gstin: inv.gstin, total: inv.total,
+                items: (lines || []).map(li => ({
+                    name: li.name || li.description || '',
+                    hsn: li.hsn_or_sac || '',
+                    quantity: parseFloat(li.quantity) || 0,
+                    rate: parseFloat(li.rate) || 0,
+                    item_total: parseFloat(li.item_total) || 0,
+                })),
+            });
+        }
+
+        // HSN fallback from the items map for lines Zoho returned without one
+        const missing = new Set();
+        for (const inv of out) for (const it of inv.items) if (!it.hsn && it.name) missing.add(it.name);
+        if (missing.size) {
+            const [hsnRows] = await pool.query(
+                `SELECT zoho_item_name, zoho_hsn_or_sac FROM zoho_items_map
+                 WHERE zoho_item_name IN (?) AND COALESCE(zoho_hsn_or_sac, '') <> ''`,
+                [[...missing]]
+            );
+            const hsnByName = Object.fromEntries(hsnRows.map(r => [r.zoho_item_name, r.zoho_hsn_or_sac]));
+            for (const inv of out) for (const it of inv.items) if (!it.hsn) it.hsn = hsnByName[it.name] || '';
+        }
+
+        res.json({ success: true, month: req.query.month, invoices: out, fetched_from_zoho: fetchedFromZoho });
+    } catch (err) {
+        console.error('GST b2b-items error:', err);
         res.status(400).json({ success: false, message: err.message });
     }
 });
@@ -349,4 +450,4 @@ router.get('/profitability', requirePermission('zoho', 'view'), async (req, res)
     }
 });
 
-module.exports = { router, setPool, monthRange, isB2B, resolveCostRate, deriveTax };
+module.exports = { router, setPool, monthRange, isB2B, resolveCostRate, deriveTax, invoiceNumberRange };

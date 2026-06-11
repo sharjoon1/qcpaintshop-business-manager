@@ -6,7 +6,7 @@
  * gst_purchase flag and cost restatement exist ONLY in the internal
  * cost-analysis report.
  */
-const { monthRange, isB2B, resolveCostRate, deriveTax } = require('../../routes/gst-reports');
+const { monthRange, isB2B, resolveCostRate, deriveTax, invoiceNumberRange } = require('../../routes/gst-reports');
 
 describe('monthRange', () => {
     it('expands YYYY-MM to first/last day (leap-aware)', () => {
@@ -30,6 +30,25 @@ describe('isB2B (GSTIN split)', () => {
         expect(isB2B('   ')).toBe(false);
         expect(isB2B(null)).toBe(false);
         expect(isB2B(undefined)).toBe(false);
+    });
+});
+
+describe('invoiceNumberRange (auditor completeness check)', () => {
+    it('orders by the numeric suffix, not lexically', () => {
+        expect(invoiceNumberRange(['INV-000101', 'INV-000099', 'INV-000100']))
+            .toEqual({ first: 'INV-000099', last: 'INV-000101', count: 3 });
+        // lexical would wrongly put INV-9 after INV-100
+        expect(invoiceNumberRange(['INV-9', 'INV-100']))
+            .toEqual({ first: 'INV-9', last: 'INV-100', count: 2 });
+    });
+
+    it('falls back to lexical when numbers are not numeric-suffixed', () => {
+        expect(invoiceNumberRange(['B/22', 'A/11']).first).toBe('A/11');
+    });
+
+    it('empty/blank-safe', () => {
+        expect(invoiceNumberRange([])).toEqual({ first: null, last: null, count: 0 });
+        expect(invoiceNumberRange([null, ' '])).toEqual({ first: null, last: null, count: 0 });
     });
 });
 
