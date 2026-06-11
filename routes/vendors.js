@@ -23,6 +23,17 @@ function setPool(p) { pool = p; vendorBillAI.setPool(p); setIdempotencyPool(p); 
 const r2 = n => Math.round((parseFloat(n) || 0) * 100) / 100;
 const GST_RATE = 0.18; // paints/putty: CGST 9 + SGST 9
 
+// Zoho rejects a raw mysql2 Date (serialized as a full ISO timestamp) with
+// "Invalid value passed for <Date>". It wants a bare YYYY-MM-DD. Format any
+// date-ish value to that, using LOCAL date parts (host TZ is IST) so a DATE
+// column's midnight doesn't roll back a day. Returns null when unparseable.
+function toYmd(value) {
+    if (!value) return null;
+    const d = new Date(value);
+    if (isNaN(d)) return null;
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+
 /**
  * Vendor bill/PO money model (owner decision 2026-06-12):
  *   subtotal = Σ(qty × DPL)   [unit_price is the ex-GST DPL cost per pack]
@@ -1005,11 +1016,16 @@ router.post('/bills/:id/push-zoho',
             // Zoho then computes GST on (subtotal − discount), matching the
             // printed invoice. Zoho applies each item's own tax rate.
             const billDiscount = parseFloat(bill.discount_amount) || 0;
+            // Dates MUST be bare YYYY-MM-DD or Zoho 400s "Invalid value passed
+            // for Invoice Date". bill_date is required → default to today; due
+            // date is optional → omit when absent/unparseable.
+            const billDate = toYmd(bill.bill_date) || toYmd(new Date());
+            const dueDate = toYmd(bill.due_date);
             const zohoResp = await zohoAPI.createBill({
                 vendor_id: zohoContactId,
                 bill_number: bill.bill_number,
-                date: bill.bill_date,
-                due_date: bill.due_date,
+                date: billDate,
+                ...(dueDate ? { due_date: dueDate } : {}),
                 line_items: lineItems,
                 ...(pushLocationId ? { location_id: pushLocationId } : {}),
                 ...(billDiscount > 0 ? { discount: billDiscount, is_discount_before_tax: true, discount_type: 'entity_level' } : {})
