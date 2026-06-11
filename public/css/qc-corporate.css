@@ -1,0 +1,376 @@
+/* ============================================================
+   QC UNIFIED DESIGN SYSTEM  — Sales & Purchase
+   Green #1B5E3B + Gold #D4A24E · no purple · no off-brand blue stat cards
+   Enhances existing classes; declare AFTER the page's own <style>.
+   ============================================================ */
+:root{
+  /* Brand */
+  --brand:#1B5E3B; --brand-700:#154D31; --brand-800:#0D3D23;
+  --brand-50:#ECF5EF; --brand-100:#D6EADD;
+  --gold:#D4A24E; --gold-50:#FBF4E7; --gold-600:#B5832F;
+
+  /* Neutrals (warm-cool slate) */
+  --ink:#0F172A; --ink-2:#334155; --ink-3:#64748B; --ink-4:#94A3B8;
+  --line:#E2E8F0; --line-2:#F1F5F9;
+  --surface:#FFFFFF; --surface-2:#F8FAFC; --surface-3:#F1F5F9;
+
+  /* Semantic status */
+  --ok:#15803D;  --ok-bg:#DCFCE7;
+  --warn:#B45309;--warn-bg:#FEF3C7;
+  --err:#B91C1C; --err-bg:#FEE2E2;
+  --info:#1D4ED8;--info-bg:#DBEAFE;
+  --neut:#475569;--neut-bg:#F1F5F9;
+
+  /* Radius */
+  --r-sm:6px; --r-md:8px; --r-lg:12px; --r-xl:16px; --r-pill:999px;
+
+  /* Shadow ladder */
+  --sh-1:0 1px 2px rgba(15,23,42,.04),0 1px 3px rgba(15,23,42,.06);
+  --sh-2:0 2px 4px rgba(15,23,42,.05),0 4px 12px rgba(15,23,42,.08);
+  --sh-3:0 8px 24px rgba(15,23,42,.10),0 2px 6px rgba(15,23,42,.06);
+  --sh-pop:0 12px 32px rgba(15,23,42,.14);
+
+  /* Focus + motion */
+  --focus:0 0 0 2px #fff,0 0 0 4px rgba(27,94,59,.55);
+  --ease:cubic-bezier(.2,.6,.2,1); --dur:150ms;
+}
+
+/* ---- 0. Page base ---------------------------------------- */
+body[data-page]{ background:var(--surface-2)!important; color:var(--ink);
+  font-family:ui-sans-serif,-apple-system,"Segoe UI",Roboto,"Inter",sans-serif; }
+.qc-tnums{ font-variant-numeric:tabular-nums; }
+
+/* ---- 1. App-bar / page header ---------------------------- */
+.qc-appbar{
+  background:var(--surface); border-bottom:1px solid var(--line);
+  border-radius:var(--r-lg); box-shadow:var(--sh-1);
+  padding:16px 20px; margin-bottom:20px;
+  display:flex; align-items:flex-start; justify-content:space-between; gap:16px;
+  position:relative; overflow:hidden;
+}
+.qc-appbar::before{ /* gold signature rail */
+  content:""; position:absolute; left:0; top:0; bottom:0; width:4px;
+  background:linear-gradient(180deg,var(--brand),var(--gold)); }
+.qc-appbar-main{ min-width:0; padding-left:8px; }
+.qc-breadcrumb{ font-size:13px; color:var(--ink-3); margin-bottom:2px;
+  display:flex; align-items:center; gap:6px; }
+.qc-breadcrumb .sep{ opacity:.4; }
+.qc-breadcrumb b{ color:var(--ink-2); font-weight:500; }
+.qc-appbar h1{ font-size:20px; line-height:28px; font-weight:600;
+  letter-spacing:-.01em; color:var(--ink); margin:0;
+  white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.qc-appbar-sub{ font-size:13px; color:var(--ink-3); margin-top:2px; }
+.qc-appbar-actions{ display:flex; align-items:center; gap:8px; flex-shrink:0; }
+@media (max-width:639px){
+  .qc-appbar{ padding:12px 14px; border-radius:0; margin:-16px -16px 16px; }
+  .qc-appbar h1{ font-size:18px; line-height:24px; }
+  .qc-breadcrumb{ display:none; }
+}
+
+/* ---- 2. KPI stat tiles ----------------------------------- */
+.qc-kpi-grid{ display:grid; gap:16px;
+  grid-template-columns:repeat(2,minmax(0,1fr)); align-items:stretch; }
+@media (min-width:1024px){ .qc-kpi-grid{ grid-template-columns:repeat(4,1fr);} }
+.qc-kpi{
+  background:var(--surface); border:1px solid var(--line);
+  border-radius:var(--r-lg); padding:16px 18px; box-shadow:var(--sh-1);
+  position:relative; display:flex; flex-direction:column; gap:6px;
+  transition:border-color var(--dur) var(--ease),box-shadow var(--dur) var(--ease),transform var(--dur) var(--ease);
+}
+.qc-kpi-label{ font-size:12px; font-weight:600; color:var(--ink-3);
+  text-transform:uppercase; letter-spacing:.04em;
+  display:flex; align-items:center; gap:8px; }
+.qc-kpi-val{ font-size:28px; line-height:1.1; font-weight:700; color:var(--ink);
+  font-variant-numeric:tabular-nums; }
+.qc-kpi-sub{ font-size:12px; color:var(--ink-3); }
+.qc-kpi-ic{ width:26px; height:26px; border-radius:var(--r-sm);
+  display:inline-flex; align-items:center; justify-content:center;
+  background:var(--brand-50); color:var(--brand); flex-shrink:0; }
+.qc-kpi-ic svg{ width:15px; height:15px; }
+/* Hero tile — the single accented metric (Outstanding / Today Collection) */
+.qc-kpi--hero{ border-color:var(--brand-100); }
+.qc-kpi--hero::before{ content:""; position:absolute; left:0; top:10px; bottom:10px;
+  width:3px; border-radius:3px; background:var(--gold); }
+.qc-kpi--hero .qc-kpi-ic{ background:var(--gold-50); color:var(--gold-600); }
+@media (max-width:639px){ .qc-kpi-val{ font-size:24px; } }
+@media (prefers-reduced-motion:no-preference){
+  .qc-kpi[role="button"]:hover,.qc-kpi.is-link:hover{
+    border-color:var(--brand-100); box-shadow:var(--sh-2); transform:translateY(-1px); } }
+
+/* ---- 3. Section tabs (restyle existing tab-active/inactive) */
+.qc-tabs{ display:flex; gap:4px; border-bottom:1px solid var(--line);
+  overflow-x:auto; position:relative; }
+.tab-active,.tab-inactive{
+  font-size:14px; padding:12px 14px!important; white-space:nowrap;
+  background:transparent; border:none; cursor:pointer; position:relative;
+  border-radius:var(--r-sm) var(--r-sm) 0 0;
+  transition:color var(--dur) var(--ease),background var(--dur) var(--ease);
+}
+.tab-inactive{ font-weight:500; color:var(--ink-3); }
+.tab-inactive:hover{ color:var(--ink-2); background:var(--line-2); }
+.tab-active{ font-weight:600; color:var(--brand); background:var(--brand-50); }
+.tab-active::after{ content:""; position:absolute; left:8px; right:8px; bottom:-1px;
+  height:2px; background:var(--gold); border-radius:2px 2px 0 0; }
+/* tab count badge (optional <span class="qc-tab-badge">) */
+.qc-tab-badge{ display:inline-flex; align-items:center; justify-content:center;
+  min-width:18px; height:18px; padding:0 5px; margin-left:6px;
+  font-size:11px; font-weight:700; line-height:1; border-radius:var(--r-pill);
+  background:var(--brand-50); color:var(--brand-700); font-variant-numeric:tabular-nums; }
+.tab-inactive .qc-tab-badge{ background:var(--neut-bg); color:var(--ink-3); }
+/* right edge scroll-fade for mobile tab overflow */
+.qc-tabs-wrap{ position:relative; }
+.qc-tabs-wrap::after{ content:""; position:absolute; right:0; top:0; bottom:1px;
+  width:28px; pointer-events:none;
+  background:linear-gradient(90deg,transparent,var(--surface-2)); }
+
+/* ---- 4. Toolbar / filter row ----------------------------- */
+.qc-toolbar{ display:flex; align-items:center; gap:10px; flex-wrap:wrap;
+  padding:12px 0; }
+.qc-search{ position:relative; flex:1 1 220px; max-width:420px; }
+.qc-search svg{ position:absolute; left:12px; top:50%; transform:translateY(-50%);
+  width:16px; height:16px; color:var(--ink-4); pointer-events:none; }
+.qc-search input,.qc-search .qc-input{ width:100%; padding-left:36px!important; }
+/* search variant of qc-input height/border (does not rename qc-input) */
+.qc-input{ height:36px; border-radius:var(--r-md); border:1px solid var(--line);
+  background:var(--surface); color:var(--ink); font-size:14px; padding:0 12px; }
+.qc-input:focus{ outline:none; border-color:var(--brand); box-shadow:var(--focus); }
+textarea.qc-input{ height:auto; padding:10px 12px; }
+@media (max-width:639px){ .qc-input{ font-size:16px; } } /* iOS no-zoom */
+.qc-toolbar-actions{ display:flex; align-items:center; gap:8px; margin-left:auto; }
+.qc-result-count{ font-size:13px; color:var(--ink-3); font-variant-numeric:tabular-nums; }
+
+/* Filter pills (restyle existing .filter-pill) */
+.pill-row{ display:flex; gap:6px; overflow-x:auto; position:relative; padding:2px 0; }
+.filter-pill{ font-size:13px; font-weight:500; padding:6px 12px;
+  border-radius:var(--r-pill); border:1px solid var(--line);
+  background:var(--surface); color:var(--ink-3); white-space:nowrap; cursor:pointer;
+  transition:all var(--dur) var(--ease); }
+.filter-pill:hover{ background:var(--surface-2); color:var(--ink-2); }
+.filter-pill.active{ background:var(--brand); border-color:var(--brand);
+  color:#fff; font-weight:600; box-shadow:var(--sh-1); }
+.filter-pill .pill-count{ margin-left:6px; opacity:.85; font-variant-numeric:tabular-nums; }
+.pill-divider{ width:1px; align-self:stretch; background:var(--line); margin:0 4px; }
+.qc-filter-grouplabel{ font-size:11px; font-weight:600; color:var(--ink-4);
+  text-transform:uppercase; letter-spacing:.04em; align-self:center; padding-right:2px; }
+
+/* ---- 5. Card list + table -------------------------------- */
+.qc-list-card{ background:var(--surface); border:1px solid var(--line);
+  border-radius:var(--r-lg); box-shadow:var(--sh-1); padding:16px;
+  position:relative; transition:border-color var(--dur) var(--ease),box-shadow var(--dur) var(--ease),transform var(--dur) var(--ease); }
+.qc-list-card.is-link{ cursor:pointer; }
+@media (prefers-reduced-motion:no-preference){
+  .qc-list-card.is-link:hover{ border-color:var(--brand-100); box-shadow:var(--sh-2);
+    transform:translateY(-1px); } }
+.qc-list-card.is-link:hover .qc-card-chevron{ opacity:1; transform:translateX(2px); }
+.qc-card-chevron{ position:absolute; right:14px; top:50%; transform:translateY(-50%);
+  color:var(--ink-4); opacity:0; transition:all var(--dur) var(--ease); }
+/* left status rail (add <span class="qc-rail qc-rail--ok"> as first child) */
+.qc-rail{ position:absolute; left:0; top:0; bottom:0; width:3px;
+  border-radius:var(--r-lg) 0 0 var(--r-lg); background:var(--neut); }
+.qc-rail--ok{ background:var(--ok); }   .qc-rail--warn{ background:var(--warn); }
+.qc-rail--err{ background:var(--err); } .qc-rail--info{ background:var(--info); }
+.qc-rail--brand{ background:var(--brand); }
+/* entity identity cell */
+.qc-entity{ font-size:15px; font-weight:600; color:var(--ink); }
+.qc-entity-meta{ font-size:13px; color:var(--ink-3); margin-top:2px; }
+.qc-money{ font-variant-numeric:tabular-nums; text-align:right; }
+.qc-money-grand{ font-size:16px; font-weight:700; color:var(--ink); }
+.qc-money-due{ font-size:12px; font-weight:600; color:var(--err); }
+/* avatar initial chip */
+.qc-avatar{ width:36px; height:36px; border-radius:var(--r-pill); flex-shrink:0;
+  display:inline-flex; align-items:center; justify-content:center;
+  background:var(--brand-50); color:var(--brand-700); font-weight:700; font-size:14px; }
+/* mini key-value grid for mobile cards */
+.qc-kv{ display:grid; grid-template-columns:repeat(2,1fr); gap:10px 12px; margin-top:10px; }
+.qc-kv-l{ font-size:11px; font-weight:600; color:var(--ink-3);
+  text-transform:uppercase; letter-spacing:.03em; }
+.qc-kv-v{ font-size:14px; color:var(--ink); font-variant-numeric:tabular-nums; }
+
+/* Read-only data tables inside modals (bill/PO/estimate/invoice items) */
+.qc-table{ width:100%; border-collapse:separate; border-spacing:0;
+  border:1px solid var(--line); border-radius:var(--r-lg); overflow:hidden; }
+.qc-table thead th{ background:var(--surface-2); font-size:12px; font-weight:600;
+  color:var(--ink-3); text-transform:uppercase; letter-spacing:.03em;
+  text-align:left; padding:10px 14px; border-bottom:1px solid var(--line); }
+.qc-table tbody td{ padding:10px 14px; font-size:14px; color:var(--ink-2);
+  border-bottom:1px solid var(--line-2); }
+.qc-table tbody tr:last-child td{ border-bottom:none; }
+.qc-table .num{ text-align:right; font-variant-numeric:tabular-nums; }
+
+/* ---- 6. Button hierarchy --------------------------------- */
+.btn-green,.btn-green-outline,.btn-secondary,.btn-ghost,.btn-danger,.btn-gold{
+  display:inline-flex; align-items:center; justify-content:center; gap:8px;
+  height:36px; padding:0 16px; border-radius:var(--r-md);
+  font-size:14px; font-weight:600; line-height:1; cursor:pointer;
+  border:1px solid transparent; white-space:nowrap;
+  transition:background var(--dur) var(--ease),border-color var(--dur) var(--ease),box-shadow var(--dur) var(--ease); }
+.btn-green{ background:var(--brand); color:#fff; border-color:var(--brand); }
+.btn-green:hover{ background:var(--brand-700); border-color:var(--brand-700); box-shadow:var(--sh-2); }
+.btn-green-outline{ background:var(--surface); color:var(--brand); border-color:var(--brand); }
+.btn-green-outline:hover{ background:var(--brand-50); }
+.btn-secondary{ background:var(--surface); color:var(--ink-2); border-color:var(--line); }
+.btn-secondary:hover{ background:var(--surface-2); border-color:var(--ink-4); }
+.btn-ghost{ background:transparent; color:var(--ink-2); border-color:transparent; font-weight:500; }
+.btn-ghost:hover{ background:var(--line-2); }
+.btn-danger{ background:var(--surface); color:var(--err); border-color:var(--err); }
+.btn-danger:hover{ background:var(--err-bg); }
+.btn-danger--solid{ background:var(--err); color:#fff; border-color:var(--err); }
+.btn-gold{ background:var(--gold); color:var(--brand-800); border-color:var(--gold); }
+.btn-gold:hover{ filter:brightness(.94); }
+.btn-green:disabled,.btn-green-outline:disabled,.btn-secondary:disabled{
+  opacity:.5; cursor:not-allowed; box-shadow:none; }
+/* icon-only ghost button (toolbar utility) */
+.btn-icon{ width:36px; height:36px; padding:0; border-radius:var(--r-md);
+  display:inline-flex; align-items:center; justify-content:center;
+  background:transparent; border:none; color:var(--ink-3); cursor:pointer;
+  transition:background var(--dur) var(--ease),color var(--dur) var(--ease); }
+.btn-icon:hover{ background:var(--line-2); color:var(--ink-2); }
+@media (max-width:639px){
+  .btn-green,.btn-green-outline,.btn-secondary,.btn-danger,.btn-gold,.filter-pill{ min-height:44px; }
+  .btn-icon{ width:44px; height:44px; } }
+
+/* ---- 7. Status pills — rationalize to 5 tones, keep names */
+.status-pill{ display:inline-flex; align-items:center; gap:6px;
+  height:22px; padding:0 10px; border-radius:var(--r-pill);
+  font-size:12px; font-weight:600; line-height:1;
+  background:var(--neut-bg); color:var(--neut); font-variant-numeric:tabular-nums; }
+.status-pill::before{ content:""; width:6px; height:6px; border-radius:50%;
+  background:currentColor; opacity:.9; flex-shrink:0; }
+/* SUCCESS tone */
+.status-paid,.status-approved,.status-converted,.status-pushed,
+.status-received,.status-active,.status-verified{ background:var(--ok-bg); color:var(--ok); }
+/* WARN tone */
+.status-partial,.status-pending,.status-corrected{ background:var(--warn-bg); color:var(--warn); }
+/* DANGER tone */
+.status-unpaid,.status-cancelled,.status-failed,.status-mismatch{ background:var(--err-bg); color:var(--err); }
+/* INFO tone (was off-brand blue 'sent') */
+.status-sent{ background:var(--info-bg); color:var(--info); }
+/* NEUTRAL tone */
+.status-draft,.status-inactive{ background:var(--neut-bg); color:var(--neut); }
+
+/* ---- 8. Modal / sheet polish ----------------------------- */
+.modal-overlay{ background:rgba(15,23,42,.45); backdrop-filter:blur(2px);
+  align-items:center; justify-content:center; padding:24px; }
+.modal-card{ background:var(--surface); border-radius:var(--r-xl);
+  box-shadow:var(--sh-pop); max-height:88vh; display:flex; flex-direction:column;
+  animation:qcModalIn .15s var(--ease); }
+@keyframes qcModalIn{ from{ opacity:0; transform:translateY(8px) scale(.97);} to{ opacity:1; transform:none; } }
+.modal-grab{ width:36px; height:4px; border-radius:var(--r-pill);
+  background:var(--line-2); margin:8px auto 0; }
+/* modal header / body / footer scaffolding (apply where helpful) */
+.qc-modal-head{ position:sticky; top:0; z-index:2; background:var(--surface);
+  display:flex; align-items:center; justify-content:space-between;
+  padding:18px 22px; border-bottom:1px solid var(--line); }
+.qc-modal-head h3,.qc-modal-head h2{ font-size:18px; font-weight:600; color:var(--ink); margin:0; }
+.qc-modal-body{ padding:20px 22px; overflow-y:auto; }
+.qc-modal-foot,.modal-footer{ position:sticky; bottom:0; z-index:2; background:var(--surface);
+  display:flex; justify-content:flex-end; gap:12px;
+  padding:16px 22px; border-top:1px solid var(--line); box-shadow:0 -4px 12px rgba(15,23,42,.04); }
+/* titled section inside dense modals */
+.qc-section{ margin-bottom:18px; }
+.qc-section-title{ font-size:12px; font-weight:700; color:var(--ink-3);
+  text-transform:uppercase; letter-spacing:.04em; margin-bottom:8px; }
+.qc-summary-strip{ display:flex; gap:18px; flex-wrap:wrap;
+  background:var(--brand-50); border:1px solid var(--brand-100);
+  border-radius:var(--r-lg); padding:14px 16px; margin-bottom:16px; }
+.qc-summary-strip .it{ min-width:0; }
+.qc-summary-strip .l{ font-size:11px; font-weight:600; color:var(--brand-700);
+  text-transform:uppercase; letter-spacing:.03em; }
+.qc-summary-strip .v{ font-size:18px; font-weight:700; color:var(--brand-800);
+  font-variant-numeric:tabular-nums; }
+@media (max-width:639px){
+  .modal-overlay{ padding:0; align-items:flex-end; }
+  .modal-card{ width:100%; max-height:94dvh; border-radius:var(--r-xl) var(--r-xl) 0 0;
+    animation:sheetUp .2s var(--ease); }
+  .qc-modal-foot,.modal-footer{ padding-bottom:calc(16px + env(safe-area-inset-bottom)); }
+  .qc-modal-foot .btn-green,.qc-modal-foot .btn-green-outline,
+  .modal-footer .btn-green,.modal-footer .btn-green-outline{ flex:1; min-height:44px; } }
+
+/* ---- 9. Empty / skeleton states -------------------------- */
+.qc-skel{ background:linear-gradient(90deg,var(--line-2) 25%,var(--surface-3) 37%,var(--line-2) 63%);
+  background-size:400% 100%; animation:qcShimmer 1.2s ease infinite; border-radius:var(--r-md); }
+.qc-skel-card{ display:block; height:88px; width:100%; margin-bottom:12px; }
+@keyframes qcShimmer{ from{ background-position:100% 0; } to{ background-position:-100% 0; } }
+@media (prefers-reduced-motion:reduce){ .qc-skel{ animation:none; background:var(--line-2); } }
+.qc-empty{ text-align:center; max-width:360px; margin:32px auto; }
+.qc-empty-ic{ width:48px; height:48px; border-radius:var(--r-pill); margin:0 auto 12px;
+  display:inline-flex; align-items:center; justify-content:center;
+  background:var(--brand-50); color:var(--brand); }
+.qc-empty h4{ font-size:16px; font-weight:600; color:var(--ink); margin:0 0 4px; }
+.qc-empty p{ font-size:14px; color:var(--ink-3); margin:0 0 16px; }
+
+/* ---- 10. Flow stepper — single idiom (vendors .flow-step) - */
+.flow-steps{ display:flex; align-items:center; gap:8px; overflow-x:auto; padding:4px 0; }
+.flow-step{ display:inline-flex; align-items:center; gap:8px; white-space:nowrap;
+  padding:6px 12px; border-radius:var(--r-pill); font-size:13px; font-weight:600;
+  background:var(--surface); border:1px solid var(--line); color:var(--ink-3); }
+.flow-step .n{ width:20px; height:20px; border-radius:50%; flex-shrink:0;
+  display:inline-flex; align-items:center; justify-content:center;
+  font-size:11px; font-weight:700; background:var(--neut-bg); color:var(--ink-3); }
+.flow-step.done{ background:var(--brand-50); border-color:var(--brand-100); color:var(--brand-700); }
+.flow-step.done .n{ background:var(--brand); color:#fff; }
+.flow-step.current{ background:var(--gold-50); border-color:var(--gold); color:var(--gold-600); }
+.flow-step.current .n{ background:var(--gold); color:var(--brand-800); }
+.flow-arrow{ color:var(--ink-4); flex-shrink:0; }
+
+/* billing's flow-dot variant aligned to same palette */
+.flow-wrap{ background:var(--surface-2); border:1px solid var(--line); border-radius:var(--r-lg); }
+.flow-dot{ background:var(--neut-bg); color:var(--ink-3); }
+.flow-done .flow-dot{ background:var(--brand); color:#fff; }
+.flow-current .flow-dot{ background:var(--gold); color:var(--brand-800);
+  box-shadow:0 0 0 4px var(--gold-50); }
+.flow-error .flow-dot{ background:var(--err); color:#fff; }
+.flow-line{ background:var(--line); } .flow-line-on{ background:var(--brand); }
+
+/* ---- 11. Reconcile editor harmonization (vendors only) ---- */
+/* Lower amber saturation; gold = "action needed" accent; green totals = trusted anchor */
+.recon-banner{ background:var(--gold-50)!important; border-color:var(--gold)!important;
+  border-radius:var(--r-lg); }
+.recon-chip{ background:var(--surface); border:1px solid var(--line); color:var(--ink-2);
+  border-radius:var(--r-pill); font-weight:600; }
+.recon-chip.warn{ background:var(--warn-bg); color:var(--warn); border-color:transparent; }
+.recon-chip.info{ background:var(--info-bg); color:var(--info); border-color:transparent; }
+.recon-card{ border:1px solid var(--line); border-radius:var(--r-lg); background:var(--surface); }
+.recon-card.has-diff{ border-color:var(--gold); box-shadow:0 0 0 1px var(--gold-50) inset; }
+.recon-field.diff{ border-color:var(--gold); }
+.recon-field.missing{ border-color:var(--err); }
+.recon-totals{ background:var(--brand-50)!important; border-color:var(--brand-100)!important;
+  border-radius:var(--r-lg); }
+.recon-match-ok{ color:var(--ok); } .recon-match-off{ color:var(--warn); }
+.recon-footer{ box-shadow:0 -6px 16px rgba(15,23,42,.06); background:var(--surface);
+  border-top:1px solid var(--line); }
+.recon-extra-card{ border:1px dashed var(--gold)!important; background:var(--gold-50)!important;
+  border-radius:var(--r-lg); }
+.recon-dpl-btn{ background:var(--gold); color:var(--brand-800); border-radius:var(--r-md); }
+
+/* ---- 12. AI scan dropzone (bill create) ------------------ */
+.qc-dropzone{ border:2px dashed var(--brand-100); background:var(--brand-50);
+  border-radius:var(--r-lg); padding:18px; text-align:center;
+  transition:border-color var(--dur),background var(--dur); }
+.qc-dropzone:hover{ border-color:var(--brand); }
+.qc-dropzone .chip{ display:inline-block; font-size:11px; font-weight:600;
+  color:var(--gold-600); background:var(--gold-50); border:1px solid var(--gold);
+  border-radius:var(--r-pill); padding:2px 8px; }
+
+/* ---- 13. Suggestion dropdown ----------------------------- */
+.suggestion-list{ background:var(--surface); border:1px solid var(--line);
+  border-radius:var(--r-md); box-shadow:var(--sh-3); overflow:hidden; }
+.suggestion-item{ padding:10px 12px; font-size:14px; color:var(--ink-2); cursor:pointer;
+  border-bottom:1px solid var(--line-2); display:flex; justify-content:space-between; gap:10px; }
+.suggestion-item:last-child{ border-bottom:none; }
+.suggestion-item:hover{ background:var(--brand-50); color:var(--brand-700); }
+.suggestion-item .rate{ font-variant-numeric:tabular-nums; color:var(--ink-3); }
+
+/* ---- 14. Method chip (payments) -------------------------- */
+.qc-method{ display:inline-flex; align-items:center; gap:6px;
+  font-size:12px; font-weight:600; padding:3px 10px; border-radius:var(--r-pill);
+  background:var(--brand-50); color:var(--brand-700); }
+.qc-method svg{ width:13px; height:13px; }
+
+/* ---- 15. Focus + a11y (non-negotiable) ------------------- */
+a:focus-visible,button:focus-visible,input:focus-visible,select:focus-visible,
+textarea:focus-visible,[tabindex]:focus-visible,.filter-pill:focus-visible,
+.tab-active:focus-visible,.tab-inactive:focus-visible{
+  outline:none; box-shadow:var(--focus); border-radius:var(--r-sm); }
+@media (prefers-reduced-motion:reduce){ *{ animation-duration:.001ms!important;
+  transition-duration:.001ms!important; } }

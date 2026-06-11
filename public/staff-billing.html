@@ -7,7 +7,7 @@
     <meta name="apple-mobile-web-app-capable" content="yes">
     <link rel="manifest" href="/manifest.json">
     <link rel="icon" type="image/png" sizes="192x192" href="/icons/icon-192x192.png">
-    <title>Billing - QC Paint Shop</title>
+    <title>Sales — QC Paint Shop</title>
     <link rel="stylesheet" href="/css/tailwind.css?v=849f1b5c">
     <link rel="stylesheet" href="/css/design-system.css?v=876c7d73">
     <link rel="stylesheet" href="/css/qc-ui.css?v=71531a2f">
@@ -124,61 +124,63 @@
         .scroll-hide::-webkit-scrollbar { display: none; }
         .scroll-hide { -ms-overflow-style: none; scrollbar-width: none; }
     </style>
+    <!-- Unified corporate design system — loaded LAST so it enhances the classes above -->
+    <link rel="stylesheet" href="/css/qc-corporate.css?v=corp1">
 </head>
 <body class="bg-gray-50 min-h-screen" data-page="billing">
 
     <div id="mainContent" class="px-4 sm:px-6 lg:px-8 py-4 pb-6 max-w-6xl mx-auto">
 
         <!-- Page Header -->
-        <div class="flex items-center justify-between mb-5">
-            <h1 class="text-xl sm:text-2xl font-bold text-gray-800">Billing</h1>
-        </div>
+        <header class="qc-appbar">
+            <div class="qc-appbar-main">
+                <nav class="qc-breadcrumb" aria-label="Breadcrumb">
+                    <span>Revenue</span><span class="sep">›</span><b>Sales</b>
+                </nav>
+                <h1>Sales</h1>
+                <p class="qc-appbar-sub">Estimates, invoices &amp; collections</p>
+            </div>
+        </header>
 
-        <!-- Stats Cards -->
-        <div class="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-5">
-            <div class="bg-white rounded-xl shadow-sm border border-green-100 p-4">
-                <div class="flex items-center gap-2 mb-1">
-                    <div class="w-8 h-8 rounded-lg bg-green-100 flex items-center justify-center">
-                        <svg class="w-4 h-4 text-green-700" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1"/></svg>
-                    </div>
-                    <span class="text-xs text-gray-500">Today Collection</span>
+        <!-- KPI Stat Tiles -->
+        <div class="qc-kpi-grid mb-5">
+            <div class="qc-kpi qc-kpi--hero">
+                <div class="qc-kpi-label">
+                    <span class="qc-kpi-ic"><svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1"/></svg></span>
+                    Today Collection
                 </div>
-                <div id="statTodayCollected" class="text-lg font-bold text-green-700">--</div>
+                <div id="statTodayCollected" class="qc-kpi-val">--</div>
             </div>
-            <div class="bg-white rounded-xl shadow-sm border border-blue-100 p-4">
-                <div class="flex items-center gap-2 mb-1">
-                    <div class="w-8 h-8 rounded-lg bg-blue-100 flex items-center justify-center">
-                        <svg class="w-4 h-4 text-blue-700" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
-                    </div>
-                    <span class="text-xs text-gray-500">Invoices</span>
+            <div class="qc-kpi">
+                <div class="qc-kpi-label">
+                    <span class="qc-kpi-ic"><svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg></span>
+                    Invoices
                 </div>
-                <div id="statInvoiceTotal" class="text-lg font-bold text-blue-700">--</div>
+                <div id="statInvoiceTotal" class="qc-kpi-val">--</div>
             </div>
-            <div class="bg-white rounded-xl shadow-sm border border-red-100 p-4">
-                <div class="flex items-center gap-2 mb-1">
-                    <div class="w-8 h-8 rounded-lg bg-red-100 flex items-center justify-center">
-                        <svg class="w-4 h-4 text-red-700" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4.5c-.77-.833-2.694-.833-3.464 0L3.34 16.5c-.77.833.192 2.5 1.732 2.5z"/></svg>
-                    </div>
-                    <span class="text-xs text-gray-500">Outstanding</span>
+            <div class="qc-kpi">
+                <div class="qc-kpi-label">
+                    <span class="qc-kpi-ic"><svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4.5c-.77-.833-2.694-.833-3.464 0L3.34 16.5c-.77.833.192 2.5 1.732 2.5z"/></svg></span>
+                    Outstanding
                 </div>
-                <div id="statOutstanding" class="text-lg font-bold text-red-700">--</div>
+                <div id="statOutstanding" class="qc-kpi-val">--</div>
             </div>
-            <div class="bg-white rounded-xl shadow-sm border border-green-100 p-4">
-                <div class="flex items-center gap-2 mb-1">
-                    <div class="w-8 h-8 rounded-lg bg-green-100 flex items-center justify-center">
-                        <svg class="w-4 h-4 text-green-700" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/></svg>
-                    </div>
-                    <span class="text-xs text-gray-500">Estimates</span>
+            <div class="qc-kpi">
+                <div class="qc-kpi-label">
+                    <span class="qc-kpi-ic"><svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/></svg></span>
+                    Estimates
                 </div>
-                <div id="statEstimateTotal" class="text-lg font-bold text-green-700">--</div>
+                <div id="statEstimateTotal" class="qc-kpi-val">--</div>
             </div>
         </div>
 
         <!-- Tab Bar -->
-        <div class="flex border-b border-gray-200 mb-4 scroll-hide overflow-x-auto">
+        <div class="qc-tabs-wrap mb-4">
+        <div class="qc-tabs scroll-hide">
             <button onclick="switchTab('estimates')" id="tabEstimates" class="tab-active px-4 py-3 text-sm whitespace-nowrap transition-all">Estimates</button>
             <button onclick="switchTab('invoices')" id="tabInvoices" class="tab-inactive px-4 py-3 text-sm whitespace-nowrap transition-all">Invoices</button>
             <button onclick="switchTab('payments')" id="tabPayments" class="tab-inactive px-4 py-3 text-sm whitespace-nowrap transition-all">Payments</button>
+        </div>
         </div>
 
         <!-- ==================== ESTIMATES TAB ==================== -->
