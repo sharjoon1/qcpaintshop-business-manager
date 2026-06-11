@@ -4,13 +4,14 @@
 // verifyBillItems from services/vendor-bill-ai-service.js. Previously this
 // file re-implemented mirrored copies of both.
 //
-// NOTE (T2 finding, not fixed here): the real verifyBillItems reads
-// staff.rate / staff.amount, but POST /bills/:id/verify feeds it
-// vendor_bill_items rows whose columns are unit_price / amount — so in
-// production the rate comparison always sees staffRate=0. The mirror used
-// unit_price and per-index difference field names (item_1_quantity); the real
-// function uses 'quantity'/'rate' field names. Tests below characterize the
-// real function via its own contract.
+// NOTE (T2 finding, FIXED 2026-06-12): verifyBillItems used to read only
+// staff.rate, but POST /bills/:id/verify feeds it vendor_bill_items rows
+// whose cost column is unit_price — the rate comparison always saw 0 and
+// false-flagged any AI-extracted rate. Owner vocabulary (2026-06-12):
+// unit price = DPL (cost); "rate" = sales price (DPL + 18% GST + 10%
+// margin). A vendor bill's printed line price IS the cost, so the AI's
+// ai.rate compares against unit_price on DB rows (staff.rate kept for
+// AI-shaped callers).
 const { createVendorSchema, createBillSchema, recordPaymentSchema } = require('../../routes/vendors');
 const { verifyBillItems } = require('../../services/vendor-bill-ai-service');
 
@@ -87,6 +88,23 @@ describe('Vendor System', () => {
             const result = verifyBillItems(staff, ai);
             expect(result.status).toBe('verified');
             expect(result.differences).toHaveLength(0);
+        });
+
+        it('accepts vendor_bill_items DB rows (unit_price cost column, no rate) and verifies clean on match', () => {
+            // shape produced by POST /bills/:id/verify — raw DB rows
+            const staff = [{ item_name: 'Paint', quantity: 5, unit_price: 2000, amount: 10000 }];
+            const ai = { items: [{ name: 'Paint', quantity: 5, rate: 2000 }], total: 10000 };
+            const result = verifyBillItems(staff, ai);
+            expect(result.status).toBe('verified');
+            expect(result.differences).toHaveLength(0);
+        });
+
+        it('still flags a real cost mismatch on DB-shaped rows', () => {
+            const staff = [{ item_name: 'Paint', quantity: 5, unit_price: 1800, amount: 9000 }];
+            const ai = { items: [{ name: 'Paint', quantity: 5, rate: 2000 }], total: 9000 };
+            const result = verifyBillItems(staff, ai);
+            expect(result.status).toBe('mismatch');
+            expect(result.differences.some(d => d.field === 'rate')).toBe(true);
         });
 
         it('should detect quantity mismatch', () => {

@@ -215,8 +215,13 @@ function verifyBillItems(staffItems, aiExtractedData) {
             });
         }
 
-        // Compare rate
-        const staffRate = parseFloat(staff.rate) || 0;
+        // Compare rate. The verify endpoint feeds raw vendor_bill_items rows
+        // whose cost column is unit_price (owner vocabulary 2026-06-12:
+        // unit price = DPL cost; "rate" = sales price = DPL + 18% GST + 10%
+        // margin). A vendor bill's printed line price IS the cost, so the
+        // AI-extracted ai.rate compares against unit_price on DB rows;
+        // staff.rate is kept for AI-shaped callers.
+        const staffRate = parseFloat(staff.rate != null ? staff.rate : staff.unit_price) || 0;
         const aiRate = parseFloat(ai.rate) || 0;
         if (Math.abs(staffRate - aiRate) > 0.01) {
             differences.push({

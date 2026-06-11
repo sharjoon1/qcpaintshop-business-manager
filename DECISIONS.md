@@ -16,6 +16,11 @@ Captured as they arrive; every phase that depends on a question must check here 
 | 2026-06-10 | **Q-B2**: clawback visibility | Owner delegated to executor recommendation: **yes — absorbed clawbacks get a ledger entry** (`painter_point_transactions`), and netting runs inside the award transaction. | Phase 2 / M2 |
 | 2026-06-10 | **Q-B3**: slab basis with dual attribution | Owner delegated to executor recommendation: **each invoice counts once per painter per period** (dedupe by invoice_id across direct/salesperson rows); basis otherwise unchanged (both billing types). | Phase 2 / M9 |
 | 2026-06-11 | **Q-P2**: exact prod DDL of the no-DDL Zoho tables | Answered by D1: read-only `mysqldump --no-data` snapshot committed at `docs/schema/prod-schema-2026-06-11.sql` (226 tables incl. all `zoho_*`). | Phase 3 / D1 |
+| 2026-06-12 | **Q-B7**: make 2FA mandatory for admin/manager? | **No — not for now.** S6's other parts (re-auth on disable, encrypt totp_secret, harden the /api/2fa/validate oracle) remain candidates without the mandate. | Phase 4 / S6 |
+| 2026-06-12 | **Q-B5/Q-B6**: extend DPL catalog to other brands + pending non-standard SKU links? | **Yes — approved.** X1 to proceed (Asian/Berger/Gem/JSW/Nippon); needs sample DPL price lists per brand from owner for parser/linker validation. | Phase 4+ / X1 |
+| 2026-06-12 | **S9+F5** (CSP + externalize mega-page JS) | **Approved** for a dedicated plan session. | Phase 4+ |
+| 2026-06-12 | Vendor-bill pricing vocabulary | **Unit price = DPL (cost); "rate" = sales price = DPL + 18% GST + 10% margin.** A vendor bill's printed line price is the cost → AI-extracted bill rate compares against `vendor_bill_items.unit_price` (verifyBillItems fix). | vendor bills |
+| 2026-06-12 | **I1** WhatsApp | Owner already uses WhatsApp Business **integrated with Zoho Books**; wants to know if that channel can be reused by this app. Investigation: depends on WHERE the number is registered (Zoho's built-in integration vs own Meta Cloud API) — see progress notes; awaiting owner detail. | Phase 4+ / I1 |
 
 ## Pending (asked at the phase that needs them)
 
