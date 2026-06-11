@@ -67,6 +67,23 @@ function normalizeScan(data) {
     data.tax = n(data.tax);
     data.total = n(data.total);
     data.subtotal = n(data.subtotal);
+
+    // Deterministic discount recovery (owner symptom 2026-06-12: "GST applied
+    // but discount didn't"). Indian bills often print the discount in an odd
+    // spot the model misses, yet subtotal/tax/total are read reliably. The
+    // discount is applied BEFORE tax, so taxable = total − tax and
+    // discount = subtotal − taxable. If the AI returned no discount but the
+    // printed numbers imply one, recover it (rounded, sanity-bounded).
+    if (!(data.discount > 0) && data.subtotal > 0 && data.total > 0 && data.tax >= 0) {
+        const taxable = data.total - data.tax;
+        const implied = Math.round((data.subtotal - taxable) * 100) / 100;
+        // Only trust a positive discount strictly smaller than the subtotal and
+        // larger than a rupee (ignore sub-rupee rounding drift / tax-inclusive
+        // bills where subtotal already equals taxable).
+        if (implied > 1 && implied < data.subtotal) {
+            data.discount = implied;
+        }
+    }
     return data;
 }
 

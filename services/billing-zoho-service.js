@@ -90,7 +90,7 @@ async function resolveZohoContact(customerType, { customerId, painterId, custome
  * @param {number} userId - admin/staff user performing the push
  * @returns {Promise<{ zohoInvoiceId, zohoInvoiceNumber, pointsResult }>}
  */
-async function pushInvoiceToZoho(invoiceId, userId) {
+async function pushInvoiceToZoho(invoiceId, userId, options = {}) {
     // 1. Load invoice
     const [invoices] = await pool.query(
         'SELECT * FROM billing_invoices WHERE id = ?',
@@ -101,6 +101,41 @@ async function pushInvoiceToZoho(invoiceId, userId) {
 
     if (invoice.zoho_status === 'pushed') {
         throw new Error(`Invoice ${invoiceId} already pushed to Zoho`);
+    }
+
+    // Salesperson (owner requirement 2026-06-12: mandatory on every Zoho push —
+    // Zoho's org makes the field required). Priority: the explicitly chosen one,
+    // else the value already on the invoice, else — for painter invoices — the
+    // painter's mapped Zoho salesperson (the painter-program concept reused
+    // here). Resolve the display name from the local salesperson master.
+    let salespersonId = options.salespersonId || invoice.zoho_salesperson_id || null;
+    let salespersonName = null;
+    if (!salespersonId && invoice.customer_type === 'painter' && invoice.painter_id) {
+        const [pr] = await pool.query('SELECT zoho_salesperson_id FROM painters WHERE id = ?', [invoice.painter_id]);
+        if (pr.length && pr[0].zoho_salesperson_id) salespersonId = pr[0].zoho_salesperson_id;
+    }
+    if (!salespersonId) {
+        const err = new Error('A salesperson is required to push this invoice to Zoho. Pick one and try again.');
+        err.code = 'SALESPERSON_REQUIRED';
+        throw err;
+    }
+    try {
+        const [sp] = await pool.query('SELECT salesperson_name FROM zoho_salespersons WHERE zoho_salesperson_id = ? LIMIT 1', [salespersonId]);
+        if (sp.length) salespersonName = sp[0].salesperson_name;
+        if (!salespersonName) {
+            const [spm] = await pool.query('SELECT zoho_salesperson_name FROM painter_zoho_salesperson_map WHERE zoho_salesperson_id = ? LIMIT 1', [salespersonId]);
+            if (spm.length) salespersonName = spm[0].zoho_salesperson_name;
+        }
+    } catch { /* name is best-effort */ }
+
+    // Location/branch to post the invoice to (owner request 2026-06-12).
+    let locationId = options.locationId || invoice.zoho_location_id || null;
+    let locationName = null;
+    if (locationId) {
+        try {
+            const [loc] = await pool.query('SELECT zoho_location_name FROM zoho_locations_map WHERE zoho_location_id = ? LIMIT 1', [locationId]);
+            if (loc.length) locationName = loc[0].zoho_location_name;
+        } catch { /* name is best-effort */ }
     }
 
     // 2. Load items
@@ -163,7 +198,9 @@ async function pushInvoiceToZoho(invoiceId, userId) {
     const zohoResult = await zohoAPI.createInvoice({
         customer_id: zohoContactId,
         date: invoiceDate,
-        line_items: lineItems
+        line_items: lineItems,
+        salesperson_id: salespersonId,
+        ...(locationId ? { location_id: locationId } : {})
     });
 
     const zohoInvoice = zohoResult && zohoResult.invoice;
@@ -220,14 +257,18 @@ async function pushInvoiceToZoho(invoiceId, userId) {
         }
     }
 
-    // 8. Update billing_invoices
+    // 8. Update billing_invoices (also stamp the salesperson + location used)
     await pool.query(
-        'UPDATE billing_invoices SET zoho_status = ?, zoho_invoice_id = ?, zoho_invoice_number = ? WHERE id = ?',
-        ['pushed', zohoInvoiceId, zohoInvoiceNumber, invoiceId]
+        `UPDATE billing_invoices
+         SET zoho_status = ?, zoho_invoice_id = ?, zoho_invoice_number = ?,
+             zoho_salesperson_id = ?, zoho_salesperson_name = ?,
+             zoho_location_id = ?, zoho_location_name = ?
+         WHERE id = ?`,
+        ['pushed', zohoInvoiceId, zohoInvoiceNumber, salespersonId, salespersonName, locationId, locationName, invoiceId]
     );
 
     // 9. Return result
-    return { zohoInvoiceId, zohoInvoiceNumber, pointsResult };
+    return { zohoInvoiceId, zohoInvoiceNumber, salespersonId, salespersonName, locationId, locationName, pointsResult };
 }
 
 module.exports = { setPool, setPointsEngine, resolveZohoContact, pushInvoiceToZoho };

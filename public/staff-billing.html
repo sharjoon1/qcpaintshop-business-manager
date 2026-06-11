@@ -419,6 +419,36 @@
         </div>
     </div>
 
+    <!-- ==================== PUSH TO ZOHO MODAL (salesperson + location) ==================== -->
+    <div id="pushModal" class="modal-overlay" onclick="if(event.target===this)closePushModal()">
+        <div class="modal-card bg-white rounded-2xl shadow-xl w-full max-w-md mt-16 overflow-hidden">
+            <div class="flex items-center justify-between px-5 py-4 border-b flex-shrink-0">
+                <h3 class="text-lg font-bold text-gray-800">Push Invoice to Zoho</h3>
+                <button onclick="closePushModal()" class="p-2 hover:bg-gray-100 rounded-full" aria-label="Close">
+                    <svg class="w-5 h-5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+                </button>
+            </div>
+            <div class="modal-body p-5 space-y-4">
+                <input type="hidden" id="pushInvoiceId">
+                <div id="pushWarning" class="hidden text-sm bg-amber-50 border border-amber-300 text-amber-800 rounded-lg p-3"></div>
+                <div>
+                    <label class="qc-label block mb-1">Salesperson * <span class="text-xs text-gray-400">(Zoho-க்கு mandatory)</span></label>
+                    <select id="pushSalesperson" class="qc-input w-full" required>
+                        <option value="">Select salesperson...</option>
+                    </select>
+                    <button type="button" onclick="syncSalespersons()" class="text-xs text-green-700 mt-1 hover:underline">↻ Sync salespersons from Zoho</button>
+                </div>
+                <div>
+                    <label class="qc-label block mb-1">Location / Branch (Zoho)</label>
+                    <select id="pushLocation" class="qc-input w-full">
+                        <option value="">Default (no location)</option>
+                    </select>
+                </div>
+                <button type="button" id="pushConfirmBtn" onclick="confirmPushToZoho()" class="btn-green w-full py-2.5 rounded-lg text-sm font-medium">Push to Zoho</button>
+            </div>
+        </div>
+    </div>
+
 <script>
 // ═══════════════════════════════════════════
 // CONFIG
@@ -909,37 +939,107 @@ async function editInvoice(id) {
     }
 }
 
+let zohoSalespersonsCache = null;
+let zohoLocationsCache = null;
+
+// Open the push modal: a salesperson is mandatory (owner 2026-06-12), a Zoho
+// location is optional. The server gate (paid OR credit-eligible) stays
+// authoritative; we surface the same warning here before the push.
 async function pushToZoho(invoiceId, paymentStatus, balanceDue) {
-    // Client-side pre-check of the server's push gate (payment_status='paid'
-    // OR credit-limit eligibility) — warn BEFORE hitting the server. The
-    // server gate in billing-zoho-service stays authoritative.
+    document.getElementById('pushInvoiceId').value = invoiceId;
+
+    const warn = document.getElementById('pushWarning');
     const due = Number(balanceDue) || 0;
-    let ok;
     if (paymentStatus !== 'paid' && due > 0.01) {
-        ok = await confirmDialog({
-            title: 'Invoice paid இல்லை',
-            message: `Balance ₹${due.toLocaleString('en-IN')} இன்னும் pending. Payment record செய்யுங்க, அல்லது customer-க்கு credit limit இருந்தால் மட்டும் push ஆகும். தொடரவா?`,
-            primaryText: 'Push anyway',
-            secondaryText: 'வேண்டாம்',
-            danger: true
-        });
+        warn.textContent = `Balance ₹${due.toLocaleString('en-IN')} இன்னும் pending. Payment record செய்யுங்க, அல்லது customer-க்கு credit limit இருந்தால் மட்டும் push ஆகும்.`;
+        warn.classList.remove('hidden');
     } else {
-        ok = await confirmDialog({
-            title: 'Push to Zoho?',
-            message: 'Zoho Books-ல் புதிய invoice create ஆகும்.',
-            primaryText: 'Push'
-        });
+        warn.classList.add('hidden');
     }
-    if (!ok) return;
+
+    // Reset selections, then populate both pickers from the local masters.
+    const spSel = document.getElementById('pushSalesperson');
+    const locSel = document.getElementById('pushLocation');
+    spSel.value = '';
+    locSel.value = '';
+    document.getElementById('pushModal').classList.add('active');
+
+    await Promise.all([loadSalespersonsInto(spSel), loadLocationsInto(locSel)]);
+}
+
+function closePushModal() {
+    document.getElementById('pushModal').classList.remove('active');
+}
+
+async function loadSalespersonsInto(sel) {
     try {
-        const res = await fetch(`${API}/invoices/${invoiceId}/push-zoho`, { method: 'POST', headers: { ...headers, 'Idempotency-Key': newIdemKey() } });
+        if (!zohoSalespersonsCache) {
+            const res = await fetch(`${API}/salespersons`, { headers });
+            const data = await res.json();
+            zohoSalespersonsCache = (data.success && Array.isArray(data.salespersons)) ? data.salespersons : [];
+        }
+        sel.innerHTML = '<option value="">Select salesperson...</option>';
+        for (const s of zohoSalespersonsCache) {
+            sel.appendChild(new Option(s.salesperson_name || s.zoho_salesperson_id, s.zoho_salesperson_id));
+        }
+        if (!zohoSalespersonsCache.length) {
+            sel.innerHTML = '<option value="">No salespersons — Sync from Zoho first</option>';
+        }
+    } catch { /* leave default */ }
+}
+
+async function loadLocationsInto(sel) {
+    try {
+        if (!zohoLocationsCache) {
+            const res = await fetch(`${API}/zoho-locations`, { headers });
+            const data = await res.json();
+            zohoLocationsCache = (data.success && Array.isArray(data.locations)) ? data.locations : [];
+        }
+        sel.innerHTML = '<option value="">Default (no location)</option>';
+        for (const l of zohoLocationsCache) {
+            sel.appendChild(new Option(l.zoho_location_name || l.zoho_location_id, l.zoho_location_id));
+        }
+    } catch { /* leave default */ }
+}
+
+async function syncSalespersons() {
+    try {
+        showToast('Syncing salespersons from Zoho...', 'success');
+        const res = await fetch(`${API}/salespersons/sync`, { method: 'POST', headers });
+        const data = await res.json();
+        if (!data.success) throw new Error(data.message);
+        zohoSalespersonsCache = null;
+        await loadSalespersonsInto(document.getElementById('pushSalesperson'));
+        showToast(data.message || 'Salespersons synced', 'success');
+    } catch (e) {
+        showToast(e.message || 'Sync failed', 'error');
+    }
+}
+
+async function confirmPushToZoho() {
+    const invoiceId = document.getElementById('pushInvoiceId').value;
+    const salespersonId = document.getElementById('pushSalesperson').value;
+    const locationId = document.getElementById('pushLocation').value || null;
+    if (!salespersonId) { showToast('Select a salesperson first', 'error'); return; }
+
+    const btn = document.getElementById('pushConfirmBtn');
+    btn.disabled = true; btn.textContent = 'Pushing...';
+    try {
+        const res = await fetch(`${API}/invoices/${invoiceId}/push-zoho`, {
+            method: 'POST',
+            headers: { ...headers, 'Idempotency-Key': newIdemKey() },
+            body: JSON.stringify({ salesperson_id: salespersonId, zoho_location_id: locationId })
+        });
         const data = await res.json();
         if (!data.success) throw new Error(data.message);
         showToast('Invoice pushed to Zoho', 'success');
+        closePushModal();
         loadStats();
         loadInvoices(invoicePage);
     } catch (e) {
         showToast(e.message || 'Push to Zoho failed', 'error');
+    } finally {
+        btn.disabled = false; btn.textContent = 'Push to Zoho';
     }
 }
 

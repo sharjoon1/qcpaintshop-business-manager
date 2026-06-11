@@ -118,6 +118,7 @@ const createBillSchema = z.object({
     items: z.array(billItemSchema).min(1),
     tax_amount: z.number().optional().nullable(),     // null → auto 18% of taxable
     discount_amount: z.number().min(0).optional().default(0),
+    zoho_location_id: z.string().optional().nullable(),   // Zoho location/branch to post to
     notes: z.string().optional().default(''),
     bill_image: z.string().optional().nullable(),
     ai_extracted_data: z.any().optional().nullable()
@@ -135,6 +136,7 @@ const createPOSchema = z.object({
     items: z.array(poItemSchema).min(1),
     tax_amount: z.number().optional().nullable(),     // null → auto 18% of taxable
     discount_amount: z.number().min(0).optional().default(0),
+    zoho_location_id: z.string().optional().nullable(),   // Zoho location/branch to post to
     expected_date: z.string().optional().nullable(),
     notes: z.string().optional().default('')
 });
@@ -417,7 +419,7 @@ router.post('/bills',
     validate(createBillSchema),
     async (req, res) => {
         try {
-            const { vendor_id, bill_number, bill_date, due_date, items, tax_amount, discount_amount, notes, bill_image, ai_extracted_data } = req.body;
+            const { vendor_id, bill_number, bill_date, due_date, items, tax_amount, discount_amount, zoho_location_id, notes, bill_image, ai_extracted_data } = req.body;
 
             // Generate bill number if not provided
             const finalBillNumber = bill_number || await generateNumber('BILL', 'vendor_bills', 'bill_number');
@@ -425,16 +427,17 @@ router.post('/bills',
             // Money model: DPL subtotal − total discount → +GST (auto 18% unless
             // an explicit tax_amount is supplied). See computeBillTotals.
             const t = computeBillTotals(items, discount_amount, tax_amount != null ? tax_amount : null);
+            const locName = await resolveLocationName(zoho_location_id);
 
             // Schema columns are entered_by + line_total (the old created_by/
             // amount names made every INSERT crash — the feature never worked
             // on prod until this fix).
             const [result] = await pool.query(
                 `INSERT INTO vendor_bills (vendor_id, bill_number, bill_date, due_date, subtotal, tax_amount, discount_amount, grand_total,
-                    balance_due, notes, bill_image, ai_extracted_data, entered_by)
-                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+                    balance_due, zoho_location_id, zoho_location_name, notes, bill_image, ai_extracted_data, entered_by)
+                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
                 [vendor_id, finalBillNumber, bill_date || null, due_date || null, t.subtotal, t.tax, t.discount,
-                 t.grand, t.grand, notes, bill_image || null,
+                 t.grand, t.grand, zoho_location_id || null, locName, notes, bill_image || null,
                  ai_extracted_data ? JSON.stringify(ai_extracted_data) : null, req.user.id]
             );
 
@@ -547,6 +550,41 @@ router.get('/zoho-items',
         }
     }
 );
+
+// Zoho locations/branches for the PO-create + bill-push location picker (owner
+// 2026-06-12). Mirrors GET /api/zoho/locations but uses the vendor module's own
+// 'view' permission so staff who don't have the 'zoho' module can still pick a
+// location. Each row carries the mapped local branch so the UI can default to
+// the user's branch.
+router.get('/zoho-locations',
+    viewPerm,
+    async (req, res) => {
+        try {
+            const [rows] = await pool.query(
+                `SELECT zoho_location_id, zoho_location_name, local_branch_id
+                 FROM zoho_locations_map
+                 WHERE is_active = 1
+                 ORDER BY zoho_location_name`
+            );
+            res.json({ success: true, locations: rows });
+        } catch (error) {
+            console.error('Vendor zoho-locations error:', error);
+            res.status(500).json({ success: false, message: 'Failed to load locations' });
+        }
+    }
+);
+
+// Resolve a location's display name from zoho_locations_map (best-effort).
+async function resolveLocationName(zohoLocationId) {
+    if (!zohoLocationId) return null;
+    try {
+        const [rows] = await pool.query(
+            'SELECT zoho_location_name FROM zoho_locations_map WHERE zoho_location_id = ? LIMIT 1',
+            [zohoLocationId]
+        );
+        return rows.length ? rows[0].zoho_location_name : null;
+    } catch { return null; }
+}
 
 // Update a Zoho item's DPL from the bill (owner decision 2026-06-12): the bill
 // is the latest purchase cost, so reconciliation can push the new DPL to the
@@ -673,16 +711,26 @@ router.post('/bills/:id/verify',
             );
 
             // Auto-apply the bill's discount + GST from the AI extraction (owner:
-            // discount/GST should populate as printed). Only seed when the bill
-            // hasn't been given its own values yet, so a manual edit isn't undone.
+            // discount/GST should populate as printed). Discount and tax are
+            // seeded INDEPENDENTLY — the old gate only seeded tax when discount
+            // was also absent, so a bill could show GST but no discount. A fresh
+            // re-scan (bodyAiData present) deliberately syncs both to the photo;
+            // otherwise we only fill values the bill hasn't been given yet so a
+            // manual edit isn't undone.
             if (aiData) {
+                const freshScan = !!bodyAiData;
                 const aiDiscount = parseFloat(aiData.discount);
                 const aiTax = parseFloat(aiData.tax);
-                const haveDiscount = parseFloat(bill.discount_amount) > 0;
-                const seedDiscount = (!haveDiscount && Number.isFinite(aiDiscount) && aiDiscount > 0) ? aiDiscount : (parseFloat(bill.discount_amount) || 0);
-                const seedTax = (bill.tax_amount == null && Number.isFinite(aiTax) && aiTax > 0) ? aiTax : (bill.tax_amount != null ? parseFloat(bill.tax_amount) : null);
-                if (!haveDiscount && (seedDiscount > 0 || seedTax != null)) {
-                    const t = computeBillTotals(staffItems, seedDiscount, seedTax);
+                const curDiscount = parseFloat(bill.discount_amount) || 0;
+                const haveTax = bill.tax_amount != null;
+
+                const applyDiscount = Number.isFinite(aiDiscount) && aiDiscount >= 0 && (freshScan || curDiscount === 0);
+                const applyTax = Number.isFinite(aiTax) && aiTax > 0 && (freshScan || !haveTax);
+
+                if (applyDiscount || applyTax) {
+                    const newDiscount = applyDiscount ? aiDiscount : curDiscount;
+                    const newTax = applyTax ? aiTax : (haveTax ? parseFloat(bill.tax_amount) : null);
+                    const t = computeBillTotals(staffItems, newDiscount, newTax);
                     const amountPaid = parseFloat(bill.amount_paid) || 0;
                     await pool.query(
                         `UPDATE vendor_bills SET tax_amount = ?, discount_amount = ?, grand_total = ?, balance_due = ? WHERE id = ?`,
@@ -896,6 +944,14 @@ router.post('/bills/:id/push-zoho',
                 rate: it.unit_price   // DPL (ex-GST cost per pack)
             }));
 
+            // Location/branch to post the bill to in Zoho (owner 2026-06-12).
+            // The push body can override (the at-push picker); else use the value
+            // chosen at PO/bill create. Persist what we end up using.
+            const pushLocationId = (req.body && req.body.zoho_location_id) || bill.zoho_location_id || null;
+            const pushLocationName = pushLocationId
+                ? (pushLocationId === bill.zoho_location_id ? bill.zoho_location_name : await resolveLocationName(pushLocationId))
+                : null;
+
             // Discount is applied at the bill level, before tax (owner model) —
             // Zoho then computes GST on (subtotal − discount), matching the
             // printed invoice. Zoho applies each item's own tax rate.
@@ -906,13 +962,14 @@ router.post('/bills/:id/push-zoho',
                 date: bill.bill_date,
                 due_date: bill.due_date,
                 line_items: lineItems,
+                ...(pushLocationId ? { location_id: pushLocationId } : {}),
                 ...(billDiscount > 0 ? { discount: billDiscount, is_discount_before_tax: true, discount_type: 'entity_level' } : {})
             });
 
             const zohoBillId = zohoResp.bill?.bill_id;
             await pool.query(
-                `UPDATE vendor_bills SET zoho_status = 'pushed', zoho_bill_id = ? WHERE id = ?`,
-                [zohoBillId || null, id]
+                `UPDATE vendor_bills SET zoho_status = 'pushed', zoho_bill_id = ?, zoho_location_id = ?, zoho_location_name = ? WHERE id = ?`,
+                [zohoBillId || null, pushLocationId, pushLocationName, id]
             );
 
             res.json({ success: true, message: 'Bill pushed to Zoho', zoho_bill_id: zohoBillId });
@@ -1042,16 +1099,17 @@ router.post('/purchase-orders',
     validate(createPOSchema),
     async (req, res) => {
         try {
-            const { vendor_id, items, tax_amount, discount_amount, expected_date, notes } = req.body;
+            const { vendor_id, items, tax_amount, discount_amount, zoho_location_id, expected_date, notes } = req.body;
 
             const po_number = await generateNumber('PO', 'vendor_purchase_orders', 'po_number');
             // Same money model as bills: DPL subtotal − discount → +GST (auto 18%).
             const t = computeBillTotals(items, discount_amount, tax_amount != null ? tax_amount : null);
+            const locName = await resolveLocationName(zoho_location_id);
 
             const [result] = await pool.query(
-                `INSERT INTO vendor_purchase_orders (vendor_id, po_number, subtotal, tax_amount, discount_amount, grand_total, expected_date, notes, created_by)
-                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-                [vendor_id, po_number, t.subtotal, t.tax, t.discount, t.grand, expected_date || null, notes, req.user.id]
+                `INSERT INTO vendor_purchase_orders (vendor_id, po_number, subtotal, tax_amount, discount_amount, grand_total, zoho_location_id, zoho_location_name, expected_date, notes, created_by)
+                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+                [vendor_id, po_number, t.subtotal, t.tax, t.discount, t.grand, zoho_location_id || null, locName, expected_date || null, notes, req.user.id]
             );
 
             const poId = result.insertId;
@@ -1091,12 +1149,13 @@ router.put('/purchase-orders/:id',
                 return res.status(400).json({ success: false, message: 'Only draft POs can be edited' });
             }
 
-            const { vendor_id, items, tax_amount, discount_amount, expected_date, notes } = req.body;
+            const { vendor_id, items, tax_amount, discount_amount, zoho_location_id, expected_date, notes } = req.body;
 
             // Replace items
             await pool.query('DELETE FROM vendor_po_items WHERE po_id = ?', [id]);
 
             const t = computeBillTotals(items, discount_amount, tax_amount != null ? tax_amount : null);
+            const locName = await resolveLocationName(zoho_location_id);
 
             // schema column is line_total, not amount
             for (const item of items) {
@@ -1110,8 +1169,8 @@ router.put('/purchase-orders/:id',
 
             await pool.query(
                 `UPDATE vendor_purchase_orders SET vendor_id = ?, subtotal = ?, tax_amount = ?, discount_amount = ?, grand_total = ?,
-                    expected_date = ?, notes = ? WHERE id = ?`,
-                [vendor_id, t.subtotal, t.tax, t.discount, t.grand, expected_date || null, notes, id]
+                    zoho_location_id = ?, zoho_location_name = ?, expected_date = ?, notes = ? WHERE id = ?`,
+                [vendor_id, t.subtotal, t.tax, t.discount, t.grand, zoho_location_id || null, locName, expected_date || null, notes, id]
             );
 
             res.json({ success: true, message: 'Purchase order updated' });
@@ -1207,10 +1266,11 @@ router.post('/purchase-orders/:id/convert-to-bill',
             const billNumber = await generateNumber('BILL', 'vendor_bills', 'bill_number');
             const [result] = await pool.query(
                 `INSERT INTO vendor_bills (vendor_id, po_id, bill_number, bill_date, subtotal, tax_amount, discount_amount, grand_total,
-                    balance_due, ai_verification_status, notes, entered_by)
-                 VALUES (?, ?, ?, CURDATE(), ?, ?, ?, ?, ?, 'pending', ?, ?)`,
+                    balance_due, zoho_location_id, zoho_location_name, ai_verification_status, notes, entered_by)
+                 VALUES (?, ?, ?, CURDATE(), ?, ?, ?, ?, ?, ?, ?, 'pending', ?, ?)`,
                 [po.vendor_id, id, billNumber, po.subtotal, po.tax_amount, po.discount_amount || 0, po.grand_total,
-                 po.grand_total, `Converted from PO ${po.po_number}`, req.user.id]
+                 po.grand_total, po.zoho_location_id || null, po.zoho_location_name || null,
+                 `Converted from PO ${po.po_number}`, req.user.id]
             );
             const billId = result.insertId;
 
@@ -1300,11 +1360,13 @@ router.post('/purchase-orders/:id/push-zoho',
                 }
             }
             const poDiscount = parseFloat(po.discount_amount) || 0;
+            const poLocationId = (req.body && req.body.zoho_location_id) || po.zoho_location_id || null;
             const zohoResp = await zohoAPI.createPurchaseOrder({
                 vendor_id: zohoContactId,
                 purchaseorder_number: po.po_number,
                 ...(deliveryDate ? { delivery_date: deliveryDate } : {}),
                 line_items: lineItems,
+                ...(poLocationId ? { location_id: poLocationId } : {}),
                 ...(poDiscount > 0 ? { discount: poDiscount, is_discount_before_tax: true, discount_type: 'entity_level' } : {})
             });
 

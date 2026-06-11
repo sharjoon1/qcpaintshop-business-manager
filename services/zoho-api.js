@@ -172,6 +172,34 @@ async function listSalespersons() {
 }
 
 /**
+ * Sync Zoho salespersons into the local zoho_salespersons master (mirrors
+ * syncLocations). The billing invoice-push picker reads this table so staff can
+ * pick a salesperson without a live Zoho call each time.
+ */
+async function syncSalespersons() {
+    if (!pool) throw new Error('Database pool not initialized');
+    const resp = await listSalespersons();
+    const list = (resp && resp.salespersons) || [];
+    let synced = 0;
+    for (const sp of list) {
+        const id = sp.salesperson_id;
+        if (!id) continue;
+        await pool.query(
+            `INSERT INTO zoho_salespersons (zoho_salesperson_id, salesperson_name, salesperson_email, is_active, last_synced_at)
+             VALUES (?, ?, ?, 1, NOW())
+             ON DUPLICATE KEY UPDATE
+                salesperson_name = VALUES(salesperson_name),
+                salesperson_email = VALUES(salesperson_email),
+                is_active = 1,
+                last_synced_at = NOW()`,
+            [id, sp.salesperson_name || '(unnamed)', sp.salesperson_email || null]
+        );
+        synced++;
+    }
+    return { success: true, synced };
+}
+
+/**
  * Get customer balance (outstanding)
  */
 async function getCustomerBalance(contactId) {
@@ -2517,6 +2545,7 @@ module.exports = {
     updateContact,
     createSalesperson,
     listSalespersons,
+    syncSalespersons,
     getCustomerBalance,
     // Items
     getItems,

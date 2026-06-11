@@ -234,6 +234,7 @@ describe('Vendor System', () => {
         it.each([
             '20260612_vendor_po_bill_link.js',
             '20260612_vendor_bill_discount.js',
+            '20260612_zoho_location_salesperson.js',
         ])('%s exports an up() function', (file) => {
             expect(typeof require(`../../migrations/${file}`).up).toBe('function');
         });
@@ -260,6 +261,29 @@ describe('Vendor System', () => {
             expect(d.discount).toBe(1823.25);
             expect(d.tax).toBe(3037.82);
             expect(d.total).toBe(19914.57);
+        });
+
+        it('recovers a missing discount from subtotal/tax/total (owner: "GST applied but discount didn\'t")', () => {
+            // AI read GST + totals but returned no discount. taxable = total − tax,
+            // discount = subtotal − taxable → the printed 1823.25 is recovered.
+            const d = normalizeScan({ items: [], subtotal: 18700, discount: 0, tax: 3037.82, total: 19914.57 });
+            expect(d.discount).toBe(1823.25);
+        });
+
+        it('does NOT invent a discount on a tax-inclusive bill (subtotal already = taxable)', () => {
+            const d = normalizeScan({ items: [], subtotal: 1000, discount: 0, tax: 180, total: 1180 });
+            expect(d.discount).toBe(0);
+        });
+
+        it('keeps an AI-read discount instead of recomputing it', () => {
+            const d = normalizeScan({ items: [], subtotal: 18700, discount: 1823.25, tax: 3037.82, total: 19914.57 });
+            expect(d.discount).toBe(1823.25);
+        });
+
+        it('ignores an implausible (negative or ≥ subtotal) derived discount', () => {
+            // total > subtotal+tax would imply a negative discount → ignore
+            const d = normalizeScan({ items: [], subtotal: 1000, discount: 0, tax: 180, total: 1300 });
+            expect(d.discount).toBe(0);
         });
     });
 

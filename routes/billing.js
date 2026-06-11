@@ -12,6 +12,7 @@ const { z } = require('zod');
 const { requirePermission } = require('../middleware/permissionMiddleware');
 const { validate, validateQuery, validateParams } = require('../middleware/validate');
 const billingZohoService = require('../services/billing-zoho-service');
+const zohoAPI = require('../services/zoho-api');
 const auditLog = require('../services/audit-log');
 const { idempotent, setPool: setIdempotencyPool } = require('../middleware/idempotency');
 
@@ -1112,6 +1113,54 @@ router.get('/payments',
 // ZOHO PUSH
 // ═══════════════════════════════════════════
 
+// Zoho salespersons for the invoice-push picker (owner 2026-06-12: salesperson
+// is mandatory on push). Lists the local master; sync pulls fresh from Zoho.
+router.get('/salespersons',
+    requirePermission('billing', 'invoice'),
+    async (req, res) => {
+        try {
+            const [rows] = await pool.query(
+                `SELECT zoho_salesperson_id, salesperson_name, salesperson_email
+                 FROM zoho_salespersons WHERE is_active = 1 ORDER BY salesperson_name`
+            );
+            res.json({ success: true, salespersons: rows });
+        } catch (error) {
+            console.error('List salespersons error:', error);
+            res.status(500).json({ success: false, message: 'Failed to load salespersons' });
+        }
+    }
+);
+
+router.post('/salespersons/sync',
+    requirePermission('billing', 'zoho_push'),
+    async (req, res) => {
+        try {
+            const result = await zohoAPI.syncSalespersons();
+            res.json({ success: true, synced: result.synced, message: `${result.synced} salesperson(s) synced from Zoho` });
+        } catch (error) {
+            console.error('Sync salespersons error:', error);
+            res.status(500).json({ success: false, message: error.message || 'Failed to sync salespersons' });
+        }
+    }
+);
+
+// Zoho locations/branches for the invoice-push location picker.
+router.get('/zoho-locations',
+    requirePermission('billing', 'invoice'),
+    async (req, res) => {
+        try {
+            const [rows] = await pool.query(
+                `SELECT zoho_location_id, zoho_location_name, local_branch_id
+                 FROM zoho_locations_map WHERE is_active = 1 ORDER BY zoho_location_name`
+            );
+            res.json({ success: true, locations: rows });
+        } catch (error) {
+            console.error('Billing zoho-locations error:', error);
+            res.status(500).json({ success: false, message: 'Failed to load locations' });
+        }
+    }
+);
+
 router.post('/invoices/:id/push-zoho',
     requirePermission('billing', 'zoho_push'),
     idempotent('billing.invoice.zohoPush'),
@@ -1119,16 +1168,27 @@ router.post('/invoices/:id/push-zoho',
     async (req, res) => {
         try {
             const { id } = req.params;
-            const result = await billingZohoService.pushInvoiceToZoho(id, req.user.id);
+            const options = {
+                salespersonId: (req.body && req.body.salesperson_id) || null,
+                locationId: (req.body && req.body.zoho_location_id) || null,
+            };
+            const result = await billingZohoService.pushInvoiceToZoho(id, req.user.id, options);
             res.json({
                 success: true,
                 message: 'Invoice pushed to Zoho',
                 zoho_invoice_id: result.zohoInvoiceId,
                 zoho_invoice_number: result.zohoInvoiceNumber,
+                salesperson_name: result.salespersonName || null,
+                location_name: result.locationName || null,
                 points_result: result.pointsResult || null
             });
         } catch (error) {
             console.error('Push to Zoho error:', error);
+            // Surface the actionable gates (missing salesperson / push eligibility)
+            // as 400s with a code so the UI can react instead of a generic 500.
+            if (error.code === 'SALESPERSON_REQUIRED' || error.code === 'PUSH_GATE') {
+                return res.status(400).json({ success: false, code: error.code, message: error.message });
+            }
             res.status(500).json({ success: false, message: error.message || 'Failed to push to Zoho' });
         }
     }
