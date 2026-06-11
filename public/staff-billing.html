@@ -195,6 +195,14 @@
                     <button id="custRequestsBtn" onclick="toggleCreditRequests()" class="btn-secondary px-4 py-2 rounded-lg text-sm font-medium hidden">Requests <span id="custPendingBadge" class="qc-tab-badge hidden">0</span></button>
                 </div>
             </div>
+            <div class="pill-row mb-3" id="creditFilterPills">
+                <button class="filter-pill active" data-status="" onclick="setCreditFilter(this)">All</button>
+                <button class="filter-pill" data-status="no_limit" onclick="setCreditFilter(this)">No limit</button>
+                <button class="filter-pill" data-status="under_50" onclick="setCreditFilter(this)">Under 50%</button>
+                <button class="filter-pill" data-status="50_to_80" onclick="setCreditFilter(this)">50–80%</button>
+                <button class="filter-pill" data-status="over_80" onclick="setCreditFilter(this)">Over 80%</button>
+                <button class="filter-pill" data-status="exceeded" onclick="setCreditFilter(this)">Exceeded</button>
+            </div>
             <div id="creditRequestsPanel" class="hidden mb-4"></div>
             <div id="customerCreditList" class="space-y-3"></div>
             <div id="customerCreditPagination" class="mt-4"></div>
@@ -587,6 +595,14 @@ const CREDIT_API = '/api/credit-limits';
 let creditCustomers = [];
 let creditRequests = [];
 let creditListSearchTimer = null;
+let creditStatusFilter = '';
+
+function setCreditFilter(btn) {
+    document.querySelectorAll('#creditFilterPills .filter-pill').forEach(p => p.classList.remove('active'));
+    btn.classList.add('active');
+    creditStatusFilter = btn.dataset.status || '';
+    loadCreditCustomers();
+}
 function creditCanManage() {
     try { const u = (window.getCurrentUser && getCurrentUser()) || null; return !!u && window.isAdminLevelRole && isAdminLevelRole(u.role); }
     catch { return false; }
@@ -605,7 +621,9 @@ async function loadCreditCustomers() {
     document.getElementById('custRequestsBtn').classList.toggle('hidden', !isAdmin);
     try {
         const search = document.getElementById('customerSearch')?.value || '';
-        const qs = new URLSearchParams(); if (search) qs.set('search', search);
+        const qs = new URLSearchParams();
+        if (search) qs.set('search', search);
+        if (creditStatusFilter) qs.set('status', creditStatusFilter);
         const res = await fetch(`${CREDIT_API}/customers?${qs}`, { headers });
         // Staff without the credit_limits:view permission can't use this tab —
         // hide it and drop them onto Estimates instead of showing a raw error.

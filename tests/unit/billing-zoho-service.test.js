@@ -10,9 +10,10 @@
 
 // Mock the Zoho API so no real HTTP happens; capture the createInvoice payload.
 const mockCreateInvoice = jest.fn(async () => ({ invoice: { invoice_id: 'ZINV1', invoice_number: 'INV-0001' } }));
+const mockCreateContact = jest.fn(async () => ({ contact: { contact_id: 'NEWCONTACT' } }));
 jest.mock('../../services/zoho-api', () => ({
     createInvoice: (...a) => mockCreateInvoice(...a),
-    createContact: jest.fn(async () => ({ contact: { contact_id: 'CONT1' } })),
+    createContact: (...a) => mockCreateContact(...a),
     createPayment: jest.fn(async () => ({})),
     finalizeDocument: jest.fn(async (_kind, _id, isAdmin) => ({ state: isAdmin ? 'approved' : 'submitted' })),
 }));
@@ -30,7 +31,7 @@ function makePool(invoice, { painterSp = null } = {}) {
             if (/FROM painter_zoho_salesperson_map/.test(s)) return [[]];
             if (/FROM zoho_locations_map/.test(s)) return [[{ zoho_location_name: 'Main Branch' }]];
             if (/FROM billing_invoice_items/.test(s)) return [[{ zoho_item_id: 'Z1', quantity: 1, unit_price: 1000, line_total: 1000 }]];
-            if (/zoho_contact_id, full_name, phone FROM painters/.test(s)) return [[{ zoho_contact_id: 'CONT1', full_name: 'Ravi Kumar', phone: '9000000000' }]];
+            if (/zoho_contact_id.*FROM painters/.test(s)) return [[{ zoho_contact_id: 'CONT1', zoho_customer_id: null, full_name: 'Ravi Kumar', phone: '9000000000' }]];
             if (/FROM zoho_customers_map/.test(s)) return [[{ zoho_contact_id: 'CONT1' }]];
             if (/^\s*UPDATE/i.test(s)) return [{ affectedRows: 1 }];
             return [[]];
@@ -88,5 +89,49 @@ describe('pushInvoiceToZoho — mandatory salesperson', () => {
         svc.setPool(makePool({ ...baseInvoice }));
         const res = await svc.pushInvoiceToZoho(1, 99, { salespersonId: 'SP', isAdmin: false });
         expect(res.zohoState).toBe('submitted');
+    });
+});
+
+// A painter is BOTH a Zoho contact (zoho_customer_id from the painter sync) AND
+// historically resolveZohoContact only read painters.zoho_contact_id — so a
+// synced painter (zoho_customer_id set, zoho_contact_id NULL) made the first
+// invoice push CREATE A DUPLICATE Zoho contact. Lock the COALESCE fix.
+describe('resolveZohoContact — painter duplicate-contact guard', () => {
+    function painterPool(painterRow) {
+        const updates = [];
+        const pool = {
+            updates,
+            query: async (sql, params) => {
+                if (/FROM painters WHERE id/.test(sql)) return [painterRow ? [painterRow] : []];
+                if (/^\s*UPDATE painters/i.test(sql)) { updates.push({ sql, params }); return [{ affectedRows: 1 }]; }
+                return [[]];
+            }
+        };
+        return pool;
+    }
+    beforeEach(() => mockCreateContact.mockClear());
+
+    it('returns the existing zoho_contact_id without creating a contact', async () => {
+        svc.setPool(painterPool({ zoho_contact_id: 'C-EXISTING', zoho_customer_id: null, full_name: 'Ravi', phone: '9' }));
+        const id = await svc.resolveZohoContact('painter', { painterId: 5 });
+        expect(id).toBe('C-EXISTING');
+        expect(mockCreateContact).not.toHaveBeenCalled();
+    });
+
+    it('falls back to zoho_customer_id (synced painter) — NO duplicate contact created', async () => {
+        svc.setPool(painterPool({ zoho_contact_id: null, zoho_customer_id: 'C-SYNCED', full_name: 'Ravi', phone: '9' }));
+        const id = await svc.resolveZohoContact('painter', { painterId: 5 });
+        expect(id).toBe('C-SYNCED');
+        expect(mockCreateContact).not.toHaveBeenCalled();
+    });
+
+    it('creates a contact only when BOTH ids are missing', async () => {
+        const pool = painterPool({ zoho_contact_id: null, zoho_customer_id: null, full_name: 'Ravi', phone: '9' });
+        svc.setPool(pool);
+        const id = await svc.resolveZohoContact('painter', { painterId: 5 });
+        expect(mockCreateContact).toHaveBeenCalledTimes(1);
+        expect(id).toBe('NEWCONTACT');
+        // the new id is written back to the painter
+        expect(pool.updates.length).toBeGreaterThan(0);
     });
 });

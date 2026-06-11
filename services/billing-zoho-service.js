@@ -26,18 +26,29 @@ function setPointsEngine(pe) { pointsEngine = pe; }
 async function resolveZohoContact(customerType, { customerId, painterId, customerName, customerPhone }) {
     // Painter lookup
     if (customerType === 'painter' && painterId) {
+        // A painter is synced to Zoho as a CONTACT — but the painter-sync writes
+        // that contact id to painters.zoho_customer_id while this billing path
+        // historically only read zoho_contact_id. A synced painter (zoho_customer_id
+        // set, zoho_contact_id NULL) therefore created a DUPLICATE Zoho contact on
+        // the first invoice push. Read BOTH and prefer either existing id.
         const [rows] = await pool.query(
-            'SELECT zoho_contact_id, full_name, phone FROM painters WHERE id = ?',
+            'SELECT zoho_contact_id, zoho_customer_id, full_name, phone FROM painters WHERE id = ?',
             [painterId]
         );
         if (!rows.length) throw new Error(`Painter ${painterId} not found`);
 
         const painter = rows[0];
-        if (painter.zoho_contact_id) {
-            return painter.zoho_contact_id;
+        const existing = painter.zoho_contact_id || painter.zoho_customer_id;
+        if (existing) {
+            // Backfill zoho_contact_id when only zoho_customer_id was set, so both
+            // columns stay consistent for future lookups.
+            if (!painter.zoho_contact_id) {
+                await pool.query('UPDATE painters SET zoho_contact_id = ? WHERE id = ?', [existing, painterId]);
+            }
+            return existing;
         }
 
-        // Create contact in Zoho
+        // Create contact in Zoho (neither id set)
         const contactName = painter.full_name || customerName || `Painter ${painterId}`;
         const phone = painter.phone || customerPhone;
         const result = await zohoAPI.createContact({
@@ -49,8 +60,8 @@ async function resolveZohoContact(customerType, { customerId, painterId, custome
         const contactId = result && result.contact && result.contact.contact_id;
         if (!contactId) throw new Error('Failed to create Zoho contact for painter');
 
-        // Save back to painter record
-        await pool.query('UPDATE painters SET zoho_contact_id = ? WHERE id = ?', [contactId, painterId]);
+        // Save back to BOTH painter columns so the sync + billing paths agree.
+        await pool.query('UPDATE painters SET zoho_contact_id = ?, zoho_customer_id = COALESCE(zoho_customer_id, ?) WHERE id = ?', [contactId, contactId, painterId]);
         return contactId;
     }
 
