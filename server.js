@@ -96,6 +96,7 @@ const photosRoutes = require('./routes/photos');
 const agreementsRoutes = require('./routes/agreements');
 const twoFARoutes = require('./routes/auth-2fa');
 const priceListRoutes = require('./routes/price-list');
+const gstReportsRoutes = require('./routes/gst-reports');
 const authInlineRoutes = require('./routes/auth');
 const paintColorsRoutes = require('./routes/paint-colors');
 const productsInlineRoutes = require('./routes/products');
@@ -378,6 +379,7 @@ if (itemMasterRoutes.setPool) itemMasterRoutes.setPool(pool);
 agreementsRoutes.setPool(pool);
 twoFARoutes.setPool(pool);
 priceListRoutes.setPool(pool);
+gstReportsRoutes.setPool(pool);
 authInlineRoutes.setPool(pool);
 paintColorsRoutes.setPool(pool);
 productsInlineRoutes.setPool(pool);
@@ -454,6 +456,7 @@ app.use('/api/item-master', itemMasterRoutes.router);
 app.use('/api/agreements', agreementsRoutes.router);
 app.use('/api/2fa', twoFARoutes);
 app.use('/api/price-list', priceListRoutes.router);
+app.use('/api/gst-reports', gstReportsRoutes.router);
 
 // Share page routes (serve HTML for public share links)
 app.get('/share/estimate/:token', (req, res) => {

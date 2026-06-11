@@ -1,0 +1,258 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>GST Reports — QC Business Manager</title>
+<script src="/js/qc-escape.js?v=32133ff2"></script>
+<style>
+:root { --primary:#667eea; --primary2:#764ba2; }
+* { box-sizing:border-box; margin:0; padding:0; font-family:'Segoe UI',system-ui,sans-serif; }
+body { background:#f3f4f6; color:#111827; }
+.header { background:linear-gradient(135deg,var(--primary),var(--primary2)); color:#fff; padding:16px 20px; display:flex; align-items:center; gap:14px; flex-wrap:wrap; }
+.header h1 { font-size:19px; }
+.header a { color:#e0e7ff; text-decoration:none; font-size:13px; }
+.controls { display:flex; gap:10px; align-items:center; margin-left:auto; flex-wrap:wrap; }
+.controls input[type=month] { padding:7px 10px; border:none; border-radius:8px; font-size:14px; }
+.tabs { display:flex; gap:4px; background:#fff; padding:8px 16px 0; border-bottom:1px solid #e5e7eb; overflow-x:auto; }
+.tab { padding:10px 16px; border:none; background:none; cursor:pointer; font-size:14px; color:#6b7280; border-bottom:3px solid transparent; white-space:nowrap; }
+.tab.active { color:var(--primary); border-bottom-color:var(--primary); font-weight:600; }
+.wrap { padding:16px; max-width:1200px; margin:0 auto; }
+.cards { display:grid; grid-template-columns:repeat(auto-fit,minmax(160px,1fr)); gap:10px; margin-bottom:14px; }
+.card { background:#fff; border-radius:10px; padding:12px 14px; box-shadow:0 1px 3px rgba(0,0,0,.08); }
+.card .lbl { font-size:12px; color:#6b7280; }
+.card .val { font-size:20px; font-weight:700; margin-top:2px; }
+.banner-warn { background:#fef2f2; border:2px solid #dc2626; color:#991b1b; border-radius:10px; padding:12px 14px; font-weight:700; margin-bottom:14px; font-size:14px; }
+.banner-info { background:#eff6ff; border:1px solid #3b82f6; color:#1e40af; border-radius:10px; padding:10px 14px; margin-bottom:14px; font-size:13px; }
+.section-title { font-size:15px; font-weight:700; margin:18px 0 8px; display:flex; align-items:center; gap:10px; }
+.btn { padding:7px 14px; border:none; border-radius:8px; cursor:pointer; font-size:13px; background:var(--primary); color:#fff; }
+.btn.gray { background:#6b7280; }
+table { width:100%; border-collapse:collapse; background:#fff; border-radius:10px; overflow:hidden; box-shadow:0 1px 3px rgba(0,0,0,.08); font-size:13px; }
+th { background:#f9fafb; text-align:left; padding:9px 10px; color:#374151; border-bottom:1px solid #e5e7eb; white-space:nowrap; }
+td { padding:8px 10px; border-bottom:1px solid #f3f4f6; }
+td.num, th.num { text-align:right; font-variant-numeric:tabular-nums; }
+.muted { color:#9ca3af; font-size:12px; }
+.pill { display:inline-block; padding:2px 8px; border-radius:99px; font-size:11px; font-weight:600; }
+.pill.red { background:#fee2e2; color:#991b1b; } .pill.green { background:#dcfce7; color:#166534; }
+.searchbox { padding:8px 12px; border:1px solid #d1d5db; border-radius:8px; width:100%; max-width:380px; font-size:14px; margin-bottom:10px; }
+.tbl-scroll { overflow-x:auto; }
+#loading { text-align:center; padding:30px; color:#6b7280; display:none; }
+@media (max-width:640px){ .header h1{font-size:16px} td,th{padding:6px 7px;font-size:12px} }
+</style>
+</head>
+<body>
+<div class="header">
+    <a href="/dashboard.html">←</a>
+    <h1>📊 GST Reports</h1>
+    <div class="controls">
+        <input type="month" id="month">
+        <button class="btn" onclick="loadActive()">Load</button>
+    </div>
+</div>
+<div class="tabs">
+    <button class="tab active" data-tab="filing" onclick="switchTab('filing')">GST Filing</button>
+    <button class="tab" data-tab="cost" onclick="switchTab('cost')">Cost Analysis (Internal)</button>
+    <button class="tab" data-tab="commission" onclick="switchTab('commission')">Painter Commission</button>
+    <button class="tab" data-tab="profit" onclick="switchTab('profit')">Profitability</button>
+    <button class="tab" data-tab="flags" onclick="switchTab('flags')">Non-GST Items</button>
+</div>
+<div class="wrap">
+    <div id="loading">Loading…</div>
+    <div id="tab-filing"></div>
+    <div id="tab-cost" style="display:none"></div>
+    <div id="tab-commission" style="display:none"></div>
+    <div id="tab-profit" style="display:none"></div>
+    <div id="tab-flags" style="display:none"></div>
+</div>
+<script>
+const token = localStorage.getItem('auth_token');
+if (!token) location.href = '/login.html';
+const fmtINR = n => '₹' + Number(n || 0).toLocaleString('en-IN', { maximumFractionDigits: 2 });
+let activeTab = 'filing';
+
+document.getElementById('month').value = new Date(Date.now() - 86400000 * 28).toISOString().slice(0, 7);
+
+async function api(path) {
+    const res = await fetch(path, { headers: { Authorization: 'Bearer ' + token } });
+    const data = await res.json();
+    if (!data.success) throw new Error(data.message || 'Request failed');
+    return data;
+}
+
+function switchTab(tab) {
+    activeTab = tab;
+    document.querySelectorAll('.tab').forEach(t => t.classList.toggle('active', t.dataset.tab === tab));
+    ['filing', 'cost', 'commission', 'profit', 'flags'].forEach(t =>
+        document.getElementById('tab-' + t).style.display = t === tab ? '' : 'none');
+    loadActive();
+}
+
+function csvDownload(filename, header, rows) {
+    const escCsv = v => { const s = String(v == null ? '' : v); return /[",\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s; };
+    const csv = [header, ...rows].map(r => r.map(escCsv).join(',')).join('\n');
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(new Blob(['﻿' + csv], { type: 'text/csv' }));
+    a.download = filename;
+    a.click();
+}
+
+let cache = {};
+async function loadActive() {
+    const month = document.getElementById('month').value;
+    if (!month) return;
+    document.getElementById('loading').style.display = 'block';
+    try {
+        if (activeTab === 'filing') await loadFiling(month);
+        else if (activeTab === 'cost') await loadCost(month);
+        else if (activeTab === 'commission') await loadCommission(month);
+        else if (activeTab === 'profit') await loadProfit(month);
+        else if (activeTab === 'flags') await loadFlags();
+    } catch (e) {
+        document.getElementById('tab-' + activeTab).innerHTML = '<div class="banner-warn">' + escHtml(e.message) + '</div>';
+    }
+    document.getElementById('loading').style.display = 'none';
+}
+
+async function loadFiling(month) {
+    const d = await api('/api/gst-reports/filing?month=' + month);
+    cache.filing = d;
+    const el = document.getElementById('tab-filing');
+    el.innerHTML = `
+        <div class="banner-info">Actual sale values for <b>${escHtml(month)}</b> — this is the report for your auditor / GSTR-1. Every non-void invoice is included at its real value.</div>
+        <div class="cards">
+            <div class="card"><div class="lbl">Invoices</div><div class="val">${d.totals.invoice_count}</div></div>
+            <div class="card"><div class="lbl">Taxable (sub total)</div><div class="val">${fmtINR(d.totals.sub_total)}</div></div>
+            <div class="card"><div class="lbl">GST (tax total)</div><div class="val">${fmtINR(d.totals.tax_total)}</div></div>
+            <div class="card"><div class="lbl">Grand total</div><div class="val">${fmtINR(d.totals.total)}</div></div>
+        </div>
+        <div class="section-title">B2B — GST invoices (${d.b2b.length})
+            <button class="btn" onclick="exportB2B()">⬇ CSV</button></div>
+        <div class="tbl-scroll"><table><thead><tr><th>Date</th><th>Invoice #</th><th>Customer</th><th>GSTIN</th><th class="num">Taxable</th><th class="num">GST</th><th class="num">Total</th></tr></thead><tbody>
+        ${d.b2b.map(i => `<tr><td>${escHtml(String(i.invoice_date).slice(0, 10))}</td><td>${escHtml(i.invoice_number)}</td><td>${escHtml(i.customer_name)}</td><td>${escHtml(i.gstin)}</td><td class="num">${fmtINR(i.sub_total)}</td><td class="num">${fmtINR(i.tax_total)}</td><td class="num">${fmtINR(i.total)}</td></tr>`).join('') || '<tr><td colspan="7" class="muted">No B2B invoices this month</td></tr>'}
+        </tbody></table></div>
+        <div class="section-title">B2C — consolidated</div>
+        <div class="cards">
+            <div class="card"><div class="lbl">B2C invoices</div><div class="val">${d.b2c.invoice_count}</div></div>
+            <div class="card"><div class="lbl">Taxable</div><div class="val">${fmtINR(d.b2c.sub_total)}</div></div>
+            <div class="card"><div class="lbl">GST</div><div class="val">${fmtINR(d.b2c.tax_total)}</div></div>
+            <div class="card"><div class="lbl">Total</div><div class="val">${fmtINR(d.b2c.total)}</div></div>
+        </div>
+        <div class="section-title">HSN summary <button class="btn" onclick="exportHSN()">⬇ CSV</button></div>
+        <div class="tbl-scroll"><table><thead><tr><th>HSN</th><th class="num">Tax %</th><th class="num">Qty</th><th class="num">Taxable value</th></tr></thead><tbody>
+        ${d.hsn.map(h => `<tr><td>${escHtml(h.hsn)}</td><td class="num">${h.tax_pct != null ? escHtml(h.tax_pct) : '—'}</td><td class="num">${Number(h.qty).toLocaleString('en-IN')}</td><td class="num">${fmtINR(h.taxable_value)}</td></tr>`).join('')}
+        </tbody></table></div>`;
+}
+
+function exportB2B() {
+    const d = cache.filing;
+    csvDownload(`gst-filing-b2b-${d.month}.csv`,
+        ['Invoice Date', 'Invoice Number', 'Customer', 'GSTIN', 'Taxable Value', 'GST', 'Total'],
+        d.b2b.map(i => [String(i.invoice_date).slice(0, 10), i.invoice_number, i.customer_name, i.gstin, i.sub_total, i.tax_total, i.total]));
+}
+function exportHSN() {
+    const d = cache.filing;
+    csvDownload(`gst-filing-hsn-${d.month}.csv`, ['HSN', 'Tax %', 'Qty', 'Taxable Value'],
+        d.hsn.map(h => [h.hsn, h.tax_pct, h.qty, h.taxable_value]));
+}
+
+async function loadCost(month) {
+    const d = await api('/api/gst-reports/cost-analysis?month=' + month);
+    cache.cost = d;
+    const row = it => `<tr><td>${escHtml(it.item_name)}</td><td>${escHtml(it.sku || '')}</td><td class="num">${Number(it.qty).toLocaleString('en-IN')}</td><td class="num">${it.cost_rate != null ? fmtINR(it.cost_rate) : '—'}<div class="muted">${escHtml(it.cost_source)}</div></td><td class="num">${it.cost_value != null ? fmtINR(it.cost_value) : '—'}</td><td class="num">${fmtINR(it.actual_revenue)}</td></tr>`;
+    document.getElementById('tab-cost').innerHTML = `
+        <div class="banner-warn">⚠ ${escHtml(d.disclaimer)}</div>
+        <div class="cards">
+            <div class="card"><div class="lbl">Actual revenue (incl. items)</div><div class="val">${fmtINR(d.summary.actual_revenue)}</div></div>
+            <div class="card"><div class="lbl">Value at purchase cost</div><div class="val">${fmtINR(d.summary.cost_value)}</div></div>
+            <div class="card"><div class="lbl">Gross margin</div><div class="val">${fmtINR(d.summary.gross_margin)}</div></div>
+        </div>
+        <div class="section-title">Items (GST-purchased) — ${d.included.length}
+            <button class="btn" onclick="exportCost()">⬇ CSV</button></div>
+        <div class="tbl-scroll"><table><thead><tr><th>Item</th><th>SKU</th><th class="num">Qty</th><th class="num">Cost rate</th><th class="num">Value @ cost</th><th class="num">Actual revenue</th></tr></thead><tbody>
+        ${d.included.map(row).join('')}
+        </tbody></table></div>
+        ${d.excluded_non_gst.length ? `<div class="section-title">Excluded — flagged "purchased without GST" (${d.excluded_non_gst.length})</div>
+        <div class="tbl-scroll"><table><thead><tr><th>Item</th><th>SKU</th><th class="num">Qty</th><th class="num">Cost rate</th><th class="num">Value @ cost</th><th class="num">Actual revenue</th></tr></thead><tbody>${d.excluded_non_gst.map(row).join('')}</tbody></table></div>` : ''}
+        ${d.no_cost_data.length ? `<div class="section-title">No cost data (${d.no_cost_data.length}) <span class="muted">set DPL / purchase rate in Zoho items</span></div>
+        <div class="tbl-scroll"><table><thead><tr><th>Item</th><th>SKU</th><th class="num">Qty</th><th class="num">Cost rate</th><th class="num">Value @ cost</th><th class="num">Actual revenue</th></tr></thead><tbody>${d.no_cost_data.map(row).join('')}</tbody></table></div>` : ''}`;
+}
+
+function exportCost() {
+    const d = cache.cost;
+    csvDownload(`INTERNAL-cost-analysis-${d.month}-NOT-FOR-FILING.csv`,
+        ['INTERNAL COST ANALYSIS — NOT FOR GST FILING', '', '', '', '', ''],
+        [['Item', 'SKU', 'Qty', 'Cost Rate', 'Value At Cost', 'Actual Revenue'],
+         ...d.included.map(i => [i.item_name, i.sku, i.qty, i.cost_rate, i.cost_value, i.actual_revenue])]);
+}
+
+async function loadCommission(month) {
+    const d = await api('/api/gst-reports/commission-expense?month=' + month);
+    cache.commission = d;
+    document.getElementById('tab-commission').innerHTML = `
+        <div class="banner-info">${escHtml(d.note)} Give this to your auditor — it is a deductible business expense.</div>
+        <div class="cards"><div class="card"><div class="lbl">Total commission paid (${escHtml(month)})</div><div class="val">${fmtINR(d.total)}</div></div>
+        <div class="card"><div class="lbl">Payouts</div><div class="val">${d.withdrawals.length}</div></div></div>
+        <div class="section-title">Payouts <button class="btn" onclick="exportCommission()">⬇ CSV</button></div>
+        <div class="tbl-scroll"><table><thead><tr><th>Date</th><th>Painter</th><th>Phone</th><th>Pool</th><th class="num">Amount</th><th>Status</th><th>Payment ref</th></tr></thead><tbody>
+        ${d.withdrawals.map(w => `<tr><td>${escHtml(String(w.processed_at).slice(0, 10))}</td><td>${escHtml(w.full_name)}</td><td>${escHtml(w.phone)}</td><td>${escHtml(w.point_pool)}</td><td class="num">${fmtINR(w.amount)}</td><td>${escHtml(w.status)}</td><td>${escHtml(w.payment_reference || '')}</td></tr>`).join('') || '<tr><td colspan="7" class="muted">No payouts this month</td></tr>'}
+        </tbody></table></div>`;
+}
+
+function exportCommission() {
+    const d = cache.commission;
+    csvDownload(`painter-commission-expense-${d.month}.csv`,
+        ['Date', 'Painter', 'Phone', 'Pool', 'Amount', 'Status', 'Payment Reference'],
+        d.withdrawals.map(w => [String(w.processed_at).slice(0, 10), w.full_name, w.phone, w.point_pool, w.amount, w.status, w.payment_reference]));
+}
+
+async function loadProfit(month) {
+    const d = await api('/api/gst-reports/profitability?month=' + month);
+    document.getElementById('tab-profit').innerHTML = `
+        <div class="banner-info">${escHtml(d.note)}</div>
+        <div class="cards">
+            <div class="card"><div class="lbl">Sales (taxable)</div><div class="val">${fmtINR(d.sales.taxable)}</div></div>
+            <div class="card"><div class="lbl">GST collected</div><div class="val">${fmtINR(d.sales.gst)}</div></div>
+            <div class="card"><div class="lbl">COGS (at cost)</div><div class="val">${fmtINR(d.cogs)}</div></div>
+            <div class="card"><div class="lbl">Gross margin</div><div class="val">${fmtINR(d.gross_margin)}</div></div>
+            <div class="card"><div class="lbl">Painter commission</div><div class="val">− ${fmtINR(d.painter_commission)}</div></div>
+            <div class="card"><div class="lbl">Staff salary</div><div class="val">− ${fmtINR(d.staff_salary)}</div></div>
+            <div class="card" style="border:2px solid var(--primary)"><div class="lbl">Indicative net (before rent etc.)</div><div class="val">${fmtINR(d.indicative_net)}</div></div>
+        </div>
+        ${d.uncosted_items ? `<div class="muted">${d.uncosted_items} item(s) had no cost data and are excluded from COGS.</div>` : ''}`;
+}
+
+async function loadFlags() {
+    const el = document.getElementById('tab-flags');
+    el.innerHTML = `
+        <div class="banner-info">"Purchased <b>without</b> GST bill" என்று flag செய்யும் items, Cost Analysis (Internal) tab-ல் தனியா பிரிக்கப்படும். GST Filing report-ஐ இது எந்த விதத்திலும் மாற்றாது.</div>
+        <input class="searchbox" id="flagSearch" placeholder="Search item / SKU…" oninput="debounceFlags()">
+        <div id="flagList"></div>`;
+    await renderFlags('');
+}
+
+let flagTimer;
+function debounceFlags() { clearTimeout(flagTimer); flagTimer = setTimeout(() => renderFlags(document.getElementById('flagSearch').value), 350); }
+
+async function renderFlags(search) {
+    const d = await api('/api/gst-reports/item-flags?search=' + encodeURIComponent(search));
+    document.getElementById('flagList').innerHTML = `
+        <div class="tbl-scroll"><table><thead><tr><th>Item</th><th>SKU</th><th>Brand</th><th>Purchase</th><th></th></tr></thead><tbody>
+        ${d.items.map(i => `<tr><td>${escHtml(i.zoho_item_name)}</td><td>${escHtml(i.zoho_sku || '')}</td><td>${escHtml(i.zoho_brand || '')}</td>
+            <td>${i.gst_purchase ? '<span class="pill green">GST bill</span>' : '<span class="pill red">No GST bill</span>'}</td>
+            <td><button class="btn gray" onclick="toggleFlag('${escJS(i.zoho_item_id)}', ${i.gst_purchase ? 0 : 1})">${i.gst_purchase ? 'Mark: no GST bill' : 'Mark: GST bill'}</button></td></tr>`).join('')}
+        </tbody></table></div>`;
+}
+
+async function toggleFlag(itemId, flag) {
+    await fetch('/api/gst-reports/item-flags/' + encodeURIComponent(itemId), {
+        method: 'PUT',
+        headers: { Authorization: 'Bearer ' + token, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ gst_purchase: flag }),
+    });
+    renderFlags(document.getElementById('flagSearch').value);
+}
+
+loadActive();
+</script>
+</body>
+</html>
