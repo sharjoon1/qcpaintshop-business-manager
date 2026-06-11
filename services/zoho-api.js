@@ -160,15 +160,18 @@ async function createSalesperson({ salesperson_name, salesperson_email = null })
     const orgId = process.env.ZOHO_ORGANIZATION_ID;
     const body = { salesperson_name };
     if (salesperson_email) body.salesperson_email = salesperson_email;
-    return await apiPost(`/settings/salespersons?organization_id=${orgId}`, body);
+    // Zoho Books salespersons live at /salespersons (NOT /settings/salespersons,
+    // which 404s "Invalid URL Passed" — verified live on prod 2026-06-12).
+    return await apiPost(`/salespersons?organization_id=${orgId}`, body);
 }
 
 /**
- * List all Sales Persons from Zoho
+ * List all Sales Persons from Zoho. Response shape: { code, message, data:[...] }
+ * — the salespersons are under `data` (verified live on prod 2026-06-12).
  */
 async function listSalespersons() {
     const orgId = process.env.ZOHO_ORGANIZATION_ID;
-    return await apiGet('/settings/salespersons', { organization_id: orgId });
+    return await apiGet('/salespersons', { organization_id: orgId });
 }
 
 /**
@@ -179,20 +182,22 @@ async function listSalespersons() {
 async function syncSalespersons() {
     if (!pool) throw new Error('Database pool not initialized');
     const resp = await listSalespersons();
-    const list = (resp && resp.salespersons) || [];
+    // Zoho returns the rows under `data`; tolerate `salespersons` too.
+    const list = (resp && (resp.data || resp.salespersons)) || [];
     let synced = 0;
     for (const sp of list) {
         const id = sp.salesperson_id;
         if (!id) continue;
+        const active = sp.is_active === false ? 0 : 1;
         await pool.query(
             `INSERT INTO zoho_salespersons (zoho_salesperson_id, salesperson_name, salesperson_email, is_active, last_synced_at)
-             VALUES (?, ?, ?, 1, NOW())
+             VALUES (?, ?, ?, ?, NOW())
              ON DUPLICATE KEY UPDATE
                 salesperson_name = VALUES(salesperson_name),
                 salesperson_email = VALUES(salesperson_email),
-                is_active = 1,
+                is_active = VALUES(is_active),
                 last_synced_at = NOW()`,
-            [id, sp.salesperson_name || '(unnamed)', sp.salesperson_email || null]
+            [id, sp.salesperson_name || '(unnamed)', sp.salesperson_email || null, active]
         );
         synced++;
     }
