@@ -225,7 +225,10 @@ async function performCodeQualityCheck() {
         const dirPath = path.join(baseDir, dir);
         if (!fs.existsSync(dirPath)) continue;
 
-        const files = fs.readdirSync(dirPath).filter(f => f.endsWith('.js'));
+        // Recursive: split route modules live in routes/<name>/ subdirectories (A8)
+        const files = fs.readdirSync(dirPath, { recursive: true })
+            .map(f => String(f).replace(/\\/g, '/'))
+            .filter(f => f.endsWith('.js'));
 
         for (const file of files) {
             const filePath = path.join(dirPath, file);

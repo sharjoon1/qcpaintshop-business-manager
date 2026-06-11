@@ -3,7 +3,7 @@
   "info": {
     "title": "QC Business Manager API",
     "description": "Generated from the route table by scripts/generate-openapi.js (A12). x-auth lists the middleware gate(s); \"public\" = no auth middleware detected on the route line. Regenerate after route changes — do not edit by hand.",
-    "version": "2026-06-10"
+    "version": "2026-06-11"
   },
   "servers": [
     {
@@ -4992,321 +4992,13 @@
         }
       }
     },
-    "/api/zoho/items/dpl-catalog/{brand}/build": {
-      "post": {
-        "tags": [
-          "zoho"
-        ],
-        "summary": "POST /api/zoho/items/dpl-catalog/:brand/build",
-        "x-source": "routes/zoho.js",
-        "x-auth": [
-          "requirePermission"
-        ],
-        "x-permission": "zoho.manage",
-        "parameters": [
-          {
-            "name": "brand",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "OK"
-          }
-        }
-      }
-    },
-    "/api/zoho/items/dpl-catalog/{brand}": {
-      "get": {
-        "tags": [
-          "zoho"
-        ],
-        "summary": "GET /api/zoho/items/dpl-catalog/:brand",
-        "x-source": "routes/zoho.js",
-        "x-auth": [
-          "requirePermission"
-        ],
-        "x-permission": "zoho.manage",
-        "parameters": [
-          {
-            "name": "brand",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "OK"
-          }
-        }
-      }
-    },
-    "/api/zoho/items/dpl-catalog/{brand}/by-zoho": {
-      "get": {
-        "tags": [
-          "zoho"
-        ],
-        "summary": "GET /api/zoho/items/dpl-catalog/:brand/by-zoho",
-        "x-source": "routes/zoho.js",
-        "x-auth": [
-          "requirePermission"
-        ],
-        "x-permission": "zoho.manage",
-        "parameters": [
-          {
-            "name": "brand",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "OK"
-          }
-        }
-      }
-    },
-    "/api/zoho/items/dpl-catalog/entry/{id}/confirm-link": {
-      "post": {
-        "tags": [
-          "zoho"
-        ],
-        "summary": "POST /api/zoho/items/dpl-catalog/entry/:id/confirm-link",
-        "x-source": "routes/zoho.js",
-        "x-auth": [
-          "requirePermission"
-        ],
-        "x-permission": "zoho.manage",
-        "parameters": [
-          {
-            "name": "id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "OK"
-          }
-        }
-      }
-    },
-    "/api/zoho/items/dpl-catalog/entry/{id}": {
-      "put": {
-        "tags": [
-          "zoho"
-        ],
-        "summary": "PUT /api/zoho/items/dpl-catalog/entry/:id",
-        "x-source": "routes/zoho.js",
-        "x-auth": [
-          "requirePermission"
-        ],
-        "x-permission": "zoho.manage",
-        "parameters": [
-          {
-            "name": "id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "OK"
-          }
-        }
-      }
-    },
-    "/api/zoho/items/dpl-catalog/entry/{id}/not-in-zoho": {
-      "post": {
-        "tags": [
-          "zoho"
-        ],
-        "summary": "POST /api/zoho/items/dpl-catalog/entry/:id/not-in-zoho",
-        "x-source": "routes/zoho.js",
-        "x-auth": [
-          "requirePermission"
-        ],
-        "x-permission": "zoho.manage",
-        "parameters": [
-          {
-            "name": "id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "OK"
-          }
-        }
-      }
-    },
-    "/api/zoho/items/dpl-catalog/{brand}/apply-prices": {
-      "post": {
-        "tags": [
-          "zoho"
-        ],
-        "summary": "POST /api/zoho/items/dpl-catalog/:brand/apply-prices",
-        "x-source": "routes/zoho.js",
-        "x-auth": [
-          "requirePermission"
-        ],
-        "x-permission": "zoho.manage",
-        "parameters": [
-          {
-            "name": "brand",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "OK"
-          }
-        }
-      }
-    },
-    "/api/zoho/items/dpl-catalog/{brand}/push": {
-      "post": {
-        "tags": [
-          "zoho"
-        ],
-        "summary": "POST /api/zoho/items/dpl-catalog/:brand/push",
-        "x-source": "routes/zoho.js",
-        "x-auth": [
-          "requirePermission"
-        ],
-        "x-permission": "zoho.manage",
-        "parameters": [
-          {
-            "name": "brand",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "OK"
-          }
-        }
-      }
-    },
-    "/api/zoho/items/zoho-item/{id}": {
-      "put": {
-        "tags": [
-          "zoho"
-        ],
-        "summary": "PUT /api/zoho/items/zoho-item/:id",
-        "x-source": "routes/zoho.js",
-        "x-auth": [
-          "requirePermission"
-        ],
-        "x-permission": "zoho.manage",
-        "parameters": [
-          {
-            "name": "id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "OK"
-          }
-        }
-      }
-    },
-    "/api/zoho/items/zoho-item/{id}/push": {
-      "post": {
-        "tags": [
-          "zoho"
-        ],
-        "summary": "POST /api/zoho/items/zoho-item/:id/push",
-        "x-source": "routes/zoho.js",
-        "x-auth": [
-          "requirePermission"
-        ],
-        "x-permission": "zoho.manage",
-        "parameters": [
-          {
-            "name": "id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "OK"
-          }
-        }
-      }
-    },
-    "/api/zoho/items/zoho-item/{id}/disposition": {
-      "post": {
-        "tags": [
-          "zoho"
-        ],
-        "summary": "POST /api/zoho/items/zoho-item/:id/disposition",
-        "x-source": "routes/zoho.js",
-        "x-auth": [
-          "requirePermission"
-        ],
-        "x-permission": "zoho.manage",
-        "parameters": [
-          {
-            "name": "id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "OK"
-          }
-        }
-      }
-    },
     "/api/zoho/status": {
       "get": {
         "tags": [
           "zoho"
         ],
         "summary": "GET /api/zoho/status",
-        "x-source": "routes/zoho.js",
+        "x-source": "routes/zoho/sync-config.js",
         "x-auth": [
           "requirePermission"
         ],
@@ -5324,7 +5016,7 @@
           "zoho"
         ],
         "summary": "GET /api/zoho/dashboard",
-        "x-source": "routes/zoho.js",
+        "x-source": "routes/zoho/sync-config.js",
         "x-auth": [
           "requirePermission"
         ],
@@ -5342,7 +5034,7 @@
           "zoho"
         ],
         "summary": "GET /api/zoho/dashboard/trend",
-        "x-source": "routes/zoho.js",
+        "x-source": "routes/zoho/sync-config.js",
         "x-auth": [
           "requirePermission"
         ],
@@ -5360,7 +5052,7 @@
           "zoho"
         ],
         "summary": "GET /api/zoho/dashboard/export",
-        "x-source": "routes/zoho.js",
+        "x-source": "routes/zoho/sync-config.js",
         "x-auth": [
           "requirePermission"
         ],
@@ -5378,7 +5070,7 @@
           "zoho"
         ],
         "summary": "GET /api/zoho/dashboard/drilldown",
-        "x-source": "routes/zoho.js",
+        "x-source": "routes/zoho/sync-config.js",
         "x-auth": [
           "requirePermission"
         ],
@@ -5396,7 +5088,7 @@
           "zoho"
         ],
         "summary": "GET /api/zoho/dashboard/drilldown/export",
-        "x-source": "routes/zoho.js",
+        "x-source": "routes/zoho/sync-config.js",
         "x-auth": [
           "requirePermission"
         ],
@@ -5414,7 +5106,7 @@
           "zoho"
         ],
         "summary": "GET /api/zoho/api-usage",
-        "x-source": "routes/zoho.js",
+        "x-source": "routes/zoho/sync-config.js",
         "x-auth": [
           "requirePermission"
         ],
@@ -5432,7 +5124,7 @@
           "zoho"
         ],
         "summary": "POST /api/zoho/sync/full",
-        "x-source": "routes/zoho.js",
+        "x-source": "routes/zoho/sync-config.js",
         "x-auth": [
           "requirePermission"
         ],
@@ -5450,7 +5142,7 @@
           "zoho"
         ],
         "summary": "POST /api/zoho/sync/invoices",
-        "x-source": "routes/zoho.js",
+        "x-source": "routes/zoho/sync-config.js",
         "x-auth": [
           "requirePermission"
         ],
@@ -5468,7 +5160,7 @@
           "zoho"
         ],
         "summary": "POST /api/zoho/sync/customers",
-        "x-source": "routes/zoho.js",
+        "x-source": "routes/zoho/sync-config.js",
         "x-auth": [
           "requirePermission"
         ],
@@ -5486,7 +5178,7 @@
           "zoho"
         ],
         "summary": "POST /api/zoho/sync/payments",
-        "x-source": "routes/zoho.js",
+        "x-source": "routes/zoho/sync-config.js",
         "x-auth": [
           "requirePermission"
         ],
@@ -5504,177 +5196,11 @@
           "zoho"
         ],
         "summary": "GET /api/zoho/sync/log",
-        "x-source": "routes/zoho.js",
+        "x-source": "routes/zoho/sync-config.js",
         "x-auth": [
           "requirePermission"
         ],
         "x-permission": "zoho.view",
-        "responses": {
-          "200": {
-            "description": "OK"
-          }
-        }
-      }
-    },
-    "/api/zoho/invoices": {
-      "get": {
-        "tags": [
-          "zoho"
-        ],
-        "summary": "GET /api/zoho/invoices",
-        "x-source": "routes/zoho.js",
-        "x-auth": [
-          "requirePermission"
-        ],
-        "x-permission": "zoho.invoices",
-        "responses": {
-          "200": {
-            "description": "OK"
-          }
-        }
-      }
-    },
-    "/api/zoho/invoices/{id}": {
-      "get": {
-        "tags": [
-          "zoho"
-        ],
-        "summary": "GET /api/zoho/invoices/:id",
-        "x-source": "routes/zoho.js",
-        "x-auth": [
-          "requirePermission"
-        ],
-        "x-permission": "zoho.invoices",
-        "parameters": [
-          {
-            "name": "id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "OK"
-          }
-        }
-      }
-    },
-    "/api/zoho/payments": {
-      "get": {
-        "tags": [
-          "zoho"
-        ],
-        "summary": "GET /api/zoho/payments",
-        "x-source": "routes/zoho.js",
-        "x-auth": [
-          "requirePermission"
-        ],
-        "x-permission": "zoho.view",
-        "responses": {
-          "200": {
-            "description": "OK"
-          }
-        }
-      }
-    },
-    "/api/zoho/payments/{id}": {
-      "get": {
-        "tags": [
-          "zoho"
-        ],
-        "summary": "GET /api/zoho/payments/:id",
-        "x-source": "routes/zoho.js",
-        "x-auth": [
-          "requirePermission"
-        ],
-        "x-permission": "zoho.view",
-        "parameters": [
-          {
-            "name": "id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "OK"
-          }
-        }
-      }
-    },
-    "/api/zoho/customers": {
-      "get": {
-        "tags": [
-          "zoho"
-        ],
-        "summary": "GET /api/zoho/customers",
-        "x-source": "routes/zoho.js",
-        "x-auth": [
-          "requirePermission"
-        ],
-        "x-permission": "zoho.view",
-        "responses": {
-          "200": {
-            "description": "OK"
-          }
-        }
-      }
-    },
-    "/api/zoho/customers/{id}/map": {
-      "put": {
-        "tags": [
-          "zoho"
-        ],
-        "summary": "PUT /api/zoho/customers/:id/map",
-        "x-source": "routes/zoho.js",
-        "x-auth": [
-          "requirePermission"
-        ],
-        "x-permission": "zoho.manage",
-        "parameters": [
-          {
-            "name": "id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "OK"
-          }
-        }
-      }
-    },
-    "/api/zoho/reports/{type}": {
-      "get": {
-        "tags": [
-          "zoho"
-        ],
-        "summary": "GET /api/zoho/reports/:type",
-        "x-source": "routes/zoho.js",
-        "x-auth": [
-          "requirePermission"
-        ],
-        "x-permission": "zoho.reports",
-        "parameters": [
-          {
-            "name": "type",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
         "responses": {
           "200": {
             "description": "OK"
@@ -5688,7 +5214,7 @@
           "zoho"
         ],
         "summary": "GET /api/zoho/config",
-        "x-source": "routes/zoho.js",
+        "x-source": "routes/zoho/sync-config.js",
         "x-auth": [
           "requirePermission"
         ],
@@ -5704,7 +5230,7 @@
           "zoho"
         ],
         "summary": "PUT /api/zoho/config",
-        "x-source": "routes/zoho.js",
+        "x-source": "routes/zoho/sync-config.js",
         "x-auth": [
           "requirePermission"
         ],
@@ -5722,7 +5248,7 @@
           "zoho"
         ],
         "summary": "GET /api/zoho/oauth/url",
-        "x-source": "routes/zoho.js",
+        "x-source": "routes/zoho/sync-config.js",
         "x-auth": [
           "requirePermission"
         ],
@@ -5740,7 +5266,7 @@
           "zoho"
         ],
         "summary": "GET /api/zoho/oauth/callback",
-        "x-source": "routes/zoho.js",
+        "x-source": "routes/zoho/sync-config.js",
         "x-auth": [
           "public"
         ],
@@ -5757,7 +5283,7 @@
           "zoho"
         ],
         "summary": "POST /api/zoho/oauth/exchange",
-        "x-source": "routes/zoho.js",
+        "x-source": "routes/zoho/sync-config.js",
         "x-auth": [
           "requirePermission"
         ],
@@ -5775,7 +5301,7 @@
           "zoho"
         ],
         "summary": "POST /api/zoho/oauth/disconnect",
-        "x-source": "routes/zoho.js",
+        "x-source": "routes/zoho/sync-config.js",
         "x-auth": [
           "requirePermission"
         ],
@@ -5793,7 +5319,7 @@
           "zoho"
         ],
         "summary": "GET /api/zoho/whatsapp/queue",
-        "x-source": "routes/zoho.js",
+        "x-source": "routes/zoho/sync-config.js",
         "x-auth": [
           "requirePermission"
         ],
@@ -5811,7 +5337,7 @@
           "zoho"
         ],
         "summary": "POST /api/zoho/whatsapp/send",
-        "x-source": "routes/zoho.js",
+        "x-source": "routes/zoho/sync-config.js",
         "x-auth": [
           "requirePermission"
         ],
@@ -5829,7 +5355,7 @@
           "zoho"
         ],
         "summary": "DELETE /api/zoho/whatsapp/:id",
-        "x-source": "routes/zoho.js",
+        "x-source": "routes/zoho/sync-config.js",
         "x-auth": [
           "requirePermission"
         ],
@@ -5857,7 +5383,7 @@
           "zoho"
         ],
         "summary": "GET /api/zoho/scheduler/status",
-        "x-source": "routes/zoho.js",
+        "x-source": "routes/zoho/sync-config.js",
         "x-auth": [
           "requirePermission"
         ],
@@ -5875,7 +5401,7 @@
           "zoho"
         ],
         "summary": "POST /api/zoho/scheduler/restart",
-        "x-source": "routes/zoho.js",
+        "x-source": "routes/zoho/sync-config.js",
         "x-auth": [
           "requirePermission"
         ],
@@ -5893,7 +5419,7 @@
           "zoho"
         ],
         "summary": "POST /api/zoho/whatsapp/process",
-        "x-source": "routes/zoho.js",
+        "x-source": "routes/zoho/sync-config.js",
         "x-auth": [
           "requirePermission"
         ],
@@ -5911,7 +5437,7 @@
           "zoho"
         ],
         "summary": "POST /api/zoho/whatsapp/queue-reminders",
-        "x-source": "routes/zoho.js",
+        "x-source": "routes/zoho/sync-config.js",
         "x-auth": [
           "requirePermission"
         ],
@@ -5929,7 +5455,7 @@
           "zoho"
         ],
         "summary": "GET /api/zoho/locations",
-        "x-source": "routes/zoho.js",
+        "x-source": "routes/zoho/sync-config.js",
         "x-auth": [
           "requirePermission"
         ],
@@ -5947,7 +5473,7 @@
           "zoho"
         ],
         "summary": "POST /api/zoho/locations/sync",
-        "x-source": "routes/zoho.js",
+        "x-source": "routes/zoho/sync-config.js",
         "x-auth": [
           "requirePermission"
         ],
@@ -5965,7 +5491,7 @@
           "zoho"
         ],
         "summary": "PUT /api/zoho/locations/:id/map",
-        "x-source": "routes/zoho.js",
+        "x-source": "routes/zoho/sync-config.js",
         "x-auth": [
           "requirePermission"
         ],
@@ -5987,17 +5513,17 @@
         }
       }
     },
-    "/api/zoho/stock": {
+    "/api/zoho/invoices": {
       "get": {
         "tags": [
           "zoho"
         ],
-        "summary": "GET /api/zoho/stock",
-        "x-source": "routes/zoho.js",
+        "summary": "GET /api/zoho/invoices",
+        "x-source": "routes/zoho/invoices-reports.js",
         "x-auth": [
           "requirePermission"
         ],
-        "x-permission": "zoho.view",
+        "x-permission": "zoho.invoices",
         "responses": {
           "200": {
             "description": "OK"
@@ -6005,74 +5531,20 @@
         }
       }
     },
-    "/api/zoho/stock/filter-options": {
+    "/api/zoho/invoices/{id}": {
       "get": {
         "tags": [
           "zoho"
         ],
-        "summary": "GET /api/zoho/stock/filter-options",
-        "x-source": "routes/zoho.js",
+        "summary": "GET /api/zoho/invoices/:id",
+        "x-source": "routes/zoho/invoices-reports.js",
         "x-auth": [
           "requirePermission"
         ],
-        "x-permission": "zoho.view",
-        "responses": {
-          "200": {
-            "description": "OK"
-          }
-        }
-      }
-    },
-    "/api/zoho/stock/by-location": {
-      "get": {
-        "tags": [
-          "zoho"
-        ],
-        "summary": "GET /api/zoho/stock/by-location",
-        "x-source": "routes/zoho.js",
-        "x-auth": [
-          "requirePermission"
-        ],
-        "x-permission": "zoho.view",
-        "responses": {
-          "200": {
-            "description": "OK"
-          }
-        }
-      }
-    },
-    "/api/zoho/stock/history": {
-      "get": {
-        "tags": [
-          "zoho"
-        ],
-        "summary": "GET /api/zoho/stock/history",
-        "x-source": "routes/zoho.js",
-        "x-auth": [
-          "requirePermission"
-        ],
-        "x-permission": "zoho.view",
-        "responses": {
-          "200": {
-            "description": "OK"
-          }
-        }
-      }
-    },
-    "/api/zoho/stock/{itemId}": {
-      "get": {
-        "tags": [
-          "zoho"
-        ],
-        "summary": "GET /api/zoho/stock/:itemId",
-        "x-source": "routes/zoho.js",
-        "x-auth": [
-          "requirePermission"
-        ],
-        "x-permission": "zoho.view",
+        "x-permission": "zoho.invoices",
         "parameters": [
           {
-            "name": "itemId",
+            "name": "id",
             "in": "path",
             "required": true,
             "schema": {
@@ -6087,47 +5559,13 @@
         }
       }
     },
-    "/api/zoho/stock/sync": {
-      "post": {
-        "tags": [
-          "zoho"
-        ],
-        "summary": "POST /api/zoho/stock/sync",
-        "x-source": "routes/zoho.js",
-        "x-auth": [
-          "requirePermission"
-        ],
-        "x-permission": "zoho.sync",
-        "responses": {
-          "200": {
-            "description": "OK"
-          }
-        }
-      }
-    },
-    "/api/zoho/inventory-adjustments": {
-      "post": {
-        "tags": [
-          "zoho"
-        ],
-        "summary": "POST /api/zoho/inventory-adjustments",
-        "x-source": "routes/zoho.js",
-        "x-auth": [
-          "requirePermission"
-        ],
-        "x-permission": "zoho.manage",
-        "responses": {
-          "200": {
-            "description": "OK"
-          }
-        }
-      },
+    "/api/zoho/payments": {
       "get": {
         "tags": [
           "zoho"
         ],
-        "summary": "GET /api/zoho/inventory-adjustments",
-        "x-source": "routes/zoho.js",
+        "summary": "GET /api/zoho/payments",
+        "x-source": "routes/zoho/invoices-reports.js",
         "x-auth": [
           "requirePermission"
         ],
@@ -6139,137 +5577,13 @@
         }
       }
     },
-    "/api/zoho/items": {
+    "/api/zoho/payments/{id}": {
       "get": {
         "tags": [
           "zoho"
         ],
-        "summary": "GET /api/zoho/items",
-        "x-source": "routes/zoho.js",
-        "x-auth": [
-          "requirePermission"
-        ],
-        "x-permission": "zoho.view",
-        "responses": {
-          "200": {
-            "description": "OK"
-          }
-        }
-      },
-      "post": {
-        "tags": [
-          "zoho"
-        ],
-        "summary": "POST /api/zoho/items",
-        "x-source": "routes/zoho.js",
-        "x-auth": [
-          "requirePermission"
-        ],
-        "x-permission": "zoho.manage",
-        "responses": {
-          "200": {
-            "description": "OK"
-          }
-        }
-      }
-    },
-    "/api/zoho/sync/items": {
-      "post": {
-        "tags": [
-          "zoho"
-        ],
-        "summary": "POST /api/zoho/sync/items",
-        "x-source": "routes/zoho.js",
-        "x-auth": [
-          "requirePermission"
-        ],
-        "x-permission": "zoho.sync",
-        "responses": {
-          "200": {
-            "description": "OK"
-          }
-        }
-      }
-    },
-    "/api/zoho/items/ai-edit": {
-      "post": {
-        "tags": [
-          "zoho"
-        ],
-        "summary": "POST /api/zoho/items/ai-edit",
-        "x-source": "routes/zoho.js",
-        "x-auth": [
-          "requirePermission"
-        ],
-        "x-permission": "zoho.manage",
-        "responses": {
-          "200": {
-            "description": "OK"
-          }
-        }
-      }
-    },
-    "/api/zoho/items/bulk-update": {
-      "post": {
-        "tags": [
-          "zoho"
-        ],
-        "summary": "POST /api/zoho/items/bulk-update",
-        "x-source": "routes/zoho.js",
-        "x-auth": [
-          "requirePermission"
-        ],
-        "x-permission": "zoho.bulk_update",
-        "responses": {
-          "200": {
-            "description": "OK"
-          }
-        }
-      }
-    },
-    "/api/zoho/items/bulk-edit": {
-      "post": {
-        "tags": [
-          "zoho"
-        ],
-        "summary": "POST /api/zoho/items/bulk-edit",
-        "x-source": "routes/zoho.js",
-        "x-auth": [
-          "requirePermission"
-        ],
-        "x-permission": "zoho.manage",
-        "responses": {
-          "200": {
-            "description": "OK"
-          }
-        }
-      }
-    },
-    "/api/zoho/items/bulk-jobs": {
-      "get": {
-        "tags": [
-          "zoho"
-        ],
-        "summary": "GET /api/zoho/items/bulk-jobs",
-        "x-source": "routes/zoho.js",
-        "x-auth": [
-          "requirePermission"
-        ],
-        "x-permission": "zoho.view",
-        "responses": {
-          "200": {
-            "description": "OK"
-          }
-        }
-      }
-    },
-    "/api/zoho/items/bulk-jobs/{id}": {
-      "get": {
-        "tags": [
-          "zoho"
-        ],
-        "summary": "GET /api/zoho/items/bulk-jobs/:id",
-        "x-source": "routes/zoho.js",
+        "summary": "GET /api/zoho/payments/:id",
+        "x-source": "routes/zoho/invoices-reports.js",
         "x-auth": [
           "requirePermission"
         ],
@@ -6291,76 +5605,66 @@
         }
       }
     },
-    "/api/zoho/items/bulk-jobs/{id}/cancel": {
-      "post": {
-        "tags": [
-          "zoho"
-        ],
-        "summary": "POST /api/zoho/items/bulk-jobs/:id/cancel",
-        "x-source": "routes/zoho.js",
-        "x-auth": [
-          "requirePermission"
-        ],
-        "x-permission": "zoho.bulk_update",
-        "parameters": [
-          {
-            "name": "id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "OK"
-          }
-        }
-      }
-    },
-    "/api/zoho/items/bulk-jobs/{id}/retry": {
-      "post": {
-        "tags": [
-          "zoho"
-        ],
-        "summary": "POST /api/zoho/items/bulk-jobs/:id/retry",
-        "x-source": "routes/zoho.js",
-        "x-auth": [
-          "requirePermission"
-        ],
-        "x-permission": "zoho.bulk_update",
-        "parameters": [
-          {
-            "name": "id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "OK"
-          }
-        }
-      }
-    },
-    "/api/zoho/items/{id}": {
+    "/api/zoho/customers": {
       "get": {
         "tags": [
           "zoho"
         ],
-        "summary": "GET /api/zoho/items/:id",
-        "x-source": "routes/zoho.js",
+        "summary": "GET /api/zoho/customers",
+        "x-source": "routes/zoho/invoices-reports.js",
         "x-auth": [
           "requirePermission"
         ],
         "x-permission": "zoho.view",
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/zoho/customers/{id}/map": {
+      "put": {
+        "tags": [
+          "zoho"
+        ],
+        "summary": "PUT /api/zoho/customers/:id/map",
+        "x-source": "routes/zoho/invoices-reports.js",
+        "x-auth": [
+          "requirePermission"
+        ],
+        "x-permission": "zoho.manage",
         "parameters": [
           {
             "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/zoho/reports/{type}": {
+      "get": {
+        "tags": [
+          "zoho"
+        ],
+        "summary": "GET /api/zoho/reports/:type",
+        "x-source": "routes/zoho/invoices-reports.js",
+        "x-auth": [
+          "requirePermission"
+        ],
+        "x-permission": "zoho.reports",
+        "parameters": [
+          {
+            "name": "type",
             "in": "path",
             "required": true,
             "schema": {
@@ -6381,7 +5685,7 @@
           "zoho"
         ],
         "summary": "GET /api/zoho/transactions/daily",
-        "x-source": "routes/zoho.js",
+        "x-source": "routes/zoho/invoices-reports.js",
         "x-auth": [
           "requirePermission"
         ],
@@ -6399,7 +5703,7 @@
           "zoho"
         ],
         "summary": "GET /api/zoho/transactions/daily/:date",
-        "x-source": "routes/zoho.js",
+        "x-source": "routes/zoho/invoices-reports.js",
         "x-auth": [
           "requirePermission"
         ],
@@ -6427,7 +5731,7 @@
           "zoho"
         ],
         "summary": "GET /api/zoho/transactions/daily/:date/:locationId",
-        "x-source": "routes/zoho.js",
+        "x-source": "routes/zoho/invoices-reports.js",
         "x-auth": [
           "requirePermission"
         ],
@@ -6463,7 +5767,7 @@
           "zoho"
         ],
         "summary": "POST /api/zoho/transactions/generate",
-        "x-source": "routes/zoho.js",
+        "x-source": "routes/zoho/invoices-reports.js",
         "x-auth": [
           "requirePermission"
         ],
@@ -6481,11 +5785,1168 @@
           "zoho"
         ],
         "summary": "GET /api/zoho/transactions/comparison",
-        "x-source": "routes/zoho.js",
+        "x-source": "routes/zoho/invoices-reports.js",
         "x-auth": [
           "requirePermission"
         ],
         "x-permission": "zoho.view",
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/zoho/expenses": {
+      "get": {
+        "tags": [
+          "zoho"
+        ],
+        "summary": "GET /api/zoho/expenses",
+        "x-source": "routes/zoho/invoices-reports.js",
+        "x-auth": [
+          "requirePermission"
+        ],
+        "x-permission": "zoho.view",
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/zoho/sync/expenses": {
+      "post": {
+        "tags": [
+          "zoho"
+        ],
+        "summary": "POST /api/zoho/sync/expenses",
+        "x-source": "routes/zoho/invoices-reports.js",
+        "x-auth": [
+          "requirePermission"
+        ],
+        "x-permission": "zoho.sync",
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/zoho/creditnotes": {
+      "get": {
+        "tags": [
+          "zoho"
+        ],
+        "summary": "GET /api/zoho/creditnotes",
+        "x-source": "routes/zoho/invoices-reports.js",
+        "x-auth": [
+          "requirePermission"
+        ],
+        "x-permission": "zoho.view",
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/zoho/sync/creditnotes": {
+      "post": {
+        "tags": [
+          "zoho"
+        ],
+        "summary": "POST /api/zoho/sync/creditnotes",
+        "x-source": "routes/zoho/invoices-reports.js",
+        "x-auth": [
+          "requirePermission"
+        ],
+        "x-permission": "zoho.sync",
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/zoho/salesorders": {
+      "get": {
+        "tags": [
+          "zoho"
+        ],
+        "summary": "GET /api/zoho/salesorders",
+        "x-source": "routes/zoho/invoices-reports.js",
+        "x-auth": [
+          "requirePermission"
+        ],
+        "x-permission": "zoho.view",
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/zoho/salesorders/{id}": {
+      "get": {
+        "tags": [
+          "zoho"
+        ],
+        "summary": "GET /api/zoho/salesorders/:id",
+        "x-source": "routes/zoho/invoices-reports.js",
+        "x-auth": [
+          "requirePermission"
+        ],
+        "x-permission": "zoho.view",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/zoho/items/dpl-catalog/{brand}/build": {
+      "post": {
+        "tags": [
+          "zoho"
+        ],
+        "summary": "POST /api/zoho/items/dpl-catalog/:brand/build",
+        "x-source": "routes/zoho/items.js",
+        "x-auth": [
+          "requirePermission"
+        ],
+        "x-permission": "zoho.manage",
+        "parameters": [
+          {
+            "name": "brand",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/zoho/items/dpl-catalog/{brand}": {
+      "get": {
+        "tags": [
+          "zoho"
+        ],
+        "summary": "GET /api/zoho/items/dpl-catalog/:brand",
+        "x-source": "routes/zoho/items.js",
+        "x-auth": [
+          "requirePermission"
+        ],
+        "x-permission": "zoho.manage",
+        "parameters": [
+          {
+            "name": "brand",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/zoho/items/dpl-catalog/{brand}/by-zoho": {
+      "get": {
+        "tags": [
+          "zoho"
+        ],
+        "summary": "GET /api/zoho/items/dpl-catalog/:brand/by-zoho",
+        "x-source": "routes/zoho/items.js",
+        "x-auth": [
+          "requirePermission"
+        ],
+        "x-permission": "zoho.manage",
+        "parameters": [
+          {
+            "name": "brand",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/zoho/items/dpl-catalog/entry/{id}/confirm-link": {
+      "post": {
+        "tags": [
+          "zoho"
+        ],
+        "summary": "POST /api/zoho/items/dpl-catalog/entry/:id/confirm-link",
+        "x-source": "routes/zoho/items.js",
+        "x-auth": [
+          "requirePermission"
+        ],
+        "x-permission": "zoho.manage",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/zoho/items/dpl-catalog/entry/{id}": {
+      "put": {
+        "tags": [
+          "zoho"
+        ],
+        "summary": "PUT /api/zoho/items/dpl-catalog/entry/:id",
+        "x-source": "routes/zoho/items.js",
+        "x-auth": [
+          "requirePermission"
+        ],
+        "x-permission": "zoho.manage",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/zoho/items/dpl-catalog/entry/{id}/not-in-zoho": {
+      "post": {
+        "tags": [
+          "zoho"
+        ],
+        "summary": "POST /api/zoho/items/dpl-catalog/entry/:id/not-in-zoho",
+        "x-source": "routes/zoho/items.js",
+        "x-auth": [
+          "requirePermission"
+        ],
+        "x-permission": "zoho.manage",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/zoho/items/dpl-catalog/{brand}/apply-prices": {
+      "post": {
+        "tags": [
+          "zoho"
+        ],
+        "summary": "POST /api/zoho/items/dpl-catalog/:brand/apply-prices",
+        "x-source": "routes/zoho/items.js",
+        "x-auth": [
+          "requirePermission"
+        ],
+        "x-permission": "zoho.manage",
+        "parameters": [
+          {
+            "name": "brand",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/zoho/items/dpl-catalog/{brand}/push": {
+      "post": {
+        "tags": [
+          "zoho"
+        ],
+        "summary": "POST /api/zoho/items/dpl-catalog/:brand/push",
+        "x-source": "routes/zoho/items.js",
+        "x-auth": [
+          "requirePermission"
+        ],
+        "x-permission": "zoho.manage",
+        "parameters": [
+          {
+            "name": "brand",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/zoho/items/zoho-item/{id}": {
+      "put": {
+        "tags": [
+          "zoho"
+        ],
+        "summary": "PUT /api/zoho/items/zoho-item/:id",
+        "x-source": "routes/zoho/items.js",
+        "x-auth": [
+          "requirePermission"
+        ],
+        "x-permission": "zoho.manage",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/zoho/items/zoho-item/{id}/push": {
+      "post": {
+        "tags": [
+          "zoho"
+        ],
+        "summary": "POST /api/zoho/items/zoho-item/:id/push",
+        "x-source": "routes/zoho/items.js",
+        "x-auth": [
+          "requirePermission"
+        ],
+        "x-permission": "zoho.manage",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/zoho/items/zoho-item/{id}/disposition": {
+      "post": {
+        "tags": [
+          "zoho"
+        ],
+        "summary": "POST /api/zoho/items/zoho-item/:id/disposition",
+        "x-source": "routes/zoho/items.js",
+        "x-auth": [
+          "requirePermission"
+        ],
+        "x-permission": "zoho.manage",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/zoho/stock": {
+      "get": {
+        "tags": [
+          "zoho"
+        ],
+        "summary": "GET /api/zoho/stock",
+        "x-source": "routes/zoho/items.js",
+        "x-auth": [
+          "requirePermission"
+        ],
+        "x-permission": "zoho.view",
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/zoho/stock/filter-options": {
+      "get": {
+        "tags": [
+          "zoho"
+        ],
+        "summary": "GET /api/zoho/stock/filter-options",
+        "x-source": "routes/zoho/items.js",
+        "x-auth": [
+          "requirePermission"
+        ],
+        "x-permission": "zoho.view",
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/zoho/stock/by-location": {
+      "get": {
+        "tags": [
+          "zoho"
+        ],
+        "summary": "GET /api/zoho/stock/by-location",
+        "x-source": "routes/zoho/items.js",
+        "x-auth": [
+          "requirePermission"
+        ],
+        "x-permission": "zoho.view",
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/zoho/stock/history": {
+      "get": {
+        "tags": [
+          "zoho"
+        ],
+        "summary": "GET /api/zoho/stock/history",
+        "x-source": "routes/zoho/items.js",
+        "x-auth": [
+          "requirePermission"
+        ],
+        "x-permission": "zoho.view",
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/zoho/stock/{itemId}": {
+      "get": {
+        "tags": [
+          "zoho"
+        ],
+        "summary": "GET /api/zoho/stock/:itemId",
+        "x-source": "routes/zoho/items.js",
+        "x-auth": [
+          "requirePermission"
+        ],
+        "x-permission": "zoho.view",
+        "parameters": [
+          {
+            "name": "itemId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/zoho/stock/sync": {
+      "post": {
+        "tags": [
+          "zoho"
+        ],
+        "summary": "POST /api/zoho/stock/sync",
+        "x-source": "routes/zoho/items.js",
+        "x-auth": [
+          "requirePermission"
+        ],
+        "x-permission": "zoho.sync",
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/zoho/inventory-adjustments": {
+      "post": {
+        "tags": [
+          "zoho"
+        ],
+        "summary": "POST /api/zoho/inventory-adjustments",
+        "x-source": "routes/zoho/items.js",
+        "x-auth": [
+          "requirePermission"
+        ],
+        "x-permission": "zoho.manage",
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      },
+      "get": {
+        "tags": [
+          "zoho"
+        ],
+        "summary": "GET /api/zoho/inventory-adjustments",
+        "x-source": "routes/zoho/items.js",
+        "x-auth": [
+          "requirePermission"
+        ],
+        "x-permission": "zoho.view",
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/zoho/items": {
+      "get": {
+        "tags": [
+          "zoho"
+        ],
+        "summary": "GET /api/zoho/items",
+        "x-source": "routes/zoho/items.js",
+        "x-auth": [
+          "requirePermission"
+        ],
+        "x-permission": "zoho.view",
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "zoho"
+        ],
+        "summary": "POST /api/zoho/items",
+        "x-source": "routes/zoho/items.js",
+        "x-auth": [
+          "requirePermission"
+        ],
+        "x-permission": "zoho.manage",
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/zoho/sync/items": {
+      "post": {
+        "tags": [
+          "zoho"
+        ],
+        "summary": "POST /api/zoho/sync/items",
+        "x-source": "routes/zoho/items.js",
+        "x-auth": [
+          "requirePermission"
+        ],
+        "x-permission": "zoho.sync",
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/zoho/items/ai-edit": {
+      "post": {
+        "tags": [
+          "zoho"
+        ],
+        "summary": "POST /api/zoho/items/ai-edit",
+        "x-source": "routes/zoho/items.js",
+        "x-auth": [
+          "requirePermission"
+        ],
+        "x-permission": "zoho.manage",
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/zoho/items/bulk-update": {
+      "post": {
+        "tags": [
+          "zoho"
+        ],
+        "summary": "POST /api/zoho/items/bulk-update",
+        "x-source": "routes/zoho/items.js",
+        "x-auth": [
+          "requirePermission"
+        ],
+        "x-permission": "zoho.bulk_update",
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/zoho/items/bulk-edit": {
+      "post": {
+        "tags": [
+          "zoho"
+        ],
+        "summary": "POST /api/zoho/items/bulk-edit",
+        "x-source": "routes/zoho/items.js",
+        "x-auth": [
+          "requirePermission"
+        ],
+        "x-permission": "zoho.manage",
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/zoho/items/bulk-jobs": {
+      "get": {
+        "tags": [
+          "zoho"
+        ],
+        "summary": "GET /api/zoho/items/bulk-jobs",
+        "x-source": "routes/zoho/items.js",
+        "x-auth": [
+          "requirePermission"
+        ],
+        "x-permission": "zoho.view",
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/zoho/items/bulk-jobs/{id}": {
+      "get": {
+        "tags": [
+          "zoho"
+        ],
+        "summary": "GET /api/zoho/items/bulk-jobs/:id",
+        "x-source": "routes/zoho/items.js",
+        "x-auth": [
+          "requirePermission"
+        ],
+        "x-permission": "zoho.view",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/zoho/items/bulk-jobs/{id}/cancel": {
+      "post": {
+        "tags": [
+          "zoho"
+        ],
+        "summary": "POST /api/zoho/items/bulk-jobs/:id/cancel",
+        "x-source": "routes/zoho/items.js",
+        "x-auth": [
+          "requirePermission"
+        ],
+        "x-permission": "zoho.bulk_update",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/zoho/items/bulk-jobs/{id}/retry": {
+      "post": {
+        "tags": [
+          "zoho"
+        ],
+        "summary": "POST /api/zoho/items/bulk-jobs/:id/retry",
+        "x-source": "routes/zoho/items.js",
+        "x-auth": [
+          "requirePermission"
+        ],
+        "x-permission": "zoho.bulk_update",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/zoho/items/{id}": {
+      "get": {
+        "tags": [
+          "zoho"
+        ],
+        "summary": "GET /api/zoho/items/:id",
+        "x-source": "routes/zoho/items.js",
+        "x-auth": [
+          "requirePermission"
+        ],
+        "x-permission": "zoho.view",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/zoho/items/parse-price-list": {
+      "post": {
+        "tags": [
+          "zoho"
+        ],
+        "summary": "POST /api/zoho/items/parse-price-list",
+        "x-source": "routes/zoho/items.js",
+        "x-auth": [
+          "requirePermission"
+        ],
+        "x-permission": "zoho.manage",
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/zoho/items/normalize/scan": {
+      "get": {
+        "tags": [
+          "zoho"
+        ],
+        "summary": "GET /api/zoho/items/normalize/scan",
+        "x-source": "routes/zoho/items.js",
+        "x-auth": [
+          "requirePermission"
+        ],
+        "x-permission": "zoho.manage",
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/zoho/items/filters/list": {
+      "get": {
+        "tags": [
+          "zoho"
+        ],
+        "summary": "GET /api/zoho/items/filters/list",
+        "x-source": "routes/zoho/items.js",
+        "x-auth": [
+          "requirePermission"
+        ],
+        "x-permission": "zoho.view",
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/zoho/items/reassign/scan": {
+      "get": {
+        "tags": [
+          "zoho"
+        ],
+        "summary": "GET /api/zoho/items/reassign/scan",
+        "x-source": "routes/zoho/items.js",
+        "x-auth": [
+          "requirePermission"
+        ],
+        "x-permission": "zoho.manage",
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/zoho/items/reassign/apply": {
+      "post": {
+        "tags": [
+          "zoho"
+        ],
+        "summary": "POST /api/zoho/items/reassign/apply",
+        "x-source": "routes/zoho/items.js",
+        "x-auth": [
+          "requirePermission"
+        ],
+        "x-permission": "zoho.manage",
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/zoho/items/normalize/meta": {
+      "get": {
+        "tags": [
+          "zoho"
+        ],
+        "summary": "GET /api/zoho/items/normalize/meta",
+        "x-source": "routes/zoho/items.js",
+        "x-auth": [
+          "requirePermission"
+        ],
+        "x-permission": "zoho.manage",
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/zoho/items/normalize/remember": {
+      "post": {
+        "tags": [
+          "zoho"
+        ],
+        "summary": "POST /api/zoho/items/normalize/remember",
+        "x-source": "routes/zoho/items.js",
+        "x-auth": [
+          "requirePermission"
+        ],
+        "x-permission": "zoho.manage",
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/zoho/items/normalize/apply": {
+      "post": {
+        "tags": [
+          "zoho"
+        ],
+        "summary": "POST /api/zoho/items/normalize/apply",
+        "x-source": "routes/zoho/items.js",
+        "x-auth": [
+          "requirePermission"
+        ],
+        "x-permission": "zoho.manage",
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/zoho/items/apply-price-list": {
+      "post": {
+        "tags": [
+          "zoho"
+        ],
+        "summary": "POST /api/zoho/items/apply-price-list",
+        "x-source": "routes/zoho/items.js",
+        "x-auth": [
+          "requirePermission"
+        ],
+        "x-permission": "zoho.manage",
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/zoho/dpl-match-report": {
+      "get": {
+        "tags": [
+          "zoho"
+        ],
+        "summary": "GET /api/zoho/dpl-match-report",
+        "x-source": "routes/zoho/items.js",
+        "x-auth": [
+          "requireAuth"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/zoho/items/ai-parse-job/{id}": {
+      "get": {
+        "tags": [
+          "zoho"
+        ],
+        "summary": "GET /api/zoho/items/ai-parse-job/:id",
+        "x-source": "routes/zoho/items.js",
+        "x-auth": [
+          "requirePermission"
+        ],
+        "x-permission": "zoho.manage",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/zoho/items/ai-parse-price-list": {
+      "post": {
+        "tags": [
+          "zoho"
+        ],
+        "summary": "POST /api/zoho/items/ai-parse-price-list",
+        "x-source": "routes/zoho/items.js",
+        "x-auth": [
+          "requirePermission"
+        ],
+        "x-permission": "zoho.manage",
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/zoho/items/brand-dpl/{brand}": {
+      "get": {
+        "tags": [
+          "zoho"
+        ],
+        "summary": "GET /api/zoho/items/brand-dpl/:brand",
+        "x-source": "routes/zoho/items.js",
+        "x-auth": [
+          "requirePermission"
+        ],
+        "x-permission": "zoho.manage",
+        "parameters": [
+          {
+            "name": "brand",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "zoho"
+        ],
+        "summary": "POST /api/zoho/items/brand-dpl/:brand",
+        "x-source": "routes/zoho/items.js",
+        "x-auth": [
+          "requirePermission"
+        ],
+        "x-permission": "zoho.manage",
+        "parameters": [
+          {
+            "name": "brand",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/zoho/items/brand-dpl/{brand}/match": {
+      "post": {
+        "tags": [
+          "zoho"
+        ],
+        "summary": "POST /api/zoho/items/brand-dpl/:brand/match",
+        "x-source": "routes/zoho/items.js",
+        "x-auth": [
+          "requirePermission"
+        ],
+        "x-permission": "zoho.manage",
+        "parameters": [
+          {
+            "name": "brand",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/zoho/items/dpl-parse-csv": {
+      "post": {
+        "tags": [
+          "zoho"
+        ],
+        "summary": "POST /api/zoho/items/dpl-parse-csv",
+        "x-source": "routes/zoho/items.js",
+        "x-auth": [
+          "requirePermission"
+        ],
+        "x-permission": "zoho.manage",
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/zoho/items/propose-naming": {
+      "get": {
+        "tags": [
+          "zoho"
+        ],
+        "summary": "GET /api/zoho/items/propose-naming",
+        "x-source": "routes/zoho/items.js",
+        "x-auth": [
+          "requirePermission"
+        ],
+        "x-permission": "zoho.manage",
         "responses": {
           "200": {
             "description": "OK"
@@ -6499,7 +6960,7 @@
           "zoho"
         ],
         "summary": "GET /api/zoho/reorder/config",
-        "x-source": "routes/zoho.js",
+        "x-source": "routes/zoho/reorder.js",
         "x-auth": [
           "requirePermission"
         ],
@@ -6515,7 +6976,7 @@
           "zoho"
         ],
         "summary": "POST /api/zoho/reorder/config",
-        "x-source": "routes/zoho.js",
+        "x-source": "routes/zoho/reorder.js",
         "x-auth": [
           "requirePermission"
         ],
@@ -6533,7 +6994,7 @@
           "zoho"
         ],
         "summary": "PUT /api/zoho/reorder/config/:id",
-        "x-source": "routes/zoho.js",
+        "x-source": "routes/zoho/reorder.js",
         "x-auth": [
           "requirePermission"
         ],
@@ -6559,7 +7020,7 @@
           "zoho"
         ],
         "summary": "DELETE /api/zoho/reorder/config/:id",
-        "x-source": "routes/zoho.js",
+        "x-source": "routes/zoho/reorder.js",
         "x-auth": [
           "requirePermission"
         ],
@@ -6587,7 +7048,7 @@
           "zoho"
         ],
         "summary": "POST /api/zoho/reorder/config/bulk",
-        "x-source": "routes/zoho.js",
+        "x-source": "routes/zoho/reorder.js",
         "x-auth": [
           "requirePermission"
         ],
@@ -6605,7 +7066,7 @@
           "zoho"
         ],
         "summary": "POST /api/zoho/reorder/config/reset-to-auto",
-        "x-source": "routes/zoho.js",
+        "x-source": "routes/zoho/reorder.js",
         "x-auth": [
           "requirePermission"
         ],
@@ -6623,7 +7084,7 @@
           "zoho"
         ],
         "summary": "GET /api/zoho/reorder/alerts",
-        "x-source": "routes/zoho.js",
+        "x-source": "routes/zoho/reorder.js",
         "x-auth": [
           "requirePermission"
         ],
@@ -6641,7 +7102,7 @@
           "zoho"
         ],
         "summary": "GET /api/zoho/reorder/alerts/summary",
-        "x-source": "routes/zoho.js",
+        "x-source": "routes/zoho/reorder.js",
         "x-auth": [
           "requirePermission"
         ],
@@ -6659,7 +7120,7 @@
           "zoho"
         ],
         "summary": "PUT /api/zoho/reorder/alerts/:id/acknowledge",
-        "x-source": "routes/zoho.js",
+        "x-source": "routes/zoho/reorder.js",
         "x-auth": [
           "requirePermission"
         ],
@@ -6687,7 +7148,7 @@
           "zoho"
         ],
         "summary": "PUT /api/zoho/reorder/alerts/:id/resolve",
-        "x-source": "routes/zoho.js",
+        "x-source": "routes/zoho/reorder.js",
         "x-auth": [
           "requirePermission"
         ],
@@ -6715,7 +7176,7 @@
           "zoho"
         ],
         "summary": "POST /api/zoho/reorder/check",
-        "x-source": "routes/zoho.js",
+        "x-source": "routes/zoho/reorder.js",
         "x-auth": [
           "requirePermission"
         ],
@@ -6733,7 +7194,7 @@
           "zoho"
         ],
         "summary": "GET /api/zoho/reorder/brands/available",
-        "x-source": "routes/zoho.js",
+        "x-source": "routes/zoho/reorder.js",
         "x-auth": [
           "requirePermission"
         ],
@@ -6751,7 +7212,7 @@
           "zoho"
         ],
         "summary": "GET /api/zoho/reorder/brands",
-        "x-source": "routes/zoho.js",
+        "x-source": "routes/zoho/reorder.js",
         "x-auth": [
           "requirePermission"
         ],
@@ -6767,7 +7228,7 @@
           "zoho"
         ],
         "summary": "POST /api/zoho/reorder/brands",
-        "x-source": "routes/zoho.js",
+        "x-source": "routes/zoho/reorder.js",
         "x-auth": [
           "requirePermission"
         ],
@@ -6785,7 +7246,7 @@
           "zoho"
         ],
         "summary": "PUT /api/zoho/reorder/brands/:id",
-        "x-source": "routes/zoho.js",
+        "x-source": "routes/zoho/reorder.js",
         "x-auth": [
           "requirePermission"
         ],
@@ -6811,7 +7272,7 @@
           "zoho"
         ],
         "summary": "DELETE /api/zoho/reorder/brands/:id",
-        "x-source": "routes/zoho.js",
+        "x-source": "routes/zoho/reorder.js",
         "x-auth": [
           "requirePermission"
         ],
@@ -6839,7 +7300,7 @@
           "zoho"
         ],
         "summary": "POST /api/zoho/reorder/backfill-sales",
-        "x-source": "routes/zoho.js",
+        "x-source": "routes/zoho/reorder.js",
         "x-auth": [
           "requirePermission"
         ],
@@ -6857,7 +7318,7 @@
           "zoho"
         ],
         "summary": "GET /api/zoho/reorder/sales-sync-status",
-        "x-source": "routes/zoho.js",
+        "x-source": "routes/zoho/reorder.js",
         "x-auth": [
           "requirePermission"
         ],
@@ -6875,7 +7336,7 @@
           "zoho"
         ],
         "summary": "POST /api/zoho/reorder/compute-now",
-        "x-source": "routes/zoho.js",
+        "x-source": "routes/zoho/reorder.js",
         "x-auth": [
           "requirePermission"
         ],
@@ -6893,7 +7354,7 @@
           "zoho"
         ],
         "summary": "POST /api/zoho/reorder/run-report",
-        "x-source": "routes/zoho.js",
+        "x-source": "routes/zoho/reorder.js",
         "x-auth": [
           "requirePermission"
         ],
@@ -6911,7 +7372,7 @@
           "zoho"
         ],
         "summary": "GET /api/zoho/reorder/report",
-        "x-source": "routes/zoho.js",
+        "x-source": "routes/zoho/reorder.js",
         "x-auth": [
           "requirePermission"
         ],
@@ -6929,7 +7390,7 @@
           "zoho"
         ],
         "summary": "GET /api/zoho/reorder/report/pdf",
-        "x-source": "routes/zoho.js",
+        "x-source": "routes/zoho/reorder.js",
         "x-auth": [
           "requirePermission"
         ],
@@ -6947,7 +7408,7 @@
           "zoho"
         ],
         "summary": "POST /api/zoho/reorder/report/send-whatsapp",
-        "x-source": "routes/zoho.js",
+        "x-source": "routes/zoho/reorder.js",
         "x-auth": [
           "requirePermission"
         ],
@@ -6965,7 +7426,7 @@
           "zoho"
         ],
         "summary": "POST /api/zoho/purchase-suggestions/calculate",
-        "x-source": "routes/zoho.js",
+        "x-source": "routes/zoho/reorder.js",
         "x-auth": [
           "requirePermission"
         ],
@@ -6983,7 +7444,7 @@
           "zoho"
         ],
         "summary": "GET /api/zoho/purchase-suggestions/latest",
-        "x-source": "routes/zoho.js",
+        "x-source": "routes/zoho/reorder.js",
         "x-auth": [
           "requirePermission"
         ],
@@ -7001,7 +7462,7 @@
           "zoho"
         ],
         "summary": "GET /api/zoho/purchase-suggestions/history",
-        "x-source": "routes/zoho.js",
+        "x-source": "routes/zoho/reorder.js",
         "x-auth": [
           "requirePermission"
         ],
@@ -7019,7 +7480,7 @@
           "zoho"
         ],
         "summary": "GET /api/zoho/purchase-suggestions/summary",
-        "x-source": "routes/zoho.js",
+        "x-source": "routes/zoho/reorder.js",
         "x-auth": [
           "requirePermission"
         ],
@@ -7037,7 +7498,7 @@
           "zoho"
         ],
         "summary": "PUT /api/zoho/purchase-suggestions/:id/dismiss",
-        "x-source": "routes/zoho.js",
+        "x-source": "routes/zoho/reorder.js",
         "x-auth": [
           "requirePermission"
         ],
@@ -7065,7 +7526,7 @@
           "zoho"
         ],
         "summary": "PUT /api/zoho/purchase-suggestions/:id/ordered",
-        "x-source": "routes/zoho.js",
+        "x-source": "routes/zoho/reorder.js",
         "x-auth": [
           "requirePermission"
         ],
@@ -7093,7 +7554,7 @@
           "zoho"
         ],
         "summary": "PUT /api/zoho/purchase-suggestions/bulk-dismiss",
-        "x-source": "routes/zoho.js",
+        "x-source": "routes/zoho/reorder.js",
         "x-auth": [
           "requirePermission"
         ],
@@ -7111,7 +7572,7 @@
           "zoho"
         ],
         "summary": "PUT /api/zoho/purchase-suggestions/bulk-ordered",
-        "x-source": "routes/zoho.js",
+        "x-source": "routes/zoho/reorder.js",
         "x-auth": [
           "requirePermission"
         ],
@@ -7129,7 +7590,7 @@
           "zoho"
         ],
         "summary": "GET /api/zoho/purchase-suggestions/branch-allocations",
-        "x-source": "routes/zoho.js",
+        "x-source": "routes/zoho/reorder.js",
         "x-auth": [
           "requirePermission"
         ],
@@ -7145,7 +7606,7 @@
           "zoho"
         ],
         "summary": "PUT /api/zoho/purchase-suggestions/branch-allocations",
-        "x-source": "routes/zoho.js",
+        "x-source": "routes/zoho/reorder.js",
         "x-auth": [
           "requirePermission"
         ],
@@ -7163,7 +7624,7 @@
           "zoho"
         ],
         "summary": "GET /api/zoho/purchase-suggestions/category-defaults",
-        "x-source": "routes/zoho.js",
+        "x-source": "routes/zoho/reorder.js",
         "x-auth": [
           "requirePermission"
         ],
@@ -7179,7 +7640,7 @@
           "zoho"
         ],
         "summary": "POST /api/zoho/purchase-suggestions/category-defaults",
-        "x-source": "routes/zoho.js",
+        "x-source": "routes/zoho/reorder.js",
         "x-auth": [
           "requirePermission"
         ],
@@ -7197,7 +7658,7 @@
           "zoho"
         ],
         "summary": "PUT /api/zoho/purchase-suggestions/category-defaults/:id",
-        "x-source": "routes/zoho.js",
+        "x-source": "routes/zoho/reorder.js",
         "x-auth": [
           "requirePermission"
         ],
@@ -7223,7 +7684,7 @@
           "zoho"
         ],
         "summary": "DELETE /api/zoho/purchase-suggestions/category-defaults/:id",
-        "x-source": "routes/zoho.js",
+        "x-source": "routes/zoho/reorder.js",
         "x-auth": [
           "requirePermission"
         ],
@@ -7251,7 +7712,7 @@
           "zoho"
         ],
         "summary": "GET /api/zoho/purchase-suggestions/config",
-        "x-source": "routes/zoho.js",
+        "x-source": "routes/zoho/reorder.js",
         "x-auth": [
           "requirePermission"
         ],
@@ -7269,7 +7730,7 @@
           "zoho"
         ],
         "summary": "GET /api/zoho/purchase-suggestions/batch/:batchId",
-        "x-source": "routes/zoho.js",
+        "x-source": "routes/zoho/reorder.js",
         "x-auth": [
           "requirePermission"
         ],
@@ -7297,7 +7758,7 @@
           "zoho"
         ],
         "summary": "GET /api/zoho/reorder/sales-analysis",
-        "x-source": "routes/zoho.js",
+        "x-source": "routes/zoho/reorder.js",
         "x-auth": [
           "requirePermission"
         ],
@@ -7315,7 +7776,7 @@
           "zoho"
         ],
         "summary": "GET /api/zoho/reorder/snoozes",
-        "x-source": "routes/zoho.js",
+        "x-source": "routes/zoho/reorder.js",
         "x-auth": [
           "requirePermission"
         ],
@@ -7333,7 +7794,7 @@
           "zoho"
         ],
         "summary": "POST /api/zoho/reorder/snooze",
-        "x-source": "routes/zoho.js",
+        "x-source": "routes/zoho/reorder.js",
         "x-auth": [
           "requirePermission"
         ],
@@ -7351,7 +7812,7 @@
           "zoho"
         ],
         "summary": "POST /api/zoho/reorder/snooze-bulk",
-        "x-source": "routes/zoho.js",
+        "x-source": "routes/zoho/reorder.js",
         "x-auth": [
           "requirePermission"
         ],
@@ -7369,7 +7830,7 @@
           "zoho"
         ],
         "summary": "DELETE /api/zoho/reorder/snooze/:itemId/:locationId",
-        "x-source": "routes/zoho.js",
+        "x-source": "routes/zoho/reorder.js",
         "x-auth": [
           "requirePermission"
         ],
@@ -7405,7 +7866,7 @@
           "zoho"
         ],
         "summary": "POST /api/zoho/reorder/vendor-mapping/scan",
-        "x-source": "routes/zoho.js",
+        "x-source": "routes/zoho/reorder.js",
         "x-auth": [
           "requirePermission"
         ],
@@ -7423,7 +7884,7 @@
           "zoho"
         ],
         "summary": "GET /api/zoho/reorder/vendor-mapping/scans",
-        "x-source": "routes/zoho.js",
+        "x-source": "routes/zoho/reorder.js",
         "x-auth": [
           "requirePermission"
         ],
@@ -7441,7 +7902,7 @@
           "zoho"
         ],
         "summary": "GET /api/zoho/reorder/vendor-mapping",
-        "x-source": "routes/zoho.js",
+        "x-source": "routes/zoho/reorder.js",
         "x-auth": [
           "requirePermission"
         ],
@@ -7459,7 +7920,7 @@
           "zoho"
         ],
         "summary": "GET /api/zoho/reorder/vendor-mapping/:zohoItemId/candidates",
-        "x-source": "routes/zoho.js",
+        "x-source": "routes/zoho/reorder.js",
         "x-auth": [
           "requirePermission"
         ],
@@ -7487,7 +7948,7 @@
           "zoho"
         ],
         "summary": "PUT /api/zoho/reorder/vendor-mapping/:zohoItemId",
-        "x-source": "routes/zoho.js",
+        "x-source": "routes/zoho/reorder.js",
         "x-auth": [
           "requirePermission"
         ],
@@ -7515,7 +7976,7 @@
           "zoho"
         ],
         "summary": "POST /api/zoho/reorder/vendor-mapping/push/:zohoItemId",
-        "x-source": "routes/zoho.js",
+        "x-source": "routes/zoho/reorder.js",
         "x-auth": [
           "requirePermission"
         ],
@@ -7543,7 +8004,7 @@
           "zoho"
         ],
         "summary": "GET /api/zoho/reorder/vendors-list",
-        "x-source": "routes/zoho.js",
+        "x-source": "routes/zoho/reorder.js",
         "x-auth": [
           "requirePermission"
         ],
@@ -7561,7 +8022,7 @@
           "zoho"
         ],
         "summary": "POST /api/zoho/reorder/vendor-mapping/apply-brand",
-        "x-source": "routes/zoho.js",
+        "x-source": "routes/zoho/reorder.js",
         "x-auth": [
           "requirePermission"
         ],
@@ -7579,7 +8040,7 @@
           "zoho"
         ],
         "summary": "POST /api/zoho/reorder/vendor-mapping/push-bulk",
-        "x-source": "routes/zoho.js",
+        "x-source": "routes/zoho/reorder.js",
         "x-auth": [
           "requirePermission"
         ],
@@ -7597,7 +8058,7 @@
           "zoho"
         ],
         "summary": "GET /api/zoho/reorder/po-preview",
-        "x-source": "routes/zoho.js",
+        "x-source": "routes/zoho/reorder.js",
         "x-auth": [
           "requirePermission"
         ],
@@ -7615,472 +8076,11 @@
           "zoho"
         ],
         "summary": "POST /api/zoho/reorder/create-po",
-        "x-source": "routes/zoho.js",
+        "x-source": "routes/zoho/reorder.js",
         "x-auth": [
           "requirePermission"
         ],
         "x-permission": "zoho.reorder",
-        "responses": {
-          "200": {
-            "description": "OK"
-          }
-        }
-      }
-    },
-    "/api/zoho/items/parse-price-list": {
-      "post": {
-        "tags": [
-          "zoho"
-        ],
-        "summary": "POST /api/zoho/items/parse-price-list",
-        "x-source": "routes/zoho.js",
-        "x-auth": [
-          "requirePermission"
-        ],
-        "x-permission": "zoho.manage",
-        "responses": {
-          "200": {
-            "description": "OK"
-          }
-        }
-      }
-    },
-    "/api/zoho/items/normalize/scan": {
-      "get": {
-        "tags": [
-          "zoho"
-        ],
-        "summary": "GET /api/zoho/items/normalize/scan",
-        "x-source": "routes/zoho.js",
-        "x-auth": [
-          "requirePermission"
-        ],
-        "x-permission": "zoho.manage",
-        "responses": {
-          "200": {
-            "description": "OK"
-          }
-        }
-      }
-    },
-    "/api/zoho/items/filters/list": {
-      "get": {
-        "tags": [
-          "zoho"
-        ],
-        "summary": "GET /api/zoho/items/filters/list",
-        "x-source": "routes/zoho.js",
-        "x-auth": [
-          "requirePermission"
-        ],
-        "x-permission": "zoho.view",
-        "responses": {
-          "200": {
-            "description": "OK"
-          }
-        }
-      }
-    },
-    "/api/zoho/items/reassign/scan": {
-      "get": {
-        "tags": [
-          "zoho"
-        ],
-        "summary": "GET /api/zoho/items/reassign/scan",
-        "x-source": "routes/zoho.js",
-        "x-auth": [
-          "requirePermission"
-        ],
-        "x-permission": "zoho.manage",
-        "responses": {
-          "200": {
-            "description": "OK"
-          }
-        }
-      }
-    },
-    "/api/zoho/items/reassign/apply": {
-      "post": {
-        "tags": [
-          "zoho"
-        ],
-        "summary": "POST /api/zoho/items/reassign/apply",
-        "x-source": "routes/zoho.js",
-        "x-auth": [
-          "requirePermission"
-        ],
-        "x-permission": "zoho.manage",
-        "responses": {
-          "200": {
-            "description": "OK"
-          }
-        }
-      }
-    },
-    "/api/zoho/items/normalize/meta": {
-      "get": {
-        "tags": [
-          "zoho"
-        ],
-        "summary": "GET /api/zoho/items/normalize/meta",
-        "x-source": "routes/zoho.js",
-        "x-auth": [
-          "requirePermission"
-        ],
-        "x-permission": "zoho.manage",
-        "responses": {
-          "200": {
-            "description": "OK"
-          }
-        }
-      }
-    },
-    "/api/zoho/items/normalize/remember": {
-      "post": {
-        "tags": [
-          "zoho"
-        ],
-        "summary": "POST /api/zoho/items/normalize/remember",
-        "x-source": "routes/zoho.js",
-        "x-auth": [
-          "requirePermission"
-        ],
-        "x-permission": "zoho.manage",
-        "responses": {
-          "200": {
-            "description": "OK"
-          }
-        }
-      }
-    },
-    "/api/zoho/items/normalize/apply": {
-      "post": {
-        "tags": [
-          "zoho"
-        ],
-        "summary": "POST /api/zoho/items/normalize/apply",
-        "x-source": "routes/zoho.js",
-        "x-auth": [
-          "requirePermission"
-        ],
-        "x-permission": "zoho.manage",
-        "responses": {
-          "200": {
-            "description": "OK"
-          }
-        }
-      }
-    },
-    "/api/zoho/items/apply-price-list": {
-      "post": {
-        "tags": [
-          "zoho"
-        ],
-        "summary": "POST /api/zoho/items/apply-price-list",
-        "x-source": "routes/zoho.js",
-        "x-auth": [
-          "requirePermission"
-        ],
-        "x-permission": "zoho.manage",
-        "responses": {
-          "200": {
-            "description": "OK"
-          }
-        }
-      }
-    },
-    "/api/zoho/dpl-match-report": {
-      "get": {
-        "tags": [
-          "zoho"
-        ],
-        "summary": "GET /api/zoho/dpl-match-report",
-        "x-source": "routes/zoho.js",
-        "x-auth": [
-          "requireAuth"
-        ],
-        "responses": {
-          "200": {
-            "description": "OK"
-          }
-        }
-      }
-    },
-    "/api/zoho/items/ai-parse-job/{id}": {
-      "get": {
-        "tags": [
-          "zoho"
-        ],
-        "summary": "GET /api/zoho/items/ai-parse-job/:id",
-        "x-source": "routes/zoho.js",
-        "x-auth": [
-          "requirePermission"
-        ],
-        "x-permission": "zoho.manage",
-        "parameters": [
-          {
-            "name": "id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "OK"
-          }
-        }
-      }
-    },
-    "/api/zoho/items/ai-parse-price-list": {
-      "post": {
-        "tags": [
-          "zoho"
-        ],
-        "summary": "POST /api/zoho/items/ai-parse-price-list",
-        "x-source": "routes/zoho.js",
-        "x-auth": [
-          "requirePermission"
-        ],
-        "x-permission": "zoho.manage",
-        "responses": {
-          "200": {
-            "description": "OK"
-          }
-        }
-      }
-    },
-    "/api/zoho/items/brand-dpl/{brand}": {
-      "get": {
-        "tags": [
-          "zoho"
-        ],
-        "summary": "GET /api/zoho/items/brand-dpl/:brand",
-        "x-source": "routes/zoho.js",
-        "x-auth": [
-          "requirePermission"
-        ],
-        "x-permission": "zoho.manage",
-        "parameters": [
-          {
-            "name": "brand",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "OK"
-          }
-        }
-      },
-      "post": {
-        "tags": [
-          "zoho"
-        ],
-        "summary": "POST /api/zoho/items/brand-dpl/:brand",
-        "x-source": "routes/zoho.js",
-        "x-auth": [
-          "requirePermission"
-        ],
-        "x-permission": "zoho.manage",
-        "parameters": [
-          {
-            "name": "brand",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "OK"
-          }
-        }
-      }
-    },
-    "/api/zoho/items/brand-dpl/{brand}/match": {
-      "post": {
-        "tags": [
-          "zoho"
-        ],
-        "summary": "POST /api/zoho/items/brand-dpl/:brand/match",
-        "x-source": "routes/zoho.js",
-        "x-auth": [
-          "requirePermission"
-        ],
-        "x-permission": "zoho.manage",
-        "parameters": [
-          {
-            "name": "brand",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "OK"
-          }
-        }
-      }
-    },
-    "/api/zoho/items/dpl-parse-csv": {
-      "post": {
-        "tags": [
-          "zoho"
-        ],
-        "summary": "POST /api/zoho/items/dpl-parse-csv",
-        "x-source": "routes/zoho.js",
-        "x-auth": [
-          "requirePermission"
-        ],
-        "x-permission": "zoho.manage",
-        "responses": {
-          "200": {
-            "description": "OK"
-          }
-        }
-      }
-    },
-    "/api/zoho/items/propose-naming": {
-      "get": {
-        "tags": [
-          "zoho"
-        ],
-        "summary": "GET /api/zoho/items/propose-naming",
-        "x-source": "routes/zoho.js",
-        "x-auth": [
-          "requirePermission"
-        ],
-        "x-permission": "zoho.manage",
-        "responses": {
-          "200": {
-            "description": "OK"
-          }
-        }
-      }
-    },
-    "/api/zoho/expenses": {
-      "get": {
-        "tags": [
-          "zoho"
-        ],
-        "summary": "GET /api/zoho/expenses",
-        "x-source": "routes/zoho.js",
-        "x-auth": [
-          "requirePermission"
-        ],
-        "x-permission": "zoho.view",
-        "responses": {
-          "200": {
-            "description": "OK"
-          }
-        }
-      }
-    },
-    "/api/zoho/sync/expenses": {
-      "post": {
-        "tags": [
-          "zoho"
-        ],
-        "summary": "POST /api/zoho/sync/expenses",
-        "x-source": "routes/zoho.js",
-        "x-auth": [
-          "requirePermission"
-        ],
-        "x-permission": "zoho.sync",
-        "responses": {
-          "200": {
-            "description": "OK"
-          }
-        }
-      }
-    },
-    "/api/zoho/creditnotes": {
-      "get": {
-        "tags": [
-          "zoho"
-        ],
-        "summary": "GET /api/zoho/creditnotes",
-        "x-source": "routes/zoho.js",
-        "x-auth": [
-          "requirePermission"
-        ],
-        "x-permission": "zoho.view",
-        "responses": {
-          "200": {
-            "description": "OK"
-          }
-        }
-      }
-    },
-    "/api/zoho/sync/creditnotes": {
-      "post": {
-        "tags": [
-          "zoho"
-        ],
-        "summary": "POST /api/zoho/sync/creditnotes",
-        "x-source": "routes/zoho.js",
-        "x-auth": [
-          "requirePermission"
-        ],
-        "x-permission": "zoho.sync",
-        "responses": {
-          "200": {
-            "description": "OK"
-          }
-        }
-      }
-    },
-    "/api/zoho/salesorders": {
-      "get": {
-        "tags": [
-          "zoho"
-        ],
-        "summary": "GET /api/zoho/salesorders",
-        "x-source": "routes/zoho.js",
-        "x-auth": [
-          "requirePermission"
-        ],
-        "x-permission": "zoho.view",
-        "responses": {
-          "200": {
-            "description": "OK"
-          }
-        }
-      }
-    },
-    "/api/zoho/salesorders/{id}": {
-      "get": {
-        "tags": [
-          "zoho"
-        ],
-        "summary": "GET /api/zoho/salesorders/:id",
-        "x-source": "routes/zoho.js",
-        "x-auth": [
-          "requirePermission"
-        ],
-        "x-permission": "zoho.view",
-        "parameters": [
-          {
-            "name": "id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
         "responses": {
           "200": {
             "description": "OK"
@@ -13317,7 +13317,7 @@
           "painters"
         ],
         "summary": "POST /api/painters/register",
-        "x-source": "routes/painters.js",
+        "x-source": "routes/painters/public.js",
         "x-auth": [
           "public"
         ],
@@ -13334,7 +13334,7 @@
           "painters"
         ],
         "summary": "POST /api/painters/send-otp",
-        "x-source": "routes/painters.js",
+        "x-source": "routes/painters/public.js",
         "x-auth": [
           "public"
         ],
@@ -13351,54 +13351,9 @@
           "painters"
         ],
         "summary": "POST /api/painters/verify-otp",
-        "x-source": "routes/painters.js",
+        "x-source": "routes/painters/public.js",
         "x-auth": [
           "public"
-        ],
-        "responses": {
-          "200": {
-            "description": "OK"
-          }
-        }
-      }
-    },
-    "/api/painters/logout": {
-      "post": {
-        "tags": [
-          "painters"
-        ],
-        "summary": "POST /api/painters/logout",
-        "x-source": "routes/painters.js",
-        "x-auth": [
-          "requirePainterSession"
-        ],
-        "responses": {
-          "200": {
-            "description": "OK"
-          }
-        }
-      }
-    },
-    "/api/painters/{id}/revoke-sessions": {
-      "post": {
-        "tags": [
-          "painters"
-        ],
-        "summary": "POST /api/painters/:id/revoke-sessions",
-        "x-source": "routes/painters.js",
-        "x-auth": [
-          "requirePermission"
-        ],
-        "x-permission": "painters.manage",
-        "parameters": [
-          {
-            "name": "id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          }
         ],
         "responses": {
           "200": {
@@ -13413,7 +13368,7 @@
           "painters"
         ],
         "summary": "GET /api/painters/validate-referral/:code",
-        "x-source": "routes/painters.js",
+        "x-source": "routes/painters/public.js",
         "x-auth": [
           "public"
         ],
@@ -13440,7 +13395,7 @@
           "painters"
         ],
         "summary": "GET /api/painters/estimates/share/:token",
-        "x-source": "routes/painters.js",
+        "x-source": "routes/painters/public.js",
         "x-auth": [
           "public"
         ],
@@ -13461,13 +13416,74 @@
         }
       }
     },
+    "/api/painters/config/coverage-rates": {
+      "get": {
+        "tags": [
+          "painters"
+        ],
+        "summary": "GET /api/painters/config/coverage-rates",
+        "x-source": "routes/painters/public.js",
+        "x-auth": [
+          "public"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/painters/{id}/activate": {
+      "post": {
+        "tags": [
+          "painters"
+        ],
+        "summary": "POST /api/painters/:id/activate",
+        "x-source": "routes/painters/public.js",
+        "x-auth": [
+          "public"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/painters/logout": {
+      "post": {
+        "tags": [
+          "painters"
+        ],
+        "summary": "POST /api/painters/logout",
+        "x-source": "routes/painters/painter.js",
+        "x-auth": [
+          "requirePainterSession"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
     "/api/painters/me": {
       "get": {
         "tags": [
           "painters"
         ],
         "summary": "GET /api/painters/me",
-        "x-source": "routes/painters.js",
+        "x-source": "routes/painters/painter.js",
         "x-auth": [
           "requirePainterAuth"
         ],
@@ -13482,7 +13498,7 @@
           "painters"
         ],
         "summary": "PUT /api/painters/me",
-        "x-source": "routes/painters.js",
+        "x-source": "routes/painters/painter.js",
         "x-auth": [
           "requirePainterAuth"
         ],
@@ -13499,7 +13515,7 @@
           "painters"
         ],
         "summary": "POST /api/painters/me/request-approval",
-        "x-source": "routes/painters.js",
+        "x-source": "routes/painters/painter.js",
         "x-auth": [
           "requirePainterSession"
         ],
@@ -13516,7 +13532,7 @@
           "painters"
         ],
         "summary": "GET /api/painters/me/status",
-        "x-source": "routes/painters.js",
+        "x-source": "routes/painters/painter.js",
         "x-auth": [
           "requirePainterSession"
         ],
@@ -13533,7 +13549,7 @@
           "painters"
         ],
         "summary": "PUT /api/painters/me/profile",
-        "x-source": "routes/painters.js",
+        "x-source": "routes/painters/painter.js",
         "x-auth": [
           "requirePainterAuth"
         ],
@@ -13550,7 +13566,7 @@
           "painters"
         ],
         "summary": "PUT /api/painters/me/profile-photo",
-        "x-source": "routes/painters.js",
+        "x-source": "routes/painters/painter.js",
         "x-auth": [
           "requirePainterAuth"
         ],
@@ -13567,7 +13583,7 @@
           "painters"
         ],
         "summary": "GET /api/painters/me/visiting-card",
-        "x-source": "routes/painters.js",
+        "x-source": "routes/painters/painter.js",
         "x-auth": [
           "requirePainterAuth"
         ],
@@ -13584,7 +13600,7 @@
           "painters"
         ],
         "summary": "GET /api/painters/me/id-card",
-        "x-source": "routes/painters.js",
+        "x-source": "routes/painters/painter.js",
         "x-auth": [
           "requirePainterAuth"
         ],
@@ -13601,7 +13617,7 @@
           "painters"
         ],
         "summary": "POST /api/painters/me/visualizations",
-        "x-source": "routes/painters.js",
+        "x-source": "routes/painters/painter.js",
         "x-auth": [
           "requirePainterAuth"
         ],
@@ -13616,7 +13632,7 @@
           "painters"
         ],
         "summary": "GET /api/painters/me/visualizations",
-        "x-source": "routes/painters.js",
+        "x-source": "routes/painters/painter.js",
         "x-auth": [
           "requirePainterAuth"
         ],
@@ -13633,7 +13649,7 @@
           "painters"
         ],
         "summary": "GET /api/painters/me/points/:pool",
-        "x-source": "routes/painters.js",
+        "x-source": "routes/painters/painter.js",
         "x-auth": [
           "requirePainterAuth"
         ],
@@ -13660,7 +13676,7 @@
           "painters"
         ],
         "summary": "GET /api/painters/me/referrals",
-        "x-source": "routes/painters.js",
+        "x-source": "routes/painters/painter.js",
         "x-auth": [
           "requirePainterAuth"
         ],
@@ -13677,7 +13693,7 @@
           "painters"
         ],
         "summary": "POST /api/painters/me/withdraw",
-        "x-source": "routes/painters.js",
+        "x-source": "routes/painters/painter.js",
         "x-auth": [
           "requirePainterAuth"
         ],
@@ -13694,7 +13710,7 @@
           "painters"
         ],
         "summary": "GET /api/painters/me/withdrawals",
-        "x-source": "routes/painters.js",
+        "x-source": "routes/painters/painter.js",
         "x-auth": [
           "requirePainterAuth"
         ],
@@ -13711,7 +13727,7 @@
           "painters"
         ],
         "summary": "GET /api/painters/me/invoices",
-        "x-source": "routes/painters.js",
+        "x-source": "routes/painters/painter.js",
         "x-auth": [
           "requirePainterAuth"
         ],
@@ -13728,7 +13744,7 @@
           "painters"
         ],
         "summary": "GET /api/painters/me/attendance",
-        "x-source": "routes/painters.js",
+        "x-source": "routes/painters/painter.js",
         "x-auth": [
           "requirePainterAuth"
         ],
@@ -13745,7 +13761,7 @@
           "painters"
         ],
         "summary": "GET /api/painters/me/dashboard",
-        "x-source": "routes/painters.js",
+        "x-source": "routes/painters/painter.js",
         "x-auth": [
           "requirePainterAuth"
         ],
@@ -13762,7 +13778,7 @@
           "painters"
         ],
         "summary": "PUT /api/painters/me/daily-streak",
-        "x-source": "routes/painters.js",
+        "x-source": "routes/painters/painter.js",
         "x-auth": [
           "requirePainterAuth"
         ],
@@ -13779,7 +13795,7 @@
           "painters"
         ],
         "summary": "GET /api/painters/me/briefing",
-        "x-source": "routes/painters.js",
+        "x-source": "routes/painters/painter.js",
         "x-auth": [
           "requirePainterAuth"
         ],
@@ -13796,7 +13812,7 @@
           "painters"
         ],
         "summary": "GET /api/painters/me/checkin-history",
-        "x-source": "routes/painters.js",
+        "x-source": "routes/painters/painter.js",
         "x-auth": [
           "requirePainterAuth"
         ],
@@ -13813,7 +13829,7 @@
           "painters"
         ],
         "summary": "GET /api/painters/me/estimates/products",
-        "x-source": "routes/painters.js",
+        "x-source": "routes/painters/painter.js",
         "x-auth": [
           "requirePainterAuth"
         ],
@@ -13830,7 +13846,7 @@
           "painters"
         ],
         "summary": "GET /api/painters/me/estimates",
-        "x-source": "routes/painters.js",
+        "x-source": "routes/painters/painter.js",
         "x-auth": [
           "requirePainterAuth"
         ],
@@ -13845,7 +13861,7 @@
           "painters"
         ],
         "summary": "POST /api/painters/me/estimates",
-        "x-source": "routes/painters.js",
+        "x-source": "routes/painters/painter.js",
         "x-auth": [
           "requirePainterAuth"
         ],
@@ -13862,7 +13878,7 @@
           "painters"
         ],
         "summary": "GET /api/painters/me/estimates/:estimateId",
-        "x-source": "routes/painters.js",
+        "x-source": "routes/painters/painter.js",
         "x-auth": [
           "requirePainterAuth"
         ],
@@ -13887,7 +13903,7 @@
           "painters"
         ],
         "summary": "PUT /api/painters/me/estimates/:estimateId",
-        "x-source": "routes/painters.js",
+        "x-source": "routes/painters/painter.js",
         "x-auth": [
           "requirePainterAuth"
         ],
@@ -13912,7 +13928,7 @@
           "painters"
         ],
         "summary": "DELETE /api/painters/me/estimates/:estimateId",
-        "x-source": "routes/painters.js",
+        "x-source": "routes/painters/painter.js",
         "x-auth": [
           "requirePainterAuth"
         ],
@@ -13939,7 +13955,7 @@
           "painters"
         ],
         "summary": "POST /api/painters/me/estimates/:estimateId/submit",
-        "x-source": "routes/painters.js",
+        "x-source": "routes/painters/painter.js",
         "x-auth": [
           "requirePainterAuth"
         ],
@@ -13966,7 +13982,7 @@
           "painters"
         ],
         "summary": "POST /api/painters/me/estimates/:estimateId/submit-to-admin",
-        "x-source": "routes/painters.js",
+        "x-source": "routes/painters/painter.js",
         "x-auth": [
           "requirePainterAuth"
         ],
@@ -13993,7 +14009,7 @@
           "painters"
         ],
         "summary": "POST /api/painters/me/estimates/:estimateId/request-discount",
-        "x-source": "routes/painters.js",
+        "x-source": "routes/painters/painter.js",
         "x-auth": [
           "requirePainterAuth"
         ],
@@ -14020,7 +14036,7 @@
           "painters"
         ],
         "summary": "POST /api/painters/me/estimates/:estimateId/payment",
-        "x-source": "routes/painters.js",
+        "x-source": "routes/painters/painter.js",
         "x-auth": [
           "requirePainterAuth"
         ],
@@ -14047,7 +14063,7 @@
           "painters"
         ],
         "summary": "GET /api/painters/me/estimates/:estimateId/pdf",
-        "x-source": "routes/painters.js",
+        "x-source": "routes/painters/painter.js",
         "x-auth": [
           "requirePainterAuth"
         ],
@@ -14074,7 +14090,7 @@
           "painters"
         ],
         "summary": "GET /api/painters/me/catalog",
-        "x-source": "routes/painters.js",
+        "x-source": "routes/painters/painter.js",
         "x-auth": [
           "requirePainterAuth"
         ],
@@ -14091,7 +14107,7 @@
           "painters"
         ],
         "summary": "GET /api/painters/me/catalog/:productId",
-        "x-source": "routes/painters.js",
+        "x-source": "routes/painters/painter.js",
         "x-auth": [
           "requirePainterAuth"
         ],
@@ -14118,7 +14134,7 @@
           "painters"
         ],
         "summary": "GET /api/painters/me/offers",
-        "x-source": "routes/painters.js",
+        "x-source": "routes/painters/painter.js",
         "x-auth": [
           "requirePainterAuth"
         ],
@@ -14135,7 +14151,7 @@
           "painters"
         ],
         "summary": "GET /api/painters/me/offer-products",
-        "x-source": "routes/painters.js",
+        "x-source": "routes/painters/painter.js",
         "x-auth": [
           "requirePainterAuth"
         ],
@@ -14152,7 +14168,7 @@
           "painters"
         ],
         "summary": "GET /api/painters/me/training",
-        "x-source": "routes/painters.js",
+        "x-source": "routes/painters/painter.js",
         "x-auth": [
           "requirePainterAuth"
         ],
@@ -14169,7 +14185,7 @@
           "painters"
         ],
         "summary": "GET /api/painters/me/training/:id",
-        "x-source": "routes/painters.js",
+        "x-source": "routes/painters/painter.js",
         "x-auth": [
           "requirePainterAuth"
         ],
@@ -14196,7 +14212,7 @@
           "painters"
         ],
         "summary": "GET /api/painters/me/attendance/today",
-        "x-source": "routes/painters.js",
+        "x-source": "routes/painters/painter.js",
         "x-auth": [
           "requirePainterAuth"
         ],
@@ -14213,7 +14229,7 @@
           "painters"
         ],
         "summary": "POST /api/painters/me/attendance/check-in",
-        "x-source": "routes/painters.js",
+        "x-source": "routes/painters/painter.js",
         "x-auth": [
           "requirePainterAuth"
         ],
@@ -14230,7 +14246,7 @@
           "painters"
         ],
         "summary": "GET /api/painters/me/attendance/monthly",
-        "x-source": "routes/painters.js",
+        "x-source": "routes/painters/painter.js",
         "x-auth": [
           "requirePainterAuth"
         ],
@@ -14247,7 +14263,7 @@
           "painters"
         ],
         "summary": "GET /api/painters/me/attendance/branches-nearby",
-        "x-source": "routes/painters.js",
+        "x-source": "routes/painters/painter.js",
         "x-auth": [
           "requirePainterAuth"
         ],
@@ -14264,7 +14280,7 @@
           "painters"
         ],
         "summary": "POST /api/painters/me/attendance/checkin",
-        "x-source": "routes/painters.js",
+        "x-source": "routes/painters/painter.js",
         "x-auth": [
           "requirePainterAuth"
         ],
@@ -14281,7 +14297,7 @@
           "painters"
         ],
         "summary": "GET /api/painters/me/attendance/month",
-        "x-source": "routes/painters.js",
+        "x-source": "routes/painters/painter.js",
         "x-auth": [
           "requirePainterAuth"
         ],
@@ -14298,7 +14314,7 @@
           "painters"
         ],
         "summary": "GET /api/painters/me/attendance/history",
-        "x-source": "routes/painters.js",
+        "x-source": "routes/painters/painter.js",
         "x-auth": [
           "requirePainterAuth"
         ],
@@ -14315,7 +14331,7 @@
           "painters"
         ],
         "summary": "POST /api/painters/me/attendance/claim",
-        "x-source": "routes/painters.js",
+        "x-source": "routes/painters/painter.js",
         "x-auth": [
           "requirePainterAuth"
         ],
@@ -14332,7 +14348,7 @@
           "painters"
         ],
         "summary": "POST /api/painters/me/fcm/register",
-        "x-source": "routes/painters.js",
+        "x-source": "routes/painters/painter.js",
         "x-auth": [
           "requirePainterAuth"
         ],
@@ -14349,7 +14365,7 @@
           "painters"
         ],
         "summary": "DELETE /api/painters/me/fcm/unregister",
-        "x-source": "routes/painters.js",
+        "x-source": "routes/painters/painter.js",
         "x-auth": [
           "requirePainterAuth"
         ],
@@ -14366,7 +14382,7 @@
           "painters"
         ],
         "summary": "GET /api/painters/me/notifications",
-        "x-source": "routes/painters.js",
+        "x-source": "routes/painters/painter.js",
         "x-auth": [
           "requirePainterAuth"
         ],
@@ -14383,10 +14399,407 @@
           "painters"
         ],
         "summary": "PUT /api/painters/me/notifications/:id/read",
-        "x-source": "routes/painters.js",
+        "x-source": "routes/painters/painter.js",
         "x-auth": [
           "requirePainterAuth"
         ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/painters/me/quotations": {
+      "post": {
+        "tags": [
+          "painters"
+        ],
+        "summary": "POST /api/painters/me/quotations",
+        "x-source": "routes/painters/painter.js",
+        "x-auth": [
+          "requirePainterAuth"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      },
+      "get": {
+        "tags": [
+          "painters"
+        ],
+        "summary": "GET /api/painters/me/quotations",
+        "x-source": "routes/painters/painter.js",
+        "x-auth": [
+          "requirePainterAuth"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/painters/me/quotations/{id}": {
+      "get": {
+        "tags": [
+          "painters"
+        ],
+        "summary": "GET /api/painters/me/quotations/:id",
+        "x-source": "routes/painters/painter.js",
+        "x-auth": [
+          "requirePainterAuth"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "painters"
+        ],
+        "summary": "PUT /api/painters/me/quotations/:id",
+        "x-source": "routes/painters/painter.js",
+        "x-auth": [
+          "requirePainterAuth"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "painters"
+        ],
+        "summary": "DELETE /api/painters/me/quotations/:id",
+        "x-source": "routes/painters/painter.js",
+        "x-auth": [
+          "requirePainterAuth"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/painters/me/quotations/{id}/send": {
+      "put": {
+        "tags": [
+          "painters"
+        ],
+        "summary": "PUT /api/painters/me/quotations/:id/send",
+        "x-source": "routes/painters/painter.js",
+        "x-auth": [
+          "requirePainterAuth"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/painters/me/price-reports": {
+      "post": {
+        "tags": [
+          "painters"
+        ],
+        "summary": "POST /api/painters/me/price-reports",
+        "x-source": "routes/painters/painter.js",
+        "x-auth": [
+          "requirePainterAuth"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      },
+      "get": {
+        "tags": [
+          "painters"
+        ],
+        "summary": "GET /api/painters/me/price-reports",
+        "x-source": "routes/painters/painter.js",
+        "x-auth": [
+          "requirePainterAuth"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/painters/me/product-requests": {
+      "post": {
+        "tags": [
+          "painters"
+        ],
+        "summary": "POST /api/painters/me/product-requests",
+        "x-source": "routes/painters/painter.js",
+        "x-auth": [
+          "requirePainterAuth"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      },
+      "get": {
+        "tags": [
+          "painters"
+        ],
+        "summary": "GET /api/painters/me/product-requests",
+        "x-source": "routes/painters/painter.js",
+        "x-auth": [
+          "requirePainterAuth"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/painters/me/gamification": {
+      "get": {
+        "tags": [
+          "painters"
+        ],
+        "summary": "GET /api/painters/me/gamification",
+        "x-source": "routes/painters/painter.js",
+        "x-auth": [
+          "requirePainterAuth"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/painters/me/leaderboard": {
+      "get": {
+        "tags": [
+          "painters"
+        ],
+        "summary": "GET /api/painters/me/leaderboard",
+        "x-source": "routes/painters/painter.js",
+        "x-auth": [
+          "requirePainterAuth"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/painters/me/challenges/{id}/claim": {
+      "post": {
+        "tags": [
+          "painters"
+        ],
+        "summary": "POST /api/painters/me/challenges/:id/claim",
+        "x-source": "routes/painters/painter.js",
+        "x-auth": [
+          "requirePainterAuth"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/painters/me/gallery": {
+      "post": {
+        "tags": [
+          "painters"
+        ],
+        "summary": "POST /api/painters/me/gallery",
+        "x-source": "routes/painters/painter.js",
+        "x-auth": [
+          "requirePainterAuth"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      },
+      "get": {
+        "tags": [
+          "painters"
+        ],
+        "summary": "GET /api/painters/me/gallery",
+        "x-source": "routes/painters/painter.js",
+        "x-auth": [
+          "requirePainterAuth"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/painters/me/gallery/{id}": {
+      "delete": {
+        "tags": [
+          "painters"
+        ],
+        "summary": "DELETE /api/painters/me/gallery/:id",
+        "x-source": "routes/painters/painter.js",
+        "x-auth": [
+          "requirePainterAuth"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/painters/me/calculations": {
+      "post": {
+        "tags": [
+          "painters"
+        ],
+        "summary": "POST /api/painters/me/calculations",
+        "x-source": "routes/painters/painter.js",
+        "x-auth": [
+          "requirePainterAuth"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      },
+      "get": {
+        "tags": [
+          "painters"
+        ],
+        "summary": "GET /api/painters/me/calculations",
+        "x-source": "routes/painters/painter.js",
+        "x-auth": [
+          "requirePainterAuth"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/painters/me/location-report": {
+      "post": {
+        "tags": [
+          "painters"
+        ],
+        "summary": "POST /api/painters/me/location-report",
+        "x-source": "routes/painters/painter.js",
+        "x-auth": [
+          "requirePainterAuth"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/painters/{id}/revoke-sessions": {
+      "post": {
+        "tags": [
+          "painters"
+        ],
+        "summary": "POST /api/painters/:id/revoke-sessions",
+        "x-source": "routes/painters/admin.js",
+        "x-auth": [
+          "requirePermission"
+        ],
+        "x-permission": "painters.manage",
         "parameters": [
           {
             "name": "id",
@@ -14410,7 +14823,7 @@
           "painters"
         ],
         "summary": "GET /api/painters/custom-rates/:painterId",
-        "x-source": "routes/painters.js",
+        "x-source": "routes/painters/admin.js",
         "x-auth": [
           "requirePermission"
         ],
@@ -14438,7 +14851,7 @@
           "painters"
         ],
         "summary": "POST /api/painters/custom-rates",
-        "x-source": "routes/painters.js",
+        "x-source": "routes/painters/admin.js",
         "x-auth": [
           "requirePermission"
         ],
@@ -14456,7 +14869,7 @@
           "painters"
         ],
         "summary": "DELETE /api/painters/custom-rates/:id",
-        "x-source": "routes/painters.js",
+        "x-source": "routes/painters/admin.js",
         "x-auth": [
           "requirePermission"
         ],
@@ -14484,7 +14897,7 @@
           "painters"
         ],
         "summary": "GET /api/painters/offer-carousel-order",
-        "x-source": "routes/painters.js",
+        "x-source": "routes/painters/admin.js",
         "x-auth": [
           "requireAuth"
         ],
@@ -14499,7 +14912,7 @@
           "painters"
         ],
         "summary": "PUT /api/painters/offer-carousel-order",
-        "x-source": "routes/painters.js",
+        "x-source": "routes/painters/admin.js",
         "x-auth": [
           "requirePermission"
         ],
@@ -14517,7 +14930,7 @@
           "painters"
         ],
         "summary": "GET /api/painters/offer-targets",
-        "x-source": "routes/painters.js",
+        "x-source": "routes/painters/admin.js",
         "x-auth": [
           "requireAuth"
         ],
@@ -14534,7 +14947,7 @@
           "painters"
         ],
         "summary": "GET /api/painters/offers",
-        "x-source": "routes/painters.js",
+        "x-source": "routes/painters/admin.js",
         "x-auth": [
           "requireAuth"
         ],
@@ -14549,7 +14962,7 @@
           "painters"
         ],
         "summary": "POST /api/painters/offers",
-        "x-source": "routes/painters.js",
+        "x-source": "routes/painters/admin.js",
         "x-auth": [
           "requirePermission"
         ],
@@ -14567,7 +14980,7 @@
           "painters"
         ],
         "summary": "PUT /api/painters/offers/:id",
-        "x-source": "routes/painters.js",
+        "x-source": "routes/painters/admin.js",
         "x-auth": [
           "requirePermission"
         ],
@@ -14593,7 +15006,7 @@
           "painters"
         ],
         "summary": "DELETE /api/painters/offers/:id",
-        "x-source": "routes/painters.js",
+        "x-source": "routes/painters/admin.js",
         "x-auth": [
           "requirePermission"
         ],
@@ -14621,7 +15034,7 @@
           "painters"
         ],
         "summary": "GET /api/painters/training",
-        "x-source": "routes/painters.js",
+        "x-source": "routes/painters/admin.js",
         "x-auth": [
           "requireAuth"
         ],
@@ -14636,7 +15049,7 @@
           "painters"
         ],
         "summary": "POST /api/painters/training",
-        "x-source": "routes/painters.js",
+        "x-source": "routes/painters/admin.js",
         "x-auth": [
           "requirePermission"
         ],
@@ -14654,7 +15067,7 @@
           "painters"
         ],
         "summary": "PUT /api/painters/training/:id",
-        "x-source": "routes/painters.js",
+        "x-source": "routes/painters/admin.js",
         "x-auth": [
           "requirePermission"
         ],
@@ -14680,7 +15093,7 @@
           "painters"
         ],
         "summary": "DELETE /api/painters/training/:id",
-        "x-source": "routes/painters.js",
+        "x-source": "routes/painters/admin.js",
         "x-auth": [
           "requirePermission"
         ],
@@ -14708,7 +15121,7 @@
           "painters"
         ],
         "summary": "POST /api/painters/products/:itemId/image",
-        "x-source": "routes/painters.js",
+        "x-source": "routes/painters/admin.js",
         "x-auth": [
           "requirePermission"
         ],
@@ -14736,7 +15149,7 @@
           "painters"
         ],
         "summary": "POST /api/painters/notifications/send-all",
-        "x-source": "routes/painters.js",
+        "x-source": "routes/painters/admin.js",
         "x-auth": [
           "requirePermission"
         ],
@@ -14754,7 +15167,7 @@
           "painters"
         ],
         "summary": "POST /api/painters/invoice/process",
-        "x-source": "routes/painters.js",
+        "x-source": "routes/painters/admin.js",
         "x-auth": [
           "requirePermission"
         ],
@@ -14772,7 +15185,7 @@
           "painters"
         ],
         "summary": "GET /api/painters/invoice/search",
-        "x-source": "routes/painters.js",
+        "x-source": "routes/painters/admin.js",
         "x-auth": [
           "requireAuth"
         ],
@@ -14789,7 +15202,7 @@
           "painters"
         ],
         "summary": "GET /api/painters/config/product-rates/grouped",
-        "x-source": "routes/painters.js",
+        "x-source": "routes/painters/admin.js",
         "x-auth": [
           "requireAuth"
         ],
@@ -14804,7 +15217,7 @@
           "painters"
         ],
         "summary": "PUT /api/painters/config/product-rates/grouped",
-        "x-source": "routes/painters.js",
+        "x-source": "routes/painters/admin.js",
         "x-auth": [
           "requirePermission"
         ],
@@ -14822,7 +15235,7 @@
           "painters"
         ],
         "summary": "GET /api/painters/config/product-rates/grouped/:productId",
-        "x-source": "routes/painters.js",
+        "x-source": "routes/painters/admin.js",
         "x-auth": [
           "requireAuth"
         ],
@@ -14849,7 +15262,7 @@
           "painters"
         ],
         "summary": "GET /api/painters/config/product-rates",
-        "x-source": "routes/painters.js",
+        "x-source": "routes/painters/admin.js",
         "x-auth": [
           "requireAuth"
         ],
@@ -14864,7 +15277,7 @@
           "painters"
         ],
         "summary": "PUT /api/painters/config/product-rates",
-        "x-source": "routes/painters.js",
+        "x-source": "routes/painters/admin.js",
         "x-auth": [
           "requirePermission"
         ],
@@ -14882,7 +15295,7 @@
           "painters"
         ],
         "summary": "POST /api/painters/config/product-rates/sync",
-        "x-source": "routes/painters.js",
+        "x-source": "routes/painters/admin.js",
         "x-auth": [
           "requirePermission"
         ],
@@ -14900,7 +15313,7 @@
           "painters"
         ],
         "summary": "GET /api/painters/config/slabs",
-        "x-source": "routes/painters.js",
+        "x-source": "routes/painters/admin.js",
         "x-auth": [
           "requireAuth"
         ],
@@ -14915,7 +15328,7 @@
           "painters"
         ],
         "summary": "POST /api/painters/config/slabs",
-        "x-source": "routes/painters.js",
+        "x-source": "routes/painters/admin.js",
         "x-auth": [
           "requirePermission"
         ],
@@ -14933,7 +15346,7 @@
           "painters"
         ],
         "summary": "PUT /api/painters/config/slabs/:id",
-        "x-source": "routes/painters.js",
+        "x-source": "routes/painters/admin.js",
         "x-auth": [
           "requirePermission"
         ],
@@ -14959,7 +15372,7 @@
           "painters"
         ],
         "summary": "DELETE /api/painters/config/slabs/:id",
-        "x-source": "routes/painters.js",
+        "x-source": "routes/painters/admin.js",
         "x-auth": [
           "requirePermission"
         ],
@@ -14987,7 +15400,7 @@
           "painters"
         ],
         "summary": "GET /api/painters/withdrawals",
-        "x-source": "routes/painters.js",
+        "x-source": "routes/painters/admin.js",
         "x-auth": [
           "requireAuth"
         ],
@@ -15004,7 +15417,7 @@
           "painters"
         ],
         "summary": "PUT /api/painters/withdrawals/:id",
-        "x-source": "routes/painters.js",
+        "x-source": "routes/painters/admin.js",
         "x-auth": [
           "requirePermission"
         ],
@@ -15032,7 +15445,7 @@
           "painters"
         ],
         "summary": "GET /api/painters/attendance",
-        "x-source": "routes/painters.js",
+        "x-source": "routes/painters/admin.js",
         "x-auth": [
           "requireAuth"
         ],
@@ -15049,7 +15462,7 @@
           "painters"
         ],
         "summary": "POST /api/painters/attendance/:checkinId/reject",
-        "x-source": "routes/painters.js",
+        "x-source": "routes/painters/admin.js",
         "x-auth": [
           "requirePermission"
         ],
@@ -15077,7 +15490,7 @@
           "painters"
         ],
         "summary": "GET /api/painters/attendance/today",
-        "x-source": "routes/painters.js",
+        "x-source": "routes/painters/admin.js",
         "x-auth": [
           "requirePermission"
         ],
@@ -15095,7 +15508,7 @@
           "painters"
         ],
         "summary": "GET /api/painters/attendance/monthly",
-        "x-source": "routes/painters.js",
+        "x-source": "routes/painters/admin.js",
         "x-auth": [
           "requirePermission"
         ],
@@ -15113,7 +15526,7 @@
           "painters"
         ],
         "summary": "GET /api/painters/:painterId/attendance/calendar",
-        "x-source": "routes/painters.js",
+        "x-source": "routes/painters/admin.js",
         "x-auth": [
           "requirePermission"
         ],
@@ -15141,7 +15554,7 @@
           "painters"
         ],
         "summary": "GET /api/painters/referrals",
-        "x-source": "routes/painters.js",
+        "x-source": "routes/painters/admin.js",
         "x-auth": [
           "requireAuth"
         ],
@@ -15158,7 +15571,7 @@
           "painters"
         ],
         "summary": "GET /api/painters/reports/summary",
-        "x-source": "routes/painters.js",
+        "x-source": "routes/painters/admin.js",
         "x-auth": [
           "requireAuth"
         ],
@@ -15175,7 +15588,7 @@
           "painters"
         ],
         "summary": "GET /api/painters/reports/top-earners",
-        "x-source": "routes/painters.js",
+        "x-source": "routes/painters/admin.js",
         "x-auth": [
           "requireAuth"
         ],
@@ -15192,7 +15605,7 @@
           "painters"
         ],
         "summary": "GET /api/painters/estimates",
-        "x-source": "routes/painters.js",
+        "x-source": "routes/painters/admin.js",
         "x-auth": [
           "requireAuth"
         ],
@@ -15209,7 +15622,7 @@
           "painters"
         ],
         "summary": "GET /api/painters/estimates/products",
-        "x-source": "routes/painters.js",
+        "x-source": "routes/painters/admin.js",
         "x-auth": [
           "requireAuth"
         ],
@@ -15226,7 +15639,7 @@
           "painters"
         ],
         "summary": "GET /api/painters/estimates/:estimateId",
-        "x-source": "routes/painters.js",
+        "x-source": "routes/painters/admin.js",
         "x-auth": [
           "requireAuth"
         ],
@@ -15253,7 +15666,7 @@
           "painters"
         ],
         "summary": "PUT /api/painters/estimates/:estimateId/items",
-        "x-source": "routes/painters.js",
+        "x-source": "routes/painters/admin.js",
         "x-auth": [
           "requirePermission"
         ],
@@ -15281,7 +15694,7 @@
           "painters"
         ],
         "summary": "GET /api/painters/estimates/:estimateId/pdf",
-        "x-source": "routes/painters.js",
+        "x-source": "routes/painters/admin.js",
         "x-auth": [
           "requireAuth"
         ],
@@ -15308,7 +15721,7 @@
           "painters"
         ],
         "summary": "PUT /api/painters/estimates/:estimateId/review",
-        "x-source": "routes/painters.js",
+        "x-source": "routes/painters/admin.js",
         "x-auth": [
           "requirePermission"
         ],
@@ -15336,7 +15749,7 @@
           "painters"
         ],
         "summary": "POST /api/painters/estimates/:estimateId/markup",
-        "x-source": "routes/painters.js",
+        "x-source": "routes/painters/admin.js",
         "x-auth": [
           "requirePermission"
         ],
@@ -15364,7 +15777,7 @@
           "painters"
         ],
         "summary": "POST /api/painters/estimates/:estimateId/approve-as-self",
-        "x-source": "routes/painters.js",
+        "x-source": "routes/painters/admin.js",
         "x-auth": [
           "requirePermission"
         ],
@@ -15392,7 +15805,7 @@
           "painters"
         ],
         "summary": "POST /api/painters/estimates/:estimateId/share",
-        "x-source": "routes/painters.js",
+        "x-source": "routes/painters/admin.js",
         "x-auth": [
           "requirePermission"
         ],
@@ -15420,7 +15833,7 @@
           "painters"
         ],
         "summary": "POST /api/painters/estimates/:estimateId/discount",
-        "x-source": "routes/painters.js",
+        "x-source": "routes/painters/admin.js",
         "x-auth": [
           "requirePermission"
         ],
@@ -15448,7 +15861,7 @@
           "painters"
         ],
         "summary": "POST /api/painters/estimates/:estimateId/approve-final",
-        "x-source": "routes/painters.js",
+        "x-source": "routes/painters/admin.js",
         "x-auth": [
           "requirePermission"
         ],
@@ -15476,7 +15889,7 @@
           "painters"
         ],
         "summary": "POST /api/painters/estimates/:estimateId/confirm-payment",
-        "x-source": "routes/painters.js",
+        "x-source": "routes/painters/admin.js",
         "x-auth": [
           "requirePermission"
         ],
@@ -15504,7 +15917,7 @@
           "painters"
         ],
         "summary": "POST /api/painters/estimates/:estimateId/payment",
-        "x-source": "routes/painters.js",
+        "x-source": "routes/painters/admin.js",
         "x-auth": [
           "requirePermission"
         ],
@@ -15532,7 +15945,7 @@
           "painters"
         ],
         "summary": "POST /api/painters/estimates/:estimateId/push-zoho",
-        "x-source": "routes/painters.js",
+        "x-source": "routes/painters/admin.js",
         "x-auth": [
           "requirePermission"
         ],
@@ -15554,382 +15967,13 @@
         }
       }
     },
-    "/api/painters/me/quotations": {
-      "post": {
-        "tags": [
-          "painters"
-        ],
-        "summary": "POST /api/painters/me/quotations",
-        "x-source": "routes/painters.js",
-        "x-auth": [
-          "requirePainterAuth"
-        ],
-        "responses": {
-          "200": {
-            "description": "OK"
-          }
-        }
-      },
-      "get": {
-        "tags": [
-          "painters"
-        ],
-        "summary": "GET /api/painters/me/quotations",
-        "x-source": "routes/painters.js",
-        "x-auth": [
-          "requirePainterAuth"
-        ],
-        "responses": {
-          "200": {
-            "description": "OK"
-          }
-        }
-      }
-    },
-    "/api/painters/me/quotations/{id}": {
-      "get": {
-        "tags": [
-          "painters"
-        ],
-        "summary": "GET /api/painters/me/quotations/:id",
-        "x-source": "routes/painters.js",
-        "x-auth": [
-          "requirePainterAuth"
-        ],
-        "parameters": [
-          {
-            "name": "id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "OK"
-          }
-        }
-      },
-      "put": {
-        "tags": [
-          "painters"
-        ],
-        "summary": "PUT /api/painters/me/quotations/:id",
-        "x-source": "routes/painters.js",
-        "x-auth": [
-          "requirePainterAuth"
-        ],
-        "parameters": [
-          {
-            "name": "id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "OK"
-          }
-        }
-      },
-      "delete": {
-        "tags": [
-          "painters"
-        ],
-        "summary": "DELETE /api/painters/me/quotations/:id",
-        "x-source": "routes/painters.js",
-        "x-auth": [
-          "requirePainterAuth"
-        ],
-        "parameters": [
-          {
-            "name": "id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "OK"
-          }
-        }
-      }
-    },
-    "/api/painters/me/quotations/{id}/send": {
-      "put": {
-        "tags": [
-          "painters"
-        ],
-        "summary": "PUT /api/painters/me/quotations/:id/send",
-        "x-source": "routes/painters.js",
-        "x-auth": [
-          "requirePainterAuth"
-        ],
-        "parameters": [
-          {
-            "name": "id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "OK"
-          }
-        }
-      }
-    },
-    "/api/painters/me/price-reports": {
-      "post": {
-        "tags": [
-          "painters"
-        ],
-        "summary": "POST /api/painters/me/price-reports",
-        "x-source": "routes/painters.js",
-        "x-auth": [
-          "requirePainterAuth"
-        ],
-        "responses": {
-          "200": {
-            "description": "OK"
-          }
-        }
-      },
-      "get": {
-        "tags": [
-          "painters"
-        ],
-        "summary": "GET /api/painters/me/price-reports",
-        "x-source": "routes/painters.js",
-        "x-auth": [
-          "requirePainterAuth"
-        ],
-        "responses": {
-          "200": {
-            "description": "OK"
-          }
-        }
-      }
-    },
-    "/api/painters/me/product-requests": {
-      "post": {
-        "tags": [
-          "painters"
-        ],
-        "summary": "POST /api/painters/me/product-requests",
-        "x-source": "routes/painters.js",
-        "x-auth": [
-          "requirePainterAuth"
-        ],
-        "responses": {
-          "200": {
-            "description": "OK"
-          }
-        }
-      },
-      "get": {
-        "tags": [
-          "painters"
-        ],
-        "summary": "GET /api/painters/me/product-requests",
-        "x-source": "routes/painters.js",
-        "x-auth": [
-          "requirePainterAuth"
-        ],
-        "responses": {
-          "200": {
-            "description": "OK"
-          }
-        }
-      }
-    },
-    "/api/painters/me/gamification": {
-      "get": {
-        "tags": [
-          "painters"
-        ],
-        "summary": "GET /api/painters/me/gamification",
-        "x-source": "routes/painters.js",
-        "x-auth": [
-          "requirePainterAuth"
-        ],
-        "responses": {
-          "200": {
-            "description": "OK"
-          }
-        }
-      }
-    },
-    "/api/painters/me/leaderboard": {
-      "get": {
-        "tags": [
-          "painters"
-        ],
-        "summary": "GET /api/painters/me/leaderboard",
-        "x-source": "routes/painters.js",
-        "x-auth": [
-          "requirePainterAuth"
-        ],
-        "responses": {
-          "200": {
-            "description": "OK"
-          }
-        }
-      }
-    },
-    "/api/painters/me/challenges/{id}/claim": {
-      "post": {
-        "tags": [
-          "painters"
-        ],
-        "summary": "POST /api/painters/me/challenges/:id/claim",
-        "x-source": "routes/painters.js",
-        "x-auth": [
-          "requirePainterAuth"
-        ],
-        "parameters": [
-          {
-            "name": "id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "OK"
-          }
-        }
-      }
-    },
-    "/api/painters/me/gallery": {
-      "post": {
-        "tags": [
-          "painters"
-        ],
-        "summary": "POST /api/painters/me/gallery",
-        "x-source": "routes/painters.js",
-        "x-auth": [
-          "requirePainterAuth"
-        ],
-        "responses": {
-          "200": {
-            "description": "OK"
-          }
-        }
-      },
-      "get": {
-        "tags": [
-          "painters"
-        ],
-        "summary": "GET /api/painters/me/gallery",
-        "x-source": "routes/painters.js",
-        "x-auth": [
-          "requirePainterAuth"
-        ],
-        "responses": {
-          "200": {
-            "description": "OK"
-          }
-        }
-      }
-    },
-    "/api/painters/me/gallery/{id}": {
-      "delete": {
-        "tags": [
-          "painters"
-        ],
-        "summary": "DELETE /api/painters/me/gallery/:id",
-        "x-source": "routes/painters.js",
-        "x-auth": [
-          "requirePainterAuth"
-        ],
-        "parameters": [
-          {
-            "name": "id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "OK"
-          }
-        }
-      }
-    },
-    "/api/painters/me/calculations": {
-      "post": {
-        "tags": [
-          "painters"
-        ],
-        "summary": "POST /api/painters/me/calculations",
-        "x-source": "routes/painters.js",
-        "x-auth": [
-          "requirePainterAuth"
-        ],
-        "responses": {
-          "200": {
-            "description": "OK"
-          }
-        }
-      },
-      "get": {
-        "tags": [
-          "painters"
-        ],
-        "summary": "GET /api/painters/me/calculations",
-        "x-source": "routes/painters.js",
-        "x-auth": [
-          "requirePainterAuth"
-        ],
-        "responses": {
-          "200": {
-            "description": "OK"
-          }
-        }
-      }
-    },
-    "/api/painters/config/coverage-rates": {
-      "get": {
-        "tags": [
-          "painters"
-        ],
-        "summary": "GET /api/painters/config/coverage-rates",
-        "x-source": "routes/painters.js",
-        "x-auth": [
-          "public"
-        ],
-        "responses": {
-          "200": {
-            "description": "OK"
-          }
-        }
-      }
-    },
     "/api/painters/admin/price-reports": {
       "get": {
         "tags": [
           "painters"
         ],
         "summary": "GET /api/painters/admin/price-reports",
-        "x-source": "routes/painters.js",
+        "x-source": "routes/painters/admin.js",
         "x-auth": [
           "requireAuth",
           "requirePermission"
@@ -15948,7 +15992,7 @@
           "painters"
         ],
         "summary": "PUT /api/painters/admin/price-reports/:id",
-        "x-source": "routes/painters.js",
+        "x-source": "routes/painters/admin.js",
         "x-auth": [
           "requireAuth",
           "requirePermission"
@@ -15977,7 +16021,7 @@
           "painters"
         ],
         "summary": "GET /api/painters/admin/product-requests",
-        "x-source": "routes/painters.js",
+        "x-source": "routes/painters/admin.js",
         "x-auth": [
           "requireAuth",
           "requirePermission"
@@ -15996,7 +16040,7 @@
           "painters"
         ],
         "summary": "PUT /api/painters/admin/product-requests/:id",
-        "x-source": "routes/painters.js",
+        "x-source": "routes/painters/admin.js",
         "x-auth": [
           "requireAuth",
           "requirePermission"
@@ -16025,7 +16069,7 @@
           "painters"
         ],
         "summary": "POST /api/painters/admin/challenges",
-        "x-source": "routes/painters.js",
+        "x-source": "routes/painters/admin.js",
         "x-auth": [
           "requireAuth",
           "requirePermission"
@@ -16044,7 +16088,7 @@
           "painters"
         ],
         "summary": "PUT /api/painters/admin/challenges/:id",
-        "x-source": "routes/painters.js",
+        "x-source": "routes/painters/admin.js",
         "x-auth": [
           "requireAuth",
           "requirePermission"
@@ -16067,30 +16111,13 @@
         }
       }
     },
-    "/api/painters/me/location-report": {
-      "post": {
-        "tags": [
-          "painters"
-        ],
-        "summary": "POST /api/painters/me/location-report",
-        "x-source": "routes/painters.js",
-        "x-auth": [
-          "requirePainterAuth"
-        ],
-        "responses": {
-          "200": {
-            "description": "OK"
-          }
-        }
-      }
-    },
     "/api/painters/locations/live": {
       "get": {
         "tags": [
           "painters"
         ],
         "summary": "GET /api/painters/locations/live",
-        "x-source": "routes/painters.js",
+        "x-source": "routes/painters/admin.js",
         "x-auth": [
           "requireAuth",
           "requirePermission"
@@ -16109,7 +16136,7 @@
           "painters"
         ],
         "summary": "GET /api/painters/:id/locations/history",
-        "x-source": "routes/painters.js",
+        "x-source": "routes/painters/admin.js",
         "x-auth": [
           "requireAuth",
           "requirePermission"
@@ -16138,36 +16165,9 @@
           "painters"
         ],
         "summary": "GET /api/painters",
-        "x-source": "routes/painters.js",
+        "x-source": "routes/painters/admin.js",
         "x-auth": [
           "requireAuth"
-        ],
-        "responses": {
-          "200": {
-            "description": "OK"
-          }
-        }
-      }
-    },
-    "/api/painters/{id}/activate": {
-      "post": {
-        "tags": [
-          "painters"
-        ],
-        "summary": "POST /api/painters/:id/activate",
-        "x-source": "routes/painters.js",
-        "x-auth": [
-          "public"
-        ],
-        "parameters": [
-          {
-            "name": "id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          }
         ],
         "responses": {
           "200": {
@@ -16182,7 +16182,7 @@
           "painters"
         ],
         "summary": "GET /api/painters/:id",
-        "x-source": "routes/painters.js",
+        "x-source": "routes/painters/admin.js",
         "x-auth": [
           "requireAuth"
         ],
@@ -16207,7 +16207,7 @@
           "painters"
         ],
         "summary": "PUT /api/painters/:id",
-        "x-source": "routes/painters.js",
+        "x-source": "routes/painters/admin.js",
         "x-auth": [
           "requirePermission"
         ],
@@ -16235,7 +16235,7 @@
           "painters"
         ],
         "summary": "PUT /api/painters/:id/approve",
-        "x-source": "routes/painters.js",
+        "x-source": "routes/painters/admin.js",
         "x-auth": [
           "requirePermission"
         ],
@@ -16263,7 +16263,7 @@
           "painters"
         ],
         "summary": "PUT /api/painters/:id/credit",
-        "x-source": "routes/painters.js",
+        "x-source": "routes/painters/admin.js",
         "x-auth": [
           "requirePermission"
         ],
@@ -16291,7 +16291,7 @@
           "painters"
         ],
         "summary": "GET /api/painters/:id/points/:pool",
-        "x-source": "routes/painters.js",
+        "x-source": "routes/painters/admin.js",
         "x-auth": [
           "requireAuth"
         ],
@@ -16326,7 +16326,7 @@
           "painters"
         ],
         "summary": "POST /api/painters/:id/points/adjust",
-        "x-source": "routes/painters.js",
+        "x-source": "routes/painters/admin.js",
         "x-auth": [
           "requirePermission"
         ],
@@ -16354,7 +16354,7 @@
           "painters"
         ],
         "summary": "GET /api/painters/:id/invoices",
-        "x-source": "routes/painters.js",
+        "x-source": "routes/painters/admin.js",
         "x-auth": [
           "requireAuth"
         ],
@@ -16381,7 +16381,7 @@
           "painters"
         ],
         "summary": "POST /api/painters/:id/attendance",
-        "x-source": "routes/painters.js",
+        "x-source": "routes/painters/admin.js",
         "x-auth": [
           "requirePermission"
         ],
@@ -16409,7 +16409,7 @@
           "painters"
         ],
         "summary": "GET /api/painters/admin/visualizations",
-        "x-source": "routes/painters.js",
+        "x-source": "routes/painters/admin.js",
         "x-auth": [
           "requirePermission"
         ],
@@ -16427,7 +16427,7 @@
           "painters"
         ],
         "summary": "PUT /api/painters/admin/visualizations/:id",
-        "x-source": "routes/painters.js",
+        "x-source": "routes/painters/admin.js",
         "x-auth": [
           "requirePermission"
         ],
@@ -16455,7 +16455,7 @@
           "painters"
         ],
         "summary": "POST /api/painters/admin/visualizations/:id/upload-result",
-        "x-source": "routes/painters.js",
+        "x-source": "routes/painters/admin.js",
         "x-auth": [
           "requirePermission"
         ],
@@ -16483,7 +16483,7 @@
           "painters"
         ],
         "summary": "GET /api/painters/admin/catalog/brands",
-        "x-source": "routes/painters.js",
+        "x-source": "routes/painters/admin.js",
         "x-auth": [
           "requireAuth",
           "requirePermission"
@@ -16502,7 +16502,7 @@
           "painters"
         ],
         "summary": "PUT /api/painters/admin/catalog/brands/order",
-        "x-source": "routes/painters.js",
+        "x-source": "routes/painters/admin.js",
         "x-auth": [
           "requireAuth",
           "requirePermission"
@@ -16521,7 +16521,7 @@
           "painters"
         ],
         "summary": "GET /api/painters/admin/catalog/categories",
-        "x-source": "routes/painters.js",
+        "x-source": "routes/painters/admin.js",
         "x-auth": [
           "requireAuth",
           "requirePermission"
@@ -16540,7 +16540,7 @@
           "painters"
         ],
         "summary": "PUT /api/painters/admin/catalog/categories/order",
-        "x-source": "routes/painters.js",
+        "x-source": "routes/painters/admin.js",
         "x-auth": [
           "requireAuth",
           "requirePermission"
@@ -16559,7 +16559,7 @@
           "painters"
         ],
         "summary": "GET /api/painters/admin/catalog/products",
-        "x-source": "routes/painters.js",
+        "x-source": "routes/painters/admin.js",
         "x-auth": [
           "requireAuth",
           "requirePermission"
@@ -16578,7 +16578,7 @@
           "painters"
         ],
         "summary": "PUT /api/painters/admin/catalog/products/order",
-        "x-source": "routes/painters.js",
+        "x-source": "routes/painters/admin.js",
         "x-auth": [
           "requireAuth",
           "requirePermission"
@@ -16597,7 +16597,7 @@
           "painters"
         ],
         "summary": "GET /api/painters/admin/catalog/painters/:id/overrides",
-        "x-source": "routes/painters.js",
+        "x-source": "routes/painters/admin.js",
         "x-auth": [
           "requireAuth",
           "requirePermission"
@@ -16626,7 +16626,7 @@
           "painters"
         ],
         "summary": "PUT /api/painters/admin/catalog/painters/:id/overrides/:level",
-        "x-source": "routes/painters.js",
+        "x-source": "routes/painters/admin.js",
         "x-auth": [
           "requireAuth",
           "requirePermission"

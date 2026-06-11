@@ -1,7 +1,11 @@
 const { router, catalogZohoScopeSql } = require('../../routes/zoho');
 
 describe('dpl-catalog endpoints registered on zoho router', () => {
-    const has = (method, path) => router.stack.some(l => l.route && l.route.path === path && l.route.methods[method]);
+    // routes/zoho is now a directory of sub-routers composed via router.use()
+    // (A8b split), so walk nested router stacks too.
+    const flatRoutes = (r) => r.stack.flatMap(l =>
+        l.route ? [l.route] : (l.handle && Array.isArray(l.handle.stack) ? flatRoutes(l.handle) : []));
+    const has = (method, path) => flatRoutes(router).some(rt => rt.path === path && rt.methods[method]);
     test('POST /items/dpl-catalog/:brand/build', () => {
         expect(has('post', '/items/dpl-catalog/:brand/build')).toBe(true);
     });

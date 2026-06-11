@@ -81,6 +81,28 @@ function parseMounts(serverSrc) {
     return mounts;
 }
 
+// A8a: a mount target may be a routes/<name>/ DIRECTORY (split sub-routers).
+// Resolve it through its index.js: map `const <var> = require('./<file>')`
+// then follow the `router.use(<var>[.router])` composition order — that is
+// the Express registration order, so route precedence stays correct.
+function resolveMountFiles(file) {
+    if (fs.existsSync(path.join(ROOT, file))) return [file];
+    const dir = file.replace(/\.js$/, '');
+    const indexPath = path.join(ROOT, dir, 'index.js');
+    if (!fs.existsSync(indexPath)) return [];
+    const src = fs.readFileSync(indexPath, 'utf8');
+    const requires = {};
+    let m;
+    const reqRe = /^const\s+(\w+)\s*=\s*require\('\.\/([\w-]+)'\)/gm;
+    while ((m = reqRe.exec(src)) !== null) requires[m[1]] = m[2];
+    const files = [];
+    const useRe = /^router\.use\((\w+)(?:\.router)?\)/gm;
+    while ((m = useRe.exec(src)) !== null) {
+        if (requires[m[1]]) files.push(`${dir}/${requires[m[1]]}.js`);
+    }
+    return files;
+}
+
 function toOpenApiPath(p) {
     return p.replace(/:([A-Za-z_][\w]*)/g, '{$1}');
 }
@@ -111,16 +133,16 @@ function generate() {
     // 2. mounted route modules (in mount order — Express precedence)
     const mounts = parseMounts(serverSrc);
     for (const mount of mounts) {
-        const filePath = path.join(ROOT, mount.file);
-        if (!fs.existsSync(filePath)) continue;
-        const src = fs.readFileSync(filePath, 'utf8');
-        const { routes, unparsed } = scanRoutes(src, ['router']);
-        unparsedTotal += unparsed;
         const tag = path.basename(mount.file, '.js');
-        for (const r of routes) {
-            const fullPath = (mount.prefix === '/' ? '' : mount.prefix) + (r.path === '/' ? '' : r.path) || '/';
-            const auth = mount.extraAuth && r.auth.includes('public') ? [mount.extraAuth] : r.auth;
-            operations.push({ ...r, path: fullPath, auth, tag, source: mount.file });
+        for (const file of resolveMountFiles(mount.file)) {
+            const src = fs.readFileSync(path.join(ROOT, file), 'utf8');
+            const { routes, unparsed } = scanRoutes(src, ['router']);
+            unparsedTotal += unparsed;
+            for (const r of routes) {
+                const fullPath = (mount.prefix === '/' ? '' : mount.prefix) + (r.path === '/' ? '' : r.path) || '/';
+                const auth = mount.extraAuth && r.auth.includes('public') ? [mount.extraAuth] : r.auth;
+                operations.push({ ...r, path: fullPath, auth, tag, source: file });
+            }
         }
     }
 

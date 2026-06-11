@@ -98,18 +98,25 @@ function collectRouteMap() {
         routes.push({ method: match[1].toUpperCase(), path: match[2], file: 'server.js' });
     }
 
-    // Scan route files
+    // Scan route files. Recursive: split route modules live in
+    // routes/<name>/ subdirectories (A8 — painters/, zoho/); the mount
+    // variable matches on the DIRECTORY name for those.
     const routesDir = path.join(rootDir, 'routes');
     if (fs.existsSync(routesDir)) {
-        const files = fs.readdirSync(routesDir).filter(f => f.endsWith('.js'));
+        const files = fs.readdirSync(routesDir, { recursive: true })
+            .map(f => String(f).replace(/\\/g, '/'))
+            .filter(f => f.endsWith('.js'));
         for (const file of files) {
             try {
                 const code = fs.readFileSync(path.join(routesDir, file), 'utf-8');
                 const routeRegex = /router\.(get|post|put|delete)\(['"]([^'"]+)['"]/g;
+                // Mount lookup key: top-level file name, or the subdirectory
+                // name for split modules (routes/painters/admin.js → painters)
+                const mountBase = file.includes('/') ? file.split('/')[0] : file.replace('.js', '');
                 const varName = Object.keys(mounts).find(k => {
-                    // Match variable name to file (e.g., aiRoutes → ai.js, paintersRoutes → painters.js)
+                    // Match variable name to file (e.g., aiRoutes → ai.js, paintersRoutes → painters/)
                     const normalized = k.replace(/Routes?$/i, '').toLowerCase();
-                    const fileBase = file.replace('.js', '').replace(/-/g, '');
+                    const fileBase = mountBase.replace(/-/g, '');
                     return normalized === fileBase || k.toLowerCase().includes(fileBase);
                 });
                 const prefix = varName ? mounts[varName] : '';
