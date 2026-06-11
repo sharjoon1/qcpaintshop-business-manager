@@ -18,7 +18,9 @@ function setPool(p) { pool = p; }
 // ─── Provider configs ──────────────────────────────────────────
 
 const GEMINI_BASE = 'generativelanguage.googleapis.com';
-const GEMINI_DEFAULT_MODEL = 'gemini-2.0-flash';
+// gemini-2.0-flash was removed from the free tier (quota limit: 0 → HTTP 429);
+// 2.5-flash works on the same key and is multimodal (vision for bill scans).
+const GEMINI_DEFAULT_MODEL = 'gemini-2.5-flash';
 
 const CLAUDE_BASE = 'api.anthropic.com';
 const CLAUDE_DEFAULT_MODEL = 'claude-sonnet-4-20250514';
