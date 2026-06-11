@@ -35,20 +35,30 @@ describe('isB2B (GSTIN split)', () => {
 
 describe('invoiceNumberRange (auditor completeness check)', () => {
     it('orders by the numeric suffix, not lexically', () => {
-        expect(invoiceNumberRange(['INV-000101', 'INV-000099', 'INV-000100']))
-            .toEqual({ first: 'INV-000099', last: 'INV-000101', count: 3 });
+        const r = invoiceNumberRange(['INV-000101', 'INV-000099', 'INV-000100']);
+        expect(r.count).toBe(3);
+        expect(r.ranges).toEqual([{ prefix: 'INV-', first: 'INV-000099', last: 'INV-000101', count: 3 }]);
         // lexical would wrongly put INV-9 after INV-100
-        expect(invoiceNumberRange(['INV-9', 'INV-100']))
-            .toEqual({ first: 'INV-9', last: 'INV-100', count: 2 });
+        expect(invoiceNumberRange(['INV-9', 'INV-100']).ranges[0])
+            .toEqual({ prefix: 'INV-', first: 'INV-9', last: 'INV-100', count: 2 });
     });
 
-    it('falls back to lexical when numbers are not numeric-suffixed', () => {
-        expect(invoiceNumberRange(['B/22', 'A/11']).first).toBe('A/11');
+    it('splits MIXED series into separate ranges (legacy INV-* vs current QCIN-*), largest first', () => {
+        const r = invoiceNumberRange(['QCIN-000787', 'INV-000002', 'QCIN-001925', 'QCIN-000900']);
+        expect(r.count).toBe(4);
+        expect(r.ranges).toEqual([
+            { prefix: 'QCIN-', first: 'QCIN-000787', last: 'QCIN-001925', count: 3 },
+            { prefix: 'INV-', first: 'INV-000002', last: 'INV-000002', count: 1 },
+        ]);
+    });
+
+    it('falls back to lexical within a series when numbers are not numeric-suffixed', () => {
+        expect(invoiceNumberRange(['B/X', 'A/X']).ranges[0].first).toBe('A/X');
     });
 
     it('empty/blank-safe', () => {
-        expect(invoiceNumberRange([])).toEqual({ first: null, last: null, count: 0 });
-        expect(invoiceNumberRange([null, ' '])).toEqual({ first: null, last: null, count: 0 });
+        expect(invoiceNumberRange([])).toEqual({ count: 0, ranges: [] });
+        expect(invoiceNumberRange([null, ' '])).toEqual({ count: 0, ranges: [] });
     });
 });
 

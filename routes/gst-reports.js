@@ -45,22 +45,37 @@ function isB2B(gstin) {
 }
 
 /**
- * Auditor's invoice-number range for the month: first/last by the numeric
- * part of the invoice number (falls back to lexical when non-numeric).
+ * Auditor's invoice-number ranges for the month, PER NUMBER SERIES — the
+ * business has more than one series (legacy INV-*, current QCIN-*), and a
+ * single mixed min→max is meaningless. Within a series, first/last by the
+ * numeric suffix (lexical fallback). Largest series first.
+ * Returns { count, ranges: [{ prefix, first, last, count }] }.
  */
 function invoiceNumberRange(numbers) {
     const list = (numbers || []).filter(n => n != null && String(n).trim() !== '');
-    if (!list.length) return { first: null, last: null, count: 0 };
-    const numeric = list.map(n => {
-        const m = String(n).match(/(\d+)\s*$/);
-        return { n, key: m ? parseInt(m[1], 10) : null };
-    });
-    if (numeric.every(x => x.key != null)) {
-        numeric.sort((a, b) => a.key - b.key);
-    } else {
-        numeric.sort((a, b) => String(a.n).localeCompare(String(b.n)));
+    if (!list.length) return { count: 0, ranges: [] };
+
+    const bySeries = new Map();
+    for (const n of list) {
+        const s = String(n).trim();
+        const m = s.match(/^(.*?)(\d+)\s*$/);
+        const prefix = m ? (m[1] || '(no prefix)') : '(non-numeric)';
+        const key = m ? parseInt(m[2], 10) : null;
+        if (!bySeries.has(prefix)) bySeries.set(prefix, []);
+        bySeries.get(prefix).push({ n: s, key });
     }
-    return { first: numeric[0].n, last: numeric[numeric.length - 1].n, count: list.length };
+
+    const ranges = [];
+    for (const [prefix, entries] of bySeries) {
+        if (entries.every(e => e.key != null)) {
+            entries.sort((a, b) => a.key - b.key);
+        } else {
+            entries.sort((a, b) => a.n.localeCompare(b.n));
+        }
+        ranges.push({ prefix, first: entries[0].n, last: entries[entries.length - 1].n, count: entries.length });
+    }
+    ranges.sort((a, b) => b.count - a.count);
+    return { count: list.length, ranges };
 }
 
 /**

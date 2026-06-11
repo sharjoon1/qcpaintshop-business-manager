@@ -15,9 +15,10 @@ body { background:#f3f4f6; color:#111827; }
 .header a { color:#e0e7ff; text-decoration:none; font-size:13px; }
 .controls { display:flex; gap:10px; align-items:center; margin-left:auto; flex-wrap:wrap; }
 .controls input[type=month] { padding:7px 10px; border:none; border-radius:8px; font-size:14px; }
-.tabs { display:flex; gap:4px; background:#fff; padding:8px 16px 0; border-bottom:1px solid #e5e7eb; overflow-x:auto; }
-.tab { padding:10px 16px; border:none; background:none; cursor:pointer; font-size:14px; color:#6b7280; border-bottom:3px solid transparent; white-space:nowrap; }
-.tab.active { color:var(--primary); border-bottom-color:var(--primary); font-weight:600; }
+.tabs { display:flex; gap:8px; background:#fff; padding:10px 16px; border-bottom:1px solid #e5e7eb; overflow-x:auto; -webkit-overflow-scrolling:touch; scrollbar-width:none; }
+.tabs::-webkit-scrollbar { display:none; }
+.tab { padding:9px 16px; border:1px solid #e5e7eb; background:#f9fafb; cursor:pointer; font-size:13px; color:#374151; border-radius:99px; white-space:nowrap; flex:0 0 auto; }
+.tab.active { color:#fff; background:linear-gradient(135deg,var(--primary),var(--primary2)); border-color:transparent; font-weight:600; }
 .wrap { padding:16px; max-width:1200px; margin:0 auto; }
 .cards { display:grid; grid-template-columns:repeat(auto-fit,minmax(160px,1fr)); gap:10px; margin-bottom:14px; }
 .card { background:#fff; border-radius:10px; padding:12px 14px; box-shadow:0 1px 3px rgba(0,0,0,.08); }
@@ -25,8 +26,8 @@ body { background:#f3f4f6; color:#111827; }
 .card .val { font-size:20px; font-weight:700; margin-top:2px; }
 .banner-warn { background:#fef2f2; border:2px solid #dc2626; color:#991b1b; border-radius:10px; padding:12px 14px; font-weight:700; margin-bottom:14px; font-size:14px; }
 .banner-info { background:#eff6ff; border:1px solid #3b82f6; color:#1e40af; border-radius:10px; padding:10px 14px; margin-bottom:14px; font-size:13px; }
-.section-title { font-size:15px; font-weight:700; margin:18px 0 8px; display:flex; align-items:center; gap:10px; }
-.btn { padding:7px 14px; border:none; border-radius:8px; cursor:pointer; font-size:13px; background:var(--primary); color:#fff; }
+.section-title { font-size:15px; font-weight:700; margin:18px 0 8px; display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
+.btn { padding:8px 14px; border:none; border-radius:8px; cursor:pointer; font-size:13px; background:var(--primary); color:#fff; white-space:nowrap; flex:0 0 auto; }
 .btn.gray { background:#6b7280; }
 table { width:100%; border-collapse:collapse; background:#fff; border-radius:10px; overflow:hidden; box-shadow:0 1px 3px rgba(0,0,0,.08); font-size:13px; }
 th { background:#f9fafb; text-align:left; padding:9px 10px; color:#374151; border-bottom:1px solid #e5e7eb; white-space:nowrap; }
@@ -38,7 +39,20 @@ td.num, th.num { text-align:right; font-variant-numeric:tabular-nums; }
 .searchbox { padding:8px 12px; border:1px solid #d1d5db; border-radius:8px; width:100%; max-width:380px; font-size:14px; margin-bottom:10px; }
 .tbl-scroll { overflow-x:auto; }
 #loading { text-align:center; padding:30px; color:#6b7280; display:none; }
-@media (max-width:640px){ .header h1{font-size:16px} td,th{padding:6px 7px;font-size:12px} }
+@media (max-width:640px){
+    .header h1{font-size:16px}
+    .wrap{padding:10px}
+    .cards{grid-template-columns:repeat(2,1fr)}
+    .card .val{font-size:16px}
+    /* Tables with .m-cards become stacked cards on mobile */
+    table.m-cards, table.m-cards tbody, table.m-cards tr, table.m-cards td { display:block; width:100%; }
+    table.m-cards thead { display:none; }
+    table.m-cards tr { background:#fff; border-radius:10px; box-shadow:0 1px 3px rgba(0,0,0,.08); margin-bottom:10px; padding:10px 12px; }
+    table.m-cards td { border:none; padding:3px 0; display:flex; justify-content:space-between; gap:10px; font-size:13px; text-align:right; }
+    table.m-cards td::before { content:attr(data-l); color:#6b7280; font-weight:500; text-align:left; flex:0 0 auto; }
+    table.m-cards td:not([data-l]) { justify-content:flex-end; }
+    table.m-cards td.num { text-align:right; }
+}
 </style>
 </head>
 <body data-page="gst-reports">
@@ -138,7 +152,11 @@ function renderFiling() {
         ${d.tax_note ? `<div class="banner-info" style="background:#fffbeb;border-color:#f59e0b;color:#92400e">ⓘ ${escHtml(d.tax_note)}</div>` : ''}
         <div class="cards">
             <div class="card"><div class="lbl">Invoices</div><div class="val">${d.totals.invoice_count}</div></div>
-            <div class="card"><div class="lbl">Invoice number range</div><div class="val" style="font-size:15px">${d.invoice_range && d.invoice_range.first ? escHtml(d.invoice_range.first) + ' → ' + escHtml(d.invoice_range.last) : '—'}</div><div class="muted">${d.invoice_range ? d.invoice_range.count + ' invoices' : ''}</div></div>
+            <div class="card"><div class="lbl">Invoice number range (series-wise)</div>
+                ${d.invoice_range && d.invoice_range.ranges.length
+                    ? d.invoice_range.ranges.map(r => `<div class="val" style="font-size:14px;margin-top:3px">${escHtml(r.first)} → ${escHtml(r.last)} <span class="muted">(${r.count})</span></div>`).join('')
+                    : '<div class="val">—</div>'}
+                <div class="muted" style="margin-top:4px">Backdated invoices-ஆல் அடுத்தடுத்த மாத ranges overlap ஆகலாம் — Zoho numbering follow ஆகுது</div></div>
             <div class="card"><div class="lbl">Taxable (sub total)</div><div class="val">${fmtINR(d.totals.sub_total)}</div></div>
             <div class="card"><div class="lbl">GST (tax total)</div><div class="val">${fmtINR(d.totals.tax_total)}</div></div>
             <div class="card"><div class="lbl">Grand total</div><div class="val">${fmtINR(d.totals.total)}</div></div>
@@ -159,14 +177,14 @@ function renderFiling() {
             <div class="card" style="border-left:4px solid var(--primary)"><div class="lbl">Total value</div><div class="val">${fmtINR(t.t)}</div></div>
         </div>`; })() : ''}
         <div id="missedPanel" style="display:none"></div>
-        <div class="tbl-scroll"><table><thead><tr><th>Date</th><th>Invoice #</th><th>Customer</th><th>GSTIN</th><th class="num">Taxable</th><th class="num">GST</th><th class="num">Total</th></tr></thead><tbody>
-        ${b2bRows.map(i => `<tr><td>${escHtml(String(i.invoice_date).slice(0, 10))}</td><td>${escHtml(i.invoice_number)}</td><td>${escHtml(i.customer_name)}</td><td>${escHtml(i.gstin)}</td><td class="num">${fmtINR(i.sub_total)}</td><td class="num">${fmtINR(i.tax_total)}</td><td class="num">${fmtINR(i.total)}</td></tr>`).join('') || '<tr><td colspan="7" class="muted">No B2B invoices this month</td></tr>'}
+        <div class="tbl-scroll"><table class="m-cards"><thead><tr><th>Date</th><th>Invoice #</th><th>Customer</th><th>GSTIN</th><th class="num">Taxable</th><th class="num">GST</th><th class="num">Total</th></tr></thead><tbody>
+        ${b2bRows.map(i => `<tr><td data-l="Date">${escHtml(String(i.invoice_date).slice(0, 10))}</td><td data-l="Invoice #"><b>${escHtml(i.invoice_number)}</b></td><td data-l="Customer">${escHtml(i.customer_name)}</td><td data-l="GSTIN">${escHtml(i.gstin)}</td><td class="num" data-l="Taxable">${fmtINR(i.sub_total)}</td><td class="num" data-l="GST">${fmtINR(i.tax_total)}</td><td class="num" data-l="Total"><b>${fmtINR(i.total)}</b></td></tr>`).join('') || '<tr><td colspan="7" class="muted">No B2B invoices this month</td></tr>'}
         </tbody></table></div>
         ${d.carried && d.carried.length ? `
         <div class="section-title" style="color:#92400e">⤵ Carried forward into ${escHtml(month)} (missed in earlier months) — ${d.carried.length}</div>
-        <div class="tbl-scroll"><table><thead><tr><th>Original month</th><th>Date</th><th>Invoice #</th><th>Customer</th><th>GSTIN</th><th class="num">Taxable</th><th class="num">GST</th><th class="num">Total</th><th></th></tr></thead><tbody>
-        ${d.carried.map(i => `<tr style="background:#fffbeb"><td>${escHtml(i.original_month)}</td><td>${escHtml(String(i.invoice_date).slice(0, 10))}</td><td>${escHtml(i.invoice_number)}</td><td>${escHtml(i.customer_name)}</td><td>${escHtml(i.gstin)}</td><td class="num">${fmtINR(i.sub_total)}</td><td class="num">${fmtINR(i.tax_total)}</td><td class="num">${fmtINR(i.total)}</td><td><button class="btn gray" onclick="removeCarry('${escJS(i.zoho_invoice_id)}')">✖</button></td></tr>`).join('')}
-        <tr style="font-weight:700"><td colspan="5">Carried subtotal</td><td class="num">${fmtINR(d.carried_totals.sub_total)}</td><td class="num">${fmtINR(d.carried_totals.tax_total)}</td><td class="num">${fmtINR(d.carried_totals.total)}</td><td></td></tr>
+        <div class="tbl-scroll"><table class="m-cards"><thead><tr><th>Original month</th><th>Date</th><th>Invoice #</th><th>Customer</th><th>GSTIN</th><th class="num">Taxable</th><th class="num">GST</th><th class="num">Total</th><th></th></tr></thead><tbody>
+        ${d.carried.map(i => `<tr style="background:#fffbeb"><td data-l="Original month">${escHtml(i.original_month)}</td><td data-l="Date">${escHtml(String(i.invoice_date).slice(0, 10))}</td><td data-l="Invoice #"><b>${escHtml(i.invoice_number)}</b></td><td data-l="Customer">${escHtml(i.customer_name)}</td><td data-l="GSTIN">${escHtml(i.gstin)}</td><td class="num" data-l="Taxable">${fmtINR(i.sub_total)}</td><td class="num" data-l="GST">${fmtINR(i.tax_total)}</td><td class="num" data-l="Total"><b>${fmtINR(i.total)}</b></td><td><button class="btn gray" onclick="removeCarry('${escJS(i.zoho_invoice_id)}')">✖ Remove</button></td></tr>`).join('')}
+        <tr style="font-weight:700"><td colspan="5" data-l="">Carried subtotal</td><td class="num" data-l="Taxable">${fmtINR(d.carried_totals.sub_total)}</td><td class="num" data-l="GST">${fmtINR(d.carried_totals.tax_total)}</td><td class="num" data-l="Total">${fmtINR(d.carried_totals.total)}</td><td></td></tr>
         </tbody></table></div>
         <div class="cards">
             <div class="card" style="border:2px solid #f59e0b"><div class="lbl">Combined filing total (month + carried)</div><div class="val">${fmtINR(d.combined_totals.total)}</div><div class="muted">taxable ${fmtINR(d.combined_totals.sub_total)} + GST ${fmtINR(d.combined_totals.tax_total)} · ${d.combined_totals.invoice_count} invoices</div></div>
@@ -247,8 +265,8 @@ async function renderMissed(search) {
     const month = document.getElementById('month').value;
     const d = await api('/api/gst-reports/missed-b2b?month=' + month + '&search=' + encodeURIComponent(search));
     document.getElementById('missedList').innerHTML = d.candidates.length ? `
-        <div class="tbl-scroll"><table><thead><tr><th>Date</th><th>Invoice #</th><th>Customer</th><th>GSTIN</th><th class="num">Total</th><th></th></tr></thead><tbody>
-        ${d.candidates.map(c => `<tr><td>${escHtml(String(c.invoice_date).slice(0, 10))}</td><td>${escHtml(c.invoice_number)}</td><td>${escHtml(c.customer_name)}</td><td>${escHtml(c.gstin)}</td><td class="num">${fmtINR(c.total)}</td>
+        <div class="tbl-scroll"><table class="m-cards"><thead><tr><th>Date</th><th>Invoice #</th><th>Customer</th><th>GSTIN</th><th class="num">Total</th><th></th></tr></thead><tbody>
+        ${d.candidates.map(c => `<tr><td data-l="Date">${escHtml(String(c.invoice_date).slice(0, 10))}</td><td data-l="Invoice #"><b>${escHtml(c.invoice_number)}</b></td><td data-l="Customer">${escHtml(c.customer_name)}</td><td data-l="GSTIN">${escHtml(c.gstin)}</td><td class="num" data-l="Total">${fmtINR(c.total)}</td>
             <td><button class="btn" onclick="addCarry('${escJS(c.zoho_invoice_id)}')">Include in ${escHtml(month)}</button></td></tr>`).join('')}
         </tbody></table></div>` : '<div class="muted">Match இல்லை (carry ஆனவை இங்கு வராது)</div>';
 }
@@ -347,8 +365,8 @@ async function loadCommission(month) {
         <div class="cards"><div class="card"><div class="lbl">Total commission paid (${escHtml(month)})</div><div class="val">${fmtINR(d.total)}</div></div>
         <div class="card"><div class="lbl">Payouts</div><div class="val">${d.withdrawals.length}</div></div></div>
         <div class="section-title">Payouts <button class="btn" onclick="exportCommission()">⬇ CSV</button></div>
-        <div class="tbl-scroll"><table><thead><tr><th>Date</th><th>Painter</th><th>Phone</th><th>Pool</th><th class="num">Amount</th><th>Status</th><th>Payment ref</th></tr></thead><tbody>
-        ${d.withdrawals.map(w => `<tr><td>${escHtml(String(w.processed_at).slice(0, 10))}</td><td>${escHtml(w.full_name)}</td><td>${escHtml(w.phone)}</td><td>${escHtml(w.point_pool)}</td><td class="num">${fmtINR(w.amount)}</td><td>${escHtml(w.status)}</td><td>${escHtml(w.payment_reference || '')}</td></tr>`).join('') || '<tr><td colspan="7" class="muted">No payouts this month</td></tr>'}
+        <div class="tbl-scroll"><table class="m-cards"><thead><tr><th>Date</th><th>Painter</th><th>Phone</th><th>Pool</th><th class="num">Amount</th><th>Status</th><th>Payment ref</th></tr></thead><tbody>
+        ${d.withdrawals.map(w => `<tr><td data-l="Date">${escHtml(String(w.processed_at).slice(0, 10))}</td><td data-l="Painter"><b>${escHtml(w.full_name)}</b></td><td data-l="Phone">${escHtml(w.phone)}</td><td data-l="Pool">${escHtml(w.point_pool)}</td><td class="num" data-l="Amount"><b>${fmtINR(w.amount)}</b></td><td data-l="Status">${escHtml(w.status)}</td><td data-l="Payment ref">${escHtml(w.payment_reference || '')}</td></tr>`).join('') || '<tr><td colspan="7" class="muted">No payouts this month</td></tr>'}
         </tbody></table></div>`;
 }
 
