@@ -777,6 +777,50 @@ router.get('/purchase-orders',
     }
 );
 
+// Get purchase order detail (with items + linked bill).
+// The UI used to "fetch the list with limit=999 and find the row" — the Zod
+// limit cap (100) silently 400'd that, so View/Edit PO never worked, and PO
+// items were never shown or preserved on edit. This endpoint fixes both.
+router.get('/purchase-orders/:id',
+    viewPerm,
+    validateParams(idParamSchema),
+    async (req, res) => {
+        try {
+            const { id } = req.params;
+
+            const [pos] = await pool.query(
+                `SELECT po.*, v.vendor_name, u.full_name AS created_by_name,
+                    CASE WHEN po.zoho_po_id IS NULL THEN NULL ELSE 'pushed' END AS zoho_status
+                 FROM vendor_purchase_orders po
+                 JOIN vendors v ON po.vendor_id = v.id
+                 LEFT JOIN users u ON po.created_by = u.id
+                 WHERE po.id = ?`,
+                [id]
+            );
+            if (!pos.length) {
+                return res.status(404).json({ success: false, message: 'Purchase order not found' });
+            }
+
+            const [items] = await pool.query(
+                'SELECT * FROM vendor_po_items WHERE po_id = ? ORDER BY id',
+                [id]
+            );
+
+            // Converted-bill linkage (vendor_bills.po_id) so the UI can jump
+            // straight to the bill created from this PO.
+            const [bills] = await pool.query(
+                'SELECT id, bill_number, ai_verification_status, zoho_status FROM vendor_bills WHERE po_id = ? LIMIT 1',
+                [id]
+            );
+
+            res.json({ success: true, purchase_order: pos[0], items, bill: bills[0] || null });
+        } catch (error) {
+            console.error('Get PO detail error:', error);
+            res.status(500).json({ success: false, message: 'Failed to get purchase order details' });
+        }
+    }
+);
+
 // Create purchase order
 router.post('/purchase-orders',
     poPerm,
@@ -1154,6 +1198,52 @@ router.post('/payments',
 );
 
 // ═══════════════════════════════════════════
+// ALL VENDORS (lightweight, for dropdowns)
+// ═══════════════════════════════════════════
+// The paginated list caps limit at 100 (Zod refine) — the dropdowns used to
+// request limit=999, get a silent 400, and stay EMPTY (the "can't choose a
+// vendor" bug). Dropdowns use this uncapped id+name list instead.
+router.get('/all',
+    viewPerm,
+    async (req, res) => {
+        try {
+            const [rows] = await pool.query(
+                `SELECT id, vendor_name, gst_number FROM vendors WHERE status = 'active' ORDER BY vendor_name`
+            );
+            res.json({ success: true, vendors: rows });
+        } catch (error) {
+            console.error('List all vendors error:', error);
+            res.status(500).json({ success: false, message: 'Failed to list vendors' });
+        }
+    }
+);
+
+// ═══════════════════════════════════════════
+// STATS (header cards)
+// ═══════════════════════════════════════════
+// The page used to derive "Outstanding" by fetching the vendor list with
+// limit=999 — silently 400'd by the limit cap, so the stat always showed ₹0.
+// One aggregate query replaces the four list fetches.
+router.get('/stats',
+    viewPerm,
+    async (req, res) => {
+        try {
+            const [rows] = await pool.query(
+                `SELECT
+                    (SELECT COUNT(*) FROM vendors) AS total_vendors,
+                    (SELECT COUNT(*) FROM vendor_bills WHERE payment_status != 'paid') AS open_bills,
+                    (SELECT COALESCE(SUM(balance_due), 0) FROM vendor_bills WHERE payment_status != 'paid') AS outstanding,
+                    (SELECT COUNT(*) FROM vendor_purchase_orders) AS purchase_orders`
+            );
+            res.json({ success: true, stats: rows[0] });
+        } catch (error) {
+            console.error('Vendor stats error:', error);
+            res.status(500).json({ success: false, message: 'Failed to load vendor stats' });
+        }
+    }
+);
+
+// ═══════════════════════════════════════════
 // GET VENDOR BY ID (must be LAST — /:id catches all)
 // ═══════════════════════════════════════════
 router.get('/:id',
@@ -1184,4 +1274,4 @@ router.get('/:id',
 
 // Zod schemas exported for unit testing only (tests/unit/vendors.test.js) —
 // routes still use them directly via validate().
-module.exports = { router, setPool, createVendorSchema, createBillSchema, recordPaymentSchema };
+module.exports = { router, setPool, createVendorSchema, createBillSchema, recordPaymentSchema, listQuerySchema };

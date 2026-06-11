@@ -18704,6 +18704,31 @@
       }
     },
     "/api/vendors/purchase-orders/{id}": {
+      "get": {
+        "tags": [
+          "vendors"
+        ],
+        "summary": "GET /api/vendors/purchase-orders/:id",
+        "x-source": "routes/vendors.js",
+        "x-auth": [
+          "public"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      },
       "put": {
         "tags": [
           "vendors"
@@ -18832,6 +18857,40 @@
           "vendors"
         ],
         "summary": "POST /api/vendors/payments",
+        "x-source": "routes/vendors.js",
+        "x-auth": [
+          "public"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/vendors/all": {
+      "get": {
+        "tags": [
+          "vendors"
+        ],
+        "summary": "GET /api/vendors/all",
+        "x-source": "routes/vendors.js",
+        "x-auth": [
+          "public"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/vendors/stats": {
+      "get": {
+        "tags": [
+          "vendors"
+        ],
+        "summary": "GET /api/vendors/stats",
         "x-source": "routes/vendors.js",
         "x-auth": [
           "public"
@@ -21886,7 +21945,7 @@
     }
   },
   "x-stats": {
-    "operations": 1038,
+    "operations": 1041,
     "shadowedDuplicates": 0,
     "unparsedDynamicPaths": 0,
     "modules": 50

@@ -12,7 +12,7 @@
 // margin). A vendor bill's printed line price IS the cost, so the AI's
 // ai.rate compares against unit_price on DB rows (staff.rate kept for
 // AI-shaped callers).
-const { createVendorSchema, createBillSchema, recordPaymentSchema } = require('../../routes/vendors');
+const { createVendorSchema, createBillSchema, recordPaymentSchema, listQuerySchema } = require('../../routes/vendors');
 const { verifyBillItems, matchProductsToZoho, setPool } = require('../../services/vendor-bill-ai-service');
 
 describe('Vendor System', () => {
@@ -58,6 +58,36 @@ describe('Vendor System', () => {
         it('should reject empty items', () => {
             const result = createBillSchema.safeParse({ vendor_id: 1, items: [] });
             expect(result.success).toBe(false);
+        });
+    });
+
+    describe('List Query Schema (limit cap)', () => {
+        // This cap silently 400'd every limit=999 fetch the page used to make
+        // (vendor dropdowns, View/Edit PO, the Outstanding stat). The UI now
+        // uses /all, /stats and /purchase-orders/:id instead — these tests
+        // lock the cap so any future "fetch the whole list" call fails loudly
+        // in review, not silently in prod.
+        it('rejects limit above 100', () => {
+            const result = listQuerySchema.safeParse({ limit: '999' });
+            expect(result.success).toBe(false);
+        });
+
+        it('accepts limit of exactly 100', () => {
+            const result = listQuerySchema.safeParse({ limit: '100' });
+            expect(result.success).toBe(true);
+            expect(result.data.limit).toBe(100);
+        });
+
+        it('defaults page=1 limit=20 and coerces string params', () => {
+            const result = listQuerySchema.safeParse({});
+            expect(result.success).toBe(true);
+            expect(result.data.page).toBe(1);
+            expect(result.data.limit).toBe(20);
+
+            const coerced = listQuerySchema.safeParse({ page: '3', limit: '50' });
+            expect(coerced.success).toBe(true);
+            expect(coerced.data.page).toBe(3);
+            expect(coerced.data.limit).toBe(50);
         });
     });
 

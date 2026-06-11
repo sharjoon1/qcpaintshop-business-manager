@@ -54,14 +54,16 @@ async function resolveZohoContact(customerType, { customerId, painterId, custome
         return contactId;
     }
 
-    // Customer lookup
+    // Customer lookup (column is zoho_contact_id — the old zoho_customer_id
+    // name doesn't exist in zoho_customers_map, so every customer-type push
+    // died on an Unknown-column SQL error before this fix)
     if (customerType === 'customer' && customerId) {
         const [rows] = await pool.query(
-            'SELECT zoho_customer_id FROM zoho_customers_map WHERE id = ?',
+            'SELECT zoho_contact_id FROM zoho_customers_map WHERE id = ?',
             [customerId]
         );
-        if (rows.length && rows[0].zoho_customer_id) {
-            return rows[0].zoho_customer_id;
+        if (rows.length && rows[0].zoho_contact_id) {
+            return rows[0].zoho_contact_id;
         }
     }
 

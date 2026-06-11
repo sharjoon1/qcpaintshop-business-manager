@@ -10,8 +10,12 @@
     <title>Vendors - QC Paint Shop</title>
     <link rel="stylesheet" href="/css/tailwind.css?v=849f1b5c">
     <link rel="stylesheet" href="/css/design-system.css?v=876c7d73">
+    <link rel="stylesheet" href="/css/qc-ui.css?v=71531a2f">
+    <link rel="stylesheet" href="/css/skeletons.css?v=597844f4">
     <script src="/universal-nav-loader.js?v=fb16cb40"></script>
     <script src="/js/auth-helper.js?v=7101c516"></script>
+    <script src="/js/qc-ui.js?v=c3b85ff6"></script>
+    <script src="/js/ui-skeletons.js?v=791a52e1"></script>
     <script>checkAuthOrRedirect();</script>
     <style>
         /* Tab styles */
@@ -31,21 +35,41 @@
         .status-pending { background: #fef3c7; color: #92400e; }
         .status-pushed { background: #d1fae5; color: #065f46; }
         .status-verified { background: #d1fae5; color: #065f46; }
+        .status-corrected { background: #dbeafe; color: #1d4ed8; }
         .status-mismatch { background: #fef3c7; color: #92400e; }
+        .status-failed { background: #fee2e2; color: #991b1b; }
+        .status-active { background: #d1fae5; color: #065f46; }
+        .status-inactive { background: #f3f4f6; color: #374151; }
 
-        /* Modal */
+        /* Filter pills */
+        .pill-row { display: flex; gap: 8px; overflow-x: auto; padding-bottom: 2px; }
+        .filter-pill { flex: 0 0 auto; padding: 7px 14px; border-radius: 9999px; font-size: 0.8rem; font-weight: 600; border: 1px solid #d1d5db; background: #fff; color: #4b5563; white-space: nowrap; cursor: pointer; transition: all .15s; }
+        .filter-pill:hover { border-color: #1B5E3B; color: #1B5E3B; }
+        .filter-pill.active { background: #1B5E3B; border-color: #1B5E3B; color: #fff; }
+
+        /* Bill flow stepper (1 Convert → 2 Photo → 3 AI Verify → 4 Submit → 5 Push) */
+        .flow-steps { display: flex; align-items: center; gap: 4px; overflow-x: auto; margin-bottom: 1rem; padding-bottom: 2px; }
+        .flow-step { flex: 0 0 auto; display: inline-flex; align-items: center; gap: 5px; font-size: 0.7rem; font-weight: 600; color: #9ca3af; padding: 4px 9px; border-radius: 9999px; background: #f3f4f6; border: 1px solid transparent; white-space: nowrap; }
+        .flow-step .n { width: 16px; height: 16px; border-radius: 50%; background: #d1d5db; color: #fff; display: inline-flex; align-items: center; justify-content: center; font-size: 0.6rem; flex: 0 0 auto; }
+        .flow-step.done { background: #d1fae5; color: #065f46; }
+        .flow-step.done .n { background: #059669; }
+        .flow-step.current { background: #FBF3E2; color: #8A6116; border-color: #D4A24E; }
+        .flow-step.current .n { background: #D4A24E; }
+        .flow-arrow { color: #d1d5db; flex: 0 0 auto; font-size: 0.7rem; }
+
+        /* Modal — centered card on desktop, bottom sheet on mobile */
         .modal-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 1000; overflow-y: auto; padding: 1rem; }
         .modal-overlay.active { display: flex; align-items: flex-start; justify-content: center; }
-
-        /* Skeleton */
-        .skeleton { background: linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%); background-size: 200% 100%; animation: shimmer 1.5s infinite; border-radius: 8px; }
-        @keyframes shimmer { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }
-
-        /* Toast */
-        .toast { position: fixed; bottom: 1.5rem; left: 50%; transform: translateX(-50%); padding: 0.75rem 1.5rem; border-radius: 0.5rem; color: #fff; font-weight: 500; z-index: 2000; animation: toastIn 0.3s ease; }
-        .toast-success { background: #059669; }
-        .toast-error { background: #dc2626; }
-        @keyframes toastIn { from { opacity: 0; transform: translateX(-50%) translateY(20px); } to { opacity: 1; transform: translateX(-50%) translateY(0); } }
+        @media (max-width: 639px) {
+            .modal-overlay { padding: 0; }
+            .modal-overlay.active { align-items: flex-end; }
+            .modal-overlay > div { margin: 0 !important; max-width: 100% !important; border-radius: 20px 20px 0 0; animation: sheetUp .28s ease; }
+            .modal-overlay > div > .modal-grab { display: block; }
+            .modal-footer .btn-green, .modal-footer .btn-green-outline { flex: 1 1 auto; min-height: 44px; }
+            .btn-green, .btn-green-outline { min-height: 44px; }
+        }
+        .modal-grab { display: none; width: 36px; height: 4px; background: #e5e7eb; border-radius: 2px; margin: 8px auto 0; }
+        @keyframes sheetUp { from { transform: translateY(100%); } to { transform: translateY(0); } }
 
         /* Suggestion dropdown */
         .suggestion-list { position: absolute; top: 100%; left: 0; right: 0; background: #fff; border: 1px solid #d1d5db; border-radius: 0.5rem; max-height: 200px; overflow-y: auto; z-index: 50; box-shadow: 0 4px 12px rgba(0,0,0,0.1); }
@@ -62,8 +86,8 @@
         .scroll-hide::-webkit-scrollbar { display: none; }
         .scroll-hide { -ms-overflow-style: none; scrollbar-width: none; }
 
-        /* AI badge */
-        .ai-badge { background: #ede9fe; color: #6d28d9; font-size: 0.65rem; padding: 1px 6px; border-radius: 9999px; font-weight: 600; }
+        /* AI badge — gold accent (house style: no purple on staff pages) */
+        .ai-badge { background: #FBF3E2; color: #8A6116; border: 1px solid #EAD9B0; font-size: 0.65rem; padding: 1px 6px; border-radius: 9999px; font-weight: 600; }
     </style>
 </head>
 <body class="bg-gray-50 min-h-screen" data-page="vendors">
@@ -138,10 +162,15 @@
                     New Vendor
                 </button>
             </div>
-            <div id="vendorList" class="space-y-3">
-                <div class="skeleton h-20 w-full"></div>
-                <div class="skeleton h-20 w-full"></div>
-                <div class="skeleton h-20 w-full"></div>
+            <div class="pill-row mb-4" id="vendorStatusPills">
+                <button class="filter-pill active" onclick="setListFilter('vendor', '', this)">All</button>
+                <button class="filter-pill" onclick="setListFilter('vendor', 'active', this)">Active</button>
+                <button class="filter-pill" onclick="setListFilter('vendor', 'inactive', this)">Inactive</button>
+            </div>
+            <div id="vendorList" class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <span class="qc-skel qc-skel-card"></span>
+                <span class="qc-skel qc-skel-card"></span>
+                <span class="qc-skel qc-skel-card"></span>
             </div>
             <div id="vendorPagination" class="flex justify-center gap-2 mt-4"></div>
         </div>
@@ -160,10 +189,16 @@
                     New Bill
                 </button>
             </div>
+            <div class="pill-row mb-4" id="billStatusPills">
+                <button class="filter-pill active" onclick="setListFilter('bill', '', this)">All</button>
+                <button class="filter-pill" onclick="setListFilter('bill', 'unpaid', this)">Unpaid</button>
+                <button class="filter-pill" onclick="setListFilter('bill', 'partial', this)">Partial</button>
+                <button class="filter-pill" onclick="setListFilter('bill', 'paid', this)">Paid</button>
+            </div>
             <div id="billList" class="space-y-3">
-                <div class="skeleton h-20 w-full"></div>
-                <div class="skeleton h-20 w-full"></div>
-                <div class="skeleton h-20 w-full"></div>
+                <span class="qc-skel qc-skel-card"></span>
+                <span class="qc-skel qc-skel-card"></span>
+                <span class="qc-skel qc-skel-card"></span>
             </div>
             <div id="billPagination" class="flex justify-center gap-2 mt-4"></div>
         </div>
@@ -179,10 +214,25 @@
                     New PO
                 </button>
             </div>
+            <div class="pill-row mb-4" id="poStatusPills">
+                <button class="filter-pill active" onclick="setListFilter('po', '', this)">All</button>
+                <button class="filter-pill" onclick="setListFilter('po', 'draft', this)">Draft</button>
+                <button class="filter-pill" onclick="setListFilter('po', 'sent', this)">Sent</button>
+                <button class="filter-pill" onclick="setListFilter('po', 'received', this)">Received</button>
+                <button class="filter-pill" onclick="setListFilter('po', 'cancelled', this)">Cancelled</button>
+            </div>
+            <div class="mb-3 px-3 py-2 bg-green-50 border border-green-100 rounded-lg text-xs text-green-900 flex items-center gap-1 overflow-x-auto scroll-hide whitespace-nowrap">
+                <span class="font-semibold">Flow:</span>
+                <span>1 Convert to Bill</span><span class="text-green-400">→</span>
+                <span>2 Upload photo</span><span class="text-green-400">→</span>
+                <span>3 AI Verify</span><span class="text-green-400">→</span>
+                <span>4 Submit</span><span class="text-green-400">→</span>
+                <span>5 Push to Zoho</span>
+            </div>
             <div id="poList" class="space-y-3">
-                <div class="skeleton h-20 w-full"></div>
-                <div class="skeleton h-20 w-full"></div>
-                <div class="skeleton h-20 w-full"></div>
+                <span class="qc-skel qc-skel-card"></span>
+                <span class="qc-skel qc-skel-card"></span>
+                <span class="qc-skel qc-skel-card"></span>
             </div>
             <div id="poPagination" class="flex justify-center gap-2 mt-4"></div>
         </div>
@@ -190,16 +240,20 @@
         <!-- ==================== PAYMENTS TAB ==================== -->
         <div id="panelPayments" class="hidden">
             <div class="flex flex-col sm:flex-row gap-3 mb-4">
-                <div class="flex-1"></div>
+                <div class="flex-1">
+                    <select id="paymentVendorFilter" onchange="loadPayments(1)" class="qc-input w-full sm:w-auto">
+                        <option value="">All Vendors</option>
+                    </select>
+                </div>
                 <button onclick="openPaymentModal()" class="btn-green px-4 py-2 rounded-lg text-sm font-medium flex items-center gap-1 justify-center">
                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
                     Record Payment
                 </button>
             </div>
             <div id="paymentList" class="space-y-3">
-                <div class="skeleton h-16 w-full"></div>
-                <div class="skeleton h-16 w-full"></div>
-                <div class="skeleton h-16 w-full"></div>
+                <span class="qc-skel qc-skel-card"></span>
+                <span class="qc-skel qc-skel-card"></span>
+                <span class="qc-skel qc-skel-card"></span>
             </div>
             <div id="paymentPagination" class="flex justify-center gap-2 mt-4"></div>
         </div>
@@ -208,6 +262,7 @@
     <!-- ==================== VENDOR DETAIL MODAL ==================== -->
     <div id="vendorDetailModal" class="modal-overlay" onclick="if(event.target===this)closeModal('vendorDetailModal')">
         <div class="bg-white rounded-2xl shadow-xl w-full max-w-2xl mt-8 mb-8 overflow-hidden">
+            <div class="modal-grab"></div>
             <div class="flex items-center justify-between px-5 py-4 border-b">
                 <h3 id="vendorDetailTitle" class="text-lg font-bold text-gray-800">Vendor Details</h3>
                 <button onclick="closeModal('vendorDetailModal')" class="p-1 hover:bg-gray-100 rounded-full">
@@ -215,13 +270,14 @@
                 </button>
             </div>
             <div id="vendorDetailBody" class="p-5 max-h-[70vh] overflow-y-auto"></div>
-            <div id="vendorDetailActions" class="px-5 py-3 border-t bg-gray-50 flex flex-wrap gap-2"></div>
+            <div id="vendorDetailActions" class="modal-footer px-5 py-3 border-t bg-gray-50 flex flex-wrap gap-2"></div>
         </div>
     </div>
 
     <!-- ==================== VENDOR CREATE/EDIT MODAL ==================== -->
     <div id="vendorFormModal" class="modal-overlay" onclick="if(event.target===this)closeModal('vendorFormModal')">
         <div class="bg-white rounded-2xl shadow-xl w-full max-w-lg mt-8 mb-8 overflow-hidden">
+            <div class="modal-grab"></div>
             <div class="flex items-center justify-between px-5 py-4 border-b">
                 <h3 id="vendorFormTitle" class="text-lg font-bold text-gray-800">New Vendor</h3>
                 <button onclick="closeModal('vendorFormModal')" class="p-1 hover:bg-gray-100 rounded-full">
@@ -275,6 +331,7 @@
     <!-- ==================== BILL DETAIL MODAL ==================== -->
     <div id="billDetailModal" class="modal-overlay" onclick="if(event.target===this)closeModal('billDetailModal')">
         <div class="bg-white rounded-2xl shadow-xl w-full max-w-2xl mt-8 mb-8 overflow-hidden">
+            <div class="modal-grab"></div>
             <div class="flex items-center justify-between px-5 py-4 border-b">
                 <h3 id="billDetailTitle" class="text-lg font-bold text-gray-800">Bill Details</h3>
                 <button onclick="closeModal('billDetailModal')" class="p-1 hover:bg-gray-100 rounded-full">
@@ -282,13 +339,14 @@
                 </button>
             </div>
             <div id="billDetailBody" class="p-5 max-h-[70vh] overflow-y-auto"></div>
-            <div id="billDetailActions" class="px-5 py-3 border-t bg-gray-50 flex flex-wrap gap-2"></div>
+            <div id="billDetailActions" class="modal-footer px-5 py-3 border-t bg-gray-50 flex flex-wrap gap-2"></div>
         </div>
     </div>
 
     <!-- ==================== BILL CREATE MODAL ==================== -->
     <div id="billFormModal" class="modal-overlay" onclick="if(event.target===this)closeModal('billFormModal')">
         <div class="bg-white rounded-2xl shadow-xl w-full max-w-2xl mt-8 mb-8 overflow-hidden">
+            <div class="modal-grab"></div>
             <div class="flex items-center justify-between px-5 py-4 border-b">
                 <h3 class="text-lg font-bold text-gray-800">New Bill</h3>
                 <button onclick="closeModal('billFormModal')" class="p-1 hover:bg-gray-100 rounded-full">
@@ -389,10 +447,10 @@
                     <textarea id="bfNotes" class="qc-input w-full" rows="2" placeholder="Optional notes..."></textarea>
                 </div>
             </form>
-            <div class="px-5 py-3 border-t bg-gray-50 flex flex-wrap gap-2 justify-end">
+            <div class="modal-footer px-5 py-3 border-t bg-gray-50 flex flex-wrap gap-2 justify-end">
                 <button type="button" onclick="closeModal('billFormModal')" class="px-4 py-2 rounded-lg text-sm text-gray-600 hover:bg-gray-100">Cancel</button>
-                <button type="button" onclick="verifyBill()" id="btnVerifyBill" class="btn-green-outline px-4 py-2 rounded-lg text-sm font-medium hidden">Verify</button>
-                <button type="button" onclick="submitBill()" class="btn-green px-4 py-2 rounded-lg text-sm font-medium">Submit Bill</button>
+                <button type="button" onclick="verifyBill()" id="btnVerifyBill" class="btn-green-outline px-4 py-2 rounded-lg text-sm font-medium hidden">AI Verify</button>
+                <button type="button" onclick="submitBill()" class="btn-green px-4 py-2 rounded-lg text-sm font-medium">Save Bill</button>
             </div>
         </div>
     </div>
@@ -400,6 +458,7 @@
     <!-- ==================== PO CREATE/EDIT MODAL ==================== -->
     <div id="poFormModal" class="modal-overlay" onclick="if(event.target===this)closeModal('poFormModal')">
         <div class="bg-white rounded-2xl shadow-xl w-full max-w-2xl mt-8 mb-8 overflow-hidden">
+            <div class="modal-grab"></div>
             <div class="flex items-center justify-between px-5 py-4 border-b">
                 <h3 id="poFormTitle" class="text-lg font-bold text-gray-800">New Purchase Order</h3>
                 <button onclick="closeModal('poFormModal')" class="p-1 hover:bg-gray-100 rounded-full">
@@ -473,7 +532,7 @@
                     <textarea id="pfNotes" class="qc-input w-full" rows="2" placeholder="Optional notes..."></textarea>
                 </div>
             </form>
-            <div class="px-5 py-3 border-t bg-gray-50 flex flex-wrap gap-2 justify-end">
+            <div class="modal-footer px-5 py-3 border-t bg-gray-50 flex flex-wrap gap-2 justify-end">
                 <button type="button" onclick="closeModal('poFormModal')" class="px-4 py-2 rounded-lg text-sm text-gray-600 hover:bg-gray-100">Cancel</button>
                 <button type="button" onclick="submitPo()" class="btn-green px-4 py-2 rounded-lg text-sm font-medium">Save PO</button>
             </div>
@@ -483,6 +542,7 @@
     <!-- ==================== PAYMENT MODAL ==================== -->
     <div id="paymentFormModal" class="modal-overlay" onclick="if(event.target===this)closeModal('paymentFormModal')">
         <div class="bg-white rounded-2xl shadow-xl w-full max-w-md mt-16 overflow-hidden">
+            <div class="modal-grab"></div>
             <div class="flex items-center justify-between px-5 py-4 border-b">
                 <h3 class="text-lg font-bold text-gray-800">Record Payment</h3>
                 <button onclick="closeModal('paymentFormModal')" class="p-1 hover:bg-gray-100 rounded-full">
@@ -549,10 +609,43 @@ let createdBillId = null; // used for verify flow
 let billImagePath = null;
 let aiExtractedData = null;
 
+// Status pill filters (vendor.status / bill.payment_status / po.status)
+const listFilters = { vendor: '', bill: '', po: '' };
+
 let vendorSearchTimer = null;
 let billSearchTimer = null;
 let poSearchTimer = null;
 let poProductSearchTimer = null;
+
+// Build a readable message out of any API response. Zod validation failures
+// come back as { error: { message, details: [{field, message}] } } with NO
+// top-level message — before this helper those errors surfaced as a generic
+// "Failed to ..." toast and looked like silent breakage (the dropdown bug).
+function apiMessage(data, fallback = 'Request failed') {
+    if (data && data.message) return data.message;
+    const err = data && data.error;
+    if (err) {
+        const details = Array.isArray(err.details) && err.details.length
+            ? ': ' + err.details.map(d => `${d.field} — ${d.message}`).join(', ')
+            : '';
+        return (err.message || fallback) + details;
+    }
+    return fallback;
+}
+
+function idemKey() {
+    return (window.crypto && crypto.randomUUID) ? crypto.randomUUID() : (Date.now() + '-' + Math.random());
+}
+
+function setListFilter(kind, value, btn) {
+    listFilters[kind] = value;
+    if (btn && btn.parentElement) {
+        btn.parentElement.querySelectorAll('.filter-pill').forEach(p => p.classList.toggle('active', p === btn));
+    }
+    if (kind === 'vendor') loadVendors(1);
+    else if (kind === 'bill') loadBills(1);
+    else if (kind === 'po') loadPurchaseOrders(1);
+}
 
 // =============================================
 // INIT
@@ -573,10 +666,8 @@ document.addEventListener('DOMContentLoaded', () => {
     const poParam = urlParams.get('po');
     if (tabParam === 'purchase-orders') {
         switchTab('purchaseOrders');
-        if (poParam) {
-            // Auto-open PO detail after data loads
-            setTimeout(() => { viewPo(parseInt(poParam)); }, 1200);
-        }
+        // PO detail has its own endpoint now — no need to wait for the list
+        if (poParam) viewPo(parseInt(poParam));
     }
 });
 
@@ -604,40 +695,20 @@ function switchTab(tab) {
 // =============================================
 async function loadStats() {
     try {
-        // Load vendor count
-        const vRes = await fetch(`${API}?page=1&limit=1`, { headers });
-        const vData = await vRes.json();
-        if (vData.success) {
-            document.getElementById('statTotalVendors').textContent = vData.pagination?.total || 0;
-        }
-
-        // Load open bills
-        const bRes = await fetch(`${API}/bills?page=1&limit=1&payment_status=unpaid`, { headers });
-        const bData = await bRes.json();
-        if (bData.success) {
-            document.getElementById('statOpenBills').textContent = bData.pagination?.total || 0;
-        }
-
-        // Load outstanding from vendor list
-        if (vData.success && vData.vendors) {
-            let totalOutstanding = 0;
-            // Fetch all vendors to sum outstanding
-            const allRes = await fetch(`${API}?page=1&limit=999`, { headers });
-            const allData = await allRes.json();
-            if (allData.success) {
-                totalOutstanding = allData.vendors.reduce((sum, v) => sum + (parseFloat(v.outstanding) || 0), 0);
-            }
-            document.getElementById('statOutstanding').textContent = formatCurrency(totalOutstanding);
-        }
-
-        // Load PO count
-        const poRes = await fetch(`${API}/purchase-orders?page=1&limit=1`, { headers });
-        const poData = await poRes.json();
-        if (poData.success) {
-            document.getElementById('statPurchaseOrders').textContent = poData.pagination?.total || 0;
-        }
+        // Single aggregate endpoint. The old version derived "Outstanding" by
+        // fetching the vendor list with limit=999 — silently 400'd by the Zod
+        // limit cap, so the card always showed ₹0.
+        const res = await fetch(`${API}/stats`, { headers });
+        const data = await res.json();
+        if (!data.success) throw new Error(apiMessage(data, 'Failed to load stats'));
+        const s = data.stats || {};
+        document.getElementById('statTotalVendors').textContent = s.total_vendors || 0;
+        document.getElementById('statOpenBills').textContent = s.open_bills || 0;
+        document.getElementById('statOutstanding').textContent = formatCurrency(s.outstanding);
+        document.getElementById('statPurchaseOrders').textContent = s.purchase_orders || 0;
     } catch (e) {
         console.error('Stats error:', e);
+        showToast(e.message || 'Failed to load stats', 'error');
     }
 }
 
@@ -646,14 +717,17 @@ async function loadStats() {
 // =============================================
 async function loadAllVendorsForDropdowns() {
     try {
-        const res = await fetch(`${API}?page=1&limit=999`, { headers });
+        // /all is the uncapped id+name list — the old ?limit=999 call was
+        // silently rejected by validation (limit max 100) leaving every
+        // vendor dropdown empty.
+        const res = await fetch(`${API}/all`, { headers });
         const data = await res.json();
-        if (data.success) {
-            allVendors = data.vendors || [];
-            populateVendorDropdowns();
-        }
+        if (!data.success) throw new Error(data.message || 'Failed to load vendors');
+        allVendors = data.vendors || [];
+        populateVendorDropdowns();
     } catch (e) {
         console.error('Load vendors for dropdown error:', e);
+        showToast('Vendor list load ஆகவில்லை — page-ஐ refresh செய்யவும்', 'error');
     }
 }
 
@@ -661,6 +735,8 @@ function populateVendorDropdowns() {
     const opts = allVendors.map(v => `<option value="${v.id}">${esc(v.vendor_name)}</option>`).join('');
     // Bill vendor filter
     document.getElementById('billVendorFilter').innerHTML = '<option value="">All Vendors</option>' + opts;
+    // Payments tab vendor filter
+    document.getElementById('paymentVendorFilter').innerHTML = '<option value="">All Vendors</option>' + opts;
     // Bill form vendor
     document.getElementById('bfVendor').innerHTML = '<option value="">Select vendor...</option>' + opts;
     // PO form vendor
@@ -676,43 +752,49 @@ async function loadVendors(page = 1) {
     vendorPage = page;
     const search = document.getElementById('vendorSearch')?.value || '';
     const container = document.getElementById('vendorList');
-    container.innerHTML = '<div class="skeleton h-20 w-full"></div>'.repeat(3);
+    container.innerHTML = qcSkeletonCards(4);
 
     try {
         const params = new URLSearchParams({ page, limit: 20 });
         if (search) params.set('search', search);
+        if (listFilters.vendor) params.set('status', listFilters.vendor);
         const res = await fetch(`${API}?${params}`, { headers });
         const data = await res.json();
-        if (!data.success) throw new Error(data.message);
+        if (!data.success) throw new Error(apiMessage(data));
 
         if (!data.vendors.length) {
-            container.innerHTML = '<div class="text-center py-12 text-gray-400">No vendors found</div>';
+            container.innerHTML = `<div class="sm:col-span-2">${qcEmptyState({
+                icon: 'users', title: 'No vendors found',
+                message: search || listFilters.vendor ? 'Try clearing the search or filter.' : 'Add a vendor or sync from Zoho Books.',
+                ctaText: 'New Vendor', onClick: 'openVendorModal()'
+            })}</div>`;
             document.getElementById('vendorPagination').innerHTML = '';
             return;
         }
 
         container.innerHTML = data.vendors.map(v => `
             <div class="bg-white rounded-xl border border-gray-100 shadow-sm p-4 cursor-pointer hover:shadow-md transition-shadow" onclick="viewVendor(${v.id})">
-                <div class="flex items-start justify-between mb-2">
-                    <div>
+                <div class="flex items-start justify-between mb-2 gap-2">
+                    <div class="min-w-0">
                         <span class="font-semibold text-gray-800 text-sm">${esc(v.vendor_name)}</span>
-                        ${v.gst_number ? `<span class="text-xs text-gray-400 ml-2">GST: ${esc(v.gst_number)}</span>` : ''}
+                        ${v.status === 'inactive' ? '<span class="status-pill status-inactive ml-1">inactive</span>' : ''}
+                        ${v.gst_number ? `<div class="text-xs text-gray-400">GST: ${esc(v.gst_number)}</div>` : ''}
                     </div>
-                    <span class="text-sm font-bold ${parseFloat(v.outstanding) > 0 ? 'text-red-600' : 'text-gray-800'}">${formatCurrency(v.outstanding)}</span>
+                    <span class="text-sm font-bold whitespace-nowrap ${parseFloat(v.outstanding) > 0 ? 'text-red-600' : 'text-gray-800'}">${formatCurrency(v.outstanding)}</span>
                 </div>
                 <div class="flex items-center justify-between text-xs text-gray-500">
-                    <div>
+                    <div class="truncate">
                         ${v.phone ? `<span>${esc(v.phone)}</span>` : ''}
                         ${v.contact_person ? `<span class="mx-1">&middot;</span><span>${esc(v.contact_person)}</span>` : ''}
                     </div>
-                    <span>${v.bill_count || 0} bills</span>
+                    <span class="whitespace-nowrap ml-2">${v.bill_count || 0} bills</span>
                 </div>
             </div>
         `).join('');
 
         renderPagination('vendorPagination', data.pagination, loadVendors);
     } catch (e) {
-        container.innerHTML = `<div class="text-center py-8 text-red-500">${esc(e.message)}</div>`;
+        container.innerHTML = `<div class="sm:col-span-2 text-center py-8 text-red-500">${esc(e.message)}</div>`;
     }
 }
 
@@ -720,7 +802,7 @@ async function viewVendor(id) {
     try {
         const res = await fetch(`${API}/${id}`, { headers });
         const data = await res.json();
-        if (!data.success) throw new Error(data.message);
+        if (!data.success) throw new Error(apiMessage(data));
 
         const v = data.vendor;
         const bills = data.recent_bills || [];
@@ -830,7 +912,7 @@ async function handleVendorSubmit(e) {
         const method = editId ? 'PUT' : 'POST';
         const res = await fetch(url, { method, headers, body: JSON.stringify(payload) });
         const data = await res.json();
-        if (!data.success) throw new Error(data.message);
+        if (!data.success) throw new Error(apiMessage(data));
         showToast(data.message || 'Vendor saved', 'success');
         closeModal('vendorFormModal');
         loadVendors(vendorPage);
@@ -849,7 +931,7 @@ async function syncVendorsFromZoho() {
     try {
         const res = await fetch(`${API}/sync-zoho`, { method: 'POST', headers });
         const data = await res.json();
-        if (!data.success) throw new Error(data.message);
+        if (!data.success) throw new Error(apiMessage(data));
         showToast(data.message || 'Sync complete', 'success');
         loadVendors(1);
         loadAllVendorsForDropdowns();
@@ -870,35 +952,42 @@ async function loadBills(page = 1) {
     const search = document.getElementById('billSearch')?.value || '';
     const vendorId = document.getElementById('billVendorFilter')?.value || '';
     const container = document.getElementById('billList');
-    container.innerHTML = '<div class="skeleton h-20 w-full"></div>'.repeat(3);
+    container.innerHTML = qcSkeletonCards(3);
 
     try {
         const params = new URLSearchParams({ page, limit: 20 });
         if (search) params.set('search', search);
         if (vendorId) params.set('vendor_id', vendorId);
+        if (listFilters.bill) params.set('payment_status', listFilters.bill);
         const res = await fetch(`${API}/bills?${params}`, { headers });
         const data = await res.json();
-        if (!data.success) throw new Error(data.message);
+        if (!data.success) throw new Error(apiMessage(data));
 
         if (!data.bills.length) {
-            container.innerHTML = '<div class="text-center py-12 text-gray-400">No bills found</div>';
+            container.innerHTML = qcEmptyState({
+                icon: 'document', title: 'No bills found',
+                message: search || vendorId || listFilters.bill ? 'Try clearing the search or filters.' : 'Create a bill manually or convert a purchase order.',
+                ctaText: 'New Bill', onClick: 'openBillModal()'
+            });
             document.getElementById('billPagination').innerHTML = '';
             return;
         }
 
         container.innerHTML = data.bills.map(b => `
             <div class="bg-white rounded-xl border border-gray-100 shadow-sm p-4 cursor-pointer hover:shadow-md transition-shadow" onclick="viewBill(${b.id})">
-                <div class="flex items-start justify-between mb-2">
-                    <div>
+                <div class="flex items-start justify-between mb-2 gap-2">
+                    <div class="flex items-center flex-wrap gap-1">
                         <span class="font-semibold text-gray-800 text-sm">${esc(b.bill_number)}</span>
-                        <span class="status-pill status-${b.payment_status} ml-2">${b.payment_status}</span>
-                        ${b.ai_verification_status ? `<span class="status-pill status-${b.ai_verification_status === 'verified' ? 'verified' : 'mismatch'} ml-1">${b.ai_verification_status}</span>` : ''}
+                        <span class="status-pill status-${b.payment_status} ml-1">${b.payment_status}</span>
+                        ${b.ai_verification_status ? `<span class="status-pill status-${b.ai_verification_status}">${b.ai_verification_status === 'pending' ? 'verify pending' : b.ai_verification_status}</span>` : ''}
+                        ${b.zoho_status === 'pushed' ? '<span class="status-pill status-pushed">zoho ✓</span>' : ''}
+                        ${b.zoho_status === 'failed' ? '<span class="status-pill status-failed">zoho failed</span>' : ''}
                     </div>
-                    <span class="text-sm font-bold text-gray-800">${formatCurrency(b.grand_total)}</span>
+                    <span class="text-sm font-bold text-gray-800 whitespace-nowrap">${formatCurrency(b.grand_total)}</span>
                 </div>
                 <div class="flex items-center justify-between text-xs text-gray-500">
-                    <span class="font-medium text-gray-700">${esc(b.vendor_name)}</span>
-                    <div class="flex items-center gap-2">
+                    <span class="font-medium text-gray-700 truncate">${esc(b.vendor_name)}</span>
+                    <div class="flex items-center gap-2 whitespace-nowrap ml-2">
                         ${parseFloat(b.balance_due) > 0 ? `<span class="text-red-600 font-semibold">Due: ${formatCurrency(b.balance_due)}</span>` : ''}
                         <span>${formatDate(b.created_at)}</span>
                     </div>
@@ -916,17 +1005,23 @@ async function viewBill(id) {
     try {
         const res = await fetch(`${API}/bills/${id}`, { headers });
         const data = await res.json();
-        if (!data.success) throw new Error(data.message);
+        if (!data.success) throw new Error(apiMessage(data));
 
         const bill = data.bill;
         const items = data.items || [];
         const payments = data.payments || [];
 
+        const needsScan = (bill.ai_verification_status === 'pending' || bill.ai_verification_status === 'mismatch')
+            && bill.zoho_status !== 'pushed';
+
         document.getElementById('billDetailTitle').textContent = `Bill ${bill.bill_number}`;
         document.getElementById('billDetailBody').innerHTML = `
-            ${bill.po_id && bill.ai_verification_status === 'pending' ? `
+            ${renderBillFlowSteps(bill)}
+            ${needsScan ? `
             <div class="mb-4 p-3 bg-amber-50 border border-amber-300 rounded-lg">
-                <div class="text-sm font-semibold text-amber-800 mb-2">Upload the bill photo and run AI verify before submitting</div>
+                <div class="text-sm font-semibold text-amber-800 mb-2">${bill.ai_verification_status === 'mismatch'
+                    ? 'AI found differences — fix the lines or re-scan the bill photo'
+                    : 'Upload the bill photo and run AI Verify before submitting'}</div>
                 <div class="flex flex-col sm:flex-row gap-2">
                     <input type="file" id="vbPhotoInput" accept="image/*" class="qc-input flex-1 text-sm">
                     <button onclick="scanAndVerifyBill(${bill.id}, ${bill.vendor_id})" id="btnScanVerify" class="btn-green px-4 py-2 rounded-lg text-sm font-medium whitespace-nowrap">Scan &amp; Verify</button>
@@ -934,8 +1029,8 @@ async function viewBill(id) {
             </div>` : ''}
             <div class="flex items-center gap-2 mb-4 flex-wrap">
                 <span class="status-pill status-${bill.payment_status}">${bill.payment_status}</span>
-                ${bill.ai_verification_status ? `<span class="status-pill status-${bill.ai_verification_status === 'verified' ? 'verified' : 'mismatch'}">${bill.ai_verification_status}</span>` : ''}
-                ${bill.zoho_status ? `<span class="status-pill status-${bill.zoho_status === 'pushed' ? 'pushed' : 'pending'}">${bill.zoho_status}</span>` : ''}
+                ${bill.ai_verification_status ? `<span class="status-pill status-${bill.ai_verification_status}">${bill.ai_verification_status === 'pending' ? 'verify pending' : bill.ai_verification_status}</span>` : ''}
+                ${bill.zoho_status ? `<span class="status-pill status-${bill.zoho_status}">zoho: ${bill.zoho_status}</span>` : ''}
                 <span class="text-sm text-gray-500">${formatDate(bill.bill_date || bill.created_at)}</span>
             </div>
             <div class="bg-gray-50 rounded-lg p-3 mb-4 text-sm space-y-1">
@@ -955,8 +1050,9 @@ async function viewBill(id) {
                         <td class="py-2">
                             ${esc(i.item_name)}
                             ${i.ai_matched ? `<span class="ai-badge ml-1">AI ${Math.round((i.ai_confidence || 0) * 100)}%</span>` : ''}
+                            ${i.hsn_or_sac ? `<span class="text-xs text-gray-400 ml-1">HSN ${esc(i.hsn_or_sac)}</span>` : '<span class="text-xs text-red-500 font-medium ml-1">HSN?</span>'}
                         </td>
-                        <td class="py-2 text-right">${i.quantity}</td>
+                        <td class="py-2 text-right">${Number(i.quantity)}</td>
                         <td class="py-2 text-right">${formatCurrency(i.unit_price)}</td>
                         <td class="py-2 text-right font-medium">${formatCurrency(i.amount)}</td>
                     </tr>`).join('')}
@@ -988,16 +1084,61 @@ async function viewBill(id) {
             ${bill.notes ? `<div class="mt-3 p-2 bg-yellow-50 rounded text-xs text-gray-600">${esc(bill.notes)}</div>` : ''}
         `;
 
-        // Actions
+        // Actions — follow the flow: verify → submit → push
         let actionsHtml = '';
+        const verified = bill.ai_verification_status === 'verified' || bill.ai_verification_status === 'corrected';
+        if (verified && !bill.verified_at) {
+            actionsHtml += `<button onclick="submitBillFinal(${bill.id})" class="btn-green px-4 py-2 rounded-lg text-sm font-medium">Submit Bill</button>`;
+        }
         if (bill.zoho_status !== 'pushed') {
-            actionsHtml += `<button onclick="pushBillToZoho(${bill.id})" class="btn-green px-4 py-2 rounded-lg text-sm font-medium">Push to Zoho</button>`;
+            actionsHtml += `<button onclick="pushBillToZoho(${bill.id})" class="${verified ? 'btn-green' : 'btn-green-outline'} px-4 py-2 rounded-lg text-sm font-medium">Push to Zoho</button>`;
+        }
+        if (parseFloat(bill.balance_due) > 0) {
+            actionsHtml += `<button onclick="closeModal('billDetailModal'); openPaymentModal(${bill.vendor_id}, ${bill.id}, ${parseFloat(bill.balance_due) || 0})" class="btn-green-outline px-4 py-2 rounded-lg text-sm font-medium">Record Payment</button>`;
         }
         document.getElementById('billDetailActions').innerHTML = actionsHtml;
 
         openModal('billDetailModal');
     } catch (e) {
         showToast(e.message || 'Failed to load bill', 'error');
+    }
+}
+
+// Compact 5-step strip: 1 Create/Convert → 2 Photo → 3 AI Verify → 4 Submit → 5 Push
+function renderBillFlowSteps(bill) {
+    const steps = [
+        { label: bill.po_id ? 'Convert' : 'Create', done: true },
+        { label: 'Photo', done: !!(bill.bill_image || bill.ai_extracted_data) },
+        { label: 'AI Verify', done: bill.ai_verification_status === 'verified' || bill.ai_verification_status === 'corrected' },
+        { label: 'Submit', done: !!bill.verified_at },
+        { label: 'Push', done: bill.zoho_status === 'pushed' }
+    ];
+    const currentIdx = steps.findIndex(s => !s.done);
+    return `<div class="flow-steps">${steps.map((s, i) => `
+        <span class="flow-step ${s.done ? 'done' : (i === currentIdx ? 'current' : '')}"><span class="n">${s.done ? '✓' : i + 1}</span>${s.label}</span>
+        ${i < steps.length - 1 ? '<span class="flow-arrow">→</span>' : ''}`).join('')}</div>`;
+}
+
+// Step 4 — POST /bills/:id/submit (HSN gate lives server-side)
+async function submitBillFinal(billId) {
+    const ok = await qcConfirm({
+        title: 'Submit bill?',
+        message: 'Every line must be matched to a Zoho item with an HSN code.',
+        primaryText: 'Submit'
+    });
+    if (!ok) return;
+    try {
+        const res = await fetch(`${API}/bills/${billId}/submit`, { method: 'POST', headers });
+        const data = await res.json();
+        if (!data.success) {
+            const extra = Array.isArray(data.items) && data.items.length ? `: ${data.items.join(', ')}` : '';
+            throw new Error(apiMessage(data, 'Submit failed') + extra);
+        }
+        showToast(data.message || 'Bill submitted', 'success');
+        loadBills(billPage);
+        viewBill(billId);
+    } catch (e) {
+        showToast(e.message || 'Submit failed', 'error');
     }
 }
 
@@ -1046,7 +1187,7 @@ async function scanBillWithAI() {
             body: formData
         });
         const data = await res.json();
-        if (!data.success) throw new Error(data.message);
+        if (!data.success) throw new Error(apiMessage(data));
 
         // Store AI data
         billImagePath = data.image_path || null;
@@ -1137,18 +1278,22 @@ function recalcBillTotals() {
 
 async function verifyBill() {
     if (!createdBillId) {
-        showToast('Submit the bill first, then verify', 'error');
+        showToast('Save the bill first, then verify', 'error');
         return;
     }
 
     try {
         const res = await fetch(`${API}/bills/${createdBillId}/verify`, { method: 'POST', headers });
         const data = await res.json();
-        if (!data.success) throw new Error(data.message);
+        if (!data.success) throw new Error(apiMessage(data));
 
         const v = data.verification;
         if (v.status === 'verified') {
             showToast('Bill verified - all items match!', 'success');
+            // Continue the flow in the detail modal (Submit → Push)
+            closeModal('billFormModal');
+            loadBills(billPage);
+            viewBill(createdBillId);
         } else {
             const diffCount = v.differences?.length || 0;
             showToast(`${diffCount} difference(s) found. Review the bill.`, 'error');
@@ -1190,7 +1335,7 @@ async function submitBill() {
     try {
         const res = await fetch(`${API}/bills`, { method: 'POST', headers, body: JSON.stringify(payload) });
         const data = await res.json();
-        if (!data.success) throw new Error(data.message);
+        if (!data.success) throw new Error(apiMessage(data));
 
         createdBillId = data.bill_id;
         showToast(`Bill ${data.bill_number} created`, 'success');
@@ -1198,9 +1343,11 @@ async function submitBill() {
         // If AI scanned, show verify button
         if (aiExtractedData) {
             document.getElementById('btnVerifyBill').classList.remove('hidden');
-            showToast('Bill created. You can now verify with AI.', 'success');
+            showToast('Bill saved. Now run AI Verify.', 'success');
         } else {
             closeModal('billFormModal');
+            // Open the detail so the flow stepper guides photo → verify → submit → push
+            viewBill(data.bill_id);
         }
 
         loadBills(billPage);
@@ -1211,12 +1358,19 @@ async function submitBill() {
 }
 
 async function pushBillToZoho(billId) {
-    if (!confirm('Push this bill to Zoho?')) return;
+    const ok = await qcConfirm({
+        title: 'Push to Zoho?',
+        message: 'This bill will be created in Zoho Books for admin approval.',
+        primaryText: 'Push'
+    });
+    if (!ok) return;
     try {
-        const idemKey = (window.crypto && crypto.randomUUID) ? crypto.randomUUID() : (Date.now() + '-' + Math.random());
-        const res = await fetch(`${API}/bills/${billId}/push-zoho`, { method: 'POST', headers: { ...headers, 'Idempotency-Key': idemKey } });
+        const res = await fetch(`${API}/bills/${billId}/push-zoho`, { method: 'POST', headers: { ...headers, 'Idempotency-Key': idemKey() } });
         const data = await res.json();
-        if (!data.success) throw new Error(data.message);
+        if (!data.success) {
+            const extra = Array.isArray(data.items) && data.items.length ? `: ${data.items.join(', ')}` : '';
+            throw new Error(apiMessage(data, 'Push failed') + extra);
+        }
         showToast(data.message || 'Bill pushed to Zoho', 'success');
         closeModal('billDetailModal');
         loadBills(billPage);
@@ -1232,17 +1386,22 @@ async function loadPurchaseOrders(page = 1) {
     poPage = page;
     const search = document.getElementById('poSearch')?.value || '';
     const container = document.getElementById('poList');
-    container.innerHTML = '<div class="skeleton h-20 w-full"></div>'.repeat(3);
+    container.innerHTML = qcSkeletonCards(3);
 
     try {
         const params = new URLSearchParams({ page, limit: 20 });
         if (search) params.set('search', search);
+        if (listFilters.po) params.set('status', listFilters.po);
         const res = await fetch(`${API}/purchase-orders?${params}`, { headers });
         const data = await res.json();
-        if (!data.success) throw new Error(data.message);
+        if (!data.success) throw new Error(apiMessage(data));
 
         if (!data.purchase_orders.length) {
-            container.innerHTML = '<div class="text-center py-12 text-gray-400">No purchase orders found</div>';
+            container.innerHTML = qcEmptyState({
+                icon: 'document', title: 'No purchase orders found',
+                message: search || listFilters.po ? 'Try clearing the search or filter.' : 'Create a PO and convert it to a bill on delivery.',
+                ctaText: 'New PO', onClick: 'openPoModal()'
+            });
             document.getElementById('poPagination').innerHTML = '';
             return;
         }
@@ -1274,33 +1433,52 @@ async function loadPurchaseOrders(page = 1) {
 }
 
 async function viewPo(id) {
-    // Re-use bill detail modal for PO detail
+    // Re-uses the bill detail modal shell for PO detail.
+    // (The old version fetched the LIST with limit=999 — silently 400'd by the
+    // Zod limit cap, so View PO never worked. Dedicated endpoint now.)
     try {
-        // Fetch PO detail by loading the list and finding the item (no dedicated detail endpoint in current routes)
-        // Actually we need to check if there's a detail route - there isn't one for POs, so we'll show from the list data
-        showToast('Loading PO details...', 'success');
-
-        // The route doesn't have a dedicated GET /purchase-orders/:id, so let's display minimal info
-        // We can still edit draft POs
-        const res = await fetch(`${API}/purchase-orders?page=1&limit=999`, { headers });
+        const res = await fetch(`${API}/purchase-orders/${id}`, { headers });
         const data = await res.json();
-        if (!data.success) throw new Error(data.message);
+        if (!data.success) throw new Error(apiMessage(data, 'PO not found'));
 
-        const po = data.purchase_orders.find(p => p.id === id);
-        if (!po) throw new Error('PO not found');
+        const po = data.purchase_order;
+        const items = data.items || [];
+        const linkedBill = data.bill || null;
 
         document.getElementById('billDetailTitle').textContent = `PO ${po.po_number}`;
         document.getElementById('billDetailBody').innerHTML = `
             <div class="flex items-center gap-2 mb-4 flex-wrap">
                 <span class="status-pill status-${po.status}">${po.status}</span>
-                ${po.zoho_status ? `<span class="status-pill status-${po.zoho_status === 'pushed' ? 'pushed' : 'pending'}">${po.zoho_status}</span>` : ''}
+                ${po.zoho_status === 'pushed' ? '<span class="status-pill status-pushed">zoho ✓</span>' : ''}
+                ${linkedBill ? `<span class="status-pill status-received">bill: ${esc(linkedBill.bill_number)}</span>` : ''}
                 <span class="text-sm text-gray-500">${formatDate(po.created_at)}</span>
             </div>
+            ${!linkedBill && po.status !== 'cancelled' ? `
+            <div class="mb-4 p-3 bg-green-50 border border-green-200 rounded-lg text-xs text-green-900">
+                <span class="font-semibold">Next:</span> 1 Convert to Bill → 2 Upload bill photo → 3 AI Verify → 4 Submit → 5 Push to Zoho
+            </div>` : ''}
             <div class="bg-gray-50 rounded-lg p-3 mb-4 text-sm space-y-1">
                 <div><span class="text-gray-500">Vendor:</span> <span class="font-medium">${esc(po.vendor_name)}</span></div>
                 ${po.expected_date ? `<div><span class="text-gray-500">Expected Date:</span> ${formatDate(po.expected_date)}</div>` : ''}
                 ${po.created_by_name ? `<div><span class="text-gray-500">Created By:</span> ${esc(po.created_by_name)}</div>` : ''}
             </div>
+            ${items.length ? `
+            <table class="w-full text-sm mb-4">
+                <thead><tr class="border-b text-left text-gray-500">
+                    <th class="py-2 font-medium">Item</th>
+                    <th class="py-2 font-medium w-16 text-right">Qty</th>
+                    <th class="py-2 font-medium w-20 text-right">Rate</th>
+                    <th class="py-2 font-medium w-24 text-right">Total</th>
+                </tr></thead>
+                <tbody>
+                    ${items.map(i => `<tr class="border-b border-gray-50">
+                        <td class="py-2">${esc(i.item_name)}</td>
+                        <td class="py-2 text-right">${Number(i.quantity)}</td>
+                        <td class="py-2 text-right">${formatCurrency(i.unit_price)}</td>
+                        <td class="py-2 text-right font-medium">${formatCurrency(i.line_total)}</td>
+                    </tr>`).join('')}
+                </tbody>
+            </table>` : ''}
             <div class="space-y-1 text-sm">
                 <div class="flex justify-between"><span class="text-gray-500">Subtotal</span><span>${formatCurrency(po.subtotal)}</span></div>
                 ${parseFloat(po.tax_amount) > 0 ? `<div class="flex justify-between"><span class="text-gray-500">Tax</span><span>${formatCurrency(po.tax_amount)}</span></div>` : ''}
@@ -1312,13 +1490,15 @@ async function viewPo(id) {
         let actionsHtml = '';
         if (po.status === 'draft') {
             actionsHtml += `<button onclick="closeModal('billDetailModal'); editPo(${po.id})" class="btn-green-outline px-4 py-2 rounded-lg text-sm font-medium">Edit</button>`;
-            actionsHtml += `<button onclick="sendPo(${po.id})" class="btn-green px-4 py-2 rounded-lg text-sm font-medium">Mark as Sent</button>`;
+            actionsHtml += `<button onclick="sendPo(${po.id})" class="btn-green-outline px-4 py-2 rounded-lg text-sm font-medium">Mark as Sent</button>`;
         }
-        if (po.status === 'draft' || po.status === 'sent') {
+        if (linkedBill) {
+            actionsHtml += `<button onclick="closeModal('billDetailModal'); viewBill(${linkedBill.id})" class="btn-green px-4 py-2 rounded-lg text-sm font-medium">View Bill ${esc(linkedBill.bill_number)}</button>`;
+        } else if (po.status !== 'cancelled') {
             actionsHtml += `<button onclick="convertPoToBill(${po.id})" class="btn-green px-4 py-2 rounded-lg text-sm font-medium">Convert to Bill</button>`;
         }
         if (po.zoho_status !== 'pushed') {
-            actionsHtml += `<button onclick="pushPoToZoho(${po.id})" class="btn-green px-4 py-2 rounded-lg text-sm font-medium">Push to Zoho</button>`;
+            actionsHtml += `<button onclick="pushPoToZoho(${po.id})" class="btn-green-outline px-4 py-2 rounded-lg text-sm font-medium">Push to Zoho</button>`;
         }
         document.getElementById('billDetailActions').innerHTML = actionsHtml;
 
@@ -1328,8 +1508,15 @@ async function viewPo(id) {
     }
 }
 
-function openPoModal(editData = null) {
-    poItems = [];
+function openPoModal(editData = null, editItems = null) {
+    // Edit mode now prefills the PO's existing lines (the old version reset
+    // poItems to [] — staff had to re-add every item just to fix a date).
+    poItems = (editItems || []).map(it => ({
+        zoho_item_id: it.zoho_item_id || '',
+        item_name: it.item_name,
+        quantity: Number(it.quantity) || 1,
+        unit_price: Number(it.unit_price) || 0
+    }));
     document.getElementById('poEditId').value = '';
     document.getElementById('poFormTitle').textContent = 'New Purchase Order';
     document.getElementById('pfVendor').value = '';
@@ -1342,7 +1529,7 @@ function openPoModal(editData = null) {
         document.getElementById('poEditId').value = editData.id;
         document.getElementById('poFormTitle').textContent = 'Edit Purchase Order';
         document.getElementById('pfVendor').value = editData.vendor_id;
-        document.getElementById('pfExpectedDate').value = editData.expected_date ? editData.expected_date.split('T')[0] : '';
+        document.getElementById('pfExpectedDate').value = editData.expected_date ? String(editData.expected_date).split('T')[0] : '';
         document.getElementById('pfTax').value = editData.tax_amount || 0;
         document.getElementById('pfNotes').value = editData.notes || '';
     }
@@ -1352,15 +1539,15 @@ function openPoModal(editData = null) {
     openModal('poFormModal');
 }
 
-function editPo(id) {
-    // Find the PO from cached list or refetch
-    fetch(`${API}/purchase-orders?page=1&limit=999`, { headers })
-        .then(r => r.json())
-        .then(data => {
-            if (!data.success) return showToast('Failed to load PO', 'error');
-            const po = data.purchase_orders.find(p => p.id === id);
-            if (po) openPoModal(po);
-        });
+async function editPo(id) {
+    try {
+        const res = await fetch(`${API}/purchase-orders/${id}`, { headers });
+        const data = await res.json();
+        if (!data.success) throw new Error(apiMessage(data, 'Failed to load PO'));
+        openPoModal(data.purchase_order, data.items || []);
+    } catch (e) {
+        showToast(e.message || 'Failed to load PO', 'error');
+    }
 }
 
 function addPoProduct(product) {
@@ -1443,7 +1630,7 @@ async function submitPo() {
         const method = editId ? 'PUT' : 'POST';
         const res = await fetch(url, { method, headers, body: JSON.stringify(payload) });
         const data = await res.json();
-        if (!data.success) throw new Error(data.message);
+        if (!data.success) throw new Error(apiMessage(data));
         showToast(data.message || 'PO saved', 'success');
         closeModal('poFormModal');
         loadPurchaseOrders(poPage);
@@ -1454,11 +1641,12 @@ async function submitPo() {
 }
 
 async function sendPo(poId) {
-    if (!confirm('Mark this PO as sent?')) return;
+    const ok = await qcConfirm({ title: 'Mark as sent?', message: 'The PO will be locked for editing.', primaryText: 'Mark Sent' });
+    if (!ok) return;
     try {
         const res = await fetch(`${API}/purchase-orders/${poId}/send`, { method: 'POST', headers });
         const data = await res.json();
-        if (!data.success) throw new Error(data.message);
+        if (!data.success) throw new Error(apiMessage(data));
         showToast(data.message || 'PO sent', 'success');
         closeModal('billDetailModal');
         loadPurchaseOrders(poPage);
@@ -1468,15 +1656,19 @@ async function sendPo(poId) {
 }
 
 async function convertPoToBill(poId) {
-    if (!confirm('Convert this PO to a bill?')) return;
+    const ok = await qcConfirm({
+        title: 'Convert PO to bill?',
+        message: 'Step 1 of 5 — after converting, upload the bill photo and run AI Verify.',
+        primaryText: 'Convert'
+    });
+    if (!ok) return;
     try {
-        const idemKey = (window.crypto && crypto.randomUUID) ? crypto.randomUUID() : (Date.now() + '-' + Math.random());
-        const res = await fetch(`${API}/purchase-orders/${poId}/convert-to-bill`, { method: 'POST', headers: { ...headers, 'Idempotency-Key': idemKey } });
+        const res = await fetch(`${API}/purchase-orders/${poId}/convert-to-bill`, { method: 'POST', headers: { ...headers, 'Idempotency-Key': idemKey() } });
         const data = await res.json();
         if (!data.success) {
             // Already converted — jump to the existing bill
             if (data.bill_id) { closeModal('billDetailModal'); viewBill(data.bill_id); }
-            throw new Error(data.message);
+            throw new Error(apiMessage(data, 'Failed to convert PO'));
         }
         showToast(data.message || 'Bill created from PO', 'success');
         closeModal('billDetailModal');
@@ -1502,7 +1694,7 @@ async function scanAndVerifyBill(billId, vendorId) {
         if (vendorId) formData.append('vendor_id', vendorId);
         const scanRes = await fetch(`${API}/bills/scan`, { method: 'POST', headers: { 'Authorization': `Bearer ${token}` }, body: formData });
         const scanData = await scanRes.json();
-        if (!scanData.success) throw new Error(scanData.message);
+        if (!scanData.success) throw new Error(apiMessage(scanData, 'Scan failed'));
 
         const verifyRes = await fetch(`${API}/bills/${billId}/verify`, {
             method: 'POST',
@@ -1510,7 +1702,7 @@ async function scanAndVerifyBill(billId, vendorId) {
             body: JSON.stringify({ ai_extracted_data: scanData.scan_result, bill_image: scanData.image_path || null })
         });
         const verifyData = await verifyRes.json();
-        if (!verifyData.success) throw new Error(verifyData.message);
+        if (!verifyData.success) throw new Error(apiMessage(verifyData, 'Verify failed'));
 
         const v = verifyData.verification;
         if (v.status === 'verified') {
@@ -1528,12 +1720,12 @@ async function scanAndVerifyBill(billId, vendorId) {
 }
 
 async function pushPoToZoho(poId) {
-    if (!confirm('Push this PO to Zoho?')) return;
+    const ok = await qcConfirm({ title: 'Push PO to Zoho?', message: 'The purchase order will be created in Zoho Books.', primaryText: 'Push' });
+    if (!ok) return;
     try {
-        const idemKey = (window.crypto && crypto.randomUUID) ? crypto.randomUUID() : (Date.now() + '-' + Math.random());
-        const res = await fetch(`${API}/purchase-orders/${poId}/push-zoho`, { method: 'POST', headers: { ...headers, 'Idempotency-Key': idemKey } });
+        const res = await fetch(`${API}/purchase-orders/${poId}/push-zoho`, { method: 'POST', headers: { ...headers, 'Idempotency-Key': idemKey() } });
         const data = await res.json();
-        if (!data.success) throw new Error(data.message);
+        if (!data.success) throw new Error(apiMessage(data));
         showToast(data.message || 'PO pushed to Zoho', 'success');
         closeModal('billDetailModal');
         loadPurchaseOrders(poPage);
@@ -1548,16 +1740,22 @@ async function pushPoToZoho(poId) {
 async function loadPayments(page = 1) {
     paymentPage = page;
     const container = document.getElementById('paymentList');
-    container.innerHTML = '<div class="skeleton h-16 w-full"></div>'.repeat(3);
+    container.innerHTML = qcSkeletonCards(3);
 
     try {
         const params = new URLSearchParams({ page, limit: 20 });
+        const vendorId = document.getElementById('paymentVendorFilter')?.value || '';
+        if (vendorId) params.set('vendor_id', vendorId);
         const res = await fetch(`${API}/payments?${params}`, { headers });
         const data = await res.json();
-        if (!data.success) throw new Error(data.message);
+        if (!data.success) throw new Error(apiMessage(data));
 
         if (!data.payments.length) {
-            container.innerHTML = '<div class="text-center py-12 text-gray-400">No payments found</div>';
+            container.innerHTML = qcEmptyState({
+                icon: 'inbox', title: 'No payments found',
+                message: vendorId ? 'No payments recorded for this vendor yet.' : 'Record your first vendor payment.',
+                ctaText: 'Record Payment', onClick: 'openPaymentModal()'
+            });
             document.getElementById('paymentPagination').innerHTML = '';
             return;
         }
@@ -1586,7 +1784,7 @@ async function loadPayments(page = 1) {
     }
 }
 
-function openPaymentModal() {
+async function openPaymentModal(vendorId = null, billId = null, amount = null) {
     document.getElementById('pmVendor').value = '';
     document.getElementById('pmBill').innerHTML = '<option value="">No specific bill</option>';
     document.getElementById('pmAmount').value = '';
@@ -1595,9 +1793,16 @@ function openPaymentModal() {
     document.getElementById('pmReference').value = '';
     document.getElementById('pmNotes').value = '';
     openModal('paymentFormModal');
+
+    // Prefill (e.g. "Record Payment" from the bill detail modal)
+    if (vendorId) {
+        document.getElementById('pmVendor').value = String(vendorId);
+        await loadVendorBillsForPayment(billId);
+        if (amount) document.getElementById('pmAmount').value = amount;
+    }
 }
 
-async function loadVendorBillsForPayment() {
+async function loadVendorBillsForPayment(selectBillId = null) {
     const vendorId = document.getElementById('pmVendor').value;
     const billSelect = document.getElementById('pmBill');
     billSelect.innerHTML = '<option value="">No specific bill</option>';
@@ -1605,23 +1810,21 @@ async function loadVendorBillsForPayment() {
     if (!vendorId) return;
 
     try {
-        const res = await fetch(`${API}/bills?vendor_id=${vendorId}&payment_status=unpaid&limit=50`, { headers });
-        const data = await res.json();
-        if (data.success && data.bills.length) {
-            data.bills.forEach(b => {
-                billSelect.innerHTML += `<option value="${b.id}">${esc(b.bill_number)} - Due: ${formatCurrency(b.balance_due)}</option>`;
-            });
-            // Also add partial bills
-            const res2 = await fetch(`${API}/bills?vendor_id=${vendorId}&payment_status=partial&limit=50`, { headers });
-            const data2 = await res2.json();
-            if (data2.success && data2.bills.length) {
-                data2.bills.forEach(b => {
-                    billSelect.innerHTML += `<option value="${b.id}">${esc(b.bill_number)} - Due: ${formatCurrency(b.balance_due)}</option>`;
-                });
-            }
-        }
+        // Fetch unpaid AND partial in parallel. (The old code only looked for
+        // partial bills when at least one unpaid bill existed — vendors with
+        // only partially-paid bills showed an empty dropdown.)
+        const [unpaid, partial] = await Promise.all([
+            fetch(`${API}/bills?vendor_id=${vendorId}&payment_status=unpaid&limit=100`, { headers }).then(r => r.json()),
+            fetch(`${API}/bills?vendor_id=${vendorId}&payment_status=partial&limit=100`, { headers }).then(r => r.json())
+        ]);
+        const bills = [...(unpaid.bills || []), ...(partial.bills || [])];
+        bills.forEach(b => {
+            billSelect.innerHTML += `<option value="${b.id}">${esc(b.bill_number)} - Due: ${formatCurrency(b.balance_due)}</option>`;
+        });
+        if (selectBillId) billSelect.value = String(selectBillId);
     } catch (e) {
         console.error('Load vendor bills error:', e);
+        showToast('Failed to load this vendor\'s open bills', 'error');
     }
 }
 
@@ -1641,9 +1844,11 @@ async function handlePaymentSubmit(e) {
     };
 
     try {
-        const res = await fetch(`${API}/payments`, { method: 'POST', headers, body: JSON.stringify(payload) });
+        // The route is idempotency-protected — send the key (double-click /
+        // retry safe), like the push/convert calls already do.
+        const res = await fetch(`${API}/payments`, { method: 'POST', headers: { ...headers, 'Idempotency-Key': idemKey() }, body: JSON.stringify(payload) });
         const data = await res.json();
-        if (!data.success) throw new Error(data.message);
+        if (!data.success) throw new Error(apiMessage(data));
         showToast(data.message || 'Payment recorded', 'success');
         closeModal('paymentFormModal');
         loadPayments(paymentPage);
@@ -1745,6 +1950,7 @@ function formatCurrency(val) {
 function formatDate(d) {
     if (!d) return '';
     const dt = new Date(d);
+    if (isNaN(dt.getTime())) return ''; // never render "NaN undefined NaN"
     const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
     return `${dt.getDate()} ${months[dt.getMonth()]} ${String(dt.getFullYear()).slice(2)}`;
 }
@@ -1757,13 +1963,12 @@ function esc(str) {
 }
 
 function showToast(msg, type = 'success') {
-    const existing = document.querySelector('.toast');
-    if (existing) existing.remove();
-    const toast = document.createElement('div');
-    toast.className = `toast toast-${type}`;
-    toast.textContent = msg;
-    document.body.appendChild(toast);
-    setTimeout(() => toast.remove(), 3000);
+    // House primitive (qc-ui.js). Tiny fallback if the script failed to load.
+    if (typeof qcToast === 'function') {
+        qcToast(msg, { variant: type === 'error' ? 'error' : 'success' });
+        return;
+    }
+    alert(msg);
 }
 </script>
 

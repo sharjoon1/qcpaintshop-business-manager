@@ -73,6 +73,17 @@ function calculateTotals(items, discountAmount = 0) {
     return { subtotal, grandTotal };
 }
 
+/**
+ * Overpayment guard (1-paisa tolerance). DECIMAL columns come back from
+ * mysql2 as STRINGS (the pool has no decimalNumbers option), so both sides
+ * must be coerced — the old inline check (`amount > balance_due + 0.01`)
+ * string-concatenated to e.g. '500.000.01', compared against NaN, and
+ * therefore never rejected anything.
+ */
+function paymentExceedsBalance(amount, balanceDue) {
+    return Number(amount) > (Number(balanceDue) || 0) + 0.01;
+}
+
 // ═══════════════════════════════════════════
 // ZOD SCHEMAS
 // ═══════════════════════════════════════════
@@ -112,8 +123,8 @@ const createInvoiceSchema = z.object({
 });
 
 const listQuerySchema = z.object({
-    page: z.coerce.number().default(1),
-    limit: z.coerce.number().default(20).refine(v => v <= 100, { message: 'Limit max 100' }),
+    page: z.coerce.number().int().positive().default(1),
+    limit: z.coerce.number().int().min(1).max(100, { message: 'Limit max 100' }).default(20),
     status: z.string().optional(),
     customer_type: z.enum(['customer', 'painter']).optional(),
     search: z.string().optional(),
@@ -250,13 +261,15 @@ router.get('/stats',
                 invoiceParams
             );
 
-            // Today's payments
+            // Today's payments — "today" is the IST business day. The DB session
+            // is forced to UTC, so CURDATE() would roll over at 05:30 IST.
             const payParams = branchId ? [branchId] : [];
             const [todayPay] = await pool.query(
                 `SELECT COALESCE(SUM(bp.amount), 0) AS today_collected
                  FROM billing_payments bp
                  JOIN billing_invoices bi ON bp.invoice_id = bi.id
-                 WHERE DATE(bp.created_at) = CURDATE() ${branchId ? ' AND bi.branch_id = ?' : ''}`,
+                 WHERE DATE(CONVERT_TZ(bp.created_at, '+00:00', '+05:30')) = DATE(CONVERT_TZ(NOW(), '+00:00', '+05:30'))
+                 ${branchId ? ' AND bi.branch_id = ?' : ''}`,
                 payParams
             );
 
@@ -292,13 +305,21 @@ router.post('/estimates',
     requirePermission('billing', 'estimate'),
     validate(createEstimateSchema),
     async (req, res) => {
+        // billing_estimates.branch_id is NOT NULL — fail fast with a clear
+        // message instead of an opaque 500 from the INSERT.
+        if (!req.user.branch_id) {
+            return res.status(400).json({ success: false, message: 'Your account has no branch assigned. Ask an admin to set your branch before billing.' });
+        }
+        const connection = await pool.getConnection();
         try {
             const data = req.body;
             const estimateNumber = await generateNumber('BE', 'billing_estimates', 'estimate_number');
 
             const { subtotal, grandTotal } = calculateTotals(data.items, data.discount_amount);
 
-            const [result] = await pool.query(
+            await connection.beginTransaction();
+
+            const [result] = await connection.execute(
                 `INSERT INTO billing_estimates
                  (estimate_number, customer_type, customer_id, painter_id,
                   customer_name, customer_phone, customer_address,
@@ -319,7 +340,7 @@ router.post('/estimates',
                     data.notes,
                     data.valid_until || null,
                     data.status,
-                    req.user.branch_id || null,
+                    req.user.branch_id,
                     req.user.id
                 ]
             );
@@ -329,13 +350,15 @@ router.post('/estimates',
             // Insert items
             for (const item of data.items) {
                 const lineTotal = item.quantity * item.unit_price;
-                await pool.query(
+                await connection.execute(
                     `INSERT INTO billing_estimate_items
                      (estimate_id, zoho_item_id, item_name, pack_size, quantity, unit_price, line_total)
                      VALUES (?, ?, ?, ?, ?, ?, ?)`,
                     [estimateId, item.zoho_item_id, item.item_name, item.pack_size, item.quantity, item.unit_price, lineTotal]
                 );
             }
+
+            await connection.commit();
 
             res.json({
                 success: true,
@@ -345,8 +368,11 @@ router.post('/estimates',
                 grand_total: grandTotal
             });
         } catch (error) {
+            await connection.rollback();
             console.error('Create estimate error:', error);
             res.status(500).json({ success: false, message: 'Failed to create estimate' });
+        } finally {
+            connection.release();
         }
     }
 );
@@ -443,6 +469,7 @@ router.put('/estimates/:id',
     validateParams(idParamSchema),
     validate(createEstimateSchema),
     async (req, res) => {
+        const connection = await pool.getConnection();
         try {
             const { id } = req.params;
             const data = req.body;
@@ -459,7 +486,15 @@ router.put('/estimates/:id',
 
             const { subtotal, grandTotal } = calculateTotals(data.items, data.discount_amount);
 
-            await pool.query(
+            // Capture pre-edit items for audit trail (U18)
+            const [beforeItems] = await pool.query(
+                'SELECT * FROM billing_estimate_items WHERE estimate_id = ? AND deleted_at IS NULL ORDER BY id',
+                [id]
+            );
+
+            await connection.beginTransaction();
+
+            await connection.execute(
                 `UPDATE billing_estimates SET
                     customer_type = ?, customer_id = ?, painter_id = ?,
                     customer_name = ?, customer_phone = ?, customer_address = ?,
@@ -476,23 +511,19 @@ router.put('/estimates/:id',
                 ]
             );
 
-            // Capture pre-edit items for audit trail (U18)
-            const [beforeItems] = await pool.query(
-                'SELECT * FROM billing_estimate_items WHERE estimate_id = ? AND deleted_at IS NULL ORDER BY id',
-                [id]
-            );
-
             // Soft-delete existing items (history preserved for U18 audit trail)
-            await pool.query('UPDATE billing_estimate_items SET deleted_at = NOW() WHERE estimate_id = ? AND deleted_at IS NULL', [id]);
+            await connection.execute('UPDATE billing_estimate_items SET deleted_at = NOW() WHERE estimate_id = ? AND deleted_at IS NULL', [id]);
             for (const item of data.items) {
                 const lineTotal = item.quantity * item.unit_price;
-                await pool.query(
+                await connection.execute(
                     `INSERT INTO billing_estimate_items
                      (estimate_id, zoho_item_id, item_name, pack_size, quantity, unit_price, line_total)
                      VALUES (?, ?, ?, ?, ?, ?, ?)`,
                     [id, item.zoho_item_id, item.item_name, item.pack_size, item.quantity, item.unit_price, lineTotal]
                 );
             }
+
+            await connection.commit();
 
             auditLog.record(req, {
                 action: 'billing.estimate.items.replace',
@@ -504,8 +535,11 @@ router.put('/estimates/:id',
 
             res.json({ success: true, message: 'Estimate updated', grand_total: grandTotal });
         } catch (error) {
+            await connection.rollback();
             console.error('Edit estimate error:', error);
             res.status(500).json({ success: false, message: 'Failed to update estimate' });
+        } finally {
+            connection.release();
         }
     }
 );
@@ -588,6 +622,7 @@ router.post('/estimates/:id/convert',
     requirePermission('billing', 'invoice'),
     validateParams(idParamSchema),
     async (req, res) => {
+        const connection = await pool.getConnection();
         try {
             const { id } = req.params;
 
@@ -608,7 +643,9 @@ router.post('/estimates/:id/convert',
 
             const invoiceNumber = await generateNumber('BI', 'billing_invoices', 'invoice_number');
 
-            const [invResult] = await pool.query(
+            await connection.beginTransaction();
+
+            const [invResult] = await connection.execute(
                 `INSERT INTO billing_invoices
                  (invoice_number, source, estimate_id, customer_type, customer_id, painter_id,
                   customer_name, customer_phone, customer_address,
@@ -629,11 +666,11 @@ router.post('/estimates/:id/convert',
             const invoiceId = invResult.insertId;
 
             // Copy items
-            const [estItems] = await pool.query(
+            const [estItems] = await connection.execute(
                 'SELECT * FROM billing_estimate_items WHERE estimate_id = ? AND deleted_at IS NULL', [id]
             );
             for (const item of estItems) {
-                await pool.query(
+                await connection.execute(
                     `INSERT INTO billing_invoice_items
                      (invoice_id, zoho_item_id, item_name, pack_size, quantity, unit_price, line_total)
                      VALUES (?, ?, ?, ?, ?, ?, ?)`,
@@ -642,10 +679,12 @@ router.post('/estimates/:id/convert',
             }
 
             // Mark estimate as converted
-            await pool.query(
+            await connection.execute(
                 "UPDATE billing_estimates SET status = 'converted', converted_to_invoice_id = ?, updated_at = NOW() WHERE id = ?",
                 [invoiceId, id]
             );
+
+            await connection.commit();
 
             res.json({
                 success: true,
@@ -654,8 +693,11 @@ router.post('/estimates/:id/convert',
                 invoice_number: invoiceNumber
             });
         } catch (error) {
+            await connection.rollback();
             console.error('Convert estimate error:', error);
             res.status(500).json({ success: false, message: 'Failed to convert estimate' });
+        } finally {
+            connection.release();
         }
     }
 );
@@ -670,6 +712,11 @@ router.post('/invoices',
     requirePermission('billing', 'invoice'),
     validate(createInvoiceSchema),
     async (req, res) => {
+        // billing_invoices.branch_id is NOT NULL — fail fast with a clear
+        // message instead of an opaque 500 from the INSERT.
+        if (!req.user.branch_id) {
+            return res.status(400).json({ success: false, message: 'Your account has no branch assigned. Ask an admin to set your branch before billing.' });
+        }
         const connection = await pool.getConnection();
         try {
             const data = req.body;
@@ -699,7 +746,7 @@ router.post('/invoices',
                     grandTotal,
                     grandTotal, // balance_due
                     data.notes,
-                    req.user.branch_id || null,
+                    req.user.branch_id,
                     req.user.id
                 ]
             );
@@ -740,7 +787,10 @@ router.get('/invoices',
     validateQuery(invoiceListQuerySchema),
     async (req, res) => {
         try {
-            const { status, customer_type, search, payment_status, zoho_status } = req.query;
+            // NOTE: no `status` filter here — billing_invoices has no `status`
+            // column (payment_status / zoho_status only); `AND bi.status = ?`
+            // was a guaranteed SQL error for any caller that passed it.
+            const { customer_type, search, payment_status, zoho_status } = req.query;
             const page = Number(req.query.page) || 1;
             const limit = Number(req.query.limit) || 20;
             const branchId = getBranchFilter(req);
@@ -750,7 +800,6 @@ router.get('/invoices',
             const params = [];
 
             if (branchId) { where += ' AND bi.branch_id = ?'; params.push(branchId); }
-            if (status) { where += ' AND bi.status = ?'; params.push(status); }
             if (customer_type) { where += ' AND bi.customer_type = ?'; params.push(customer_type); }
             if (payment_status) { where += ' AND bi.payment_status = ?'; params.push(payment_status); }
             if (zoho_status) { where += ' AND bi.zoho_status = ?'; params.push(zoho_status); }
@@ -842,19 +891,20 @@ router.put('/invoices/:id',
             const { id } = req.params;
             const data = req.body;
 
+            // No early connection.release() here — the finally block releases.
+            // Releasing twice pushes the same connection into the pool's free
+            // list twice, letting two requests share one connection (pool
+            // poisoning / interleaved transactions).
             const [existing] = await pool.query(
                 'SELECT id, payment_status, zoho_invoice_id FROM billing_invoices WHERE id = ?', [id]
             );
             if (!existing.length) {
-                connection.release();
                 return res.status(404).json({ success: false, message: 'Invoice not found' });
             }
             if (existing[0].payment_status !== 'unpaid') {
-                connection.release();
                 return res.status(400).json({ success: false, message: 'Only unpaid invoices can be edited' });
             }
             if (existing[0].zoho_invoice_id) {
-                connection.release();
                 return res.status(400).json({ success: false, message: 'Cannot edit an invoice already pushed to Zoho' });
             }
 
@@ -953,10 +1003,10 @@ router.post('/invoices/:id/payment',
             }
 
             const invoice = invoices[0];
-            if (data.amount > invoice.balance_due + 0.01) {
+            if (paymentExceedsBalance(data.amount, invoice.balance_due)) {
                 return res.status(400).json({
                     success: false,
-                    message: `Payment amount exceeds balance due (${invoice.balance_due})`
+                    message: `Payment amount exceeds balance due (${Number(invoice.balance_due).toFixed(2)})`
                 });
             }
 
@@ -1086,6 +1136,10 @@ router.post('/invoices/:id/push-zoho',
 
 // ═══════════════════════════════════════════
 
-// calculateTotals + schemas exported for unit testing only
-// (tests/unit/billing.test.js) — routes still use them directly.
-module.exports = { router, setPool, setPointsEngine, calculateTotals, createEstimateSchema, recordPaymentSchema };
+// calculateTotals + schemas + paymentExceedsBalance exported for unit testing
+// only (tests/unit/billing.test.js) — routes still use them directly.
+module.exports = {
+    router, setPool, setPointsEngine,
+    calculateTotals, paymentExceedsBalance,
+    createEstimateSchema, recordPaymentSchema, listQuerySchema
+};

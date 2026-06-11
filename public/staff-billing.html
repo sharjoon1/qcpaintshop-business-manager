@@ -10,8 +10,12 @@
     <title>Billing - QC Paint Shop</title>
     <link rel="stylesheet" href="/css/tailwind.css?v=849f1b5c">
     <link rel="stylesheet" href="/css/design-system.css?v=876c7d73">
+    <link rel="stylesheet" href="/css/qc-ui.css?v=71531a2f">
+    <link rel="stylesheet" href="/css/skeletons.css?v=597844f4">
     <script src="/universal-nav-loader.js?v=fb16cb40"></script>
     <script src="/js/auth-helper.js?v=7101c516"></script>
+    <script src="/js/qc-ui.js?v=c3b85ff6"></script>
+    <script src="/js/ui-skeletons.js?v=791a52e1"></script>
     <script>checkAuthOrRedirect();</script>
     <style>
         /* Tab styles */
@@ -24,27 +28,86 @@
         .status-draft { background: #f3f4f6; color: #374151; }
         .status-sent { background: #dbeafe; color: #1d4ed8; }
         .status-approved { background: #d1fae5; color: #065f46; }
-        .status-converted { background: #ede9fe; color: #5b21b6; }
+        .status-converted { background: #d1fae5; color: #065f46; }
         .status-cancelled { background: #fee2e2; color: #991b1b; }
         .status-unpaid { background: #fee2e2; color: #991b1b; }
         .status-partial { background: #fef3c7; color: #92400e; }
         .status-paid { background: #d1fae5; color: #065f46; }
         .status-pending { background: #fef3c7; color: #92400e; }
         .status-pushed { background: #d1fae5; color: #065f46; }
+        .status-failed { background: #fee2e2; color: #991b1b; }
 
-        /* Modal */
+        /* Modal — centered card on desktop, bottom sheet on mobile */
         .modal-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 1000; overflow-y: auto; padding: 1rem; }
         .modal-overlay.active { display: flex; align-items: flex-start; justify-content: center; }
+        .modal-card { display: flex; flex-direction: column; max-height: calc(100vh - 4rem); }
+        .modal-body { flex: 1 1 auto; overflow-y: auto; min-height: 0; }
+        .modal-footer { flex-shrink: 0; }
+        @media (max-width: 639px) {
+            .modal-overlay { padding: 0; overflow-y: hidden; }
+            .modal-overlay.active { align-items: flex-end; }
+            .modal-card {
+                width: 100%; max-width: 100% !important; margin: 0 !important;
+                border-radius: 1.25rem 1.25rem 0 0 !important;
+                max-height: 94vh; max-height: 94dvh;
+                animation: sheetUp 0.28s cubic-bezier(0.21, 1.02, 0.73, 1);
+            }
+            .modal-footer { padding-bottom: calc(0.75rem + env(safe-area-inset-bottom)); }
+        }
+        @keyframes sheetUp { from { transform: translateY(48px); opacity: 0.6; } to { transform: translateY(0); opacity: 1; } }
 
-        /* Skeleton */
-        .skeleton { background: linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%); background-size: 200% 100%; animation: shimmer 1.5s infinite; border-radius: 8px; }
-        @keyframes shimmer { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }
+        /* Filter pills (horizontal scroll) */
+        .filter-pill {
+            flex: 0 0 auto; padding: 6px 14px; min-height: 36px;
+            border-radius: 9999px; border: 1px solid #d1d5db; background: #fff;
+            font-size: 0.8rem; font-weight: 500; color: #4b5563; white-space: nowrap;
+            transition: all 0.15s ease; cursor: pointer;
+        }
+        .filter-pill:hover { border-color: #1B5E3B; color: #1B5E3B; }
+        .filter-pill.active { background: #1B5E3B; border-color: #1B5E3B; color: #fff; }
+        .pill-divider { flex: 0 0 auto; width: 1px; background: #e5e7eb; margin: 4px 2px; }
 
-        /* Toast */
+        /* Qty stepper (estimate-create-new pattern) */
+        .qty-stepper { display: inline-flex; align-items: center; gap: 6px; }
+        .qty-btn {
+            width: 32px; height: 32px; border: 1.5px solid #d1d5db; border-radius: 8px;
+            background: #fff; font-size: 16px; line-height: 1; color: #374151;
+            display: inline-flex; align-items: center; justify-content: center; cursor: pointer;
+        }
+        .qty-btn:hover { border-color: #1B5E3B; color: #1B5E3B; }
+        .qty-input { width: 56px; text-align: center; border: 1px solid #d1d5db; border-radius: 8px; padding: 5px 4px; font-size: 0.875rem; }
+
+        /* Flow stepper (estimate → invoice → payment → Zoho progression) */
+        .flow-wrap { display: flex; align-items: flex-start; margin-bottom: 1rem; padding: 0.75rem 0.25rem; background: #f9fafb; border-radius: 0.75rem; }
+        .flow-step { display: flex; flex-direction: column; align-items: center; flex: 0 0 auto; min-width: 64px; text-align: center; }
+        .flow-dot {
+            width: 24px; height: 24px; border-radius: 9999px; font-size: 0.7rem; font-weight: 700;
+            display: inline-flex; align-items: center; justify-content: center;
+            background: #e5e7eb; color: #6b7280; margin-bottom: 4px;
+        }
+        .flow-done .flow-dot { background: #1B5E3B; color: #fff; }
+        .flow-current .flow-dot { background: #fef3c7; color: #92400e; box-shadow: 0 0 0 3px #fef3c7; }
+        .flow-error .flow-dot { background: #fee2e2; color: #991b1b; }
+        .flow-label { font-size: 0.7rem; font-weight: 600; color: #6b7280; }
+        .flow-done .flow-label { color: #1B5E3B; }
+        .flow-error .flow-label { color: #991b1b; }
+        .flow-sub { font-size: 0.65rem; color: #9ca3af; }
+        .flow-line { flex: 1 1 auto; height: 2px; background: #e5e7eb; margin-top: 11px; min-width: 16px; }
+        .flow-line-on { background: #1B5E3B; }
+
+        /* Toast (fallback when qc-ui.js is unavailable) */
         .toast { position: fixed; bottom: 1.5rem; left: 50%; transform: translateX(-50%); padding: 0.75rem 1.5rem; border-radius: 0.5rem; color: #fff; font-weight: 500; z-index: 2000; animation: toastIn 0.3s ease; }
         .toast-success { background: #059669; }
         .toast-error { background: #dc2626; }
         @keyframes toastIn { from { opacity: 0; transform: translateX(-50%) translateY(20px); } to { opacity: 1; transform: translateX(-50%) translateY(0); } }
+
+        /* Mobile: comfortable ≥44px tap targets */
+        @media (max-width: 639px) {
+            .btn-green, .btn-green-outline, .filter-pill { min-height: 44px; }
+            #detailActions button, #createActions button { flex: 1 1 auto; min-height: 44px; }
+            #estimatePagination button, #invoicePagination button, #paymentPagination button { min-height: 44px; min-width: 44px; }
+            .qty-btn { width: 40px; height: 40px; }
+        }
 
         /* Suggestion dropdown */
         .suggestion-list { position: absolute; top: 100%; left: 0; right: 0; background: #fff; border: 1px solid #d1d5db; border-radius: 0.5rem; max-height: 200px; overflow-y: auto; z-index: 50; box-shadow: 0 4px 12px rgba(0,0,0,0.1); }
@@ -120,7 +183,7 @@
 
         <!-- ==================== ESTIMATES TAB ==================== -->
         <div id="panelEstimates">
-            <div class="flex flex-col sm:flex-row gap-3 mb-4">
+            <div class="flex flex-col sm:flex-row gap-3 mb-3">
                 <div class="flex-1">
                     <input id="estimateSearch" type="text" placeholder="Search estimates..." class="qc-input w-full" oninput="debounceEstimateSearch()">
                 </div>
@@ -129,45 +192,59 @@
                     New Estimate
                 </button>
             </div>
+            <div id="estimateFilterPills" class="flex gap-2 overflow-x-auto scroll-hide pb-1 mb-3">
+                <button type="button" class="filter-pill active" data-val="" onclick="setEstimateFilter(this)">All</button>
+                <button type="button" class="filter-pill" data-val="draft" onclick="setEstimateFilter(this)">Draft</button>
+                <button type="button" class="filter-pill" data-val="sent" onclick="setEstimateFilter(this)">Sent</button>
+                <button type="button" class="filter-pill" data-val="converted" onclick="setEstimateFilter(this)">Invoiced</button>
+                <button type="button" class="filter-pill" data-val="cancelled" onclick="setEstimateFilter(this)">Cancelled</button>
+            </div>
             <div id="estimateList" class="space-y-3">
-                <div class="skeleton h-20 w-full"></div>
-                <div class="skeleton h-20 w-full"></div>
-                <div class="skeleton h-20 w-full"></div>
+                <span class="qc-skel qc-skel-card"></span>
+                <span class="qc-skel qc-skel-card"></span>
+                <span class="qc-skel qc-skel-card"></span>
             </div>
             <div id="estimatePagination" class="flex justify-center gap-2 mt-4"></div>
         </div>
 
         <!-- ==================== INVOICES TAB ==================== -->
         <div id="panelInvoices" class="hidden">
-            <div class="flex flex-col sm:flex-row gap-3 mb-4">
+            <div class="flex flex-col sm:flex-row gap-3 mb-3">
                 <div class="flex-1">
                     <input id="invoiceSearch" type="text" placeholder="Search invoices..." class="qc-input w-full" oninput="debounceInvoiceSearch()">
                 </div>
-                <select id="invoiceStatusFilter" onchange="loadInvoices(1)" class="qc-input w-auto">
-                    <option value="">All Status</option>
-                    <option value="unpaid">Unpaid</option>
-                    <option value="partial">Partial</option>
-                    <option value="paid">Paid</option>
-                </select>
                 <button onclick="openCreateModal('invoice')" class="btn-green px-4 py-2 rounded-lg text-sm font-medium flex items-center gap-1 justify-center">
                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
                     New Invoice
                 </button>
             </div>
+            <div id="invoiceFilterPills" class="flex gap-2 overflow-x-auto scroll-hide pb-1 mb-3">
+                <button type="button" class="filter-pill active" data-group="pay" data-val="" onclick="setInvoiceFilter(this)">All</button>
+                <button type="button" class="filter-pill" data-group="pay" data-val="unpaid" onclick="setInvoiceFilter(this)">Unpaid</button>
+                <button type="button" class="filter-pill" data-group="pay" data-val="partial" onclick="setInvoiceFilter(this)">Partial</button>
+                <button type="button" class="filter-pill" data-group="pay" data-val="paid" onclick="setInvoiceFilter(this)">Paid</button>
+                <span class="pill-divider"></span>
+                <button type="button" class="filter-pill" data-group="zoho" data-val="pending" onclick="setInvoiceFilter(this)">Zoho Pending</button>
+                <button type="button" class="filter-pill" data-group="zoho" data-val="pushed" onclick="setInvoiceFilter(this)">Zoho Pushed</button>
+                <button type="button" class="filter-pill" data-group="zoho" data-val="failed" onclick="setInvoiceFilter(this)">Zoho Failed</button>
+            </div>
             <div id="invoiceList" class="space-y-3">
-                <div class="skeleton h-20 w-full"></div>
-                <div class="skeleton h-20 w-full"></div>
-                <div class="skeleton h-20 w-full"></div>
+                <span class="qc-skel qc-skel-card"></span>
+                <span class="qc-skel qc-skel-card"></span>
+                <span class="qc-skel qc-skel-card"></span>
             </div>
             <div id="invoicePagination" class="flex justify-center gap-2 mt-4"></div>
         </div>
 
         <!-- ==================== PAYMENTS TAB ==================== -->
         <div id="panelPayments" class="hidden">
+            <div class="mb-3">
+                <input id="paymentSearch" type="text" placeholder="Search by invoice number or customer..." class="qc-input w-full" oninput="debouncePaymentSearch()">
+            </div>
             <div id="paymentList" class="space-y-3">
-                <div class="skeleton h-16 w-full"></div>
-                <div class="skeleton h-16 w-full"></div>
-                <div class="skeleton h-16 w-full"></div>
+                <span class="qc-skel qc-skel-card"></span>
+                <span class="qc-skel qc-skel-card"></span>
+                <span class="qc-skel qc-skel-card"></span>
             </div>
             <div id="paymentPagination" class="flex justify-center gap-2 mt-4"></div>
         </div>
@@ -175,28 +252,28 @@
 
     <!-- ==================== DETAIL MODAL ==================== -->
     <div id="detailModal" class="modal-overlay" onclick="if(event.target===this)closeDetailModal()">
-        <div class="bg-white rounded-2xl shadow-xl w-full max-w-2xl mt-8 mb-8 overflow-hidden">
-            <div class="flex items-center justify-between px-5 py-4 border-b">
+        <div class="modal-card bg-white rounded-2xl shadow-xl w-full max-w-2xl mt-8 mb-8 overflow-hidden">
+            <div class="flex items-center justify-between px-5 py-4 border-b flex-shrink-0">
                 <h3 id="detailTitle" class="text-lg font-bold text-gray-800">Details</h3>
-                <button onclick="closeDetailModal()" class="p-1 hover:bg-gray-100 rounded-full">
+                <button onclick="closeDetailModal()" class="p-2 hover:bg-gray-100 rounded-full" aria-label="Close">
                     <svg class="w-5 h-5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
                 </button>
             </div>
-            <div id="detailBody" class="p-5 max-h-[70vh] overflow-y-auto"></div>
-            <div id="detailActions" class="px-5 py-3 border-t bg-gray-50 flex flex-wrap gap-2"></div>
+            <div id="detailBody" class="modal-body p-5"></div>
+            <div id="detailActions" class="modal-footer px-5 py-3 border-t bg-gray-50 flex flex-wrap gap-2"></div>
         </div>
     </div>
 
     <!-- ==================== CREATE/EDIT MODAL ==================== -->
     <div id="createModal" class="modal-overlay" onclick="if(event.target===this)closeCreateModal()">
-        <div class="bg-white rounded-2xl shadow-xl w-full max-w-2xl mt-8 mb-8 overflow-hidden">
-            <div class="flex items-center justify-between px-5 py-4 border-b">
+        <div class="modal-card bg-white rounded-2xl shadow-xl w-full max-w-2xl mt-8 mb-8 overflow-hidden">
+            <div class="flex items-center justify-between px-5 py-4 border-b flex-shrink-0">
                 <h3 id="createTitle" class="text-lg font-bold text-gray-800">New Estimate</h3>
-                <button onclick="closeCreateModal()" class="p-1 hover:bg-gray-100 rounded-full">
+                <button onclick="closeCreateModal()" class="p-2 hover:bg-gray-100 rounded-full" aria-label="Close">
                     <svg class="w-5 h-5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
                 </button>
             </div>
-            <form id="createForm" onsubmit="handleFormSubmit(event)" class="p-5 max-h-[70vh] overflow-y-auto space-y-4" style="min-height:0;">
+            <form id="createForm" onsubmit="handleFormSubmit(event)" class="modal-body p-5 space-y-4" style="min-height:0;">
 
                 <!-- Customer Type -->
                 <div>
@@ -269,22 +346,9 @@
                     </div>
                 </div>
 
-                <!-- Items Table -->
-                <div class="overflow-x-auto">
-                    <table class="w-full text-sm">
-                        <thead>
-                            <tr class="bg-gray-50 text-left">
-                                <th class="px-2 py-2 font-medium text-gray-600">Product</th>
-                                <th class="px-2 py-2 font-medium text-gray-600 w-20">Qty</th>
-                                <th class="px-2 py-2 font-medium text-gray-600 w-24">Rate</th>
-                                <th class="px-2 py-2 font-medium text-gray-600 w-24 text-right">Total</th>
-                                <th class="px-2 py-2 w-10"></th>
-                            </tr>
-                        </thead>
-                        <tbody id="itemsTableBody">
-                            <tr id="noItemsRow"><td colspan="5" class="text-center py-6 text-gray-400 text-sm">No items added</td></tr>
-                        </tbody>
-                    </table>
+                <!-- Items List (card rows — works on desktop and mobile) -->
+                <div id="itemsList" class="space-y-2">
+                    <div id="noItemsRow" class="text-center py-6 text-gray-400 text-sm border border-dashed border-gray-200 rounded-lg">No items added — search products above</div>
                 </div>
 
                 <!-- Totals -->
@@ -309,20 +373,20 @@
                     <textarea id="formNotes" class="qc-input w-full" rows="2" placeholder="Optional notes..."></textarea>
                 </div>
             </form>
-            <div id="createActions" class="px-5 py-3 border-t bg-gray-50 flex flex-wrap gap-2 justify-end"></div>
+            <div id="createActions" class="modal-footer px-5 py-3 border-t bg-gray-50 flex flex-wrap gap-2 justify-end"></div>
         </div>
     </div>
 
     <!-- ==================== PAYMENT MODAL ==================== -->
     <div id="paymentModal" class="modal-overlay" onclick="if(event.target===this)closePaymentModal()">
-        <div class="bg-white rounded-2xl shadow-xl w-full max-w-md mt-16 overflow-hidden">
-            <div class="flex items-center justify-between px-5 py-4 border-b">
+        <div class="modal-card bg-white rounded-2xl shadow-xl w-full max-w-md mt-16 overflow-hidden">
+            <div class="flex items-center justify-between px-5 py-4 border-b flex-shrink-0">
                 <h3 class="text-lg font-bold text-gray-800">Record Payment</h3>
-                <button onclick="closePaymentModal()" class="p-1 hover:bg-gray-100 rounded-full">
+                <button onclick="closePaymentModal()" class="p-2 hover:bg-gray-100 rounded-full" aria-label="Close">
                     <svg class="w-5 h-5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
                 </button>
             </div>
-            <form id="paymentForm" onsubmit="handlePaymentSubmit(event)" class="p-5 space-y-4">
+            <form id="paymentForm" onsubmit="handlePaymentSubmit(event)" class="modal-body p-5 space-y-4">
                 <input type="hidden" id="payInvoiceId">
                 <div class="flex justify-between text-sm bg-gray-50 rounded-lg p-3">
                     <span class="text-gray-500">Invoice</span>
@@ -372,11 +436,41 @@ let estimatePage = 1;
 let invoicePage = 1;
 let paymentPage = 1;
 
+let estimateStatusFilter = '';
+let invoicePayFilter = '';
+let invoiceZohoFilter = '';
+
 let estimateSearchTimer = null;
 let invoiceSearchTimer = null;
+let paymentSearchTimer = null;
 let productSearchTimer = null;
 let painterSearchTimer = null;
 let customerSearchTimer = null;
+
+// ═══════════════════════════════════════════
+// SHARED UI HELPERS (qc-ui / ui-skeletons with graceful fallbacks)
+// ═══════════════════════════════════════════
+function newIdemKey() {
+    return (window.crypto && crypto.randomUUID) ? crypto.randomUUID() : (Date.now() + '-' + Math.random());
+}
+
+function skeletons(n) {
+    return window.qcSkeletonCards ? qcSkeletonCards(n) : '<span class="qc-skel qc-skel-card"></span>'.repeat(n);
+}
+
+function emptyState(opts) {
+    if (window.qcEmptyState) return qcEmptyState(opts);
+    return `<div class="text-center py-12 text-gray-400">${esc(opts.title || 'Nothing here yet')}</div>`;
+}
+
+function errorState(msg) {
+    return `<div class="text-center py-8 text-red-500">${esc(msg || 'Something went wrong')}</div>`;
+}
+
+function confirmDialog(opts) {
+    if (window.qcConfirm) return qcConfirm(opts);
+    return Promise.resolve(window.confirm((opts.title ? opts.title + '\n' : '') + (opts.message || '')));
+}
 
 // ═══════════════════════════════════════════
 // INIT
@@ -430,52 +524,98 @@ async function loadStats() {
 // ═══════════════════════════════════════════
 // ESTIMATES
 // ═══════════════════════════════════════════
+function setEstimateFilter(btn) {
+    estimateStatusFilter = btn.dataset.val;
+    document.querySelectorAll('#estimateFilterPills .filter-pill').forEach(p => p.classList.toggle('active', p === btn));
+    loadEstimates(1);
+}
+
 async function loadEstimates(page = 1) {
     estimatePage = page;
     const search = document.getElementById('estimateSearch')?.value || '';
     const container = document.getElementById('estimateList');
-    container.innerHTML = '<div class="skeleton h-20 w-full"></div>'.repeat(3);
+    container.innerHTML = skeletons(3);
 
     try {
         const params = new URLSearchParams({ page, limit: 20 });
         if (search) params.set('search', search);
+        if (estimateStatusFilter) params.set('status', estimateStatusFilter);
         const res = await fetch(`${API}/estimates?${params}`, { headers });
         const data = await res.json();
         if (!data.success) throw new Error(data.message);
 
         if (!data.estimates.length) {
-            container.innerHTML = '<div class="text-center py-12 text-gray-400">No estimates found</div>';
+            container.innerHTML = (search || estimateStatusFilter)
+                ? emptyState({ icon: 'search', title: 'No matching estimates', message: 'Try a different search or filter.' })
+                : emptyState({ icon: 'document', title: 'No estimates yet', message: 'Create your first estimate to get started.', ctaText: '+ New Estimate', onClick: "openCreateModal('estimate')" });
             document.getElementById('estimatePagination').innerHTML = '';
             return;
         }
 
         container.innerHTML = data.estimates.map(est => `
             <div class="bg-white rounded-xl border border-gray-100 shadow-sm p-4 cursor-pointer hover:shadow-md transition-shadow" onclick="viewEstimate(${est.id})">
-                <div class="flex items-start justify-between mb-2">
-                    <div>
+                <div class="flex items-start justify-between gap-2 mb-2">
+                    <div class="min-w-0">
                         <span class="font-semibold text-gray-800 text-sm">${esc(est.estimate_number)}</span>
                         <span class="status-pill status-${est.status} ml-2">${est.status}</span>
                     </div>
-                    <span class="text-sm font-bold text-gray-800">${formatCurrency(est.grand_total)}</span>
+                    <span class="text-sm font-bold text-gray-800 whitespace-nowrap">${formatCurrency(est.grand_total)}</span>
                 </div>
                 <div class="flex items-center justify-between text-xs text-gray-500">
-                    <div>
+                    <div class="truncate">
                         <span class="font-medium text-gray-700">${esc(est.customer_name)}</span>
                         ${est.created_by_name ? ` &middot; ${esc(est.created_by_name)}` : ''}
                     </div>
-                    <span>${formatDate(est.created_at)}</span>
+                    <span class="whitespace-nowrap ml-2">${formatDate(est.created_at)}</span>
                 </div>
                 ${['draft', 'sent'].includes(est.status) ? `
                 <div class="mt-2 pt-2 border-t border-gray-50">
-                    <button onclick="event.stopPropagation(); convertEstimate(${est.id})" class="text-xs font-medium text-green-700 hover:text-green-900">Convert to Invoice &rarr;</button>
+                    <button onclick="event.stopPropagation(); convertEstimate(${est.id})" class="text-xs font-medium text-green-700 hover:text-green-900 py-2 pr-3 -my-2">Convert to Invoice &rarr;</button>
                 </div>` : ''}
             </div>
         `).join('');
 
         renderPagination('estimatePagination', data.pagination, loadEstimates);
     } catch (e) {
-        container.innerHTML = `<div class="text-center py-8 text-red-500">${esc(e.message)}</div>`;
+        container.innerHTML = errorState(e.message);
     }
+}
+
+/**
+ * Render the Estimate→Invoice→Payment→Push progression as a stepper.
+ * steps: [{ label, sub, state: 'done'|'current'|'pending'|'error' }]
+ */
+function flowStepper(steps) {
+    return `<div class="flow-wrap">${steps.map((s, i) => `
+        ${i > 0 ? `<span class="flow-line ${['done', 'current', 'error'].includes(s.state) ? 'flow-line-on' : ''}"></span>` : ''}
+        <div class="flow-step flow-${s.state}">
+            <span class="flow-dot">${s.state === 'done' ? '&#10003;' : (s.state === 'error' ? '!' : i + 1)}</span>
+            <span class="flow-label">${esc(s.label)}</span>
+            ${s.sub ? `<span class="flow-sub">${esc(s.sub)}</span>` : ''}
+        </div>`).join('')}</div>`;
+}
+
+function estimateFlow(est) {
+    if (est.status === 'cancelled') return '';
+    const sentState = est.status === 'draft' ? 'pending' : 'done';
+    const convState = est.status === 'converted' ? 'done' : 'pending';
+    return flowStepper([
+        { label: 'Created', state: 'done' },
+        { label: 'Sent', state: sentState },
+        { label: 'Invoiced', state: convState }
+    ]);
+}
+
+function invoiceFlow(inv) {
+    const payState = inv.payment_status === 'paid' ? 'done' : (inv.payment_status === 'partial' ? 'current' : 'pending');
+    const paySub = inv.payment_status === 'paid' ? 'paid' : (inv.payment_status === 'partial' ? 'partial' : 'unpaid');
+    const zohoState = inv.zoho_status === 'pushed' ? 'done' : (inv.zoho_status === 'failed' ? 'error' : 'pending');
+    const zohoSub = inv.zoho_status === 'pushed' ? (inv.zoho_invoice_number || 'pushed') : (inv.zoho_status || 'pending');
+    return flowStepper([
+        { label: 'Invoice', sub: inv.source === 'estimate' ? 'from estimate' : 'direct', state: 'done' },
+        { label: 'Payment', sub: paySub, state: payState },
+        { label: 'Zoho', sub: zohoSub, state: zohoState }
+    ]);
 }
 
 async function viewEstimate(id) {
@@ -489,6 +629,7 @@ async function viewEstimate(id) {
 
         document.getElementById('detailTitle').textContent = `Estimate ${est.estimate_number}`;
         document.getElementById('detailBody').innerHTML = `
+            ${estimateFlow(est)}
             <div class="flex items-center gap-2 mb-4">
                 <span class="status-pill status-${est.status}">${est.status}</span>
                 <span class="text-sm text-gray-500">${formatDate(est.created_at)}</span>
@@ -510,7 +651,7 @@ async function viewEstimate(id) {
                 <tbody>
                     ${items.map(i => `<tr class="border-b border-gray-50">
                         <td class="py-2">${esc(i.item_name)}${i.pack_size ? ` <span class="text-gray-400 text-xs">(${esc(i.pack_size)})</span>` : ''}</td>
-                        <td class="py-2 text-right">${i.quantity}</td>
+                        <td class="py-2 text-right">${formatQty(i.quantity)}</td>
                         <td class="py-2 text-right">${formatCurrency(i.unit_price)}</td>
                         <td class="py-2 text-right font-medium">${formatCurrency(i.line_total)}</td>
                     </tr>`).join('')}
@@ -532,9 +673,13 @@ async function viewEstimate(id) {
             actions.innerHTML += `<button onclick="closeDetailModal(); editEstimate(${est.id})" class="btn-green-outline px-4 py-2 rounded-lg text-sm font-medium">Edit</button>`;
             actions.innerHTML += `<button onclick="closeDetailModal(); convertEstimate(${est.id})" class="btn-green px-4 py-2 rounded-lg text-sm font-medium">Convert to Invoice</button>`;
         }
+        if (est.status === 'converted' && est.converted_to_invoice_id) {
+            actions.innerHTML += `<button onclick="closeDetailModal(); switchTab('invoices'); viewInvoice(${est.converted_to_invoice_id})" class="btn-green px-4 py-2 rounded-lg text-sm font-medium">View Invoice &rarr;</button>`;
+        }
         if (est.status !== 'cancelled' && !est.converted_to_invoice_id) {
             actions.innerHTML += `<button onclick="closeDetailModal(); cancelEstimate(${est.id})" class="px-4 py-2 rounded-lg text-sm font-medium text-red-600 hover:bg-red-50 border border-red-200">Cancel</button>`;
         }
+        actions.classList.toggle('hidden', !actions.innerHTML);
 
         document.getElementById('detailModal').classList.add('active');
     } catch (e) {
@@ -543,21 +688,38 @@ async function viewEstimate(id) {
 }
 
 async function convertEstimate(id) {
-    if (!confirm('Convert this estimate to an invoice?')) return;
+    const ok = await confirmDialog({
+        title: 'Convert to Invoice?',
+        message: 'Estimate-ஐ invoice-ஆ மாற்றலாமா? இது undo செய்ய முடியாது.',
+        primaryText: 'Convert'
+    });
+    if (!ok) return;
     try {
-        const res = await fetch(`${API}/estimates/${id}/convert`, { method: 'POST', headers });
+        const res = await fetch(`${API}/estimates/${id}/convert`, { method: 'POST', headers: { ...headers, 'Idempotency-Key': newIdemKey() } });
         const data = await res.json();
         if (!data.success) throw new Error(data.message);
         showToast(`Invoice ${data.invoice_number} created`, 'success');
         loadStats();
         loadEstimates(estimatePage);
+        // Take the user straight to the new invoice (next step in the flow)
+        if (data.invoice_id) {
+            switchTab('invoices');
+            viewInvoice(data.invoice_id);
+        }
     } catch (e) {
         showToast(e.message || 'Conversion failed', 'error');
     }
 }
 
 async function cancelEstimate(id) {
-    if (!confirm('Cancel this estimate? This cannot be undone.')) return;
+    const ok = await confirmDialog({
+        title: 'Cancel Estimate?',
+        message: 'இந்த estimate-ஐ cancel செய்யலாமா? இது undo செய்ய முடியாது.',
+        primaryText: 'Cancel Estimate',
+        secondaryText: 'Back',
+        danger: true
+    });
+    if (!ok) return;
     try {
         const res = await fetch(`${API}/estimates/${id}`, { method: 'DELETE', headers });
         const data = await res.json();
@@ -584,40 +746,56 @@ async function editEstimate(id) {
 // ═══════════════════════════════════════════
 // INVOICES
 // ═══════════════════════════════════════════
+function setInvoiceFilter(btn) {
+    const group = btn.dataset.group;
+    if (group === 'pay') {
+        invoicePayFilter = btn.dataset.val;
+        document.querySelectorAll('#invoiceFilterPills .filter-pill[data-group="pay"]').forEach(p => p.classList.toggle('active', p === btn));
+    } else {
+        // Zoho pills toggle on/off (click the active one again to clear)
+        const wasActive = btn.classList.contains('active');
+        invoiceZohoFilter = wasActive ? '' : btn.dataset.val;
+        document.querySelectorAll('#invoiceFilterPills .filter-pill[data-group="zoho"]').forEach(p => p.classList.toggle('active', p === btn && !wasActive));
+    }
+    loadInvoices(1);
+}
+
 async function loadInvoices(page = 1) {
     invoicePage = page;
     const search = document.getElementById('invoiceSearch')?.value || '';
-    const paymentStatus = document.getElementById('invoiceStatusFilter')?.value || '';
     const container = document.getElementById('invoiceList');
-    container.innerHTML = '<div class="skeleton h-20 w-full"></div>'.repeat(3);
+    container.innerHTML = skeletons(3);
 
     try {
         const params = new URLSearchParams({ page, limit: 20 });
         if (search) params.set('search', search);
-        if (paymentStatus) params.set('payment_status', paymentStatus);
+        if (invoicePayFilter) params.set('payment_status', invoicePayFilter);
+        if (invoiceZohoFilter) params.set('zoho_status', invoiceZohoFilter);
         const res = await fetch(`${API}/invoices?${params}`, { headers });
         const data = await res.json();
         if (!data.success) throw new Error(data.message);
 
         if (!data.invoices.length) {
-            container.innerHTML = '<div class="text-center py-12 text-gray-400">No invoices found</div>';
+            container.innerHTML = (search || invoicePayFilter || invoiceZohoFilter)
+                ? emptyState({ icon: 'search', title: 'No matching invoices', message: 'Try a different search or filter.' })
+                : emptyState({ icon: 'document', title: 'No invoices yet', message: 'Create a direct invoice or convert an estimate.', ctaText: '+ New Invoice', onClick: "openCreateModal('invoice')" });
             document.getElementById('invoicePagination').innerHTML = '';
             return;
         }
 
         container.innerHTML = data.invoices.map(inv => `
             <div class="bg-white rounded-xl border border-gray-100 shadow-sm p-4 cursor-pointer hover:shadow-md transition-shadow" onclick="viewInvoice(${inv.id})">
-                <div class="flex items-start justify-between mb-2">
-                    <div>
+                <div class="flex items-start justify-between gap-2 mb-2">
+                    <div class="min-w-0">
                         <span class="font-semibold text-gray-800 text-sm">${esc(inv.invoice_number)}</span>
                         <span class="status-pill status-${inv.payment_status} ml-2">${inv.payment_status}</span>
-                        ${inv.zoho_status ? `<span class="status-pill status-${inv.zoho_status === 'pushed' ? 'pushed' : 'pending'} ml-1">${inv.zoho_status}</span>` : ''}
+                        ${inv.zoho_status ? `<span class="status-pill status-${esc(inv.zoho_status)} ml-1">${inv.zoho_status === 'pushed' ? 'zoho ✓' : 'zoho ' + esc(inv.zoho_status)}</span>` : ''}
                     </div>
-                    <span class="text-sm font-bold text-gray-800">${formatCurrency(inv.grand_total)}</span>
+                    <span class="text-sm font-bold text-gray-800 whitespace-nowrap">${formatCurrency(inv.grand_total)}</span>
                 </div>
                 <div class="flex items-center justify-between text-xs text-gray-500">
-                    <span class="font-medium text-gray-700">${esc(inv.customer_name)}</span>
-                    <div class="flex items-center gap-2">
+                    <span class="font-medium text-gray-700 truncate">${esc(inv.customer_name)}</span>
+                    <div class="flex items-center gap-2 whitespace-nowrap ml-2">
                         ${inv.balance_due > 0 ? `<span class="text-red-600 font-semibold">Due: ${formatCurrency(inv.balance_due)}</span>` : ''}
                         <span>${formatDate(inv.created_at)}</span>
                     </div>
@@ -627,7 +805,7 @@ async function loadInvoices(page = 1) {
 
         renderPagination('invoicePagination', data.pagination, loadInvoices);
     } catch (e) {
-        container.innerHTML = `<div class="text-center py-8 text-red-500">${esc(e.message)}</div>`;
+        container.innerHTML = errorState(e.message);
     }
 }
 
@@ -643,10 +821,13 @@ async function viewInvoice(id) {
 
         document.getElementById('detailTitle').textContent = `Invoice ${inv.invoice_number}`;
         document.getElementById('detailBody').innerHTML = `
-            <div class="flex items-center gap-2 mb-4">
+            ${invoiceFlow(inv)}
+            <div class="flex items-center gap-2 flex-wrap mb-4">
                 <span class="status-pill status-${inv.payment_status}">${inv.payment_status}</span>
-                ${inv.zoho_status ? `<span class="status-pill status-${inv.zoho_status === 'pushed' ? 'pushed' : 'pending'}">${inv.zoho_status}</span>` : ''}
+                ${inv.zoho_status ? `<span class="status-pill status-${esc(inv.zoho_status)}">zoho ${esc(inv.zoho_status)}</span>` : ''}
+                ${inv.zoho_invoice_number ? `<span class="status-pill status-pushed">${esc(inv.zoho_invoice_number)}</span>` : ''}
                 <span class="text-sm text-gray-500">${formatDate(inv.created_at)}</span>
+                ${inv.created_by_name ? `<span class="text-sm text-gray-400">&middot; ${esc(inv.created_by_name)}</span>` : ''}
             </div>
             <div class="bg-gray-50 rounded-lg p-3 mb-4 text-sm space-y-1">
                 <div><span class="text-gray-500">Customer:</span> <span class="font-medium">${esc(inv.customer_name)}</span></div>
@@ -664,7 +845,7 @@ async function viewInvoice(id) {
                 <tbody>
                     ${items.map(i => `<tr class="border-b border-gray-50">
                         <td class="py-2">${esc(i.item_name)}${i.pack_size ? ` <span class="text-gray-400 text-xs">(${esc(i.pack_size)})</span>` : ''}</td>
-                        <td class="py-2 text-right">${i.quantity}</td>
+                        <td class="py-2 text-right">${formatQty(i.quantity)}</td>
                         <td class="py-2 text-right">${formatCurrency(i.unit_price)}</td>
                         <td class="py-2 text-right font-medium">${formatCurrency(i.line_total)}</td>
                     </tr>`).join('')}
@@ -699,14 +880,17 @@ async function viewInvoice(id) {
         actions.innerHTML = '';
 
         if (inv.balance_due > 0) {
-            actions.innerHTML += `<button onclick="closeDetailModal(); openPaymentModal(${inv.id}, '${esc(inv.invoice_number)}', ${inv.balance_due})" class="btn-green px-4 py-2 rounded-lg text-sm font-medium">Record Payment</button>`;
+            actions.innerHTML += `<button onclick="closeDetailModal(); openPaymentModal(${inv.id}, '${esc(inv.invoice_number)}', ${Number(inv.balance_due) || 0})" class="btn-green px-4 py-2 rounded-lg text-sm font-medium">Record Payment</button>`;
         }
-        if (inv.payment_status !== 'paid' && inv.zoho_status !== 'pushed') {
+        // Server only allows editing UNPAID invoices that are not pushed —
+        // mirror that here so the button is never a dead end for partial/paid.
+        if (inv.payment_status === 'unpaid' && inv.zoho_status !== 'pushed') {
             actions.innerHTML += `<button onclick="closeDetailModal(); editInvoice(${inv.id})" class="btn-green-outline px-4 py-2 rounded-lg text-sm font-medium">Edit</button>`;
         }
         if (inv.zoho_status !== 'pushed') {
-            actions.innerHTML += `<button onclick="closeDetailModal(); pushToZoho(${inv.id})" class="px-4 py-2 rounded-lg text-sm font-medium text-blue-700 hover:bg-blue-50 border border-blue-200">Push to Zoho</button>`;
+            actions.innerHTML += `<button onclick="closeDetailModal(); pushToZoho(${inv.id}, '${esc(inv.payment_status)}', ${Number(inv.balance_due) || 0})" class="px-4 py-2 rounded-lg text-sm font-medium text-blue-700 hover:bg-blue-50 border border-blue-200">Push to Zoho</button>`;
         }
+        actions.classList.toggle('hidden', !actions.innerHTML);
 
         document.getElementById('detailModal').classList.add('active');
     } catch (e) {
@@ -725,14 +909,34 @@ async function editInvoice(id) {
     }
 }
 
-async function pushToZoho(invoiceId) {
-    if (!confirm('Push this invoice to Zoho? This will create a Zoho invoice.')) return;
+async function pushToZoho(invoiceId, paymentStatus, balanceDue) {
+    // Client-side pre-check of the server's push gate (payment_status='paid'
+    // OR credit-limit eligibility) — warn BEFORE hitting the server. The
+    // server gate in billing-zoho-service stays authoritative.
+    const due = Number(balanceDue) || 0;
+    let ok;
+    if (paymentStatus !== 'paid' && due > 0.01) {
+        ok = await confirmDialog({
+            title: 'Invoice paid இல்லை',
+            message: `Balance ₹${due.toLocaleString('en-IN')} இன்னும் pending. Payment record செய்யுங்க, அல்லது customer-க்கு credit limit இருந்தால் மட்டும் push ஆகும். தொடரவா?`,
+            primaryText: 'Push anyway',
+            secondaryText: 'வேண்டாம்',
+            danger: true
+        });
+    } else {
+        ok = await confirmDialog({
+            title: 'Push to Zoho?',
+            message: 'Zoho Books-ல் புதிய invoice create ஆகும்.',
+            primaryText: 'Push'
+        });
+    }
+    if (!ok) return;
     try {
-        const idemKey = (window.crypto && crypto.randomUUID) ? crypto.randomUUID() : (Date.now() + '-' + Math.random());
-        const res = await fetch(`${API}/invoices/${invoiceId}/push-zoho`, { method: 'POST', headers: { ...headers, 'Idempotency-Key': idemKey } });
+        const res = await fetch(`${API}/invoices/${invoiceId}/push-zoho`, { method: 'POST', headers: { ...headers, 'Idempotency-Key': newIdemKey() } });
         const data = await res.json();
         if (!data.success) throw new Error(data.message);
         showToast('Invoice pushed to Zoho', 'success');
+        loadStats();
         loadInvoices(invoicePage);
     } catch (e) {
         showToast(e.message || 'Push to Zoho failed', 'error');
@@ -744,17 +948,21 @@ async function pushToZoho(invoiceId) {
 // ═══════════════════════════════════════════
 async function loadPayments(page = 1) {
     paymentPage = page;
+    const search = document.getElementById('paymentSearch')?.value || '';
     const container = document.getElementById('paymentList');
-    container.innerHTML = '<div class="skeleton h-16 w-full"></div>'.repeat(3);
+    container.innerHTML = skeletons(3);
 
     try {
         const params = new URLSearchParams({ page, limit: 20 });
+        if (search) params.set('search', search);
         const res = await fetch(`${API}/payments?${params}`, { headers });
         const data = await res.json();
         if (!data.success) throw new Error(data.message);
 
         if (!data.payments.length) {
-            container.innerHTML = '<div class="text-center py-12 text-gray-400">No payments recorded yet</div>';
+            container.innerHTML = search
+                ? emptyState({ icon: 'search', title: 'No matching payments', message: 'Try a different invoice number or customer name.' })
+                : emptyState({ icon: 'inbox', title: 'No payments recorded yet', message: 'Payments you record against invoices will appear here.' });
             document.getElementById('paymentPagination').innerHTML = '';
             return;
         }
@@ -780,7 +988,7 @@ async function loadPayments(page = 1) {
 
         renderPagination('paymentPagination', data.pagination, loadPayments);
     } catch (e) {
-        container.innerHTML = `<div class="text-center py-8 text-red-500">${esc(e.message)}</div>`;
+        container.innerHTML = errorState(e.message);
     }
 }
 
@@ -941,9 +1149,12 @@ function submitForm(action) {
 
 async function submitAPI(url, method, payload) {
     try {
-        const res = await fetch(url, { method, headers, body: JSON.stringify(payload) });
+        // Idempotency-Key on creates protects against double-tap duplicates
+        // (server middleware replays the first response for 24h).
+        const reqHeaders = method === 'POST' ? { ...headers, 'Idempotency-Key': newIdemKey() } : headers;
+        const res = await fetch(url, { method, headers: reqHeaders, body: JSON.stringify(payload) });
         const data = await res.json();
-        if (!data.success) throw new Error(data.message);
+        if (!data.success) throw new Error(extractApiError(data));
         showToast(data.message || 'Saved successfully', 'success');
         closeCreateModal();
         loadStats();
@@ -980,13 +1191,18 @@ async function handlePaymentSubmit(e) {
         notes: ''
     };
     try {
-        const res = await fetch(`${API}/invoices/${invoiceId}/payment`, { method: 'POST', headers, body: JSON.stringify(payload) });
+        const res = await fetch(`${API}/invoices/${invoiceId}/payment`, {
+            method: 'POST',
+            headers: { ...headers, 'Idempotency-Key': newIdemKey() },
+            body: JSON.stringify(payload)
+        });
         const data = await res.json();
-        if (!data.success) throw new Error(data.message);
+        if (!data.success) throw new Error(extractApiError(data));
         showToast('Payment recorded', 'success');
         closePaymentModal();
         loadStats();
         loadInvoices(invoicePage);
+        if (currentTab === 'payments') loadPayments(paymentPage);
     } catch (e) {
         showToast(e.message || 'Payment failed', 'error');
     }
@@ -1012,11 +1228,13 @@ async function searchProducts() {
 
         // Keep the result objects on the element and reference them by index instead of
         // serializing each product into an onclick attribute (avoids HTML/JS-context injection).
+        // NOTE: /api/billing/products does not return pack_size (zoho_items_map
+        // has no such column — size lives inside the item name). Show SKU instead.
         el._results = data.products;
         el.innerHTML = data.products.map((p, i) => `
             <div class="suggestion-item" data-idx="${i}">
                 <div class="font-medium text-gray-800">${esc(p.item_name)}</div>
-                <div class="text-xs text-gray-400">${p.pack_size ? esc(p.pack_size) + ' &middot; ' : ''}${formatCurrency(p.rate)}</div>
+                <div class="text-xs text-gray-400">${p.sku ? esc(p.sku) + ' &middot; ' : ''}${formatCurrency(p.rate)}</div>
             </div>
         `).join('');
         if (!el._wired) {
@@ -1052,35 +1270,52 @@ function removeItem(idx) {
     recalcTotals();
 }
 
-function updateItemField(idx, field, value) {
-    currentItems[idx][field] = Number(value) || 0;
+function changeQty(idx, delta) {
+    const cur = Number(currentItems[idx].quantity) || 1;
+    currentItems[idx].quantity = Math.max(1, cur + delta);
+    renderItems();
     recalcTotals();
-    // Update line total display
-    const row = document.querySelector(`#itemRow${idx} .line-total`);
-    if (row) row.textContent = formatCurrency(currentItems[idx].quantity * currentItems[idx].unit_price);
+}
+
+function updateItemField(idx, field, value) {
+    let v = Number(value) || 0;
+    // Server (Zod) rejects quantity <= 0 and unit_price < 0 — clamp here.
+    if (field === 'quantity' && v <= 0) v = 1;
+    if (field === 'unit_price' && v < 0) v = 0;
+    currentItems[idx][field] = v;
+    renderItems(); // onchange fires on blur, safe to re-render
+    recalcTotals();
 }
 
 function renderItems() {
-    const tbody = document.getElementById('itemsTableBody');
+    const list = document.getElementById('itemsList');
     if (!currentItems.length) {
-        tbody.innerHTML = '<tr id="noItemsRow"><td colspan="5" class="text-center py-6 text-gray-400 text-sm">No items added</td></tr>';
+        list.innerHTML = '<div id="noItemsRow" class="text-center py-6 text-gray-400 text-sm border border-dashed border-gray-200 rounded-lg">No items added — search products above</div>';
         return;
     }
-    tbody.innerHTML = currentItems.map((item, idx) => `
-        <tr id="itemRow${idx}" class="border-b border-gray-50">
-            <td class="px-2 py-2">
-                <div class="text-sm font-medium text-gray-800">${esc(item.item_name)}</div>
-                ${item.pack_size ? `<div class="text-xs text-gray-400">${esc(item.pack_size)}</div>` : ''}
-            </td>
-            <td class="px-2 py-2"><input type="number" value="${item.quantity}" min="1" step="1" class="qc-input w-full text-center text-sm" onchange="updateItemField(${idx},'quantity',this.value)"></td>
-            <td class="px-2 py-2"><input type="number" value="${item.unit_price}" min="0" step="0.01" class="qc-input w-full text-right text-sm" onchange="updateItemField(${idx},'unit_price',this.value)"></td>
-            <td class="px-2 py-2 text-right text-sm font-medium line-total">${formatCurrency(item.quantity * item.unit_price)}</td>
-            <td class="px-2 py-2 text-center">
-                <button type="button" onclick="removeItem(${idx})" class="text-red-400 hover:text-red-600">
+    list.innerHTML = currentItems.map((item, idx) => `
+        <div id="itemRow${idx}" class="bg-gray-50 rounded-lg p-3">
+            <div class="flex items-start justify-between gap-2 mb-2">
+                <div class="text-sm font-medium text-gray-800 flex-1 min-w-0">${esc(item.item_name)}
+                    ${item.pack_size ? `<span class="text-xs text-gray-400 font-normal">(${esc(item.pack_size)})</span>` : ''}
+                </div>
+                <button type="button" onclick="removeItem(${idx})" class="text-red-400 hover:text-red-600 p-2 -m-2" aria-label="Remove item">
                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
                 </button>
-            </td>
-        </tr>
+            </div>
+            <div class="flex items-center gap-3 flex-wrap">
+                <div class="qty-stepper">
+                    <button type="button" class="qty-btn" onclick="changeQty(${idx},-1)" aria-label="Decrease quantity">&minus;</button>
+                    <input type="number" value="${Number(item.quantity) || 1}" min="0.01" step="any" class="qty-input" onchange="updateItemField(${idx},'quantity',this.value)" aria-label="Quantity">
+                    <button type="button" class="qty-btn" onclick="changeQty(${idx},1)" aria-label="Increase quantity">+</button>
+                </div>
+                <div class="flex items-center gap-1 text-sm">
+                    <span class="text-gray-400">&#8377;</span>
+                    <input type="number" value="${Number(item.unit_price) || 0}" min="0" step="0.01" class="qc-input w-24 text-right text-sm" onchange="updateItemField(${idx},'unit_price',this.value)" aria-label="Unit price">
+                </div>
+                <div class="text-sm font-semibold text-gray-800 ml-auto line-total">${formatCurrency((Number(item.quantity) || 0) * (Number(item.unit_price) || 0))}</div>
+            </div>
+        </div>
     `).join('');
 }
 
@@ -1217,6 +1452,11 @@ function debounceInvoiceSearch() {
     invoiceSearchTimer = setTimeout(() => loadInvoices(1), 300);
 }
 
+function debouncePaymentSearch() {
+    clearTimeout(paymentSearchTimer);
+    paymentSearchTimer = setTimeout(() => loadPayments(1), 300);
+}
+
 // ═══════════════════════════════════════════
 // PAGINATION
 // ═══════════════════════════════════════════
@@ -1252,6 +1492,24 @@ function formatCurrency(val) {
     return '\u20B9' + num.toLocaleString('en-IN', { minimumFractionDigits: 0, maximumFractionDigits: 2 });
 }
 
+// DECIMAL columns arrive as strings ('2.00') \u2014 trim trailing zeros for display.
+function formatQty(q) {
+    return String(Number(q) || 0);
+}
+
+// Zod validation failures come back as { error: { message, details: [{field,message}] } }
+// with no top-level message \u2014 surface the first field error instead of a generic toast.
+function extractApiError(data) {
+    if (data && data.message) return data.message;
+    const err = data && data.error;
+    if (err) {
+        const d = err.details && err.details[0];
+        if (d) return (d.field && d.field !== '_root' ? d.field + ': ' : '') + d.message;
+        return err.message || 'Request failed';
+    }
+    return 'Request failed';
+}
+
 function formatDate(d) {
     if (!d) return '';
     const dt = new Date(d);
@@ -1267,6 +1525,11 @@ function esc(str) {
 }
 
 function showToast(msg, type = 'success') {
+    if (window.qcToast) {
+        qcToast(msg, { variant: type === 'error' ? 'error' : 'success' });
+        return;
+    }
+    // Fallback when qc-ui.js is unavailable
     const existing = document.querySelector('.toast');
     if (existing) existing.remove();
 
