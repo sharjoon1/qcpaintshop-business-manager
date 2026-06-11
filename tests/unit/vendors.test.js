@@ -12,7 +12,7 @@
 // margin). A vendor bill's printed line price IS the cost, so the AI's
 // ai.rate compares against unit_price on DB rows (staff.rate kept for
 // AI-shaped callers).
-const { createVendorSchema, createBillSchema, recordPaymentSchema, listQuerySchema } = require('../../routes/vendors');
+const { createVendorSchema, createBillSchema, recordPaymentSchema, listQuerySchema, computeBillTotals } = require('../../routes/vendors');
 const { verifyBillItems, matchProductsToZoho, setPool, buildReconciliation } = require('../../services/vendor-bill-ai-service');
 
 describe('Vendor System', () => {
@@ -230,10 +230,44 @@ describe('Vendor System', () => {
         });
     });
 
-    describe('PO→Bill link migration', () => {
-        it('20260612_vendor_po_bill_link exports an up() function', () => {
-            const migration = require('../../migrations/20260612_vendor_po_bill_link.js');
-            expect(typeof migration.up).toBe('function');
+    describe('migrations export up()', () => {
+        it.each([
+            '20260612_vendor_po_bill_link.js',
+            '20260612_vendor_bill_discount.js',
+        ])('%s exports an up() function', (file) => {
+            expect(typeof require(`../../migrations/${file}`).up).toBe('function');
+        });
+    });
+
+    describe('computeBillTotals (DPL subtotal − discount → +GST)', () => {
+        it('reproduces a real Berger bill: 18700 − 1823.25 = 16876.75 → +18% = 19914.57', () => {
+            // line: SEAL-O-PRIME 20L, 5 packs @ 3740 DPL = 18700 subtotal
+            const t = computeBillTotals([{ quantity: 5, unit_price: 3740 }], 1823.25);
+            expect(t.subtotal).toBe(18700);
+            expect(t.discount).toBe(1823.25);
+            expect(t.taxable).toBe(16876.75);
+            expect(t.tax).toBe(3037.82);   // 16876.75 × 0.18 = 3037.815 → 3037.82
+            expect(t.grand).toBe(19914.57);
+        });
+
+        it('auto-computes 18% GST when no explicit tax is given', () => {
+            const t = computeBillTotals([{ quantity: 1, unit_price: 1000 }]);
+            expect(t.taxable).toBe(1000);
+            expect(t.tax).toBe(180);
+            expect(t.grand).toBe(1180);
+        });
+
+        it('uses an explicit tax amount when supplied (IGST / odd bills)', () => {
+            const t = computeBillTotals([{ quantity: 1, unit_price: 1000 }], 0, 175.5);
+            expect(t.tax).toBe(175.5);
+            expect(t.grand).toBe(1175.5);
+        });
+
+        it('discount cannot exceed the subtotal', () => {
+            const t = computeBillTotals([{ quantity: 1, unit_price: 100 }], 500);
+            expect(t.discount).toBe(100);
+            expect(t.taxable).toBe(0);
+            expect(t.grand).toBe(0);
         });
     });
 

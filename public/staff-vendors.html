@@ -111,6 +111,35 @@
         .recon-line-total { font-size: 0.8rem; font-weight: 700; color: #1B5E3B; }
         .recon-extra-card { border: 1px dashed #D4A24E; border-radius: 0.75rem; padding: 0.625rem 0.75rem; background: #FBF3E2; display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; margin-bottom: 0.5rem; }
 
+        /* Per-line DPL update (amber) — wraps on mobile */
+        .recon-dpl-row { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 0.5rem; background: #FFFBEB; border: 1px solid #FCD34D; border-radius: 0.5rem; padding: 0.4rem 0.6rem; margin-bottom: 0.625rem; }
+        .recon-dpl-text { font-size: 0.72rem; color: #8A6116; }
+        .recon-dpl-text b { color: #6B4A0C; }
+        .recon-dpl-btn { font-size: 0.68rem; font-weight: 700; color: #fff; background: #D4A24E; border: 1px solid #C08F3A; border-radius: 9999px; padding: 4px 10px; cursor: pointer; white-space: nowrap; min-height: 28px; }
+        .recon-dpl-btn:hover { background: #C08F3A; }
+        .recon-dpl-btn:disabled { opacity: 0.6; cursor: default; }
+        .recon-qty-hint { font-size: 0.64rem; color: #6B7280; line-height: 1.25; margin-top: 1px; }
+
+        /* Bill totals breakdown */
+        .recon-totals { border: 1px solid #C7E6D3; border-radius: 0.875rem; background: #F0FDF4; padding: 0.75rem 0.875rem; margin: 0.875rem 0; }
+        .recon-totals-title { font-size: 0.7rem; font-weight: 700; text-transform: uppercase; letter-spacing: .03em; color: #1B5E3B; margin-bottom: 0.5rem; }
+        .recon-totals-row { display: flex; align-items: center; justify-content: space-between; gap: 0.75rem; padding: 3px 0; }
+        .recon-totals-mid { border-top: 1px dashed #C7E6D3; padding-top: 6px; margin-top: 2px; }
+        .recon-totals-label { font-size: 0.82rem; color: #374151; display: inline-flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+        .recon-totals-sub { font-size: 0.64rem; color: #9CA3AF; }
+        .recon-totals-val { font-size: 0.85rem; font-weight: 600; color: #1F2937; white-space: nowrap; }
+        .recon-totals-grand { border-top: 1px solid #1B5E3B; margin-top: 4px; padding-top: 7px; }
+        .recon-totals-grand .recon-totals-label { font-weight: 700; color: #1B5E3B; font-size: 0.92rem; }
+        .recon-totals-grand .recon-totals-val { font-weight: 800; color: #1B5E3B; font-size: 1.02rem; }
+        .recon-totals-input { display: inline-flex; align-items: center; gap: 2px; background: #fff; border: 1px solid #A7C9B4; border-radius: 0.5rem; padding: 0 6px; min-height: 36px; }
+        .recon-totals-input .recon-rs { font-size: 0.8rem; color: #6B7280; }
+        .recon-totals-input input { width: 6.5rem; max-width: 38vw; text-align: right; border: none; outline: none; background: transparent; font-size: 0.85rem; color: #1F2937; padding: 6px 0; min-height: 36px; }
+        .recon-auto-tag { font-size: 0.58rem; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; color: #1B5E3B; background: #DCFCE7; border: 1px solid #A7F3D0; border-radius: 9999px; padding: 0 6px; }
+        .recon-auto-reset { font-size: 0.62rem; font-weight: 600; color: #1B5E3B; text-decoration: underline; background: none; border: none; cursor: pointer; padding: 0; }
+        .recon-match-ok { font-size: 0.75rem; font-weight: 700; color: #157347; margin-top: 0.5rem; }
+        .recon-match-off { font-size: 0.72rem; font-weight: 600; color: #B45309; margin-top: 0.5rem; }
+        @media (max-width: 639px) { .recon-totals-input input { min-height: 44px; padding: 10px 0; } .recon-totals-input { min-height: 44px; } }
+
         /* Sticky reconcile footer on mobile */
         .recon-footer { position: sticky; bottom: 0; background: #fff; border-top: 1px solid #E5E7EB; padding: 0.625rem 0; margin: 0.75rem -1.25rem -1.25rem; padding-left: 1.25rem; padding-right: 1.25rem; display: flex; gap: 0.5rem; z-index: 5; }
         @media (max-width: 639px) { .recon-footer .btn-green, .recon-footer .btn-green-outline { flex: 1 1 auto; min-height: 44px; } }
@@ -669,6 +698,10 @@ let reconAiByIndex = {};         // index → ai counterpart { name, quantity, r
 let reconExtra = [];             // ai_extra lines not yet on the bill
 let reconPickerLineIdx = null;   // which line the match-picker is targeting
 let reconPickerTimer = null;
+// Bill-level money state (new model: subtotal − discount → taxable + GST → grand)
+let reconDiscount = 0;           // ONE bill-level discount (₹), seeded from bill.discount_amount
+let reconTaxAmount = null;       // GST override; null = auto 18% of taxable
+let reconAiTotal = 0;            // AI-extracted printed total (ai_extracted_data.total), 0 if unknown
 
 // Status pill filters (vendor.status / bill.payment_status / po.status)
 const listFilters = { vendor: '', bill: '', po: '' };
@@ -1083,7 +1116,7 @@ async function viewBill(id) {
         // read-only items table) so staff fix every difference inline. The
         // Scan & Re-scan photo box + flow stepper stay above it.
         if (recon && bill.zoho_status !== 'pushed' && reconHasUnresolved(recon.summary)) {
-            renderReconcileEditor(bill, recon, payments, needsScan);
+            renderReconcileEditor(bill, recon, payments, needsScan, data.ai_extracted_data);
             openModal('billDetailModal');
             return;
         }
@@ -1205,7 +1238,7 @@ function reconHasUnresolved(summary) {
 }
 
 // Entry point: clone the reconciliation into editable state, then render.
-function renderReconcileEditor(bill, recon, payments, needsScan) {
+function renderReconcileEditor(bill, recon, payments, needsScan, aiExtracted) {
     reconBillId = bill.id;
     // bill-side lines are the editable rows (the values that get saved)
     reconLines = (recon.lines || []).map(l => ({
@@ -1216,12 +1249,22 @@ function renderReconcileEditor(bill, recon, payments, needsScan) {
         zoho_item_id: l.bill.zoho_item_id || null,
         zoho_item_name: '',            // sub-note when matched via picker
         ai_matched: !!l.bill.ai_matched,
-        ai_confidence: Number(l.bill.ai_confidence) || 0
+        ai_confidence: Number(l.bill.ai_confidence) || 0,
+        // Catalog DPL for the matched Zoho item (null if unmatched / no DPL),
+        // so the card can offer a per-line "Update item DPL" when it differs.
+        stored_dpl: (l.bill.stored_dpl != null) ? Number(l.bill.stored_dpl) : null
     }));
     // ai counterpart by index (for "Photo: …" tags + ← use + Apply all)
     reconAiByIndex = {};
     (recon.lines || []).forEach(l => { if (l.ai) reconAiByIndex[l.index] = l.ai; });
     reconExtra = (recon.ai_extra || []).map(a => ({ ...a }));
+
+    // Bill-level money: seed discount + GST, GST stays "auto" (null) until the
+    // user types an override. The AI printed total (if extracted) lets us show
+    // a "✓ matches invoice" hint against the live grand total.
+    reconDiscount = Number(bill.discount_amount) || 0;
+    reconTaxAmount = (bill.tax_amount != null && bill.tax_amount !== '') ? Number(bill.tax_amount) : null;
+    reconAiTotal = (aiExtracted && aiExtracted.total != null) ? Number(aiExtracted.total) || 0 : 0;
 
     document.getElementById('billDetailTitle').textContent = `Reconcile Bill ${bill.bill_number}`;
     // The Scan & Re-scan photo box (reused) + the flow stepper sit above the editor.
@@ -1293,13 +1336,16 @@ function renderReconEditorBody() {
             `).join('')}
         </div>` : '';
 
+    // Bill totals breakdown — its own container so input edits refresh it alone.
+    const totalsSection = `<div id="reconTotalsPanel">${renderReconTotalsPanel()}</div>`;
+
     const footer = `
         <div class="recon-footer">
             <button onclick="reconCancel()" class="btn-green-outline px-4 py-2 rounded-lg text-sm font-medium">Cancel</button>
             <button onclick="reconSave()" id="btnReconSave" class="btn-green px-4 py-2 rounded-lg text-sm font-medium flex-1 sm:flex-none">Save &amp; Re-verify</button>
         </div>`;
 
-    document.getElementById('reconEditorRoot').innerHTML = banner + cards + extraSection + footer;
+    document.getElementById('reconEditorRoot').innerHTML = banner + cards + extraSection + totalsSection + footer;
 }
 
 // One editable card per bill line.
@@ -1314,6 +1360,26 @@ function renderReconCard(line, idx) {
     const rateDiff = ai && Math.abs((Number(line.unit_price) || 0) - (Number(ai.rate) || 0)) > 0.01;
     const hsnDiff = ai && line.hsn_or_sac && ai.hsn_or_sac && String(line.hsn_or_sac) !== String(ai.hsn_or_sac);
     const hsnMissing = !line.hsn_or_sac;
+
+    // Per-line DPL update: only when matched to a Zoho item whose catalog DPL
+    // differs from this bill's cost (unit_price). The button pushes the bill
+    // cost as the item's new DPL → Zoho.
+    const billDpl = Number(line.unit_price) || 0;
+    const dplDiff = line.zoho_item_id && line.stored_dpl != null && Math.abs(line.stored_dpl - billDpl) > 0.01;
+    const dplRow = dplDiff ? `
+        <div class="recon-dpl-row">
+            <span class="recon-dpl-text">Item DPL: stored <b>${formatCurrency(line.stored_dpl)}</b> → bill <b>${formatCurrency(billDpl)}</b></span>
+            <button type="button" id="reconDplBtn${idx}" onclick="reconUpdateItemDpl(${idx})" class="recon-dpl-btn">Update item DPL</button>
+        </div>` : '';
+
+    // Quantity clarity: when our pack qty < AI qty AND AI qty is a clean
+    // multiple of it, the AI likely read total LITRES, not pack count. Hint
+    // only — never auto-change (the "← use" stays for when AI is right).
+    const aiQ = ai ? Number(ai.quantity) || 0 : 0;
+    const billQ = Number(line.quantity) || 0;
+    const qtyLitreHint = ai && aiQ > billQ && billQ > 0 && (aiQ % billQ === 0)
+        ? `<div class="recon-qty-hint">AI படித்தது ${aiQ} (மொத்த அளவு போல) — pack qty-ஐ வைக்கவும்</div>`
+        : '';
 
     // Match row
     const matchRow = line.zoho_item_id ? `
@@ -1340,6 +1406,7 @@ function renderReconCard(line, idx) {
                 </button>
             </div>
             <div class="mb-2">${matchRow}</div>
+            ${dplRow}
             <div class="recon-grid">
                 <!-- Quantity -->
                 <div class="recon-field ${qtyDiff ? 'diff' : ''}">
@@ -1350,6 +1417,7 @@ function renderReconCard(line, idx) {
                         <span class="recon-photo-tag">📷 ${Number(ai.quantity)}</span>
                         ${qtyDiff ? `<button class="recon-use-btn" onclick="reconUseAi(${idx}, 'quantity')">← use</button>` : ''}
                     </div>` : ''}
+                    ${qtyLitreHint}
                 </div>
                 <!-- Rate (unit_price) -->
                 <div class="recon-field ${rateDiff ? 'diff' : ''}">
@@ -1398,6 +1466,96 @@ function computeReconSummary() {
     return { quantity, rate, hsn, needs_match, needs_hsn, count_diff: ai_item_count !== bill_item_count, ai_item_count, bill_item_count };
 }
 
+// ── Bill-level money (new model, mirrors routes/vendors.js computeBillTotals) ──
+// subtotal = Σ(qty×unit_price); taxable = subtotal − discount (one bill-level
+// discount, capped at subtotal); GST = override or auto 18% of taxable;
+// grand = taxable + GST. Round each step to 2dp, exactly like the backend.
+function r2(n) { return Math.round((Number(n) || 0) * 100) / 100; }
+
+function computeReconTotals() {
+    const subtotal = r2(reconLines.reduce((s, l) => s + (Number(l.quantity) || 0) * (Number(l.unit_price) || 0), 0));
+    const discount = r2(Math.min(Math.max(Number(reconDiscount) || 0, 0), subtotal));
+    const taxable = r2(subtotal - discount);
+    const taxAuto = reconTaxAmount == null;
+    const tax = taxAuto ? r2(taxable * 0.18) : r2(reconTaxAmount);
+    const grand = r2(taxable + tax);
+    return { subtotal, discount, taxable, tax, taxAuto, grand };
+}
+
+// The totals breakdown panel. Re-rendered into #reconTotalsPanel on every edit
+// so it stays live without re-rendering (and losing focus on) the line cards.
+function renderReconTotalsPanel() {
+    const t = computeReconTotals();
+    const matches = reconAiTotal > 0 && Math.abs(t.grand - reconAiTotal) < 0.01;
+    const matchHint = reconAiTotal > 0
+        ? (matches
+            ? `<div class="recon-match-ok">✓ matches invoice (${formatCurrency(reconAiTotal)})</div>`
+            : `<div class="recon-match-off">Invoice total: ${formatCurrency(reconAiTotal)} — ${formatCurrency(Math.abs(t.grand - reconAiTotal))} ${t.grand > reconAiTotal ? 'over' : 'short'}</div>`)
+        : '';
+    return `
+        <div class="recon-totals">
+            <div class="recon-totals-title">Bill totals</div>
+            <div class="recon-totals-row">
+                <span class="recon-totals-label">Subtotal <span class="recon-totals-sub">(Σ qty × rate)</span></span>
+                <span class="recon-totals-val">${formatCurrency(t.subtotal)}</span>
+            </div>
+            <div class="recon-totals-row">
+                <span class="recon-totals-label">− Discount</span>
+                <span class="recon-totals-input">
+                    <span class="recon-rs">₹</span>
+                    <input type="number" id="reconDiscountInput" value="${reconDiscount || 0}" min="0" step="0.01"
+                        oninput="reconSetDiscount(this.value)" inputmode="decimal" aria-label="Bill discount">
+                </span>
+            </div>
+            <div class="recon-totals-row recon-totals-mid">
+                <span class="recon-totals-label">= Taxable</span>
+                <span class="recon-totals-val">${formatCurrency(t.taxable)}</span>
+            </div>
+            <div class="recon-totals-row">
+                <span class="recon-totals-label">+ GST 18% ${t.taxAuto ? '<span class="recon-auto-tag">auto</span>' : '<button type="button" class="recon-auto-reset" onclick="reconResetTax()">reset to auto</button>'}</span>
+                <span class="recon-totals-input">
+                    <span class="recon-rs">₹</span>
+                    <input type="number" id="reconTaxInput" value="${t.taxAuto ? '' : reconTaxAmount}" placeholder="${t.tax}" min="0" step="0.01"
+                        oninput="reconSetTax(this.value)" inputmode="decimal" aria-label="GST amount">
+                </span>
+            </div>
+            <div class="recon-totals-row recon-totals-grand">
+                <span class="recon-totals-label">Grand Total</span>
+                <span class="recon-totals-val">${formatCurrency(t.grand)}</span>
+            </div>
+            ${matchHint}
+        </div>`;
+}
+
+// Discount / GST input handlers — update state, then re-render ONLY the totals
+// panel (input focus is preserved because the line cards aren't touched).
+function reconSetDiscount(value) {
+    reconDiscount = Math.max(Number(value) || 0, 0);
+    refreshReconTotals();
+}
+function reconSetTax(value) {
+    const v = String(value).trim();
+    reconTaxAmount = (v === '') ? null : Math.max(Number(v) || 0, 0); // blank → back to auto
+    refreshReconTotals();
+}
+function reconResetTax() {
+    reconTaxAmount = null;
+    refreshReconTotals();
+}
+// Re-render the totals panel in place. The discount input keeps focus/caret;
+// the GST input only needs a fresh placeholder (its auto value) when blank.
+function refreshReconTotals() {
+    const host = document.getElementById('reconTotalsPanel');
+    if (!host) return;
+    const focusedId = (document.activeElement && document.activeElement.id) || null;
+    const caret = (focusedId && document.activeElement.selectionStart != null) ? document.activeElement.selectionStart : null;
+    host.innerHTML = renderReconTotalsPanel();
+    if (focusedId) {
+        const el = document.getElementById(focusedId);
+        if (el) { el.focus(); if (caret != null) { try { el.setSelectionRange(caret, caret); } catch (e) {} } }
+    }
+}
+
 function reconUpdateField(idx, field, value) {
     if (field === 'item_name' || field === 'hsn_or_sac') {
         reconLines[idx][field] = value;
@@ -1415,6 +1573,32 @@ function reconUseAi(idx, field) {
     else if (field === 'unit_price') reconLines[idx].unit_price = Number(ai.rate) || 0;
     else if (field === 'hsn_or_sac') reconLines[idx].hsn_or_sac = ai.hsn_or_sac || '';
     renderReconEditorBody();
+}
+
+// Push this line's bill cost as the Zoho item's new DPL (updates DPL + sales
+// rate + Zoho). On success, set stored_dpl so the amber row disappears.
+async function reconUpdateItemDpl(idx) {
+    const line = reconLines[idx];
+    if (!line || !line.zoho_item_id) return;
+    const dpl = Number(line.unit_price) || 0;
+    const btn = document.getElementById(`reconDplBtn${idx}`);
+    if (btn) { btn.disabled = true; btn.textContent = 'Updating...'; }
+    try {
+        const res = await fetch(`${API}/items/dpl`, {
+            method: 'POST',
+            headers: { ...headers, 'Idempotency-Key': idemKey() },
+            body: JSON.stringify({ zoho_item_id: line.zoho_item_id, dpl })
+        });
+        const data = await res.json();
+        if (!data.success) throw new Error(apiMessage(data, 'DPL update failed'));
+        // Reflect the new stored DPL so the diff (and the amber row) clears.
+        line.stored_dpl = (data.dpl != null) ? Number(data.dpl) : dpl;
+        showToast(`Item DPL updated → Zoho ${data.zoho_pushed ? 'pushed' : 'queued'}`, 'success');
+        renderReconEditorBody();
+    } catch (e) {
+        showToast(e.message || 'DPL update failed', 'error');
+        if (btn) { btn.disabled = false; btn.textContent = 'Update item DPL'; }
+    }
 }
 
 // Bulk: copy every AI value into its matching bill line.
@@ -1482,6 +1666,8 @@ async function reconSave() {
     const btn = document.getElementById('btnReconSave');
     if (btn) { btn.disabled = true; btn.textContent = 'Saving...'; }
 
+    // Bill-level money goes alongside the items (new model). tax_amount stays
+    // null while GST is in auto mode so the backend recomputes 18%.
     const payload = {
         items: reconLines.map(l => ({
             zoho_item_id: l.zoho_item_id || null,
@@ -1491,7 +1677,9 @@ async function reconSave() {
             hsn_or_sac: (l.hsn_or_sac || '').trim() || null,
             ai_matched: !!l.ai_matched,
             ai_confidence: Number(l.ai_confidence) || 0
-        }))
+        })),
+        discount_amount: Math.max(Number(reconDiscount) || 0, 0),
+        tax_amount: (reconTaxAmount == null) ? null : Math.max(Number(reconTaxAmount) || 0, 0)
     };
 
     try {

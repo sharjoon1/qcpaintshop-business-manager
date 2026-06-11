@@ -15,8 +15,31 @@ const vendorBillAI = require('../services/vendor-bill-ai-service');
 const zohoAPI = require('../services/zoho-api');
 const { idempotent, setPool: setIdempotencyPool } = require('../middleware/idempotency');
 
+const { computeZohoRate } = require('../services/dpl-catalog');
+
 let pool;
 function setPool(p) { pool = p; vendorBillAI.setPool(p); setIdempotencyPool(p); }
+
+const r2 = n => Math.round((parseFloat(n) || 0) * 100) / 100;
+const GST_RATE = 0.18; // paints/putty: CGST 9 + SGST 9
+
+/**
+ * Vendor bill/PO money model (owner decision 2026-06-12):
+ *   subtotal = Σ(qty × DPL)   [unit_price is the ex-GST DPL cost per pack]
+ *   taxable  = subtotal − total discount  (discount applied to the TOTAL, never item-wise)
+ *   tax      = explicit taxAmount when given, else taxable × 18%
+ *   grand    = taxable + tax
+ * Returns every intermediate so the UI can show a transparent breakdown that
+ * must reconcile to the printed invoice amount.
+ */
+function computeBillTotals(items, discountAmount = 0, taxAmount = null) {
+    const subtotal = r2((items || []).reduce((s, it) => s + (parseFloat(it.quantity) || 0) * (parseFloat(it.unit_price) || 0), 0));
+    const discount = r2(Math.min(Math.max(parseFloat(discountAmount) || 0, 0), subtotal));
+    const taxable = r2(subtotal - discount);
+    const tax = taxAmount != null ? r2(taxAmount) : r2(taxable * GST_RATE);
+    const grand = r2(taxable + tax);
+    return { subtotal, discount, taxable, tax, grand };
+}
 
 // ═══════════════════════════════════════════
 // HELPERS
@@ -93,7 +116,8 @@ const createBillSchema = z.object({
     bill_date: z.string().optional().nullable(),
     due_date: z.string().optional().nullable(),
     items: z.array(billItemSchema).min(1),
-    tax_amount: z.number().optional().default(0),
+    tax_amount: z.number().optional().nullable(),     // null → auto 18% of taxable
+    discount_amount: z.number().min(0).optional().default(0),
     notes: z.string().optional().default(''),
     bill_image: z.string().optional().nullable(),
     ai_extracted_data: z.any().optional().nullable()
@@ -109,7 +133,8 @@ const poItemSchema = z.object({
 const createPOSchema = z.object({
     vendor_id: z.number().positive(),
     items: z.array(poItemSchema).min(1),
-    tax_amount: z.number().optional().default(0),
+    tax_amount: z.number().optional().nullable(),     // null → auto 18% of taxable
+    discount_amount: z.number().min(0).optional().default(0),
     expected_date: z.string().optional().nullable(),
     notes: z.string().optional().default('')
 });
@@ -389,24 +414,24 @@ router.post('/bills',
     validate(createBillSchema),
     async (req, res) => {
         try {
-            const { vendor_id, bill_number, bill_date, due_date, items, tax_amount, notes, bill_image, ai_extracted_data } = req.body;
+            const { vendor_id, bill_number, bill_date, due_date, items, tax_amount, discount_amount, notes, bill_image, ai_extracted_data } = req.body;
 
             // Generate bill number if not provided
             const finalBillNumber = bill_number || await generateNumber('BILL', 'vendor_bills', 'bill_number');
 
-            // Calculate totals
-            const subtotal = items.reduce((sum, it) => sum + (it.quantity * it.unit_price), 0);
-            const grand_total = subtotal + (tax_amount || 0);
+            // Money model: DPL subtotal − total discount → +GST (auto 18% unless
+            // an explicit tax_amount is supplied). See computeBillTotals.
+            const t = computeBillTotals(items, discount_amount, tax_amount != null ? tax_amount : null);
 
             // Schema columns are entered_by + line_total (the old created_by/
             // amount names made every INSERT crash — the feature never worked
             // on prod until this fix).
             const [result] = await pool.query(
-                `INSERT INTO vendor_bills (vendor_id, bill_number, bill_date, due_date, subtotal, tax_amount, grand_total,
+                `INSERT INTO vendor_bills (vendor_id, bill_number, bill_date, due_date, subtotal, tax_amount, discount_amount, grand_total,
                     balance_due, notes, bill_image, ai_extracted_data, entered_by)
-                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-                [vendor_id, finalBillNumber, bill_date || null, due_date || null, subtotal, tax_amount,
-                 grand_total, grand_total, notes, bill_image || null,
+                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+                [vendor_id, finalBillNumber, bill_date || null, due_date || null, t.subtotal, t.tax, t.discount,
+                 t.grand, t.grand, notes, bill_image || null,
                  ai_extracted_data ? JSON.stringify(ai_extracted_data) : null, req.user.id]
             );
 
@@ -471,7 +496,23 @@ router.get('/bills/:id',
             let aiData = null, verification = null, reconciliation = null;
             try { aiData = bill.ai_extracted_data ? JSON.parse(bill.ai_extracted_data) : null; } catch (e) { aiData = null; }
             try { verification = bill.ai_verification_result ? JSON.parse(bill.ai_verification_result) : null; } catch (e) { verification = null; }
-            if (aiData) reconciliation = vendorBillAI.buildReconciliation(items, aiData);
+            if (aiData) {
+                reconciliation = vendorBillAI.buildReconciliation(items, aiData);
+                // Attach the catalog's stored DPL per matched line so the UI can
+                // offer a per-line "update item DPL" when the bill's cost differs.
+                const ids = reconciliation.lines.map(l => l.bill.zoho_item_id).filter(Boolean);
+                if (ids.length) {
+                    const [dplRows] = await pool.query(
+                        `SELECT zoho_item_id, zoho_cf_dpl FROM zoho_items_map WHERE zoho_item_id IN (?)`, [ids]
+                    );
+                    const dplById = new Map(dplRows.map(r => [r.zoho_item_id, r.zoho_cf_dpl != null ? parseFloat(r.zoho_cf_dpl) : null]));
+                    for (const l of reconciliation.lines) {
+                        l.bill.stored_dpl = l.bill.zoho_item_id ? (dplById.get(l.bill.zoho_item_id) ?? null) : null;
+                        // bill DPL = the line's cost (unit_price); flag a difference
+                        l.dpl_diff = l.bill.stored_dpl != null && Math.abs(l.bill.stored_dpl - l.bill.unit_price) > 0.01;
+                    }
+                }
+            }
 
             res.json({ success: true, bill, items, payments, ai_extracted_data: aiData, verification, reconciliation });
         } catch (error) {
@@ -504,15 +545,57 @@ router.get('/zoho-items',
     }
 );
 
+// Update a Zoho item's DPL from the bill (owner decision 2026-06-12): the bill
+// is the latest purchase cost, so reconciliation can push the new DPL to the
+// item — writes zoho_cf_dpl, recomputes the sales rate (ceil(DPL×1.18×1.10)),
+// and pushes to Zoho live (best-effort: the local mirror is updated even if the
+// Zoho call fails, so it can be re-pushed from the items page).
+router.post('/items/dpl',
+    managePerm,
+    validate(z.object({ zoho_item_id: z.string().min(1), dpl: z.number().positive() })),
+    async (req, res) => {
+        try {
+            const { zoho_item_id, dpl } = req.body;
+            const [rows] = await pool.query(
+                'SELECT zoho_item_id, zoho_hsn_or_sac FROM zoho_items_map WHERE zoho_item_id = ?',
+                [zoho_item_id]
+            );
+            if (!rows.length) return res.status(404).json({ success: false, message: 'Item not found' });
+
+            const rate = computeZohoRate(dpl);
+            await pool.query(
+                `UPDATE zoho_items_map SET zoho_cf_dpl = ?, zoho_rate = ?, zoho_purchase_rate = ?, dpl_updated_at = NOW()
+                 WHERE zoho_item_id = ?`,
+                [dpl, rate, dpl, zoho_item_id]
+            );
+
+            let pushed = false, pushError = null;
+            try {
+                const changes = { cf_dpl: dpl, purchase_rate: dpl, rate };
+                if (rows[0].zoho_hsn_or_sac) changes.hsn_or_sac = String(rows[0].zoho_hsn_or_sac).trim();
+                await zohoAPI.updateItem(zoho_item_id, changes);
+                pushed = true;
+            } catch (e) {
+                pushError = e.message;
+                console.error('Vendor DPL Zoho push failed:', e.message);
+            }
+            res.json({ success: true, dpl, sales_rate: rate, zoho_pushed: pushed, push_error: pushError });
+        } catch (error) {
+            console.error('Vendor DPL update error:', error);
+            res.status(500).json({ success: false, message: 'Failed to update DPL' });
+        }
+    }
+);
+
 // Replace bill items
 router.put('/bills/:id/items',
     managePerm,
     validateParams(idParamSchema),
-    validate(z.object({ items: z.array(billItemSchema).min(1), tax_amount: z.number().optional() })),
+    validate(z.object({ items: z.array(billItemSchema).min(1), tax_amount: z.number().optional().nullable(), discount_amount: z.number().min(0).optional() })),
     async (req, res) => {
         try {
             const { id } = req.params;
-            const { items, tax_amount } = req.body;
+            const { items, tax_amount, discount_amount } = req.body;
 
             const [bills] = await pool.query('SELECT * FROM vendor_bills WHERE id = ?', [id]);
             if (!bills.length) {
@@ -523,29 +606,29 @@ router.put('/bills/:id/items',
             await pool.query('DELETE FROM vendor_bill_items WHERE bill_id = ?', [id]);
 
             // Insert new items (schema column is line_total, not amount)
-            const subtotal = items.reduce((sum, it) => sum + (it.quantity * it.unit_price), 0);
             for (const item of items) {
                 const lineTotal = item.quantity * item.unit_price;
                 await pool.query(
                     `INSERT INTO vendor_bill_items (bill_id, zoho_item_id, item_name, quantity, unit_price, line_total, hsn_or_sac, ai_matched, ai_confidence)
                      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
                     [id, item.zoho_item_id || null, item.item_name, item.quantity, item.unit_price, lineTotal,
-                     item.hsn_or_sac || null, item.ai_matched, item.ai_confidence]
+                     (item.hsn_or_sac || '').trim() || null, item.ai_matched, item.ai_confidence]
                 );
             }
 
-            // Recalculate totals
-            const finalTax = tax_amount !== undefined ? tax_amount : bills[0].tax_amount;
-            const grand_total = subtotal + finalTax;
+            // Recalculate totals (DPL subtotal − discount → +GST). Keep the
+            // bill's existing discount/tax unless the caller overrides them.
+            const discount = discount_amount !== undefined ? discount_amount : parseFloat(bills[0].discount_amount) || 0;
+            const tax = tax_amount !== undefined ? tax_amount : (bills[0].tax_amount != null ? parseFloat(bills[0].tax_amount) : null);
+            const t = computeBillTotals(items, discount, tax);
             const amount_paid = parseFloat(bills[0].amount_paid) || 0;
-            const balance_due = grand_total - amount_paid;
 
             await pool.query(
-                `UPDATE vendor_bills SET subtotal = ?, tax_amount = ?, grand_total = ?, balance_due = ? WHERE id = ?`,
-                [subtotal, finalTax, grand_total, balance_due, id]
+                `UPDATE vendor_bills SET subtotal = ?, tax_amount = ?, discount_amount = ?, grand_total = ?, balance_due = ? WHERE id = ?`,
+                [t.subtotal, t.tax, t.discount, t.grand, t.grand - amount_paid, id]
             );
 
-            res.json({ success: true, message: 'Bill items updated', subtotal, grand_total, balance_due });
+            res.json({ success: true, message: 'Bill items updated', totals: t, balance_due: t.grand - amount_paid });
         } catch (error) {
             console.error('Replace bill items error:', error);
             res.status(500).json({ success: false, message: 'Failed to update bill items' });
@@ -607,12 +690,16 @@ router.post('/bills/:id/verify',
 router.post('/bills/:id/reconcile',
     managePerm,
     validateParams(idParamSchema),
-    validate(z.object({ items: z.array(billItemSchema).min(1) })),
+    validate(z.object({
+        items: z.array(billItemSchema).min(1),
+        tax_amount: z.number().optional().nullable(),
+        discount_amount: z.number().min(0).optional(),
+    })),
     async (req, res) => {
         const conn = await pool.getConnection();
         try {
             const { id } = req.params;
-            const { items } = req.body;
+            const { items, tax_amount, discount_amount } = req.body;
 
             const [bills] = await conn.query('SELECT * FROM vendor_bills WHERE id = ?', [id]);
             if (!bills.length) { conn.release(); return res.status(404).json({ success: false, message: 'Bill not found' }); }
@@ -622,10 +709,8 @@ router.post('/bills/:id/reconcile',
             await conn.beginTransaction();
 
             await conn.query('DELETE FROM vendor_bill_items WHERE bill_id = ?', [id]);
-            let subtotal = 0;
             for (const item of items) {
                 const lineTotal = item.quantity * item.unit_price;
-                subtotal += lineTotal;
                 await conn.query(
                     `INSERT INTO vendor_bill_items (bill_id, zoho_item_id, item_name, quantity, unit_price, line_total, hsn_or_sac, ai_matched, ai_confidence)
                      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
@@ -634,11 +719,13 @@ router.post('/bills/:id/reconcile',
                 );
             }
 
-            const grandTotal = subtotal + (parseFloat(bill.tax_amount) || 0);
+            const discount = discount_amount !== undefined ? discount_amount : parseFloat(bill.discount_amount) || 0;
+            const tax = tax_amount !== undefined ? tax_amount : (bill.tax_amount != null ? parseFloat(bill.tax_amount) : null);
+            const t = computeBillTotals(items, discount, tax);
             const amountPaid = parseFloat(bill.amount_paid) || 0;
             await conn.query(
-                `UPDATE vendor_bills SET subtotal = ?, grand_total = ?, balance_due = ? WHERE id = ?`,
-                [subtotal, grandTotal, grandTotal - amountPaid, id]
+                `UPDATE vendor_bills SET subtotal = ?, tax_amount = ?, discount_amount = ?, grand_total = ?, balance_due = ? WHERE id = ?`,
+                [t.subtotal, t.tax, t.discount, t.grand, t.grand - amountPaid, id]
             );
 
             // Re-verify against the stored AI extraction
@@ -656,7 +743,7 @@ router.post('/bills/:id/reconcile',
             await conn.commit();
 
             const reconciliation = aiData ? vendorBillAI.buildReconciliation(savedItems, aiData) : null;
-            res.json({ success: true, status: newStatus, verification: result, reconciliation });
+            res.json({ success: true, status: newStatus, verification: result, totals: t, reconciliation });
         } catch (error) {
             await conn.rollback();
             console.error('Reconcile bill error:', error);
@@ -782,16 +869,22 @@ router.post('/bills/:id/push-zoho',
             const lineItems = items.map(it => ({
                 item_id: it.zoho_item_id || undefined,
                 name: it.item_name,
+                hsn_or_sac: it.hsn_or_sac || undefined,
                 quantity: it.quantity,
-                rate: it.unit_price
+                rate: it.unit_price   // DPL (ex-GST cost per pack)
             }));
 
+            // Discount is applied at the bill level, before tax (owner model) —
+            // Zoho then computes GST on (subtotal − discount), matching the
+            // printed invoice. Zoho applies each item's own tax rate.
+            const billDiscount = parseFloat(bill.discount_amount) || 0;
             const zohoResp = await zohoAPI.createBill({
                 vendor_id: zohoContactId,
                 bill_number: bill.bill_number,
                 date: bill.bill_date,
                 due_date: bill.due_date,
-                line_items: lineItems
+                line_items: lineItems,
+                ...(billDiscount > 0 ? { discount: billDiscount, is_discount_before_tax: true, discount_type: 'entity_level' } : {})
             });
 
             const zohoBillId = zohoResp.bill?.bill_id;
@@ -927,16 +1020,16 @@ router.post('/purchase-orders',
     validate(createPOSchema),
     async (req, res) => {
         try {
-            const { vendor_id, items, tax_amount, expected_date, notes } = req.body;
+            const { vendor_id, items, tax_amount, discount_amount, expected_date, notes } = req.body;
 
             const po_number = await generateNumber('PO', 'vendor_purchase_orders', 'po_number');
-            const subtotal = items.reduce((sum, it) => sum + (it.quantity * it.unit_price), 0);
-            const grand_total = subtotal + (tax_amount || 0);
+            // Same money model as bills: DPL subtotal − discount → +GST (auto 18%).
+            const t = computeBillTotals(items, discount_amount, tax_amount != null ? tax_amount : null);
 
             const [result] = await pool.query(
-                `INSERT INTO vendor_purchase_orders (vendor_id, po_number, subtotal, tax_amount, grand_total, expected_date, notes, created_by)
-                 VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-                [vendor_id, po_number, subtotal, tax_amount, grand_total, expected_date || null, notes, req.user.id]
+                `INSERT INTO vendor_purchase_orders (vendor_id, po_number, subtotal, tax_amount, discount_amount, grand_total, expected_date, notes, created_by)
+                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+                [vendor_id, po_number, t.subtotal, t.tax, t.discount, t.grand, expected_date || null, notes, req.user.id]
             );
 
             const poId = result.insertId;
@@ -976,13 +1069,12 @@ router.put('/purchase-orders/:id',
                 return res.status(400).json({ success: false, message: 'Only draft POs can be edited' });
             }
 
-            const { vendor_id, items, tax_amount, expected_date, notes } = req.body;
+            const { vendor_id, items, tax_amount, discount_amount, expected_date, notes } = req.body;
 
             // Replace items
             await pool.query('DELETE FROM vendor_po_items WHERE po_id = ?', [id]);
 
-            const subtotal = items.reduce((sum, it) => sum + (it.quantity * it.unit_price), 0);
-            const grand_total = subtotal + (tax_amount || 0);
+            const t = computeBillTotals(items, discount_amount, tax_amount != null ? tax_amount : null);
 
             // schema column is line_total, not amount
             for (const item of items) {
@@ -995,9 +1087,9 @@ router.put('/purchase-orders/:id',
             }
 
             await pool.query(
-                `UPDATE vendor_purchase_orders SET vendor_id = ?, subtotal = ?, tax_amount = ?, grand_total = ?,
+                `UPDATE vendor_purchase_orders SET vendor_id = ?, subtotal = ?, tax_amount = ?, discount_amount = ?, grand_total = ?,
                     expected_date = ?, notes = ? WHERE id = ?`,
-                [vendor_id, subtotal, tax_amount, grand_total, expected_date || null, notes, id]
+                [vendor_id, t.subtotal, t.tax, t.discount, t.grand, expected_date || null, notes, id]
             );
 
             res.json({ success: true, message: 'Purchase order updated' });
@@ -1092,10 +1184,10 @@ router.post('/purchase-orders/:id/convert-to-bill',
 
             const billNumber = await generateNumber('BILL', 'vendor_bills', 'bill_number');
             const [result] = await pool.query(
-                `INSERT INTO vendor_bills (vendor_id, po_id, bill_number, bill_date, subtotal, tax_amount, grand_total,
+                `INSERT INTO vendor_bills (vendor_id, po_id, bill_number, bill_date, subtotal, tax_amount, discount_amount, grand_total,
                     balance_due, ai_verification_status, notes, entered_by)
-                 VALUES (?, ?, ?, CURDATE(), ?, ?, ?, ?, 'pending', ?, ?)`,
-                [po.vendor_id, id, billNumber, po.subtotal, po.tax_amount, po.grand_total,
+                 VALUES (?, ?, ?, CURDATE(), ?, ?, ?, ?, ?, 'pending', ?, ?)`,
+                [po.vendor_id, id, billNumber, po.subtotal, po.tax_amount, po.discount_amount || 0, po.grand_total,
                  po.grand_total, `Converted from PO ${po.po_number}`, req.user.id]
             );
             const billId = result.insertId;
@@ -1185,11 +1277,13 @@ router.post('/purchase-orders/:id/push-zoho',
                     deliveryDate = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
                 }
             }
+            const poDiscount = parseFloat(po.discount_amount) || 0;
             const zohoResp = await zohoAPI.createPurchaseOrder({
                 vendor_id: zohoContactId,
                 purchaseorder_number: po.po_number,
                 ...(deliveryDate ? { delivery_date: deliveryDate } : {}),
-                line_items: lineItems
+                line_items: lineItems,
+                ...(poDiscount > 0 ? { discount: poDiscount, is_discount_before_tax: true, discount_type: 'entity_level' } : {})
             });
 
             // vendor_purchase_orders has no zoho_status column (prod schema) —
@@ -1384,4 +1478,4 @@ router.get('/:id',
 
 // Zod schemas exported for unit testing only (tests/unit/vendors.test.js) —
 // routes still use them directly via validate().
-module.exports = { router, setPool, createVendorSchema, createBillSchema, recordPaymentSchema, listQuerySchema };
+module.exports = { router, setPool, createVendorSchema, createBillSchema, recordPaymentSchema, listQuerySchema, computeBillTotals };
