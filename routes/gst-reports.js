@@ -106,15 +106,34 @@ router.get('/filing', requirePermission('zoho', 'view'), async (req, res) => {
         let branchSql = '';
         if (req.query.branch_id) { branchSql = ' AND zi.local_branch_id = ?'; params.push(req.query.branch_id); }
 
+        // An invoice carried forward to another month leaves its natural month
+        // (adj.filed_in_month <> this month) so it is never counted twice.
         const [invoices] = await pool.query(
             `SELECT zi.invoice_number, zi.invoice_date, zi.customer_name, zi.status,
                     zi.sub_total, zi.tax_total, zi.total,
                     TRIM(COALESCE(zcm.zoho_gst_no, '')) AS gstin
              FROM zoho_invoices zi
              LEFT JOIN zoho_customers_map zcm ON zcm.zoho_contact_id = zi.zoho_customer_id
+             LEFT JOIN gst_filing_adjustments adj ON adj.zoho_invoice_id = zi.zoho_invoice_id
              WHERE zi.invoice_date BETWEEN ? AND ? AND zi.status <> 'void'${branchSql}
+               AND (adj.zoho_invoice_id IS NULL OR adj.filed_in_month = ?)
              ORDER BY zi.invoice_date, zi.invoice_number`,
-            params
+            [...params, req.query.month]
+        );
+
+        // Invoices from OTHER months the owner chose to file in THIS month
+        const [carried] = await pool.query(
+            `SELECT zi.zoho_invoice_id, zi.invoice_number, zi.invoice_date, zi.customer_name,
+                    zi.status, zi.sub_total, zi.tax_total, zi.total,
+                    TRIM(COALESCE(zcm.zoho_gst_no, '')) AS gstin,
+                    adj.original_month, adj.note
+             FROM gst_filing_adjustments adj
+             JOIN zoho_invoices zi ON zi.zoho_invoice_id = adj.zoho_invoice_id
+             LEFT JOIN zoho_customers_map zcm ON zcm.zoho_contact_id = zi.zoho_customer_id
+             WHERE adj.filed_in_month = ? AND zi.status <> 'void'
+               AND zi.invoice_date NOT BETWEEN ? AND ?
+             ORDER BY zi.invoice_date, zi.invoice_number`,
+            [req.query.month, from, to]
         );
 
         const b2b = [];
@@ -154,6 +173,19 @@ router.get('/filing', requirePermission('zoho', 'view'), async (req, res) => {
             hsnParams
         );
 
+        for (const inv of carried) {
+            const t = deriveTax(inv.total, inv.sub_total, inv.tax_total);
+            anyDerived = anyDerived || t.derived;
+            inv.sub_total = t.taxable;
+            inv.tax_total = t.gst;
+        }
+        const carriedTotals = {
+            invoice_count: carried.length,
+            sub_total: r2(carried.reduce((s, i) => s + i.sub_total, 0)),
+            tax_total: r2(carried.reduce((s, i) => s + i.tax_total, 0)),
+            total: r2(carried.reduce((s, i) => s + (parseFloat(i.total) || 0), 0)),
+        };
+
         const totals = {
             invoice_count: invoices.length,
             b2b_count: b2b.length,
@@ -161,9 +193,16 @@ router.get('/filing', requirePermission('zoho', 'view'), async (req, res) => {
             tax_total: r2(invoices.reduce((s, i) => s + (parseFloat(i.tax_total) || 0), 0)),
             total: r2(invoices.reduce((s, i) => s + (parseFloat(i.total) || 0), 0)),
         };
+        const combined = {
+            invoice_count: totals.invoice_count + carriedTotals.invoice_count,
+            sub_total: r2(totals.sub_total + carriedTotals.sub_total),
+            tax_total: r2(totals.tax_total + carriedTotals.tax_total),
+            total: r2(totals.total + carriedTotals.total),
+        };
 
         res.json({
             success: true, month: req.query.month, totals, b2b, b2c, hsn,
+            carried, carried_totals: carriedTotals, combined_totals: combined,
             invoice_range: invoiceNumberRange(invoices.map(i => i.invoice_number)),
             tax_note: anyDerived
                 ? 'Taxable/GST split derived from the GST-inclusive total at a uniform 18% (Zoho line-level tax is not synced). Cross-check totals against Zoho Books’ own GSTR-1 before filing.'
@@ -172,6 +211,74 @@ router.get('/filing', requirePermission('zoho', 'view'), async (req, res) => {
     } catch (err) {
         console.error('GST filing report error:', err);
         res.status(400).json({ success: false, message: err.message });
+    }
+});
+
+// ── CARRY-FORWARD of missed B2B invoices ────────────────────────────────────
+// GSTR-1 permits reporting a missed invoice in a later month's return. The
+// owner picks the invoice; it then appears ONLY in the chosen month.
+
+router.get('/missed-b2b', requirePermission('zoho', 'view'), async (req, res) => {
+    try {
+        const [from] = monthRange(req.query.month); // candidates must precede this month
+        const search = `%${req.query.search || ''}%`;
+        const [rows] = await pool.query(
+            `SELECT zi.zoho_invoice_id, zi.invoice_number, zi.invoice_date, zi.customer_name,
+                    zi.total, TRIM(zcm.zoho_gst_no) AS gstin
+             FROM zoho_invoices zi
+             JOIN zoho_customers_map zcm ON zcm.zoho_contact_id = zi.zoho_customer_id
+             LEFT JOIN gst_filing_adjustments adj ON adj.zoho_invoice_id = zi.zoho_invoice_id
+             WHERE zi.invoice_date < ? AND zi.invoice_date >= DATE_SUB(?, INTERVAL 6 MONTH)
+               AND zi.status <> 'void'
+               AND TRIM(COALESCE(zcm.zoho_gst_no, '')) <> ''
+               AND adj.zoho_invoice_id IS NULL
+               AND (zi.invoice_number LIKE ? OR zi.customer_name LIKE ?)
+             ORDER BY zi.invoice_date DESC
+             LIMIT 100`,
+            [from, from, search, search]
+        );
+        res.json({ success: true, candidates: rows });
+    } catch (err) {
+        console.error('GST missed-b2b error:', err);
+        res.status(400).json({ success: false, message: err.message });
+    }
+});
+
+router.post('/carry-forward', requirePermission('zoho', 'edit'), async (req, res) => {
+    try {
+        const { zoho_invoice_id, filed_in_month, note } = req.body;
+        monthRange(filed_in_month); // validates format
+        const [[inv]] = await pool.query(
+            'SELECT invoice_number, invoice_date FROM zoho_invoices WHERE zoho_invoice_id = ?',
+            [zoho_invoice_id]
+        );
+        if (!inv) return res.status(404).json({ success: false, message: 'Invoice not found' });
+        const originalMonth = String(inv.invoice_date instanceof Date
+            ? inv.invoice_date.toISOString().slice(0, 7)
+            : String(inv.invoice_date).slice(0, 7));
+        if (originalMonth >= filed_in_month) {
+            return res.status(400).json({ success: false, message: 'Carry-forward must move an invoice to a LATER month' });
+        }
+        await pool.query(
+            `INSERT INTO gst_filing_adjustments (zoho_invoice_id, original_month, filed_in_month, note, created_by)
+             VALUES (?, ?, ?, ?, ?)
+             ON DUPLICATE KEY UPDATE filed_in_month = VALUES(filed_in_month), note = VALUES(note), created_by = VALUES(created_by)`,
+            [zoho_invoice_id, originalMonth, filed_in_month, note || null, req.user.id]
+        );
+        res.json({ success: true, invoice_number: inv.invoice_number, original_month: originalMonth, filed_in_month });
+    } catch (err) {
+        console.error('GST carry-forward error:', err);
+        res.status(400).json({ success: false, message: err.message });
+    }
+});
+
+router.delete('/carry-forward/:zohoInvoiceId', requirePermission('zoho', 'edit'), async (req, res) => {
+    try {
+        const [r] = await pool.query('DELETE FROM gst_filing_adjustments WHERE zoho_invoice_id = ?', [req.params.zohoInvoiceId]);
+        res.json({ success: true, removed: r.affectedRows });
+    } catch (err) {
+        console.error('GST carry-forward delete error:', err);
+        res.status(500).json({ success: false, message: 'Failed to remove' });
     }
 });
 
@@ -189,15 +296,36 @@ router.get('/b2b-items', requirePermission('zoho', 'view'), async (req, res) => 
 
         const [invoices] = await pool.query(
             `SELECT zi.zoho_invoice_id, zi.invoice_number, zi.invoice_date, zi.customer_name,
-                    zi.total, zi.line_items, TRIM(COALESCE(zcm.zoho_gst_no, '')) AS gstin
+                    zi.total, zi.line_items, TRIM(COALESCE(zcm.zoho_gst_no, '')) AS gstin,
+                    NULL AS carried_from
              FROM zoho_invoices zi
              JOIN zoho_customers_map zcm ON zcm.zoho_contact_id = zi.zoho_customer_id
+             LEFT JOIN gst_filing_adjustments adj ON adj.zoho_invoice_id = zi.zoho_invoice_id
              WHERE zi.invoice_date BETWEEN ? AND ? AND zi.status <> 'void'
                AND TRIM(COALESCE(zcm.zoho_gst_no, '')) <> ''${customerSql}
+               AND (adj.zoho_invoice_id IS NULL OR adj.filed_in_month = ?)
              ORDER BY zi.invoice_date, zi.invoice_number
              LIMIT 300`,
-            params
+            [...params, req.query.month]
         );
+
+        // carried-forward invoices filed in this month (from earlier months)
+        const carriedParams = [req.query.month, from, to];
+        let carriedCustomerSql = '';
+        if (req.query.customer) { carriedCustomerSql = ' AND zi.customer_name = ?'; carriedParams.push(req.query.customer); }
+        const [carriedInvs] = await pool.query(
+            `SELECT zi.zoho_invoice_id, zi.invoice_number, zi.invoice_date, zi.customer_name,
+                    zi.total, zi.line_items, TRIM(COALESCE(zcm.zoho_gst_no, '')) AS gstin,
+                    adj.original_month AS carried_from
+             FROM gst_filing_adjustments adj
+             JOIN zoho_invoices zi ON zi.zoho_invoice_id = adj.zoho_invoice_id
+             LEFT JOIN zoho_customers_map zcm ON zcm.zoho_contact_id = zi.zoho_customer_id
+             WHERE adj.filed_in_month = ? AND zi.status <> 'void'
+               AND zi.invoice_date NOT BETWEEN ? AND ?${carriedCustomerSql}
+             ORDER BY zi.invoice_date`,
+            carriedParams
+        );
+        invoices.push(...carriedInvs);
 
         const out = [];
         let fetchedFromZoho = 0;
@@ -225,7 +353,9 @@ router.get('/b2b-items', requirePermission('zoho', 'view'), async (req, res) => 
             out.push({
                 invoice_number: inv.invoice_number, invoice_date: inv.invoice_date,
                 customer_name: inv.customer_name, gstin: inv.gstin, total: inv.total,
+                carried_from: inv.carried_from || null,
                 items: (lines || []).map(li => ({
+                    item_id: li.item_id || null,
                     name: li.name || li.description || '',
                     hsn: li.hsn_or_sac || '',
                     quantity: parseFloat(li.quantity) || 0,
@@ -233,6 +363,24 @@ router.get('/b2b-items', requirePermission('zoho', 'view'), async (req, res) => 
                     item_total: parseFloat(li.item_total) || 0,
                 })),
             });
+        }
+
+        // cost columns for the internal cost view (DPL → purchase rate)
+        const itemIds = new Set();
+        for (const inv of out) for (const it of inv.items) if (it.item_id) itemIds.add(it.item_id);
+        if (itemIds.size) {
+            const [costRows] = await pool.query(
+                `SELECT zoho_item_id, zoho_cf_dpl, zoho_purchase_rate, last_purchase_rate
+                 FROM zoho_items_map WHERE zoho_item_id IN (?)`,
+                [[...itemIds]]
+            );
+            const costById = Object.fromEntries(costRows.map(r => [r.zoho_item_id, resolveCostRate(r)]));
+            for (const inv of out) for (const it of inv.items) {
+                const c = (it.item_id && costById[it.item_id]) || { rate: null, source: 'none' };
+                it.cost_rate = c.rate;
+                it.cost_source = c.source;
+                it.cost_value = c.rate != null ? r2(it.quantity * c.rate) : null;
+            }
         }
 
         // HSN fallback from the items map for lines Zoho returned without one

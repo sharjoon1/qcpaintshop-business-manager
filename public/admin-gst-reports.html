@@ -149,10 +149,28 @@ function renderFiling() {
                 ${customers.map(c => `<option value="${escAttr(c)}" ${c === b2bCustomerFilter ? 'selected' : ''}>${escHtml(c)}</option>`).join('')}
             </select>
             <button class="btn" onclick="exportB2B()">⬇ Invoices CSV</button>
-            <button class="btn" onclick="loadB2BItems()">📦 Item-wise (HSN)</button></div>
+            <button class="btn" onclick="loadB2BItems('filing')">📦 Item-wise (HSN)</button>
+            <button class="btn gray" onclick="toggleMissedPanel()">➕ Missed invoice</button></div>
+        ${b2bCustomerFilter ? (() => { const t = b2bRows.reduce((a, i) => ({ s: a.s + (+i.sub_total || 0), g: a.g + (+i.tax_total || 0), t: a.t + (+i.total || 0) }), { s: 0, g: 0, t: 0 }); return `
+        <div class="cards">
+            <div class="card" style="border-left:4px solid var(--primary)"><div class="lbl">${escHtml(b2bCustomerFilter)} — invoices</div><div class="val">${b2bRows.length}</div></div>
+            <div class="card" style="border-left:4px solid var(--primary)"><div class="lbl">Taxable</div><div class="val">${fmtINR(t.s)}</div></div>
+            <div class="card" style="border-left:4px solid var(--primary)"><div class="lbl">GST</div><div class="val">${fmtINR(t.g)}</div></div>
+            <div class="card" style="border-left:4px solid var(--primary)"><div class="lbl">Total value</div><div class="val">${fmtINR(t.t)}</div></div>
+        </div>`; })() : ''}
+        <div id="missedPanel" style="display:none"></div>
         <div class="tbl-scroll"><table><thead><tr><th>Date</th><th>Invoice #</th><th>Customer</th><th>GSTIN</th><th class="num">Taxable</th><th class="num">GST</th><th class="num">Total</th></tr></thead><tbody>
         ${b2bRows.map(i => `<tr><td>${escHtml(String(i.invoice_date).slice(0, 10))}</td><td>${escHtml(i.invoice_number)}</td><td>${escHtml(i.customer_name)}</td><td>${escHtml(i.gstin)}</td><td class="num">${fmtINR(i.sub_total)}</td><td class="num">${fmtINR(i.tax_total)}</td><td class="num">${fmtINR(i.total)}</td></tr>`).join('') || '<tr><td colspan="7" class="muted">No B2B invoices this month</td></tr>'}
         </tbody></table></div>
+        ${d.carried && d.carried.length ? `
+        <div class="section-title" style="color:#92400e">⤵ Carried forward into ${escHtml(month)} (missed in earlier months) — ${d.carried.length}</div>
+        <div class="tbl-scroll"><table><thead><tr><th>Original month</th><th>Date</th><th>Invoice #</th><th>Customer</th><th>GSTIN</th><th class="num">Taxable</th><th class="num">GST</th><th class="num">Total</th><th></th></tr></thead><tbody>
+        ${d.carried.map(i => `<tr style="background:#fffbeb"><td>${escHtml(i.original_month)}</td><td>${escHtml(String(i.invoice_date).slice(0, 10))}</td><td>${escHtml(i.invoice_number)}</td><td>${escHtml(i.customer_name)}</td><td>${escHtml(i.gstin)}</td><td class="num">${fmtINR(i.sub_total)}</td><td class="num">${fmtINR(i.tax_total)}</td><td class="num">${fmtINR(i.total)}</td><td><button class="btn gray" onclick="removeCarry('${escJS(i.zoho_invoice_id)}')">✖</button></td></tr>`).join('')}
+        <tr style="font-weight:700"><td colspan="5">Carried subtotal</td><td class="num">${fmtINR(d.carried_totals.sub_total)}</td><td class="num">${fmtINR(d.carried_totals.tax_total)}</td><td class="num">${fmtINR(d.carried_totals.total)}</td><td></td></tr>
+        </tbody></table></div>
+        <div class="cards">
+            <div class="card" style="border:2px solid #f59e0b"><div class="lbl">Combined filing total (month + carried)</div><div class="val">${fmtINR(d.combined_totals.total)}</div><div class="muted">taxable ${fmtINR(d.combined_totals.sub_total)} + GST ${fmtINR(d.combined_totals.tax_total)} · ${d.combined_totals.invoice_count} invoices</div></div>
+        </div>` : ''}
         <div id="b2bItems"></div>
         <div class="section-title">B2C — consolidated</div>
         <div class="cards">
@@ -175,24 +193,33 @@ function exportB2B() {
         filteredB2B().map(i => [String(i.invoice_date).slice(0, 10), i.invoice_number, i.customer_name, i.gstin, i.sub_total, i.tax_total, i.total]));
 }
 
-async function loadB2BItems() {
-    const month = cache.filing.month;
-    const box = document.getElementById('b2bItems');
+// mode: 'filing' (actual rates) | 'cost' (purchase-cost view, internal)
+async function loadB2BItems(mode) {
+    const month = document.getElementById('month').value;
+    const box = document.getElementById(mode === 'cost' ? 'b2bItemsCost' : 'b2bItems');
+    const filter = mode === 'cost' ? costCustomerFilter : b2bCustomerFilter;
     box.innerHTML = '<div class="muted" style="padding:14px">Loading item-wise detail… (first load fetches lines from Zoho — may take a minute)</div>';
     try {
-        const q = '/api/gst-reports/b2b-items?month=' + month + (b2bCustomerFilter ? '&customer=' + encodeURIComponent(b2bCustomerFilter) : '');
+        const q = '/api/gst-reports/b2b-items?month=' + month + (filter ? '&customer=' + encodeURIComponent(filter) : '');
         const d = await api(q);
         cache.b2bItems = d;
+        const isCost = mode === 'cost';
+        const head = isCost
+            ? '<th>Item</th><th>HSN</th><th class="num">Qty</th><th class="num">Cost rate</th><th class="num">Value @ cost</th><th class="num">Actual amount</th>'
+            : '<th>Item</th><th>HSN</th><th class="num">Qty</th><th class="num">Rate</th><th class="num">Amount</th>';
+        const rowOf = it => isCost
+            ? `<tr><td>${escHtml(it.name)}</td><td>${escHtml(it.hsn || '—')}</td><td class="num">${it.quantity}</td><td class="num">${it.cost_rate != null ? fmtINR(it.cost_rate) : '—'}<div class="muted">${escHtml(it.cost_source || '')}</div></td><td class="num">${it.cost_value != null ? fmtINR(it.cost_value) : '—'}</td><td class="num">${fmtINR(it.item_total)}</td></tr>`
+            : `<tr><td>${escHtml(it.name)}</td><td>${escHtml(it.hsn || '—')}</td><td class="num">${it.quantity}</td><td class="num">${fmtINR(it.rate)}</td><td class="num">${fmtINR(it.item_total)}</td></tr>`;
         box.innerHTML = `
-            <div class="section-title">Item-wise detail with HSN (${d.invoices.length} invoices)
-                <button class="btn" onclick="exportB2BItems()">⬇ Item-wise CSV</button>
+            <div class="section-title">${isCost ? 'B2B invoice-wise at PURCHASE COST (internal)' : 'Item-wise detail with HSN'} (${d.invoices.length} invoices)
+                <button class="btn" onclick="exportB2BItems('${isCost ? 'cost' : 'filing'}')">⬇ Item-wise CSV</button>
                 ${d.fetched_from_zoho ? `<span class="muted">${d.fetched_from_zoho} fetched from Zoho & cached</span>` : ''}</div>
             ${d.invoices.map(inv => `
                 <div style="margin-bottom:12px">
-                    <div style="font-weight:600;font-size:13px;padding:6px 2px">${escHtml(inv.invoice_number)} · ${escHtml(String(inv.invoice_date).slice(0, 10))} · ${escHtml(inv.customer_name)} <span class="muted">${escHtml(inv.gstin)}</span> · ${fmtINR(inv.total)}</div>
+                    <div style="font-weight:600;font-size:13px;padding:6px 2px">${inv.carried_from ? `<span class="pill" style="background:#fef3c7;color:#92400e">carried from ${escHtml(inv.carried_from)}</span> ` : ''}${escHtml(inv.invoice_number)} · ${escHtml(String(inv.invoice_date).slice(0, 10))} · ${escHtml(inv.customer_name)} <span class="muted">${escHtml(inv.gstin)}</span> · ${fmtINR(inv.total)}</div>
                     ${inv.fetch_error ? `<div class="banner-warn">${escHtml(inv.fetch_error)}</div>` : `
-                    <div class="tbl-scroll"><table><thead><tr><th>Item</th><th>HSN</th><th class="num">Qty</th><th class="num">Rate</th><th class="num">Amount</th></tr></thead><tbody>
-                    ${inv.items.map(it => `<tr><td>${escHtml(it.name)}</td><td>${escHtml(it.hsn || '—')}</td><td class="num">${it.quantity}</td><td class="num">${fmtINR(it.rate)}</td><td class="num">${fmtINR(it.item_total)}</td></tr>`).join('')}
+                    <div class="tbl-scroll"><table><thead><tr>${head}</tr></thead><tbody>
+                    ${inv.items.map(rowOf).join('')}
                     </tbody></table></div>`}
                 </div>`).join('')}`;
     } catch (e) {
@@ -200,15 +227,69 @@ async function loadB2BItems() {
     }
 }
 
-function exportB2BItems() {
+async function toggleMissedPanel() {
+    const p = document.getElementById('missedPanel');
+    if (p.style.display !== 'none') { p.style.display = 'none'; return; }
+    p.style.display = '';
+    p.innerHTML = `
+        <div style="background:#fffbeb;border:1px solid #f59e0b;border-radius:10px;padding:12px;margin-bottom:12px">
+            <div style="font-weight:700;margin-bottom:8px">முந்தைய மாதங்களில் filing-ல் விடுபட்ட B2B invoice-ஐ இந்த மாதக் கணக்கில் சேர்க்க</div>
+            <input class="searchbox" id="missedSearch" placeholder="Invoice # / customer search…" oninput="debounceMissed()">
+            <div id="missedList" class="muted">கடந்த 6 மாத B2B invoices (carry ஆகாதவை) தேடுங்க…</div>
+        </div>`;
+    renderMissed('');
+}
+
+let missedTimer;
+function debounceMissed() { clearTimeout(missedTimer); missedTimer = setTimeout(() => renderMissed(document.getElementById('missedSearch').value), 350); }
+
+async function renderMissed(search) {
+    const month = document.getElementById('month').value;
+    const d = await api('/api/gst-reports/missed-b2b?month=' + month + '&search=' + encodeURIComponent(search));
+    document.getElementById('missedList').innerHTML = d.candidates.length ? `
+        <div class="tbl-scroll"><table><thead><tr><th>Date</th><th>Invoice #</th><th>Customer</th><th>GSTIN</th><th class="num">Total</th><th></th></tr></thead><tbody>
+        ${d.candidates.map(c => `<tr><td>${escHtml(String(c.invoice_date).slice(0, 10))}</td><td>${escHtml(c.invoice_number)}</td><td>${escHtml(c.customer_name)}</td><td>${escHtml(c.gstin)}</td><td class="num">${fmtINR(c.total)}</td>
+            <td><button class="btn" onclick="addCarry('${escJS(c.zoho_invoice_id)}')">Include in ${escHtml(month)}</button></td></tr>`).join('')}
+        </tbody></table></div>` : '<div class="muted">Match இல்லை (carry ஆனவை இங்கு வராது)</div>';
+}
+
+async function addCarry(zohoInvoiceId) {
+    const month = document.getElementById('month').value;
+    const res = await fetch('/api/gst-reports/carry-forward', {
+        method: 'POST',
+        headers: { Authorization: 'Bearer ' + token, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ zoho_invoice_id: zohoInvoiceId, filed_in_month: month }),
+    });
+    const d = await res.json();
+    if (!d.success) { alert(d.message || 'Failed'); return; }
+    loadActive();
+}
+
+async function removeCarry(zohoInvoiceId) {
+    await fetch('/api/gst-reports/carry-forward/' + encodeURIComponent(zohoInvoiceId), {
+        method: 'DELETE', headers: { Authorization: 'Bearer ' + token },
+    });
+    loadActive();
+}
+
+function exportB2BItems(mode) {
     const d = cache.b2bItems;
-    const suffix = b2bCustomerFilter ? '-' + b2bCustomerFilter.replace(/[^\w]+/g, '_').slice(0, 30) : '';
+    const filter = mode === 'cost' ? costCustomerFilter : b2bCustomerFilter;
+    const suffix = filter ? '-' + filter.replace(/[^\w]+/g, '_').slice(0, 30) : '';
     const rows = [];
     for (const inv of d.invoices) for (const it of inv.items) {
-        rows.push([String(inv.invoice_date).slice(0, 10), inv.invoice_number, inv.customer_name, inv.gstin, it.name, it.hsn, it.quantity, it.rate, it.item_total]);
+        rows.push(mode === 'cost'
+            ? [String(inv.invoice_date).slice(0, 10), inv.invoice_number, inv.customer_name, it.name, it.hsn, it.quantity, it.cost_rate, it.cost_value, it.item_total]
+            : [String(inv.invoice_date).slice(0, 10), inv.invoice_number, inv.customer_name, inv.gstin, it.name, it.hsn, it.quantity, it.rate, it.item_total]);
     }
-    csvDownload(`gst-filing-b2b-items-${d.month}${suffix}.csv`,
-        ['Invoice Date', 'Invoice Number', 'Customer', 'GSTIN', 'Item', 'HSN', 'Qty', 'Rate', 'Amount'], rows);
+    if (mode === 'cost') {
+        csvDownload(`INTERNAL-b2b-at-cost-${d.month}${suffix}-NOT-FOR-FILING.csv`,
+            ['INTERNAL — NOT FOR GST FILING', '', '', '', '', '', '', '', ''],
+            [['Invoice Date', 'Invoice Number', 'Customer', 'Item', 'HSN', 'Qty', 'Cost Rate', 'Value At Cost', 'Actual Amount'], ...rows]);
+    } else {
+        csvDownload(`gst-filing-b2b-items-${d.month}${suffix}.csv`,
+            ['Invoice Date', 'Invoice Number', 'Customer', 'GSTIN', 'Item', 'HSN', 'Qty', 'Rate', 'Amount'], rows);
+    }
 }
 function exportHSN() {
     const d = cache.filing;
@@ -216,9 +297,14 @@ function exportHSN() {
         d.hsn.map(h => [h.hsn, h.tax_pct, h.qty, h.taxable_value]));
 }
 
+let costCustomerFilter = '';
 async function loadCost(month) {
     const d = await api('/api/gst-reports/cost-analysis?month=' + month);
     cache.cost = d;
+    if (!cache.filing || cache.filing.month !== month) {
+        try { cache.filing = await api('/api/gst-reports/filing?month=' + month); } catch (e) { /* dropdown just stays empty */ }
+    }
+    const costCustomers = cache.filing ? [...new Set(cache.filing.b2b.map(i => i.customer_name))].sort() : [];
     const row = it => `<tr><td>${escHtml(it.item_name)}</td><td>${escHtml(it.sku || '')}</td><td class="num">${Number(it.qty).toLocaleString('en-IN')}</td><td class="num">${it.cost_rate != null ? fmtINR(it.cost_rate) : '—'}<div class="muted">${escHtml(it.cost_source)}</div></td><td class="num">${it.cost_value != null ? fmtINR(it.cost_value) : '—'}</td><td class="num">${fmtINR(it.actual_revenue)}</td></tr>`;
     document.getElementById('tab-cost').innerHTML = `
         <div class="banner-warn">⚠ ${escHtml(d.disclaimer)}</div>
@@ -227,6 +313,13 @@ async function loadCost(month) {
             <div class="card"><div class="lbl">Value at purchase cost</div><div class="val">${fmtINR(d.summary.cost_value)}</div></div>
             <div class="card"><div class="lbl">Gross margin</div><div class="val">${fmtINR(d.summary.gross_margin)}</div></div>
         </div>
+        <div class="section-title">B2B invoice-wise at cost
+            <select onchange="costCustomerFilter=this.value" style="padding:6px 10px;border:1px solid #d1d5db;border-radius:8px;font-size:13px;max-width:240px">
+                <option value="">All customers</option>
+                ${costCustomers.map(c => `<option value="${escAttr(c)}" ${c === costCustomerFilter ? 'selected' : ''}>${escHtml(c)}</option>`).join('')}
+            </select>
+            <button class="btn" onclick="loadB2BItems('cost')">📦 Load invoice-wise (HSN + cost)</button></div>
+        <div id="b2bItemsCost"></div>
         <div class="section-title">Items (GST-purchased) — ${d.included.length}
             <button class="btn" onclick="exportCost()">⬇ CSV</button></div>
         <div class="tbl-scroll"><table><thead><tr><th>Item</th><th>SKU</th><th class="num">Qty</th><th class="num">Cost rate</th><th class="num">Value @ cost</th><th class="num">Actual revenue</th></tr></thead><tbody>
