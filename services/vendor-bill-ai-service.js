@@ -336,18 +336,26 @@ function verifyBillItems(staffItems, aiExtractedData) {
         }
     }
 
-    // Compare total. DB rows (vendor_bill_items) carry line_total, not amount —
-    // without the fallback the staff total always computed 0 and false-flagged
-    // a 'total' mismatch on every verify of real DB rows.
-    const staffTotal = parseFloat(staffItems.reduce((sum, it) => sum + (parseFloat(it.amount != null ? it.amount : it.line_total) || 0), 0)) || 0;
-    const aiTotal = parseFloat(aiExtractedData.total) || 0;
-    if (Math.abs(staffTotal - aiTotal) > 1.0) {
+    // Compare SUBTOTAL (pre-tax), NOT the printed grand total. Σ(line_total) is
+    // the bill's PRE-tax subtotal (line_total = qty × unit_price = ex-GST cost);
+    // aiExtractedData.total is the POST-tax printed grand total. Comparing those
+    // two is apples-to-oranges — on any GST/discount bill they differ by
+    // (tax − discount), so it false-flagged a 'total' mismatch on EVERY real
+    // bill and left it permanently un-pushable. Compare like-for-like against
+    // the AI's own pre-tax subtotal (normalizeScan populates it; derive it from
+    // total − tax + discount when the scan didn't return an explicit subtotal).
+    // DB rows (vendor_bill_items) carry line_total, not amount — keep that fallback.
+    const staffSubtotal = parseFloat(staffItems.reduce((sum, it) => sum + (parseFloat(it.amount != null ? it.amount : it.line_total) || 0), 0)) || 0;
+    const aiSubtotal = parseFloat(aiExtractedData.subtotal) > 0
+        ? parseFloat(aiExtractedData.subtotal)
+        : (parseFloat(aiExtractedData.total) || 0) - (parseFloat(aiExtractedData.tax) || 0) + (parseFloat(aiExtractedData.discount) || 0);
+    if (aiSubtotal > 0 && Math.abs(staffSubtotal - aiSubtotal) > 1.0) {
         differences.push({
-            field: 'total',
+            field: 'subtotal',
             item_name: null,
-            expected: aiTotal,
-            actual: staffTotal,
-            message: `Total mismatch: AI=${aiTotal}, Staff=${staffTotal}`
+            expected: aiSubtotal,
+            actual: staffSubtotal,
+            message: `Subtotal mismatch: AI=${aiSubtotal}, Staff=${staffSubtotal}`
         });
     }
 

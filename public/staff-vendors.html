@@ -1159,7 +1159,12 @@ async function viewBill(id) {
         // line-count mismatch — render the INTERACTIVE editor (in place of the
         // read-only items table) so staff fix every difference inline. The
         // Scan & Re-scan photo box + flow stepper stay above it.
-        if (recon && bill.zoho_status !== 'pushed' && reconHasUnresolved(recon.summary)) {
+        // Also open the editor for ANY unpushed 'mismatch' bill — even when the
+        // per-line summary is clean (e.g. a bill-level subtotal/discount/GST
+        // difference the summary can't express), so a mismatch is never a
+        // read-only dead-end with no fix path.
+        if (recon && bill.zoho_status !== 'pushed'
+            && (reconHasUnresolved(recon.summary) || bill.ai_verification_status === 'mismatch')) {
             renderReconcileEditor(bill, recon, payments, needsScan, data.ai_extracted_data);
             openModal('billDetailModal');
             return;
@@ -1177,6 +1182,10 @@ async function viewBill(id) {
                     <input type="file" id="vbPhotoInput" accept="image/*" multiple class="qc-input flex-1 text-sm">
                     <button onclick="scanAndVerifyBill(${bill.id}, ${bill.vendor_id})" id="btnScanVerify" class="btn-green px-4 py-2 rounded-lg text-sm font-medium whitespace-nowrap">Scan &amp; Verify</button>
                 </div>
+                ${bill.ai_verification_status === 'mismatch' ? `
+                <div class="mt-2 pt-2 border-t border-amber-200 text-xs text-amber-700">
+                    Reviewed it and the bill is correct? <button onclick="overrideVerifyBill(${bill.id})" class="underline font-medium hover:text-amber-900">Accept &amp; mark verified</button> to push.
+                </div>` : ''}
             </div>` : (bill.zoho_status !== 'pushed' ? `
             <details class="mb-4 rounded-lg border border-gray-200 bg-gray-50">
                 <summary class="px-3 py-2 text-sm font-medium text-gray-600 cursor-pointer select-none">Re-verify against bill photo (before push)</summary>
@@ -1412,6 +1421,7 @@ function renderReconEditorBody() {
     const footer = `
         <div class="recon-footer">
             <button onclick="reconCancel()" class="btn-green-outline px-4 py-2 rounded-lg text-sm font-medium">Cancel</button>
+            <button onclick="overrideVerifyBill(${reconBillId})" class="btn-green-outline px-4 py-2 rounded-lg text-sm font-medium" title="Accept the remaining differences and mark this bill verified so it can be pushed">Accept &amp; Verify</button>
             <button onclick="reconSave()" id="btnReconSave" class="btn-green px-4 py-2 rounded-lg text-sm font-medium flex-1 sm:flex-none">Save &amp; Re-verify</button>
         </div>`;
 
@@ -2104,6 +2114,29 @@ async function submitBill() {
         loadStats();
     } catch (e) {
         showToast(e.message || 'Failed to create bill', 'error');
+    }
+}
+
+// Accept the remaining AI differences and mark the bill verified so it can be
+// pushed. Does NOT bypass the Zoho match + HSN gate (the push still enforces it).
+async function overrideVerifyBill(billId) {
+    const ok = await qcConfirm({
+        title: 'Accept differences & mark verified?',
+        message: 'You confirm this bill is correct as entered. It will be marked verified so you can push it to Zoho. (Each line still needs a Zoho match + HSN to push.)',
+        primaryText: 'Accept & Verify'
+    });
+    if (!ok) return;
+    try {
+        const res = await fetch(`${API}/bills/${billId}/override-verify`, {
+            method: 'POST', headers, body: JSON.stringify({})
+        });
+        const data = await res.json();
+        if (!data.success) throw new Error(apiMessage(data, 'Override failed'));
+        showToast(data.message || 'Bill marked verified', 'success');
+        loadBills(billPage);
+        viewBill(billId);
+    } catch (e) {
+        showToast(e.message || 'Override failed', 'error');
     }
 }
 

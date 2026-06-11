@@ -824,6 +824,55 @@ router.post('/bills/:id/reconcile',
     }
 );
 
+// Override verify — the durable "never stuck" escape hatch (owner 2026-06-12).
+// When the AI verdict is a 'mismatch' the staff have reviewed and accept (e.g.
+// the AI mis-read a bill-level figure that can't be reconciled by editing), an
+// authorized user can mark the bill 'corrected' so it can be submitted/pushed.
+// This does NOT bypass the real integrity gate — submit + push-zoho still
+// re-check that every line is Zoho-matched and HSN'd. The acceptance is stamped
+// on the bill (verified_by/verified_at + a marker in ai_verification_result).
+router.post('/bills/:id/override-verify',
+    managePerm,
+    validateParams(idParamSchema),
+    async (req, res) => {
+        try {
+            const { id } = req.params;
+            const [bills] = await pool.query('SELECT * FROM vendor_bills WHERE id = ?', [id]);
+            if (!bills.length) {
+                return res.status(404).json({ success: false, message: 'Bill not found' });
+            }
+            const bill = bills[0];
+            if (bill.zoho_status === 'pushed') {
+                return res.status(400).json({ success: false, message: 'Bill is already pushed to Zoho' });
+            }
+            if (bill.ai_verification_status === 'verified' || bill.ai_verification_status === 'corrected') {
+                return res.json({ success: true, message: 'Bill is already verified', status: bill.ai_verification_status });
+            }
+
+            let prior = {};
+            try { prior = bill.ai_verification_result ? JSON.parse(bill.ai_verification_result) : {}; } catch { prior = {}; }
+            const note = (req.body && typeof req.body.note === 'string') ? req.body.note.slice(0, 500) : '';
+            const result = {
+                ...prior,
+                status: 'corrected',
+                overridden: true,
+                overridden_by: req.user.id,
+                override_note: note,
+            };
+
+            await pool.query(
+                `UPDATE vendor_bills SET ai_verification_status = 'corrected', ai_verification_result = ?, verified_at = NOW(), verified_by = ? WHERE id = ?`,
+                [JSON.stringify(result), req.user.id, id]
+            );
+
+            res.json({ success: true, message: 'Differences accepted — bill marked verified. It can now be pushed (a Zoho match + HSN are still required per line).', status: 'corrected' });
+        } catch (error) {
+            console.error('Override verify error:', error);
+            res.status(500).json({ success: false, message: 'Failed to override verification' });
+        }
+    }
+);
+
 // Submit bill (mark as verified)
 router.post('/bills/:id/submit',
     managePerm,

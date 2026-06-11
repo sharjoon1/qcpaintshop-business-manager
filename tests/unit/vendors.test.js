@@ -228,6 +228,30 @@ describe('Vendor System', () => {
             expect(result.status).toBe('verified');
             expect(result.differences).toHaveLength(0);
         });
+
+        it('verifies a real GST bill: Σline_total (pre-tax) vs AI subtotal, NOT post-tax total (BILL-20260611-001)', () => {
+            // Owner's stuck bill: one line 5 × 3740 = 18700 pre-tax subtotal.
+            // AI printed subtotal 18700, discount 1823.25, GST 3037.82, total
+            // 19914.57 (post-tax grand). The OLD code compared 18700 vs 19914.57
+            // → permanent 'total' mismatch → un-pushable. Must be 'verified'.
+            const staff = [{ item_name: 'SEAL O PRIMER 20 L', quantity: 5, unit_price: 3740, line_total: 18700, hsn_or_sac: '32091090' }];
+            const ai = {
+                items: [{ name: 'SEAL O PRIMER 20 L', quantity: 5, rate: 3740, hsn_or_sac: '32091090' }],
+                subtotal: 18700, discount: 1823.25, tax: 3037.82, total: 19914.57
+            };
+            const result = verifyBillItems(staff, ai);
+            expect(result.status).toBe('verified');
+            expect(result.differences).toHaveLength(0);
+        });
+
+        it('still flags a genuine subtotal mismatch (line sum disagrees with AI subtotal)', () => {
+            const staff = [{ item_name: 'Paint', quantity: 5, unit_price: 3740, line_total: 18700 }];
+            const ai = { items: [{ name: 'Paint', quantity: 5, rate: 3740 }], subtotal: 17000, tax: 3060, total: 20060 };
+            const result = verifyBillItems(staff, ai);
+            // qty 5=5, rate 3740=3740 match; only the subtotal disagrees (18700 vs 17000)
+            expect(result.status).toBe('mismatch');
+            expect(result.differences.some(d => d.field === 'subtotal')).toBe(true);
+        });
     });
 
     describe('migrations export up()', () => {
