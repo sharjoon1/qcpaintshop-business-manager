@@ -79,6 +79,33 @@ function invoiceNumberRange(numbers) {
 }
 
 /**
+ * Classify a bulk carry-forward request. Mirrors the single /carry-forward
+ * rule: an invoice may only move to a LATER month than its own. Pure — the
+ * route does the DB fetch + upsert.
+ * @param requestedIds  string[] of zoho_invoice_id the user selected
+ * @param invoiceRows   [{ zoho_invoice_id, invoice_number, invoice_date }] from DB
+ * @param filedInMonth  'YYYY-MM'
+ * Returns { valid: [{ zoho_invoice_id, original_month, invoice_number }],
+ *           skipped: [{ id, reason: 'not_found' | 'not_earlier' }] }
+ */
+function planBulkCarry(requestedIds, invoiceRows, filedInMonth) {
+    monthRange(filedInMonth); // validates 'YYYY-MM' format (throws on bad input)
+    const byId = new Map((invoiceRows || []).map(r => [String(r.zoho_invoice_id), r]));
+    const valid = [];
+    const skipped = [];
+    for (const id of (requestedIds || [])) {
+        const inv = byId.get(String(id));
+        if (!inv) { skipped.push({ id, reason: 'not_found' }); continue; }
+        const originalMonth = inv.invoice_date instanceof Date
+            ? inv.invoice_date.toISOString().slice(0, 7)
+            : String(inv.invoice_date).slice(0, 7);
+        if (originalMonth >= filedInMonth) { skipped.push({ id, reason: 'not_earlier' }); continue; }
+        valid.push({ zoho_invoice_id: id, original_month: originalMonth, invoice_number: inv.invoice_number });
+    }
+    return { valid, skipped };
+}
+
+/**
  * Purchase-cost rate for an item row. Preference: DPL custom field (when it
  * parses to a positive number) → zoho_purchase_rate → last_purchase_rate.
  * Returns { rate, source } or { rate: null, source: 'none' }.
@@ -613,4 +640,4 @@ router.get('/profitability', requirePermission('zoho', 'view'), async (req, res)
     }
 });
 
-module.exports = { router, setPool, monthRange, isB2B, resolveCostRate, deriveTax, invoiceNumberRange };
+module.exports = { router, setPool, monthRange, isB2B, resolveCostRate, deriveTax, invoiceNumberRange, planBulkCarry };

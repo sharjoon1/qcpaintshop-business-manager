@@ -6,7 +6,7 @@
  * gst_purchase flag and cost restatement exist ONLY in the internal
  * cost-analysis report.
  */
-const { monthRange, isB2B, resolveCostRate, deriveTax, invoiceNumberRange } = require('../../routes/gst-reports');
+const { monthRange, isB2B, resolveCostRate, deriveTax, invoiceNumberRange, planBulkCarry } = require('../../routes/gst-reports');
 
 describe('monthRange', () => {
     it('expands YYYY-MM to first/last day (leap-aware)', () => {
@@ -101,5 +101,35 @@ describe('resolveCostRate (purchase-cost preference)', () => {
 
     it('rejects negative/garbage DPL strings instead of using them', () => {
         expect(resolveCostRate({ zoho_cf_dpl: '-5', zoho_purchase_rate: '120' }).source).toBe('purchase_rate');
+    });
+});
+
+describe('planBulkCarry (bulk carry-forward classifier)', () => {
+    const rows = [
+        { zoho_invoice_id: 'A', invoice_number: 'QCIN-1', invoice_date: '2026-03-15' },
+        { zoho_invoice_id: 'B', invoice_number: 'QCIN-2', invoice_date: new Date('2026-04-20T00:00:00Z') },
+        { zoho_invoice_id: 'C', invoice_number: 'QCIN-3', invoice_date: '2026-06-02' }, // same month as filed → skip
+    ];
+
+    it('keeps earlier-month invoices and reports their original month', () => {
+        const r = planBulkCarry(['A', 'B'], rows, '2026-06');
+        expect(r.valid).toEqual([
+            { zoho_invoice_id: 'A', original_month: '2026-03', invoice_number: 'QCIN-1' },
+            { zoho_invoice_id: 'B', original_month: '2026-04', invoice_number: 'QCIN-2' },
+        ]);
+        expect(r.skipped).toEqual([]);
+    });
+
+    it('skips not-found ids and same-or-later-month invoices with a reason', () => {
+        const r = planBulkCarry(['A', 'C', 'Z'], rows, '2026-06');
+        expect(r.valid.map(v => v.zoho_invoice_id)).toEqual(['A']);
+        expect(r.skipped).toEqual([
+            { id: 'C', reason: 'not_earlier' },
+            { id: 'Z', reason: 'not_found' },
+        ]);
+    });
+
+    it('rejects a malformed filed_in_month', () => {
+        expect(() => planBulkCarry(['A'], rows, '2026-13')).toThrow();
     });
 });
