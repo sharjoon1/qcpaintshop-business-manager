@@ -13,7 +13,7 @@
 // ai.rate compares against unit_price on DB rows (staff.rate kept for
 // AI-shaped callers).
 const { createVendorSchema, createBillSchema, recordPaymentSchema, listQuerySchema } = require('../../routes/vendors');
-const { verifyBillItems, matchProductsToZoho, setPool } = require('../../services/vendor-bill-ai-service');
+const { verifyBillItems, matchProductsToZoho, setPool, buildReconciliation } = require('../../services/vendor-bill-ai-service');
 
 describe('Vendor System', () => {
 
@@ -234,6 +234,62 @@ describe('Vendor System', () => {
         it('20260612_vendor_po_bill_link exports an up() function', () => {
             const migration = require('../../migrations/20260612_vendor_po_bill_link.js');
             expect(typeof migration.up).toBe('function');
+        });
+    });
+
+    describe('buildReconciliation (line-by-line diff model for the UI)', () => {
+        it('flags qty/rate/hsn diffs per line and what each line needs', () => {
+            const billItems = [
+                // line 0: qty + rate differ, matched + hsn present
+                { item_name: 'Primer', quantity: 1, unit_price: 4699, hsn_or_sac: '3208', zoho_item_id: 'Z1', ai_matched: 1, ai_confidence: 0.9 },
+                // line 1: unmatched + no hsn
+                { item_name: 'Putty', quantity: 3, unit_price: 1200, hsn_or_sac: '', zoho_item_id: null, ai_matched: 0, ai_confidence: 0 },
+            ];
+            const aiData = { items: [
+                { name: 'Primer 20L', quantity: 2, rate: 4699, hsn_or_sac: '321130' },
+                { name: 'Putty', quantity: 3, rate: 1200, hsn_or_sac: '3214' },
+            ], total: 13598 };
+
+            const r = buildReconciliation(billItems, aiData);
+            expect(r.lines).toHaveLength(2);
+            expect(r.lines[0].diffs).toEqual({ quantity: true, rate: false, hsn: true });
+            expect(r.lines[0].ai).toEqual({ name: 'Primer 20L', quantity: 2, rate: 4699, hsn_or_sac: '321130' });
+            expect(r.lines[0].needs_match).toBe(false);
+            expect(r.lines[1].needs_match).toBe(true);
+            expect(r.lines[1].needs_hsn).toBe(true);
+            // a missing HSN on the bill side is NOT a 'hsn diff' (gate handles absence)
+            expect(r.lines[1].diffs.hsn).toBe(false);
+            expect(r.summary).toMatchObject({ quantity: 1, hsn: 1, needs_match: 1, needs_hsn: 1, count_diff: false });
+        });
+
+        it('reports AI lines beyond the bill count as ai_extra', () => {
+            const r = buildReconciliation(
+                [{ item_name: 'A', quantity: 1, unit_price: 100, hsn_or_sac: '1', zoho_item_id: 'Z' }],
+                { items: [{ name: 'A', quantity: 1, rate: 100, hsn_or_sac: '1' }, { name: 'B', quantity: 2, rate: 50, hsn_or_sac: '2' }] }
+            );
+            expect(r.summary.count_diff).toBe(true);
+            expect(r.ai_extra).toEqual([{ name: 'B', quantity: 2, rate: 50, hsn_or_sac: '2' }]);
+        });
+
+        it('uses unit_price (DB cost column) for the rate comparison', () => {
+            // line matches on rate when unit_price === ai.rate
+            const r = buildReconciliation(
+                [{ item_name: 'X', quantity: 1, unit_price: 999, hsn_or_sac: '1', zoho_item_id: 'Z' }],
+                { items: [{ name: 'X', quantity: 1, rate: 999, hsn_or_sac: '1' }] }
+            );
+            expect(r.lines[0].diffs.rate).toBe(false);
+            expect(r.lines[0].bill.unit_price).toBe(999);
+        });
+    });
+
+    describe('billItemSchema persists hsn_or_sac (Zod no longer strips it)', () => {
+        it('keeps hsn_or_sac through createBillSchema item parsing', () => {
+            const parsed = createBillSchema.safeParse({
+                vendor_id: 1,
+                items: [{ item_name: 'P', quantity: 1, unit_price: 10, hsn_or_sac: '3208' }],
+            });
+            expect(parsed.success).toBe(true);
+            expect(parsed.data.items[0].hsn_or_sac).toBe('3208');
         });
     });
 });

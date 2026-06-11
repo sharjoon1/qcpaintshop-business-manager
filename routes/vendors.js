@@ -80,6 +80,9 @@ const billItemSchema = z.object({
     item_name: z.string().min(1),
     quantity: z.number().positive(),
     unit_price: z.number().min(0),
+    // Without this field Zod silently stripped HSN edits on every items save,
+    // so reconciled HSN values never persisted (the submit gate then blocked).
+    hsn_or_sac: z.string().optional().nullable().default(null),
     ai_matched: z.boolean().optional().default(false),
     ai_confidence: z.number().min(0).max(1).optional().default(0)
 });
@@ -462,10 +465,41 @@ router.get('/bills/:id',
                 [id]
             );
 
-            res.json({ success: true, bill: bills[0], items, payments });
+            // Parse the stored AI scan + verdict, and compute the line-by-line
+            // reconciliation the UI renders (what differs, what needs fixing).
+            const bill = bills[0];
+            let aiData = null, verification = null, reconciliation = null;
+            try { aiData = bill.ai_extracted_data ? JSON.parse(bill.ai_extracted_data) : null; } catch (e) { aiData = null; }
+            try { verification = bill.ai_verification_result ? JSON.parse(bill.ai_verification_result) : null; } catch (e) { verification = null; }
+            if (aiData) reconciliation = vendorBillAI.buildReconciliation(items, aiData);
+
+            res.json({ success: true, bill, items, payments, ai_extracted_data: aiData, verification, reconciliation });
         } catch (error) {
             console.error('Get bill detail error:', error);
             res.status(500).json({ success: false, message: 'Failed to get bill details' });
+        }
+    }
+);
+
+// Zoho item search for the reconciliation match-picker (returns HSN so a match
+// auto-fills the line's HSN).
+router.get('/zoho-items',
+    viewPerm,
+    async (req, res) => {
+        try {
+            const q = `%${(req.query.q || '').trim()}%`;
+            const [rows] = await pool.query(
+                `SELECT zoho_item_id, zoho_item_name, zoho_sku, zoho_brand, zoho_rate, zoho_hsn_or_sac
+                 FROM zoho_items_map
+                 WHERE zoho_status = 'active'
+                   AND (zoho_item_name LIKE ? OR zoho_sku LIKE ? OR zoho_brand LIKE ?)
+                 ORDER BY zoho_item_name LIMIT 30`,
+                [q, q, q]
+            );
+            res.json({ success: true, items: rows });
+        } catch (error) {
+            console.error('Vendor zoho-items search error:', error);
+            res.status(500).json({ success: false, message: 'Search failed' });
         }
     }
 );
@@ -563,6 +597,72 @@ router.post('/bills/:id/verify',
         } catch (error) {
             console.error('Verify bill error:', error);
             res.status(500).json({ success: false, message: 'Failed to verify bill' });
+        }
+    }
+);
+
+// Reconcile: save the corrected lines AND re-verify in one call, returning the
+// fresh verdict + reconciliation model. This is what the reconciliation UI
+// posts when the user has fixed the differences.
+router.post('/bills/:id/reconcile',
+    managePerm,
+    validateParams(idParamSchema),
+    validate(z.object({ items: z.array(billItemSchema).min(1) })),
+    async (req, res) => {
+        const conn = await pool.getConnection();
+        try {
+            const { id } = req.params;
+            const { items } = req.body;
+
+            const [bills] = await conn.query('SELECT * FROM vendor_bills WHERE id = ?', [id]);
+            if (!bills.length) { conn.release(); return res.status(404).json({ success: false, message: 'Bill not found' }); }
+            const bill = bills[0];
+            if (bill.zoho_status === 'pushed') { conn.release(); return res.status(400).json({ success: false, message: 'Bill already pushed to Zoho — cannot edit' }); }
+
+            await conn.beginTransaction();
+
+            await conn.query('DELETE FROM vendor_bill_items WHERE bill_id = ?', [id]);
+            let subtotal = 0;
+            for (const item of items) {
+                const lineTotal = item.quantity * item.unit_price;
+                subtotal += lineTotal;
+                await conn.query(
+                    `INSERT INTO vendor_bill_items (bill_id, zoho_item_id, item_name, quantity, unit_price, line_total, hsn_or_sac, ai_matched, ai_confidence)
+                     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+                    [id, item.zoho_item_id || null, item.item_name, item.quantity, item.unit_price, lineTotal,
+                     (item.hsn_or_sac || '').trim() || null, item.ai_matched ? 1 : 0, item.ai_confidence || 0]
+                );
+            }
+
+            const grandTotal = subtotal + (parseFloat(bill.tax_amount) || 0);
+            const amountPaid = parseFloat(bill.amount_paid) || 0;
+            await conn.query(
+                `UPDATE vendor_bills SET subtotal = ?, grand_total = ?, balance_due = ? WHERE id = ?`,
+                [subtotal, grandTotal, grandTotal - amountPaid, id]
+            );
+
+            // Re-verify against the stored AI extraction
+            const aiData = bill.ai_extracted_data ? JSON.parse(bill.ai_extracted_data) : null;
+            const [savedItems] = await conn.query('SELECT * FROM vendor_bill_items WHERE bill_id = ?', [id]);
+            const result = vendorBillAI.verifyBillItems(savedItems, aiData);
+            // 'corrected' when the staff reconciled to a clean verdict — distinct
+            // from a first-pass auto 'verified' so the audit shows human review.
+            const newStatus = result.status === 'verified' ? 'corrected' : 'mismatch';
+            await conn.query(
+                `UPDATE vendor_bills SET ai_verification_status = ?, ai_verification_result = ? WHERE id = ?`,
+                [newStatus, JSON.stringify(result), id]
+            );
+
+            await conn.commit();
+
+            const reconciliation = aiData ? vendorBillAI.buildReconciliation(savedItems, aiData) : null;
+            res.json({ success: true, status: newStatus, verification: result, reconciliation });
+        } catch (error) {
+            await conn.rollback();
+            console.error('Reconcile bill error:', error);
+            res.status(500).json({ success: false, message: 'Failed to reconcile bill' });
+        } finally {
+            conn.release();
         }
     }
 );

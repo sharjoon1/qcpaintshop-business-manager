@@ -298,4 +298,66 @@ function verifyBillItems(staffItems, aiExtractedData) {
     };
 }
 
-module.exports = { setPool, scanBillImage, matchProductsToZoho, verifyBillItems };
+// ─── buildReconciliation ───────────────────────────────────────
+// Pairs each saved bill line with the AI-read line at the same position and
+// flags per-field differences + what each line still needs (a Zoho match, an
+// HSN), plus AI lines that have no bill counterpart. This is the data model
+// the reconciliation UI renders so staff can fix every difference inline.
+function buildReconciliation(billItems, aiExtractedData) {
+    const aiItems = (aiExtractedData && Array.isArray(aiExtractedData.items)) ? aiExtractedData.items : [];
+    const num = v => parseFloat(v) || 0;
+    const hsnOf = o => (o && (o.hsn_or_sac || '')).toString().trim();
+
+    const lines = (billItems || []).map((bill, i) => {
+        const ai = aiItems[i] || null;
+        const billRate = num(bill.unit_price != null ? bill.unit_price : bill.rate);
+        const aiRate = ai ? num(ai.rate) : null;
+        const billQty = num(bill.quantity);
+        const aiQty = ai ? num(ai.quantity) : null;
+        const billHsn = hsnOf(bill);
+        const aiHsn = ai ? hsnOf(ai) : '';
+        return {
+            index: i,
+            bill: {
+                item_name: bill.item_name,
+                quantity: billQty,
+                unit_price: billRate,
+                hsn_or_sac: billHsn,
+                zoho_item_id: bill.zoho_item_id || null,
+                ai_matched: !!bill.ai_matched,
+                ai_confidence: num(bill.ai_confidence),
+            },
+            ai: ai ? { name: ai.name || '', quantity: aiQty, rate: aiRate, hsn_or_sac: aiHsn } : null,
+            diffs: {
+                quantity: ai != null && Math.abs(billQty - aiQty) > 0.01,
+                rate: ai != null && Math.abs(billRate - aiRate) > 0.01,
+                hsn: !!(billHsn && aiHsn && billHsn !== aiHsn),
+            },
+            needs_match: !bill.zoho_item_id,
+            needs_hsn: !billHsn,
+        };
+    });
+
+    // AI lines beyond the bill's line count — staff can add them
+    const aiExtra = aiItems.slice(billItems ? billItems.length : 0).map(ai => ({
+        name: ai.name || '',
+        quantity: num(ai.quantity),
+        rate: num(ai.rate),
+        hsn_or_sac: hsnOf(ai),
+    }));
+
+    const summary = {
+        quantity: lines.filter(l => l.diffs.quantity).length,
+        rate: lines.filter(l => l.diffs.rate).length,
+        hsn: lines.filter(l => l.diffs.hsn).length,
+        needs_match: lines.filter(l => l.needs_match).length,
+        needs_hsn: lines.filter(l => l.needs_hsn).length,
+        count_diff: aiItems.length !== (billItems ? billItems.length : 0),
+        ai_item_count: aiItems.length,
+        bill_item_count: billItems ? billItems.length : 0,
+    };
+
+    return { lines, ai_extra: aiExtra, summary };
+}
+
+module.exports = { setPool, scanBillImage, matchProductsToZoho, verifyBillItems, buildReconciliation };

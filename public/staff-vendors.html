@@ -88,6 +88,40 @@
 
         /* AI badge — gold accent (house style: no purple on staff pages) */
         .ai-badge { background: #FBF3E2; color: #8A6116; border: 1px solid #EAD9B0; font-size: 0.65rem; padding: 1px 6px; border-radius: 9999px; font-weight: 600; }
+
+        /* ===== Reconcile editor (AI Verify diff fix-up) ===== */
+        .recon-banner { background: #FFFBEB; border: 1px solid #FCD34D; border-radius: 0.75rem; padding: 0.75rem 0.875rem; margin-bottom: 0.875rem; }
+        .recon-chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+        .recon-chip { font-size: 0.7rem; font-weight: 600; padding: 2px 9px; border-radius: 9999px; background: #FEF3C7; color: #92400E; border: 1px solid #FCD34D; white-space: nowrap; }
+        .recon-chip.warn { background: #FEE2E2; color: #991B1B; border-color: #FCA5A5; }
+        .recon-chip.info { background: #DBEAFE; color: #1D4ED8; border-color: #93C5FD; }
+
+        .recon-card { border: 1px solid #E5E7EB; border-radius: 0.875rem; padding: 0.875rem; margin-bottom: 0.75rem; background: #fff; }
+        .recon-card.has-diff { border-color: #FCD34D; background: #FFFEFA; }
+        .recon-grid { display: grid; grid-template-columns: 1fr; gap: 0.625rem; margin-top: 0.625rem; }
+        @media (min-width: 640px) { .recon-grid { grid-template-columns: repeat(3, 1fr); } }
+        .recon-field { display: flex; flex-direction: column; gap: 3px; }
+        .recon-field-label { font-size: 0.65rem; font-weight: 600; color: #6B7280; text-transform: uppercase; letter-spacing: .02em; }
+        .recon-field.diff { background: #FFFBEB; border: 1px solid #FCD34D; border-radius: 0.5rem; padding: 6px; margin: -6px; }
+        .recon-field.missing { background: #FEF2F2; border: 1px solid #FCA5A5; border-radius: 0.5rem; padding: 6px; margin: -6px; }
+        .recon-photo-tag { font-size: 0.68rem; color: #8A6116; display: inline-flex; align-items: center; gap: 4px; }
+        .recon-use-btn { font-size: 0.65rem; font-weight: 700; color: #1B5E3B; background: #ECFDF5; border: 1px solid #A7F3D0; border-radius: 9999px; padding: 1px 8px; cursor: pointer; white-space: nowrap; }
+        .recon-use-btn:hover { background: #D1FAE5; }
+        .recon-req-hint { font-size: 0.65rem; color: #DC2626; font-weight: 600; }
+        .recon-line-total { font-size: 0.8rem; font-weight: 700; color: #1B5E3B; }
+        .recon-extra-card { border: 1px dashed #D4A24E; border-radius: 0.75rem; padding: 0.625rem 0.75rem; background: #FBF3E2; display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; margin-bottom: 0.5rem; }
+
+        /* Sticky reconcile footer on mobile */
+        .recon-footer { position: sticky; bottom: 0; background: #fff; border-top: 1px solid #E5E7EB; padding: 0.625rem 0; margin: 0.75rem -1.25rem -1.25rem; padding-left: 1.25rem; padding-right: 1.25rem; display: flex; gap: 0.5rem; z-index: 5; }
+        @media (max-width: 639px) { .recon-footer .btn-green, .recon-footer .btn-green-outline { flex: 1 1 auto; min-height: 44px; } }
+
+        /* Zoho match picker overlay (lighter than the modal shell) */
+        .recon-picker { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.45); z-index: 1100; padding: 1rem; }
+        .recon-picker.active { display: flex; align-items: flex-start; justify-content: center; }
+        .recon-picker-card { background: #fff; border-radius: 1rem; width: 100%; max-width: 30rem; margin-top: 3rem; max-height: 80vh; display: flex; flex-direction: column; overflow: hidden; box-shadow: 0 10px 40px rgba(0,0,0,0.2); }
+        @media (max-width: 639px) { .recon-picker { padding: 0; } .recon-picker.active { align-items: flex-end; } .recon-picker-card { margin-top: 0; max-width: 100%; border-radius: 1.25rem 1.25rem 0 0; max-height: 88vh; } }
+        .recon-picker-item { padding: 0.625rem 0.75rem; cursor: pointer; border-bottom: 1px solid #F3F4F6; }
+        .recon-picker-item:hover { background: #F0FDF4; }
     </style>
 </head>
 <body class="bg-gray-50 min-h-screen" data-page="vendors">
@@ -592,6 +626,25 @@
         </div>
     </div>
 
+    <!-- ==================== ZOHO ITEM MATCH PICKER (reconcile editor) ==================== -->
+    <div id="reconPicker" class="recon-picker" onclick="if(event.target===this)closeReconPicker()">
+        <div class="recon-picker-card">
+            <div class="modal-grab"></div>
+            <div class="flex items-center justify-between px-4 py-3 border-b">
+                <h3 class="text-base font-bold text-gray-800">Match to Zoho item</h3>
+                <button onclick="closeReconPicker()" class="p-1 hover:bg-gray-100 rounded-full">
+                    <svg class="w-5 h-5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+                </button>
+            </div>
+            <div class="px-4 py-3 border-b">
+                <input type="text" id="reconPickerSearch" class="qc-input w-full" placeholder="Search by name, SKU or brand..." oninput="debounceReconPickerSearch()" autocomplete="off">
+            </div>
+            <div id="reconPickerResults" class="overflow-y-auto flex-1">
+                <div class="px-4 py-8 text-center text-sm text-gray-400">Type at least 2 characters to search.</div>
+            </div>
+        </div>
+    </div>
+
 <script>
 // =============================================
 // CONFIG
@@ -608,6 +661,14 @@ let allVendors = []; // cached for dropdowns
 let createdBillId = null; // used for verify flow
 let billImagePath = null;
 let aiExtractedData = null;
+
+// ===== Reconcile editor state (AI Verify diff fix-up) =====
+let reconBillId = null;          // bill currently open in the reconcile editor
+let reconLines = [];             // editable bill-side lines (cloned from reconciliation.lines[].bill)
+let reconAiByIndex = {};         // index → ai counterpart { name, quantity, rate, hsn_or_sac }
+let reconExtra = [];             // ai_extra lines not yet on the bill
+let reconPickerLineIdx = null;   // which line the match-picker is targeting
+let reconPickerTimer = null;
 
 // Status pill filters (vendor.status / bill.payment_status / po.status)
 const listFilters = { vendor: '', bill: '', po: '' };
@@ -1010,9 +1071,22 @@ async function viewBill(id) {
         const bill = data.bill;
         const items = data.items || [];
         const payments = data.payments || [];
+        const recon = data.reconciliation || null;
 
         const needsScan = (bill.ai_verification_status === 'pending' || bill.ai_verification_status === 'mismatch')
             && bill.zoho_status !== 'pushed';
+
+        // ── Reconcile editor branch ──────────────────────────────
+        // When the backend has a reconciliation model, the bill isn't pushed,
+        // and there are unresolved diffs / missing matches / missing HSN /
+        // line-count mismatch — render the INTERACTIVE editor (in place of the
+        // read-only items table) so staff fix every difference inline. The
+        // Scan & Re-scan photo box + flow stepper stay above it.
+        if (recon && bill.zoho_status !== 'pushed' && reconHasUnresolved(recon.summary)) {
+            renderReconcileEditor(bill, recon, payments, needsScan);
+            openModal('billDetailModal');
+            return;
+        }
 
         document.getElementById('billDetailTitle').textContent = `Bill ${bill.bill_number}`;
         document.getElementById('billDetailBody').innerHTML = `
@@ -1117,6 +1191,413 @@ function renderBillFlowSteps(bill) {
     return `<div class="flow-steps">${steps.map((s, i) => `
         <span class="flow-step ${s.done ? 'done' : (i === currentIdx ? 'current' : '')}"><span class="n">${s.done ? '✓' : i + 1}</span>${s.label}</span>
         ${i < steps.length - 1 ? '<span class="flow-arrow">→</span>' : ''}`).join('')}</div>`;
+}
+
+// =============================================
+// RECONCILE EDITOR (AI Verify diff fix-up)
+// =============================================
+
+// True when the summary still has anything for staff to fix.
+function reconHasUnresolved(summary) {
+    if (!summary) return false;
+    return (summary.quantity > 0) || (summary.rate > 0) || (summary.hsn > 0)
+        || (summary.needs_match > 0) || (summary.needs_hsn > 0) || !!summary.count_diff;
+}
+
+// Entry point: clone the reconciliation into editable state, then render.
+function renderReconcileEditor(bill, recon, payments, needsScan) {
+    reconBillId = bill.id;
+    // bill-side lines are the editable rows (the values that get saved)
+    reconLines = (recon.lines || []).map(l => ({
+        item_name: l.bill.item_name || '',
+        quantity: Number(l.bill.quantity) || 0,
+        unit_price: Number(l.bill.unit_price) || 0,
+        hsn_or_sac: l.bill.hsn_or_sac || '',
+        zoho_item_id: l.bill.zoho_item_id || null,
+        zoho_item_name: '',            // sub-note when matched via picker
+        ai_matched: !!l.bill.ai_matched,
+        ai_confidence: Number(l.bill.ai_confidence) || 0
+    }));
+    // ai counterpart by index (for "Photo: …" tags + ← use + Apply all)
+    reconAiByIndex = {};
+    (recon.lines || []).forEach(l => { if (l.ai) reconAiByIndex[l.index] = l.ai; });
+    reconExtra = (recon.ai_extra || []).map(a => ({ ...a }));
+
+    document.getElementById('billDetailTitle').textContent = `Reconcile Bill ${bill.bill_number}`;
+    // The Scan & Re-scan photo box (reused) + the flow stepper sit above the editor.
+    const photoBox = needsScan ? `
+        <div class="mb-4 p-3 bg-amber-50 border border-amber-300 rounded-lg">
+            <div class="text-sm font-semibold text-amber-800 mb-2">Re-scan the bill photo if the AI read it wrong</div>
+            <div class="flex flex-col sm:flex-row gap-2">
+                <input type="file" id="vbPhotoInput" accept="image/*" class="qc-input flex-1 text-sm">
+                <button onclick="scanAndVerifyBill(${bill.id}, ${bill.vendor_id})" id="btnScanVerify" class="btn-green px-4 py-2 rounded-lg text-sm font-medium whitespace-nowrap">Scan &amp; Verify</button>
+            </div>
+        </div>` : '';
+
+    document.getElementById('billDetailBody').innerHTML = `
+        ${renderBillFlowSteps(bill)}
+        ${photoBox}
+        <div class="bg-gray-50 rounded-lg p-3 mb-3 text-sm">
+            <span class="text-gray-500">Vendor:</span> <span class="font-medium">${esc(bill.vendor_name)}</span>
+        </div>
+        <div id="reconEditorRoot"></div>
+    `;
+    // Footer actions live inside the body so the sticky footer scrolls with the editor.
+    document.getElementById('billDetailActions').innerHTML = '';
+    renderReconEditorBody();
+}
+
+// Re-render just the editor body (cards + banner + footer) from current state.
+function renderReconEditorBody() {
+    const summary = computeReconSummary();
+    const chips = [];
+    if (summary.quantity > 0) chips.push(`<span class="recon-chip">${summary.quantity} qty</span>`);
+    if (summary.rate > 0) chips.push(`<span class="recon-chip">${summary.rate} rate</span>`);
+    if (summary.hsn > 0) chips.push(`<span class="recon-chip">${summary.hsn} HSN</span>`);
+    if (summary.needs_match > 0) chips.push(`<span class="recon-chip warn">${summary.needs_match} unmatched</span>`);
+    if (summary.needs_hsn > 0) chips.push(`<span class="recon-chip warn">${summary.needs_hsn} HSN missing</span>`);
+    if (summary.count_diff) chips.push(`<span class="recon-chip info">AI ${summary.ai_item_count} / bill ${summary.bill_item_count} items</span>`);
+
+    const anyAi = Object.keys(reconAiByIndex).length > 0;
+
+    const banner = `
+        <div class="recon-banner">
+            <div class="flex items-start gap-2">
+                <svg class="w-5 h-5 text-amber-500 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4.5c-.77-.833-2.694-.833-3.464 0L3.34 16.5c-.77.833.192 2.5 1.732 2.5z"/></svg>
+                <div class="flex-1 min-w-0">
+                    <div class="text-sm font-semibold text-amber-900">AI Verify கண்டுபிடித்த differences — ஒவ்வொரு வரியையும் சரிபார்த்து திருத்துங்க</div>
+                    ${chips.length ? `<div class="recon-chips">${chips.join('')}</div>` : '<div class="text-xs text-green-700 font-medium mt-1">No differences left — Save &amp; Re-verify to finish.</div>'}
+                </div>
+            </div>
+            ${anyAi ? `<button onclick="reconApplyAllAi()" class="btn-green-outline px-3 py-1.5 rounded-lg text-xs font-semibold mt-3 inline-flex items-center gap-1">
+                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+                Apply all AI values
+            </button>` : ''}
+        </div>`;
+
+    const cards = reconLines.map((line, idx) => renderReconCard(line, idx)).join('');
+
+    const extraSection = reconExtra.length ? `
+        <div class="mt-4">
+            <div class="text-sm font-semibold text-gray-700 mb-2 flex items-center gap-1">
+                <span>📷</span> Photo-ல் இருக்கு, உங்க bill-ல் இல்லை
+            </div>
+            ${reconExtra.map((a, i) => `
+                <div class="recon-extra-card">
+                    <div class="min-w-0">
+                        <div class="text-sm font-medium text-gray-800 truncate">${esc(a.name || '(unnamed)')}</div>
+                        <div class="text-xs text-gray-600">${Number(a.quantity) || 0} × ${formatCurrency(a.rate)}${a.hsn_or_sac ? ` · HSN ${esc(a.hsn_or_sac)}` : ''}</div>
+                    </div>
+                    <button onclick="reconAddExtra(${i})" class="btn-green px-3 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap">Add</button>
+                </div>
+            `).join('')}
+        </div>` : '';
+
+    const footer = `
+        <div class="recon-footer">
+            <button onclick="reconCancel()" class="btn-green-outline px-4 py-2 rounded-lg text-sm font-medium">Cancel</button>
+            <button onclick="reconSave()" id="btnReconSave" class="btn-green px-4 py-2 rounded-lg text-sm font-medium flex-1 sm:flex-none">Save &amp; Re-verify</button>
+        </div>`;
+
+    document.getElementById('reconEditorRoot').innerHTML = banner + cards + extraSection + footer;
+}
+
+// One editable card per bill line.
+function renderReconCard(line, idx) {
+    const ai = reconAiByIndex[idx] || null;
+    const hasDiff = ai && (
+        Math.abs((Number(line.quantity) || 0) - (Number(ai.quantity) || 0)) > 0.01 ||
+        Math.abs((Number(line.unit_price) || 0) - (Number(ai.rate) || 0)) > 0.01 ||
+        (line.hsn_or_sac && ai.hsn_or_sac && String(line.hsn_or_sac) !== String(ai.hsn_or_sac))
+    );
+    const qtyDiff = ai && Math.abs((Number(line.quantity) || 0) - (Number(ai.quantity) || 0)) > 0.01;
+    const rateDiff = ai && Math.abs((Number(line.unit_price) || 0) - (Number(ai.rate) || 0)) > 0.01;
+    const hsnDiff = ai && line.hsn_or_sac && ai.hsn_or_sac && String(line.hsn_or_sac) !== String(ai.hsn_or_sac);
+    const hsnMissing = !line.hsn_or_sac;
+
+    // Match row
+    const matchRow = line.zoho_item_id ? `
+        <div class="flex items-center gap-2 flex-wrap">
+            <span class="inline-flex items-center gap-1 text-xs font-semibold text-green-700">
+                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+                Zoho matched
+            </span>
+            ${line.zoho_item_name ? `<span class="text-xs text-gray-400 truncate">${esc(line.zoho_item_name)}</span>` : ''}
+            <button onclick="openReconPicker(${idx})" class="text-xs text-gray-500 underline hover:text-gray-700">change</button>
+        </div>` : `
+        <div class="flex items-center gap-2 flex-wrap">
+            <span class="inline-block text-xs font-semibold px-2 py-0.5 rounded bg-red-100 text-red-700">Unmatched</span>
+            <button onclick="openReconPicker(${idx})" class="btn-green-outline px-3 py-1 rounded-lg text-xs font-semibold">Match Zoho item</button>
+        </div>`;
+
+    return `
+        <div class="recon-card ${hasDiff || hsnMissing || !line.zoho_item_id ? 'has-diff' : ''}" id="reconCard${idx}">
+            <div class="flex items-start justify-between gap-2 mb-2">
+                <input type="text" value="${esc(line.item_name)}" class="qc-input w-full text-sm font-medium" placeholder="Item name"
+                    onchange="reconUpdateField(${idx}, 'item_name', this.value)">
+                <button onclick="reconRemoveLine(${idx})" class="text-red-400 hover:text-red-600 flex-shrink-0 p-1" title="Remove line">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+                </button>
+            </div>
+            <div class="mb-2">${matchRow}</div>
+            <div class="recon-grid">
+                <!-- Quantity -->
+                <div class="recon-field ${qtyDiff ? 'diff' : ''}">
+                    <span class="recon-field-label">Qty</span>
+                    <input type="number" value="${line.quantity}" min="0" step="1" class="qc-input w-full text-sm"
+                        onchange="reconUpdateField(${idx}, 'quantity', this.value)">
+                    ${ai && ai.quantity != null ? `<div class="flex items-center justify-between gap-1">
+                        <span class="recon-photo-tag">📷 ${Number(ai.quantity)}</span>
+                        ${qtyDiff ? `<button class="recon-use-btn" onclick="reconUseAi(${idx}, 'quantity')">← use</button>` : ''}
+                    </div>` : ''}
+                </div>
+                <!-- Rate (unit_price) -->
+                <div class="recon-field ${rateDiff ? 'diff' : ''}">
+                    <span class="recon-field-label">Rate</span>
+                    <input type="number" value="${line.unit_price}" min="0" step="0.01" class="qc-input w-full text-sm"
+                        onchange="reconUpdateField(${idx}, 'unit_price', this.value)">
+                    ${ai && ai.rate != null ? `<div class="flex items-center justify-between gap-1">
+                        <span class="recon-photo-tag">📷 ${formatCurrency(ai.rate)}</span>
+                        ${rateDiff ? `<button class="recon-use-btn" onclick="reconUseAi(${idx}, 'unit_price')">← use</button>` : ''}
+                    </div>` : ''}
+                </div>
+                <!-- HSN -->
+                <div class="recon-field ${hsnDiff ? 'diff' : (hsnMissing ? 'missing' : '')}">
+                    <span class="recon-field-label">HSN / SAC</span>
+                    <input type="text" value="${esc(line.hsn_or_sac || '')}" class="qc-input w-full text-sm"
+                        placeholder="${ai && ai.hsn_or_sac ? esc(ai.hsn_or_sac) : 'HSN'}"
+                        onchange="reconUpdateField(${idx}, 'hsn_or_sac', this.value)">
+                    ${ai && ai.hsn_or_sac ? `<div class="flex items-center justify-between gap-1">
+                        <span class="recon-photo-tag">📷 ${esc(ai.hsn_or_sac)}</span>
+                        ${(hsnDiff || (hsnMissing && ai.hsn_or_sac)) ? `<button class="recon-use-btn" onclick="reconUseAi(${idx}, 'hsn_or_sac')">← use</button>` : ''}
+                    </div>` : ''}
+                    ${hsnMissing ? '<span class="recon-req-hint">required before submit</span>' : ''}
+                </div>
+            </div>
+            <div class="flex justify-end mt-2">
+                <span class="recon-line-total">Line: ${formatCurrency((Number(line.quantity) || 0) * (Number(line.unit_price) || 0))}</span>
+            </div>
+        </div>`;
+}
+
+// Recompute the summary client-side from current edits (so chips update live).
+function computeReconSummary() {
+    let quantity = 0, rate = 0, hsn = 0, needs_match = 0, needs_hsn = 0;
+    reconLines.forEach((line, idx) => {
+        const ai = reconAiByIndex[idx] || null;
+        if (ai) {
+            if (Math.abs((Number(line.quantity) || 0) - (Number(ai.quantity) || 0)) > 0.01) quantity++;
+            if (Math.abs((Number(line.unit_price) || 0) - (Number(ai.rate) || 0)) > 0.01) rate++;
+            if (line.hsn_or_sac && ai.hsn_or_sac && String(line.hsn_or_sac) !== String(ai.hsn_or_sac)) hsn++;
+        }
+        if (!line.zoho_item_id) needs_match++;
+        if (!line.hsn_or_sac) needs_hsn++;
+    });
+    const ai_item_count = Object.keys(reconAiByIndex).length + reconExtra.length;
+    const bill_item_count = reconLines.length;
+    return { quantity, rate, hsn, needs_match, needs_hsn, count_diff: ai_item_count !== bill_item_count, ai_item_count, bill_item_count };
+}
+
+function reconUpdateField(idx, field, value) {
+    if (field === 'item_name' || field === 'hsn_or_sac') {
+        reconLines[idx][field] = value;
+    } else {
+        reconLines[idx][field] = Number(value) || 0;
+    }
+    renderReconEditorBody();
+}
+
+// Copy a single AI value into the bill line.
+function reconUseAi(idx, field) {
+    const ai = reconAiByIndex[idx];
+    if (!ai) return;
+    if (field === 'quantity') reconLines[idx].quantity = Number(ai.quantity) || 0;
+    else if (field === 'unit_price') reconLines[idx].unit_price = Number(ai.rate) || 0;
+    else if (field === 'hsn_or_sac') reconLines[idx].hsn_or_sac = ai.hsn_or_sac || '';
+    renderReconEditorBody();
+}
+
+// Bulk: copy every AI value into its matching bill line.
+function reconApplyAllAi() {
+    reconLines.forEach((line, idx) => {
+        const ai = reconAiByIndex[idx];
+        if (!ai) return;
+        if (ai.quantity != null) line.quantity = Number(ai.quantity) || 0;
+        if (ai.rate != null) line.unit_price = Number(ai.rate) || 0;
+        if (ai.hsn_or_sac) line.hsn_or_sac = ai.hsn_or_sac;
+    });
+    renderReconEditorBody();
+    showToast('AI values applied to all lines', 'success');
+}
+
+function reconRemoveLine(idx) {
+    reconLines.splice(idx, 1);
+    // Re-index the ai map so counterparts still line up with their cards.
+    const remapped = {};
+    Object.keys(reconAiByIndex).map(Number).forEach(k => {
+        if (k < idx) remapped[k] = reconAiByIndex[k];
+        else if (k > idx) remapped[k - 1] = reconAiByIndex[k];
+        // k === idx: that AI counterpart drops with the line
+    });
+    reconAiByIndex = remapped;
+    renderReconEditorBody();
+}
+
+// Append an AI-extra line as a new (unmatched, HSN-needed) bill line.
+function reconAddExtra(extraIdx) {
+    const a = reconExtra[extraIdx];
+    if (!a) return;
+    reconLines.push({
+        item_name: a.name || '',
+        quantity: Number(a.quantity) || 1,
+        unit_price: Number(a.rate) || 0,
+        hsn_or_sac: a.hsn_or_sac || '',
+        zoho_item_id: null,
+        zoho_item_name: '',
+        ai_matched: false,
+        ai_confidence: 0
+    });
+    reconExtra.splice(extraIdx, 1);
+    renderReconEditorBody();
+}
+
+function reconCancel() {
+    const id = reconBillId;
+    reconBillId = null;
+    // Reload read-only view (the editor branch won't re-trigger once resolved,
+    // but Cancel should always show the plain detail).
+    closeModal('billDetailModal');
+    if (id) viewBill(id);
+}
+
+// Save & Re-verify — POST /bills/:id/reconcile, then act on the verdict.
+async function reconSave() {
+    if (!reconBillId) return;
+    // Guard: every line needs a name.
+    for (const line of reconLines) {
+        if (!String(line.item_name || '').trim()) { showToast('Every line needs an item name', 'error'); return; }
+    }
+    if (!reconLines.length) { showToast('Add at least one item before saving', 'error'); return; }
+
+    const btn = document.getElementById('btnReconSave');
+    if (btn) { btn.disabled = true; btn.textContent = 'Saving...'; }
+
+    const payload = {
+        items: reconLines.map(l => ({
+            zoho_item_id: l.zoho_item_id || null,
+            item_name: l.item_name,
+            quantity: Number(l.quantity) || 0,
+            unit_price: Number(l.unit_price) || 0,
+            hsn_or_sac: (l.hsn_or_sac || '').trim() || null,
+            ai_matched: !!l.ai_matched,
+            ai_confidence: Number(l.ai_confidence) || 0
+        }))
+    };
+
+    try {
+        const res = await fetch(`${API}/bills/${reconBillId}/reconcile`, {
+            method: 'POST',
+            headers: { ...headers, 'Idempotency-Key': idemKey() },
+            body: JSON.stringify(payload)
+        });
+        const data = await res.json();
+        if (!data.success) throw new Error(apiMessage(data, 'Reconcile failed'));
+
+        const billId = reconBillId;
+        const status = data.status;
+        if (status === 'corrected' || status === 'verified') {
+            showToast('All differences fixed — bill ready to submit', 'success');
+            reconBillId = null;
+            loadBills(billPage);
+            viewBill(billId); // resolved → falls through to read-only + Submit button
+        } else {
+            // Still a mismatch — toast the remaining count and re-render the
+            // editor from the fresh reconciliation. Re-fetching via viewBill()
+            // keeps the vendor name + flow stepper + summary chips accurate (the
+            // editor branch re-triggers because diffs/needs remain).
+            const remaining = (data.verification && Array.isArray(data.verification.differences))
+                ? data.verification.differences.length : 0;
+            showToast(`${remaining} difference(s) still need fixing`, 'error');
+            reconBillId = null;
+            loadBills(billPage);
+            viewBill(billId);
+        }
+    } catch (e) {
+        showToast(e.message || 'Reconcile failed', 'error');
+        if (btn) { btn.disabled = false; btn.textContent = 'Save & Re-verify'; }
+    }
+}
+
+// =============================================
+// ZOHO MATCH PICKER (reconcile editor)
+// =============================================
+function openReconPicker(lineIdx) {
+    reconPickerLineIdx = lineIdx;
+    document.getElementById('reconPickerSearch').value = '';
+    document.getElementById('reconPickerResults').innerHTML =
+        '<div class="px-4 py-8 text-center text-sm text-gray-400">Type at least 2 characters to search.</div>';
+    document.getElementById('reconPicker').classList.add('active');
+    // Pre-seed the search with the line's item name to save a keystroke.
+    const seed = (reconLines[lineIdx] && reconLines[lineIdx].item_name) ? reconLines[lineIdx].item_name.trim() : '';
+    if (seed.length >= 2) {
+        document.getElementById('reconPickerSearch').value = seed;
+        searchReconZohoItems();
+    }
+    setTimeout(() => { const s = document.getElementById('reconPickerSearch'); if (s) s.focus(); }, 50);
+}
+
+function closeReconPicker() {
+    document.getElementById('reconPicker').classList.remove('active');
+    reconPickerLineIdx = null;
+}
+
+function debounceReconPickerSearch() {
+    clearTimeout(reconPickerTimer);
+    reconPickerTimer = setTimeout(searchReconZohoItems, 300);
+}
+
+async function searchReconZohoItems() {
+    const term = document.getElementById('reconPickerSearch').value.trim();
+    const el = document.getElementById('reconPickerResults');
+    if (term.length < 2) {
+        el.innerHTML = '<div class="px-4 py-8 text-center text-sm text-gray-400">Type at least 2 characters to search.</div>';
+        return;
+    }
+    el.innerHTML = '<div class="px-4 py-8 text-center text-sm text-gray-400">Searching...</div>';
+    try {
+        const res = await fetch(`${API}/zoho-items?q=${encodeURIComponent(term)}`, { headers });
+        const data = await res.json();
+        if (!data.success) throw new Error(apiMessage(data, 'Search failed'));
+        const items = data.items || [];
+        if (!items.length) {
+            el.innerHTML = '<div class="px-4 py-8 text-center text-sm text-gray-400">No matching Zoho items.</div>';
+            return;
+        }
+        el.innerHTML = items.map(it => `
+            <div class="recon-picker-item" onclick='pickReconZohoItem(${JSON.stringify(it).replace(/'/g, "&#39;")})'>
+                <div class="text-sm font-medium text-gray-800">${esc(it.zoho_item_name)}</div>
+                <div class="text-xs text-gray-500">
+                    ${it.zoho_brand ? esc(it.zoho_brand) : ''}${it.zoho_sku ? ` · ${esc(it.zoho_sku)}` : ''}${it.zoho_hsn_or_sac ? ` · HSN ${esc(it.zoho_hsn_or_sac)}` : ''}${(it.zoho_rate != null && it.zoho_rate !== '') ? ` · ${formatCurrency(it.zoho_rate)}` : ''}
+                </div>
+            </div>
+        `).join('');
+    } catch (e) {
+        el.innerHTML = `<div class="px-4 py-8 text-center text-sm text-red-500">${esc(e.message)}</div>`;
+    }
+}
+
+// Picking a Zoho item: set the line's zoho_item_id + ai_matched, auto-fill HSN
+// from the zoho item (if it has one), keep the bill's own item_name, and show
+// the matched zoho name as a sub-note.
+function pickReconZohoItem(it) {
+    if (reconPickerLineIdx == null || !reconLines[reconPickerLineIdx]) { closeReconPicker(); return; }
+    const line = reconLines[reconPickerLineIdx];
+    line.zoho_item_id = it.zoho_item_id;
+    line.ai_matched = true;
+    line.zoho_item_name = it.zoho_item_name || '';
+    if (it.zoho_hsn_or_sac) line.hsn_or_sac = it.zoho_hsn_or_sac; // only override when zoho has one
+    closeReconPicker();
+    renderReconEditorBody();
 }
 
 // Step 4 — POST /bills/:id/submit (HSN gate lives server-side)
