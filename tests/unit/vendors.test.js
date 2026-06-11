@@ -259,6 +259,7 @@ describe('Vendor System', () => {
             '20260612_vendor_po_bill_link.js',
             '20260612_vendor_bill_discount.js',
             '20260612_zoho_location_salesperson.js',
+            '20260612_soft_delete_invoices_bills.js',
         ])('%s exports an up() function', (file) => {
             expect(typeof require(`../../migrations/${file}`).up).toBe('function');
         });

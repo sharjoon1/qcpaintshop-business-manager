@@ -1316,6 +1316,11 @@ async function viewBill(id) {
         if (parseFloat(bill.balance_due) > 0) {
             actionsHtml += `<button onclick="closeModal('billDetailModal'); openPaymentModal(${bill.vendor_id}, ${bill.id}, ${parseFloat(bill.balance_due) || 0})" class="btn-green-outline px-4 py-2 rounded-lg text-sm font-medium">Record Payment</button>`;
         }
+        // Delete/Void — only when the bill has no payment (server re-checks).
+        if ((parseFloat(bill.amount_paid) || 0) <= 0.01 && bill.payment_status === 'unpaid') {
+            const pushed = bill.zoho_status === 'pushed';
+            actionsHtml += `<button onclick="deleteBill(${bill.id}, ${pushed})" class="btn-danger px-4 py-2 rounded-lg text-sm font-medium">${pushed ? 'Void' : 'Delete'}</button>`;
+        }
         document.getElementById('billDetailActions').innerHTML = actionsHtml;
 
         if (bill.zoho_status !== 'pushed') {
@@ -2179,6 +2184,48 @@ async function overrideVerifyBill(billId) {
     }
 }
 
+// Delete / Void a bill. Pushed bills are VOIDed in Zoho (admin-only); the
+// server enforces the no-payment + admin gates.
+async function deleteBill(billId, pushed) {
+    const ok = await qcConfirm({
+        title: pushed ? 'Void this bill?' : 'Delete this bill?',
+        message: pushed ? 'It will be VOIDed in Zoho (admin only). This cannot be undone.' : 'This bill will be removed.',
+        primaryText: pushed ? 'Void' : 'Delete'
+    });
+    if (!ok) return;
+    try {
+        const res = await fetch(`${API}/bills/${billId}`, { method: 'DELETE', headers });
+        const data = await res.json();
+        if (!data.success) throw new Error(apiMessage(data, 'Delete failed'));
+        showToast(data.message || 'Bill removed', 'success');
+        closeModal('billDetailModal');
+        loadBills(billPage);
+        loadStats();
+    } catch (e) {
+        showToast(e.message || 'Delete failed', 'error');
+    }
+}
+
+// Cancel a PO (soft). Pushed POs are cancelled in Zoho too (admin-only).
+async function deletePo(poId, pushed) {
+    const ok = await qcConfirm({
+        title: 'Cancel this purchase order?',
+        message: pushed ? 'It will also be cancelled in Zoho (admin only).' : 'The purchase order will be marked cancelled.',
+        primaryText: 'Cancel PO'
+    });
+    if (!ok) return;
+    try {
+        const res = await fetch(`${API}/purchase-orders/${poId}`, { method: 'DELETE', headers });
+        const data = await res.json();
+        if (!data.success) throw new Error(apiMessage(data, 'Cancel failed'));
+        showToast(data.message || 'PO cancelled', 'success');
+        closeModal('billDetailModal');
+        loadPurchaseOrders(poPage);
+    } catch (e) {
+        showToast(e.message || 'Cancel failed', 'error');
+    }
+}
+
 async function pushBillToZoho(billId) {
     const ok = await qcConfirm({
         title: 'Push to Zoho?',
@@ -2315,7 +2362,7 @@ async function viewPo(id) {
         `;
 
         let actionsHtml = '';
-        if (po.status === 'draft') {
+        if (po.status === 'draft' && po.zoho_status !== 'pushed') {
             actionsHtml += `<button onclick="closeModal('billDetailModal'); editPo(${po.id})" class="btn-green-outline px-4 py-2 rounded-lg text-sm font-medium">Edit</button>`;
             actionsHtml += `<button onclick="sendPo(${po.id})" class="btn-green-outline px-4 py-2 rounded-lg text-sm font-medium">Mark as Sent</button>`;
         }
@@ -2326,6 +2373,10 @@ async function viewPo(id) {
         }
         if (po.zoho_status !== 'pushed') {
             actionsHtml += `<button onclick="pushPoToZoho(${po.id})" class="btn-green-outline px-4 py-2 rounded-lg text-sm font-medium">Push to Zoho</button>`;
+        }
+        // Cancel/Delete — unless already converted to a bill or cancelled.
+        if (!linkedBill && po.status !== 'cancelled') {
+            actionsHtml += `<button onclick="deletePo(${po.id}, ${po.zoho_status === 'pushed'})" class="btn-danger px-4 py-2 rounded-lg text-sm font-medium">Cancel PO</button>`;
         }
         document.getElementById('billDetailActions').innerHTML = actionsHtml;
 

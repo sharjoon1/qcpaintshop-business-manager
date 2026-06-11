@@ -1207,6 +1207,11 @@ async function viewInvoice(id) {
         if (inv.zoho_status !== 'pushed') {
             actions.innerHTML += `<button onclick="closeDetailModal(); pushToZoho(${inv.id}, '${esc(inv.payment_status)}', ${Number(inv.balance_due) || 0}, '${esc(inv.customer_type || '')}', '${esc(inv.painter_salesperson_id || '')}')" class="btn-green-outline px-4 py-2 rounded-lg text-sm font-medium">Push to Zoho</button>`;
         }
+        // Delete/Void — only for unpaid invoices (a paid one can't be removed).
+        if (inv.payment_status === 'unpaid') {
+            const pushed = inv.zoho_status === 'pushed';
+            actions.innerHTML += `<button onclick="deleteInvoice(${inv.id}, ${pushed})" class="btn-danger px-4 py-2 rounded-lg text-sm font-medium">${pushed ? 'Void' : 'Delete'}</button>`;
+        }
         actions.classList.toggle('hidden', !actions.innerHTML);
 
         document.getElementById('detailModal').classList.add('active');
@@ -1272,6 +1277,31 @@ async function pushToZoho(invoiceId, paymentStatus, balanceDue, customerType, pa
 
 function closePushModal() {
     document.getElementById('pushModal').classList.remove('active');
+}
+
+// Delete / Void an invoice. Pushed invoices are VOIDed in Zoho (admin-only) and
+// painter points reversed; the server enforces all gates.
+async function deleteInvoice(invoiceId, pushed) {
+    const ok = await confirmDialog({
+        title: pushed ? 'Void this invoice?' : 'Delete this invoice?',
+        message: pushed
+            ? 'It will be VOIDed in Zoho (admin only). Any painter loyalty points awarded for it will be reversed. This cannot be undone.'
+            : 'This draft invoice will be removed.',
+        primaryText: pushed ? 'Void' : 'Delete',
+        danger: true
+    });
+    if (!ok) return;
+    try {
+        const res = await fetch(`${API}/invoices/${invoiceId}`, { method: 'DELETE', headers });
+        const data = await res.json();
+        if (!data.success) throw new Error(data.message || 'Delete failed');
+        showToast(data.message || 'Invoice removed', 'success');
+        closeDetailModal();
+        loadStats();
+        loadInvoices(invoicePage);
+    } catch (e) {
+        showToast(e.message || 'Delete failed', 'error');
+    }
 }
 
 async function loadSalespersonsInto(sel) {

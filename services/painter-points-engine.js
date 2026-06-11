@@ -779,6 +779,61 @@ async function queueClawback(painterId, amount, reason, source = 'attendance') {
     );
 }
 
+// Reverse the points awarded for an invoice that's being voided/deleted (owner
+// 2026-06-12: a voided painter invoice must NOT leave the painter holding its
+// points — CLAUDE.md §6). Resilient: deduct what the painter still has now and
+// queue a pending clawback for any shortfall (regular pool) so it nets against
+// future earns instead of throwing. `invoiceId` is the reference_id used at
+// award time (the Zoho invoice id the billing module passes as invoice_id).
+async function _reversePool(painterId, poolName, amount, invoiceId, createdBy) {
+    if (!(amount > 0)) return { deducted: 0, clawback: 0 };
+    const [rows] = await pool.query('SELECT regular_points, annual_points FROM painters WHERE id = ?', [painterId]);
+    if (!rows.length) return { deducted: 0, clawback: 0 };
+    const bal = parseFloat(rows[0][`${poolName}_points`]) || 0;
+    const deductNow = Math.min(bal, amount);
+    if (deductNow > 0) {
+        await deductPoints(painterId, poolName, deductNow, 'void', String(invoiceId), 'invoice_void',
+            `Reversal: voided invoice ${invoiceId}`, createdBy);
+    }
+    const shortfall = Math.round((amount - deductNow) * 100) / 100;
+    if (shortfall > 0 && poolName === 'regular') {
+        await queueClawback(painterId, shortfall, `Voided invoice ${invoiceId}`, 'void');
+    }
+    return { deducted: deductNow, clawback: shortfall };
+}
+
+async function reverseInvoicePoints(invoiceId, createdBy = null) {
+    if (!pool) throw new Error('Database pool not initialized');
+    const ref = String(invoiceId);
+    // The award claim rows (direct + salesperson attribution) carry the painter's
+    // regular/annual points; referral points to the referrer live only in the
+    // ledger (source='referral').
+    const [claims] = await pool.query(
+        'SELECT painter_id, regular_points, annual_points FROM painter_invoices_processed WHERE invoice_id = ? OR zoho_invoice_id = ?',
+        [ref, ref]
+    );
+    const reversed = [];
+    for (const c of claims) {
+        const reg = await _reversePool(c.painter_id, 'regular', parseFloat(c.regular_points) || 0, ref, createdBy);
+        const ann = await _reversePool(c.painter_id, 'annual', parseFloat(c.annual_points) || 0, ref, createdBy);
+        reversed.push({ painter_id: c.painter_id, regular: reg, annual: ann });
+    }
+    // Referral earns awarded to OTHER painters for this invoice.
+    const [refTxns] = await pool.query(
+        "SELECT painter_id, pool, SUM(amount) AS amt FROM painter_point_transactions WHERE source = 'referral' AND reference_id = ? AND type = 'earn' GROUP BY painter_id, pool",
+        [ref]
+    );
+    for (const t of refTxns) {
+        const r = await _reversePool(t.painter_id, t.pool, parseFloat(t.amt) || 0, ref, createdBy);
+        reversed.push({ painter_id: t.painter_id, referral_pool: t.pool, ...r });
+    }
+    // Drop the claim rows so the (now-void) invoice no longer counts as awarded.
+    if (claims.length) {
+        await pool.query('DELETE FROM painter_invoices_processed WHERE invoice_id = ? OR zoho_invoice_id = ?', [ref, ref]);
+    }
+    return { invoiceId: ref, claims: claims.length, reversed };
+}
+
 module.exports = {
     setPool,
     getReferralTier,
@@ -798,5 +853,6 @@ module.exports = {
     getLevelMultiplier,
     addPointsWithMultiplier,
     checkLevelUp,
-    queueClawback
+    queueClawback,
+    reverseInvoicePoints
 };

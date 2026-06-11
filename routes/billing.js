@@ -17,8 +17,9 @@ const auditLog = require('../services/audit-log');
 const { idempotent, setPool: setIdempotencyPool } = require('../middleware/idempotency');
 
 let pool;
+let pointsEngine = null;
 function setPool(p) { pool = p; billingZohoService.setPool(p); auditLog.setPool(p); setIdempotencyPool(p); }
-function setPointsEngine(pe) { billingZohoService.setPointsEngine(pe); }
+function setPointsEngine(pe) { pointsEngine = pe; billingZohoService.setPointsEngine(pe); }
 
 // ═══════════════════════════════════════════
 // HELPERS
@@ -250,14 +251,14 @@ router.get('/stats',
                      COALESCE(SUM(amount_paid), 0) AS total_collected,
                      COALESCE(SUM(balance_due), 0) AS total_outstanding
                  FROM billing_invoices
-                 WHERE 1=1 ${branchWhere}`,
+                 WHERE deleted_at IS NULL ${branchWhere}`,
                 invoiceParams
             );
 
             const [invByStatus] = await pool.query(
                 `SELECT payment_status, COUNT(*) AS cnt
                  FROM billing_invoices
-                 WHERE 1=1 ${branchWhere}
+                 WHERE deleted_at IS NULL ${branchWhere}
                  GROUP BY payment_status`,
                 invoiceParams
             );
@@ -797,7 +798,7 @@ router.get('/invoices',
             const branchId = getBranchFilter(req);
             const offset = (page - 1) * limit;
 
-            let where = 'WHERE 1=1';
+            let where = 'WHERE bi.deleted_at IS NULL';
             const params = [];
 
             if (branchId) { where += ' AND bi.branch_id = ?'; params.push(branchId); }
@@ -859,7 +860,7 @@ router.get('/invoices/:id',
                  FROM billing_invoices bi
                  LEFT JOIN users u ON bi.created_by = u.id
                  LEFT JOIN painters p ON bi.painter_id = p.id
-                 WHERE bi.id = ?`,
+                 WHERE bi.id = ? AND bi.deleted_at IS NULL`,
                 [id]
             );
             if (!invoices.length) {
@@ -888,6 +889,70 @@ router.get('/invoices/:id',
     }
 );
 
+// Delete / Void invoice (owner 2026-06-12). Drafts (not pushed) → soft-cancel
+// locally. Pushed → admin-only → VOID in Zoho (GST-safe) + reverse painter
+// points. Refused when the invoice has any payment. Never hard-deletes.
+router.delete('/invoices/:id',
+    requirePermission('billing', 'invoice'),
+    validateParams(idParamSchema),
+    async (req, res) => {
+        try {
+            const { id } = req.params;
+            const [rows] = await pool.query('SELECT * FROM billing_invoices WHERE id = ? AND deleted_at IS NULL', [id]);
+            if (!rows.length) return res.status(404).json({ success: false, message: 'Invoice not found' });
+            const inv = rows[0];
+
+            // Gate: never delete an invoice that has a payment (orphans money rows;
+            // Zoho also refuses to void/delete a paid invoice).
+            const amountPaid = parseFloat(inv.amount_paid) || 0;
+            const [payCount] = await pool.query('SELECT COUNT(*) AS c FROM billing_payments WHERE invoice_id = ?', [id]);
+            if (inv.payment_status !== 'unpaid' || amountPaid > 0.01 || payCount[0].c > 0) {
+                return res.status(400).json({ success: false, code: 'INVOICE_HAS_PAYMENTS', message: 'This invoice has a payment recorded — reverse the payment first (or handle it directly in Zoho).' });
+            }
+
+            const pushed = !!inv.zoho_invoice_id;
+            if (pushed && !isFullAdmin(req.user && req.user.role)) {
+                return res.status(403).json({ success: false, message: 'Only an admin can delete an invoice that is already in Zoho.' });
+            }
+
+            // Reflect in Zoho: VOID the pushed invoice (keeps the record/number).
+            if (pushed) {
+                try { await zohoAPI.voidInvoice(inv.zoho_invoice_id); }
+                catch (zErr) {
+                    return res.status(400).json({ success: false, code: 'ZOHO_VOID_FAILED', message: 'Zoho would not void this invoice: ' + (zErr.message || zErr) });
+                }
+            }
+
+            // Soft-delete locally FIRST (never hard-delete a money row) + items,
+            // and free any estimate that converted into this invoice — so the
+            // user-visible removal lands before the (separate-txn) points
+            // reversal. If reversal then fails it's logged + recoverable, and a
+            // re-run 404s (already deleted) rather than re-voiding in Zoho.
+            await pool.query('UPDATE billing_invoices SET deleted_at = NOW() WHERE id = ?', [id]);
+            await pool.query('UPDATE billing_invoice_items SET deleted_at = NOW() WHERE invoice_id = ? AND deleted_at IS NULL', [id]);
+            await pool.query("UPDATE billing_estimates SET converted_to_invoice_id = NULL, status = 'sent' WHERE converted_to_invoice_id = ?", [id]);
+
+            // Reverse painter points (awarded on push) for a voided painter invoice.
+            let pointsReversal = null;
+            if (pushed && inv.customer_type === 'painter' && inv.painter_id && pointsEngine && pointsEngine.reverseInvoicePoints) {
+                try { pointsReversal = await pointsEngine.reverseInvoicePoints(inv.zoho_invoice_id, req.user.id); }
+                catch (pErr) { console.error('[invoice.delete] points reversal failed:', pErr.message); }
+            }
+
+            await auditLog.record(req, {
+                action: 'billing.invoice.delete',
+                entity_type: 'billing_invoice', entity_id: id,
+                before: inv, after: { deleted_at: 'now', voided_in_zoho: pushed }
+            });
+
+            res.json({ success: true, voided: pushed, message: pushed ? 'Invoice voided in Zoho and removed' : 'Invoice deleted', points_reversal: pointsReversal });
+        } catch (error) {
+            console.error('Delete invoice error:', error);
+            res.status(500).json({ success: false, message: 'Failed to delete invoice' });
+        }
+    }
+);
+
 // Edit invoice (unpaid + not pushed only)
 router.put('/invoices/:id',
     requirePermission('billing', 'invoice'),
@@ -904,7 +969,7 @@ router.put('/invoices/:id',
             // list twice, letting two requests share one connection (pool
             // poisoning / interleaved transactions).
             const [existing] = await pool.query(
-                'SELECT id, payment_status, zoho_invoice_id FROM billing_invoices WHERE id = ?', [id]
+                'SELECT id, payment_status, zoho_invoice_id FROM billing_invoices WHERE id = ? AND deleted_at IS NULL', [id]
             );
             if (!existing.length) {
                 return res.status(404).json({ success: false, message: 'Invoice not found' });
@@ -1004,7 +1069,7 @@ router.post('/invoices/:id/payment',
             const data = req.body;
 
             const [invoices] = await pool.query(
-                'SELECT id, balance_due, payment_status FROM billing_invoices WHERE id = ?', [id]
+                'SELECT id, balance_due, payment_status FROM billing_invoices WHERE id = ? AND deleted_at IS NULL', [id]
             );
             if (!invoices.length) {
                 return res.status(404).json({ success: false, message: 'Invoice not found' });
@@ -1032,7 +1097,7 @@ router.post('/invoices/:id/payment',
             );
             const totalPaid = Number(paySum[0].total_paid);
 
-            const [inv] = await pool.query('SELECT grand_total FROM billing_invoices WHERE id = ?', [id]);
+            const [inv] = await pool.query('SELECT grand_total FROM billing_invoices WHERE id = ? AND deleted_at IS NULL', [id]);
             const grandTotal = Number(inv[0].grand_total);
             const balanceDue = Math.max(0, grandTotal - totalPaid);
             const paymentStatus = balanceDue <= 0.01 ? 'paid' : 'partial';

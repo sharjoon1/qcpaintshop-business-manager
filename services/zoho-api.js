@@ -2471,6 +2471,24 @@ async function markInvoiceSent(invoiceId) {
     return await apiPost(`/invoices/${invoiceId}/status/sent?organization_id=${orgId}`, {});
 }
 
+// VOID / CANCEL transitions for the delete flow (owner 2026-06-12: deleting a
+// PUSHED doc voids it in Zoho — GST-safe, keeps the record/number — rather than
+// hard-deleting). Void works on submitted/approved invoices+bills; POs use the
+// 'cancelled' status. apiPost rejects on Zoho code!==0, so a "has payments"
+// refusal surfaces as a thrown Error the route maps to a 400.
+async function voidInvoice(invoiceId) {
+    const orgId = process.env.ZOHO_ORGANIZATION_ID;
+    return await apiPost(`/invoices/${invoiceId}/status/void?organization_id=${orgId}`, {});
+}
+async function voidBill(billId) {
+    const orgId = process.env.ZOHO_ORGANIZATION_ID;
+    return await apiPost(`/bills/${billId}/status/void?organization_id=${orgId}`, {});
+}
+async function markPOCancelled(poId) {
+    const orgId = process.env.ZOHO_ORGANIZATION_ID;
+    return await apiPost(`/purchaseorders/${poId}/status/cancelled?organization_id=${orgId}`, {});
+}
+
 // Take a freshly-created bill/invoice OUT OF DRAFT. Staff (isAdmin=false) →
 // submit for approval (it lands in the admin's Zoho approval queue); admin →
 // submit + approve (finalized directly). Falls back to mark-open/sent if the
@@ -2666,6 +2684,9 @@ module.exports = {
     approveInvoice,
     markInvoiceSent,
     finalizeDocument,
+    voidInvoice,
+    voidBill,
+    markPOCancelled,
     getPurchaseOrders,
     createPurchaseOrder,
     // Expenses

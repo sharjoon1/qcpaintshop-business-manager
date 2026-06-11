@@ -206,8 +206,8 @@ router.get('/',
 
             const [rows] = await pool.query(
                 `SELECT v.*,
-                    (SELECT COUNT(*) FROM vendor_bills WHERE vendor_id = v.id) AS bill_count,
-                    (SELECT COALESCE(SUM(balance_due), 0) FROM vendor_bills WHERE vendor_id = v.id AND payment_status != 'paid') AS outstanding
+                    (SELECT COUNT(*) FROM vendor_bills WHERE vendor_id = v.id AND deleted_at IS NULL) AS bill_count,
+                    (SELECT COALESCE(SUM(balance_due), 0) FROM vendor_bills WHERE vendor_id = v.id AND payment_status != 'paid' AND deleted_at IS NULL) AS outstanding
                  FROM vendors v
                  ${where}
                  ORDER BY v.created_at DESC
@@ -379,7 +379,7 @@ router.get('/bills',
             const limit = Number(req.query.limit) || 20;
             const offset = (page - 1) * limit;
 
-            let where = 'WHERE 1=1';
+            let where = 'WHERE vb.deleted_at IS NULL';
             const params = [];
 
             if (vendor_id) {
@@ -485,7 +485,7 @@ router.get('/bills/:id',
                 `SELECT vb.*, v.vendor_name
                  FROM vendor_bills vb
                  JOIN vendors v ON vb.vendor_id = v.id
-                 WHERE vb.id = ?`,
+                 WHERE vb.id = ? AND vb.deleted_at IS NULL`,
                 [id]
             );
             if (!bills.length) {
@@ -679,9 +679,18 @@ router.put('/bills/:id/items',
             const { id } = req.params;
             const { items, tax_amount, discount_amount } = req.body;
 
-            const [bills] = await pool.query('SELECT * FROM vendor_bills WHERE id = ?', [id]);
+            const [bills] = await pool.query('SELECT * FROM vendor_bills WHERE id = ? AND deleted_at IS NULL', [id]);
             if (!bills.length) {
                 return res.status(404).json({ success: false, message: 'Bill not found' });
+            }
+            // Block editing a bill that's already in Zoho or has a payment (owner
+            // 2026-06-12: a pushed doc is delete/recreate, not edit-in-place; a
+            // paid bill must not have its lines rewritten under the payment).
+            if (bills[0].zoho_status === 'pushed') {
+                return res.status(400).json({ success: false, code: 'ALREADY_PUSHED', message: 'This bill is already in Zoho — delete it and create a new one to make changes.' });
+            }
+            if ((parseFloat(bills[0].amount_paid) || 0) > 0.01 || bills[0].payment_status !== 'unpaid') {
+                return res.status(400).json({ success: false, code: 'BILL_HAS_PAYMENTS', message: 'This bill has a payment recorded — it can no longer be edited.' });
             }
 
             // Delete old items
@@ -726,7 +735,7 @@ router.post('/bills/:id/verify',
         try {
             const { id } = req.params;
 
-            const [bills] = await pool.query('SELECT * FROM vendor_bills WHERE id = ?', [id]);
+            const [bills] = await pool.query('SELECT * FROM vendor_bills WHERE id = ? AND deleted_at IS NULL', [id]);
             if (!bills.length) {
                 return res.status(404).json({ success: false, message: 'Bill not found' });
             }
@@ -812,7 +821,7 @@ router.post('/bills/:id/reconcile',
             const { id } = req.params;
             const { items, tax_amount, discount_amount } = req.body;
 
-            const [bills] = await conn.query('SELECT * FROM vendor_bills WHERE id = ?', [id]);
+            const [bills] = await conn.query('SELECT * FROM vendor_bills WHERE id = ? AND deleted_at IS NULL', [id]);
             if (!bills.length) { conn.release(); return res.status(404).json({ success: false, message: 'Bill not found' }); }
             const bill = bills[0];
             if (bill.zoho_status === 'pushed') { conn.release(); return res.status(400).json({ success: false, message: 'Bill already pushed to Zoho — cannot edit' }); }
@@ -878,7 +887,7 @@ router.post('/bills/:id/override-verify',
     async (req, res) => {
         try {
             const { id } = req.params;
-            const [bills] = await pool.query('SELECT * FROM vendor_bills WHERE id = ?', [id]);
+            const [bills] = await pool.query('SELECT * FROM vendor_bills WHERE id = ? AND deleted_at IS NULL', [id]);
             if (!bills.length) {
                 return res.status(404).json({ success: false, message: 'Bill not found' });
             }
@@ -922,7 +931,7 @@ router.post('/bills/:id/submit',
         try {
             const { id } = req.params;
 
-            const [bills] = await pool.query('SELECT * FROM vendor_bills WHERE id = ?', [id]);
+            const [bills] = await pool.query('SELECT * FROM vendor_bills WHERE id = ? AND deleted_at IS NULL', [id]);
             if (!bills.length) {
                 return res.status(404).json({ success: false, message: 'Bill not found' });
             }
@@ -976,7 +985,7 @@ router.post('/bills/:id/push-zoho',
                 `SELECT vb.*, v.vendor_name, v.zoho_contact_id, v.gst_number
                  FROM vendor_bills vb
                  JOIN vendors v ON vb.vendor_id = v.id
-                 WHERE vb.id = ?`,
+                 WHERE vb.id = ? AND vb.deleted_at IS NULL`,
                 [id]
             );
             if (!bills.length) {
@@ -1096,6 +1105,42 @@ router.post('/bills/:id/push-zoho',
     }
 );
 
+// Delete / Void bill (owner 2026-06-12). Not pushed → soft-cancel locally.
+// Pushed → admin-only → VOID in Zoho (GST-safe). Refused if it has any payment.
+router.delete('/bills/:id',
+    managePerm,
+    validateParams(idParamSchema),
+    async (req, res) => {
+        try {
+            const { id } = req.params;
+            const [bills] = await pool.query('SELECT * FROM vendor_bills WHERE id = ? AND deleted_at IS NULL', [id]);
+            if (!bills.length) return res.status(404).json({ success: false, message: 'Bill not found' });
+            const bill = bills[0];
+
+            const amountPaid = parseFloat(bill.amount_paid) || 0;
+            const [payCount] = await pool.query('SELECT COUNT(*) AS c FROM vendor_payments WHERE bill_id = ?', [id]);
+            if (amountPaid > 0.01 || bill.payment_status !== 'unpaid' || payCount[0].c > 0) {
+                return res.status(400).json({ success: false, code: 'BILL_HAS_PAYMENTS', message: 'This bill has a payment recorded — reverse it first (or handle it in Zoho).' });
+            }
+
+            const pushed = bill.zoho_status === 'pushed';
+            if (pushed && !isFullAdmin(req.user && req.user.role)) {
+                return res.status(403).json({ success: false, message: 'Only an admin can delete a bill that is already in Zoho.' });
+            }
+            if (pushed && bill.zoho_bill_id) {
+                try { await zohoAPI.voidBill(bill.zoho_bill_id); }
+                catch (zErr) { return res.status(400).json({ success: false, code: 'ZOHO_VOID_FAILED', message: 'Zoho would not void this bill: ' + (zErr.message || zErr) }); }
+            }
+
+            await pool.query('UPDATE vendor_bills SET deleted_at = NOW() WHERE id = ?', [id]);
+            res.json({ success: true, voided: pushed, message: pushed ? 'Bill voided in Zoho and removed' : 'Bill deleted' });
+        } catch (error) {
+            console.error('Delete bill error:', error);
+            res.status(500).json({ success: false, message: 'Failed to delete bill' });
+        }
+    }
+);
+
 // ═══════════════════════════════════════════
 // PURCHASE ORDERS
 // ═══════════════════════════════════════════
@@ -1197,7 +1242,7 @@ router.get('/purchase-orders/:id',
             // Converted-bill linkage (vendor_bills.po_id) so the UI can jump
             // straight to the bill created from this PO.
             const [bills] = await pool.query(
-                'SELECT id, bill_number, ai_verification_status, zoho_status FROM vendor_bills WHERE po_id = ? LIMIT 1',
+                'SELECT id, bill_number, ai_verification_status, zoho_status FROM vendor_bills WHERE po_id = ? AND deleted_at IS NULL LIMIT 1',
                 [id]
             );
 
@@ -1263,6 +1308,12 @@ router.put('/purchase-orders/:id',
             }
             if (pos[0].status !== 'draft') {
                 return res.status(400).json({ success: false, message: 'Only draft POs can be edited' });
+            }
+            // A pushed PO can still be status='draft' locally (push never advances
+            // status) — block editing it (owner 2026-06-12: a doc already in Zoho
+            // is not edited in place; delete/cancel it and recreate).
+            if (pos[0].zoho_po_id) {
+                return res.status(400).json({ success: false, code: 'ALREADY_PUSHED', message: 'This PO is already in Zoho — cancel it and create a new one to make changes.' });
             }
 
             const { vendor_id, items, tax_amount, discount_amount, zoho_location_id, expected_date, notes } = req.body;
@@ -1349,7 +1400,7 @@ router.post('/purchase-orders/:id/convert-to-bill',
             }
 
             const [existing] = await pool.query(
-                'SELECT id, bill_number FROM vendor_bills WHERE po_id = ? LIMIT 1',
+                'SELECT id, bill_number FROM vendor_bills WHERE po_id = ? AND deleted_at IS NULL LIMIT 1',
                 [id]
             );
             if (existing.length) {
@@ -1511,6 +1562,43 @@ router.post('/purchase-orders/:id/push-zoho',
     }
 );
 
+// Delete / Cancel purchase order (owner 2026-06-12). Soft-cancel via the
+// existing 'cancelled' status. Pushed → admin-only → cancel in Zoho too.
+// Refused if the PO was already converted to a (live) bill.
+router.delete('/purchase-orders/:id',
+    poPerm,
+    validateParams(idParamSchema),
+    async (req, res) => {
+        try {
+            const { id } = req.params;
+            const [pos] = await pool.query('SELECT * FROM vendor_purchase_orders WHERE id = ?', [id]);
+            if (!pos.length) return res.status(404).json({ success: false, message: 'Purchase order not found' });
+            const po = pos[0];
+            if (po.status === 'cancelled') return res.json({ success: true, message: 'Purchase order already cancelled' });
+
+            const [billRows] = await pool.query('SELECT id, bill_number FROM vendor_bills WHERE po_id = ? AND deleted_at IS NULL LIMIT 1', [id]);
+            if (billRows.length) {
+                return res.status(400).json({ success: false, code: 'PO_HAS_BILL', message: `This PO is converted to bill ${billRows[0].bill_number} — delete that bill first.` });
+            }
+
+            const pushed = !!po.zoho_po_id;
+            if (pushed && !isFullAdmin(req.user && req.user.role)) {
+                return res.status(403).json({ success: false, message: 'Only an admin can cancel a PO that is already in Zoho.' });
+            }
+            if (pushed) {
+                try { await zohoAPI.markPOCancelled(po.zoho_po_id); }
+                catch (zErr) { return res.status(400).json({ success: false, code: 'ZOHO_CANCEL_FAILED', message: 'Zoho would not cancel this PO: ' + (zErr.message || zErr) }); }
+            }
+
+            await pool.query("UPDATE vendor_purchase_orders SET status = 'cancelled' WHERE id = ?", [id]);
+            res.json({ success: true, voided: pushed, message: pushed ? 'PO cancelled in Zoho and here' : 'Purchase order cancelled' });
+        } catch (error) {
+            console.error('Delete PO error:', error);
+            res.status(500).json({ success: false, message: 'Failed to cancel purchase order' });
+        }
+    }
+);
+
 // ═══════════════════════════════════════════
 // PAYMENTS
 // ═══════════════════════════════════════════
@@ -1644,8 +1732,8 @@ router.get('/stats',
             const [rows] = await pool.query(
                 `SELECT
                     (SELECT COUNT(*) FROM vendors) AS total_vendors,
-                    (SELECT COUNT(*) FROM vendor_bills WHERE payment_status != 'paid') AS open_bills,
-                    (SELECT COALESCE(SUM(balance_due), 0) FROM vendor_bills WHERE payment_status != 'paid') AS outstanding,
+                    (SELECT COUNT(*) FROM vendor_bills WHERE payment_status != 'paid' AND deleted_at IS NULL) AS open_bills,
+                    (SELECT COALESCE(SUM(balance_due), 0) FROM vendor_bills WHERE payment_status != 'paid' AND deleted_at IS NULL) AS outstanding,
                     (SELECT COUNT(*) FROM vendor_purchase_orders) AS purchase_orders`
             );
             res.json({ success: true, stats: rows[0] });
@@ -1670,7 +1758,7 @@ router.get('/:id',
                 return res.status(404).json({ success: false, message: 'Vendor not found' });
             }
             const [recent_bills] = await pool.query(
-                'SELECT * FROM vendor_bills WHERE vendor_id = ? ORDER BY created_at DESC LIMIT 10', [id]
+                'SELECT * FROM vendor_bills WHERE vendor_id = ? AND deleted_at IS NULL ORDER BY created_at DESC LIMIT 10', [id]
             );
             const [recent_payments] = await pool.query(
                 `SELECT vp.*, u.full_name AS paid_by_name
