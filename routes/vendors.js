@@ -597,6 +597,36 @@ async function resolveLocationName(zohoLocationId) {
     } catch { return null; }
 }
 
+// Zoho requires a discount_account_id when an entity-level discount is applied
+// to a BILL/PO (purchase discounts post to an account — error 11018 "Associate
+// an account for discount" otherwise). The account id lives in ai_config
+// (config_key 'zoho_purchase_discount_account_id', seeded to the org's
+// "Purchase Discounts" expense account) so it's editable without a deploy.
+async function resolvePurchaseDiscountAccountId() {
+    try {
+        const [rows] = await pool.query(
+            "SELECT config_value FROM ai_config WHERE config_key = 'zoho_purchase_discount_account_id' LIMIT 1"
+        );
+        const v = rows.length ? String(rows[0].config_value || '').trim() : '';
+        return v || null;
+    } catch { return null; }
+}
+
+// Zoho needs each bill/PO line to carry a tax (error 110802 "Specify either a
+// Tax or Tax Exemption or Reverse Charge") because the Zoho items have no
+// default tax. The owner's paints are 18% GST (intra-state CGST9+SGST9 = the
+// "GST18" tax group). The tax id lives in ai_config
+// ('zoho_default_gst_tax_id') so it's adjustable (e.g. IGST18 for inter-state).
+async function resolveDefaultGstTaxId() {
+    try {
+        const [rows] = await pool.query(
+            "SELECT config_value FROM ai_config WHERE config_key = 'zoho_default_gst_tax_id' LIMIT 1"
+        );
+        const v = rows.length ? String(rows[0].config_value || '').trim() : '';
+        return v || null;
+    } catch { return null; }
+}
+
 // Update a Zoho item's DPL from the bill (owner decision 2026-06-12): the bill
 // is the latest purchase cost, so reconciliation can push the new DPL to the
 // item — writes zoho_cf_dpl, recomputes the sales rate (ceil(DPL×1.18×1.10)),
@@ -996,12 +1026,16 @@ router.post('/bills/:id/push-zoho',
             // Load items
             const [items] = await pool.query('SELECT * FROM vendor_bill_items WHERE bill_id = ?', [id]);
 
+            // Each line must carry a tax (Zoho 110802) — the items have no Zoho
+            // default tax, so attach the configured GST tax (18% group).
+            const gstTaxId = await resolveDefaultGstTaxId();
             const lineItems = items.map(it => ({
                 item_id: it.zoho_item_id || undefined,
                 name: it.item_name,
                 hsn_or_sac: it.hsn_or_sac || undefined,
                 quantity: it.quantity,
-                rate: it.unit_price   // DPL (ex-GST cost per pack)
+                rate: it.unit_price,   // DPL (ex-GST cost per pack)
+                ...(gstTaxId ? { tax_id: gstTaxId } : {})
             }));
 
             // Location/branch to post the bill to in Zoho (owner 2026-06-12).
@@ -1021,6 +1055,8 @@ router.post('/bills/:id/push-zoho',
             // date is optional → omit when absent/unparseable.
             const billDate = toYmd(bill.bill_date) || toYmd(new Date());
             const dueDate = toYmd(bill.due_date);
+            // Entity-level bill discount needs a discount_account_id (Zoho 11018).
+            const discountAccountId = billDiscount > 0 ? await resolvePurchaseDiscountAccountId() : null;
             const zohoResp = await zohoAPI.createBill({
                 vendor_id: zohoContactId,
                 bill_number: bill.bill_number,
@@ -1028,7 +1064,12 @@ router.post('/bills/:id/push-zoho',
                 ...(dueDate ? { due_date: dueDate } : {}),
                 line_items: lineItems,
                 ...(pushLocationId ? { location_id: pushLocationId } : {}),
-                ...(billDiscount > 0 ? { discount: billDiscount, is_discount_before_tax: true, discount_type: 'entity_level' } : {})
+                ...(billDiscount > 0 ? {
+                    discount: billDiscount,
+                    is_discount_before_tax: true,
+                    discount_type: 'entity_level',
+                    ...(discountAccountId ? { discount_account_id: discountAccountId } : {})
+                } : {})
             });
 
             const zohoBillId = zohoResp.bill?.bill_id;
@@ -1407,11 +1448,14 @@ router.post('/purchase-orders/:id/push-zoho',
 
             const [items] = await pool.query('SELECT * FROM vendor_po_items WHERE po_id = ?', [id]);
 
+            // Each line must carry a tax (Zoho 110802) — attach the configured GST.
+            const poGstTaxId = await resolveDefaultGstTaxId();
             const lineItems = items.map(it => ({
                 item_id: it.zoho_item_id || undefined,
                 name: it.item_name,
                 quantity: it.quantity,
-                rate: it.unit_price
+                rate: it.unit_price,
+                ...(poGstTaxId ? { tax_id: poGstTaxId } : {})
             }));
 
             // expected_date arrives as a JS Date from mysql2 — serialized raw it
@@ -1426,13 +1470,19 @@ router.post('/purchase-orders/:id/push-zoho',
             }
             const poDiscount = parseFloat(po.discount_amount) || 0;
             const poLocationId = (req.body && req.body.zoho_location_id) || po.zoho_location_id || null;
+            const poDiscountAccountId = poDiscount > 0 ? await resolvePurchaseDiscountAccountId() : null;
             const zohoResp = await zohoAPI.createPurchaseOrder({
                 vendor_id: zohoContactId,
                 purchaseorder_number: po.po_number,
                 ...(deliveryDate ? { delivery_date: deliveryDate } : {}),
                 line_items: lineItems,
                 ...(poLocationId ? { location_id: poLocationId } : {}),
-                ...(poDiscount > 0 ? { discount: poDiscount, is_discount_before_tax: true, discount_type: 'entity_level' } : {})
+                ...(poDiscount > 0 ? {
+                    discount: poDiscount,
+                    is_discount_before_tax: true,
+                    discount_type: 'entity_level',
+                    ...(poDiscountAccountId ? { discount_account_id: poDiscountAccountId } : {})
+                } : {})
             });
 
             // vendor_purchase_orders has no zoho_status column (prod schema) —
