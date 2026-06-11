@@ -51,20 +51,21 @@ async function scanBillImage(imagePath) {
         { role: 'user', content: `[IMAGE: data:${mimeType};base64,${base64}]\n\nExtract all data from this vendor bill image. Return JSON only.` }
     ];
 
-    // clawdbot (KAI) first; when its gateway is down (a recurring prod state)
-    // fall back to Gemini — buildGeminiPayload converts the [IMAGE: ...]
-    // convention into an inline_data vision part.
+    // Gemini first — it's the reliable provider (multimodal; buildGeminiPayload
+    // turns the [IMAGE: ...] convention into an inline_data vision part). The
+    // clawdbot (KAI) gateway is the legacy primary; kept as a fallback for when
+    // it's restored, but it's currently down on prod.
     let response;
     try {
         response = await aiEngine.generate(messages, {
-            provider: 'clawdbot',
+            provider: 'gemini',
             maxTokens: 4096,
             temperature: 0.1
         });
-    } catch (clawErr) {
-        console.warn('[VendorBillAI] clawdbot scan failed, falling back to gemini:', clawErr.message);
+    } catch (gemErr) {
+        console.warn('[VendorBillAI] gemini scan failed, trying clawdbot:', gemErr.message);
         response = await aiEngine.generate(messages, {
-            provider: 'gemini',
+            provider: 'clawdbot',
             maxTokens: 4096,
             temperature: 0.1
         });
