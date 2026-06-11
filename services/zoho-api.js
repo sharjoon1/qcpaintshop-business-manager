@@ -2442,6 +2442,59 @@ async function createBill(billData) {
     return await apiPost(`/bills?organization_id=${orgId}`, billData);
 }
 
+// Transaction approval transitions. Zoho creates bills/invoices via API as
+// DRAFT. To take them out of draft: submit (→ pending approval) then approve
+// (→ open/finalized). When the org's approval workflow is OFF, submit/approve
+// error — use markBillOpen/markInvoiceSent as the fallback to leave draft.
+async function submitBill(billId) {
+    const orgId = process.env.ZOHO_ORGANIZATION_ID;
+    return await apiPost(`/bills/${billId}/submit?organization_id=${orgId}`, {});
+}
+async function approveBill(billId) {
+    const orgId = process.env.ZOHO_ORGANIZATION_ID;
+    return await apiPost(`/bills/${billId}/approve?organization_id=${orgId}`, {});
+}
+async function markBillOpen(billId) {
+    const orgId = process.env.ZOHO_ORGANIZATION_ID;
+    return await apiPost(`/bills/${billId}/status/open?organization_id=${orgId}`, {});
+}
+async function submitInvoice(invoiceId) {
+    const orgId = process.env.ZOHO_ORGANIZATION_ID;
+    return await apiPost(`/invoices/${invoiceId}/submit?organization_id=${orgId}`, {});
+}
+async function approveInvoice(invoiceId) {
+    const orgId = process.env.ZOHO_ORGANIZATION_ID;
+    return await apiPost(`/invoices/${invoiceId}/approve?organization_id=${orgId}`, {});
+}
+async function markInvoiceSent(invoiceId) {
+    const orgId = process.env.ZOHO_ORGANIZATION_ID;
+    return await apiPost(`/invoices/${invoiceId}/status/sent?organization_id=${orgId}`, {});
+}
+
+// Take a freshly-created bill/invoice OUT OF DRAFT. Staff (isAdmin=false) →
+// submit for approval (it lands in the admin's Zoho approval queue); admin →
+// submit + approve (finalized directly). Falls back to mark-open/sent if the
+// org's approval workflow is off. Never throws — the doc is already created.
+async function finalizeDocument(kind, docId, isAdmin) {
+    if (!docId) return { state: 'draft' };
+    const isBill = kind === 'bill';
+    const submit = isBill ? submitBill : submitInvoice;
+    const approve = isBill ? approveBill : approveInvoice;
+    const markOpen = isBill ? markBillOpen : markInvoiceSent;
+    try {
+        await submit(docId);
+        if (isAdmin) {
+            await approve(docId);
+            return { state: 'approved' };
+        }
+        return { state: 'submitted' };
+    } catch (err) {
+        // Approval workflow likely disabled — at least take it out of draft.
+        try { await markOpen(docId); return { state: isBill ? 'open' : 'sent' }; }
+        catch { console.error(`Zoho finalize ${kind} ${docId} failed:`, err.message); return { state: 'draft', error: err.message }; }
+    }
+}
+
 async function getPurchaseOrders(params = {}) {
     const orgId = process.env.ZOHO_ORGANIZATION_ID;
     return await apiGet('/purchaseorders', { organization_id: orgId, ...params });
@@ -2606,6 +2659,13 @@ module.exports = {
     getBills,
     getBill,
     createBill,
+    submitBill,
+    approveBill,
+    markBillOpen,
+    submitInvoice,
+    approveInvoice,
+    markInvoiceSent,
+    finalizeDocument,
     getPurchaseOrders,
     createPurchaseOrder,
     // Expenses

@@ -14,6 +14,7 @@ jest.mock('../../services/zoho-api', () => ({
     createInvoice: (...a) => mockCreateInvoice(...a),
     createContact: jest.fn(async () => ({ contact: { contact_id: 'CONT1' } })),
     createPayment: jest.fn(async () => ({})),
+    finalizeDocument: jest.fn(async (_kind, _id, isAdmin) => ({ state: isAdmin ? 'approved' : 'submitted' })),
 }));
 
 const svc = require('../../services/billing-zoho-service');
@@ -75,5 +76,17 @@ describe('pushInvoiceToZoho — mandatory salesperson', () => {
         svc.setPool(makePool({ ...baseInvoice }));
         await svc.pushInvoiceToZoho(1, 99, { salespersonId: 'SP-CHOSEN' });
         expect(mockCreateInvoice.mock.calls[0][0]).not.toHaveProperty('location_id');
+    });
+
+    it('admin push approves the invoice in Zoho (out of draft, finalized)', async () => {
+        svc.setPool(makePool({ ...baseInvoice }));
+        const res = await svc.pushInvoiceToZoho(1, 99, { salespersonId: 'SP', isAdmin: true });
+        expect(res.zohoState).toBe('approved');
+    });
+
+    it('staff push submits the invoice for admin approval (out of draft, pending)', async () => {
+        svc.setPool(makePool({ ...baseInvoice }));
+        const res = await svc.pushInvoiceToZoho(1, 99, { salespersonId: 'SP', isAdmin: false });
+        expect(res.zohoState).toBe('submitted');
     });
 });

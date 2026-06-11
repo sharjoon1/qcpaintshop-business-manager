@@ -9,7 +9,7 @@
 const express = require('express');
 const router = express.Router();
 const { z } = require('zod');
-const { requirePermission } = require('../middleware/permissionMiddleware');
+const { requirePermission, isFullAdmin } = require('../middleware/permissionMiddleware');
 const { validate, validateQuery, validateParams } = require('../middleware/validate');
 const billingZohoService = require('../services/billing-zoho-service');
 const zohoAPI = require('../services/zoho-api');
@@ -1171,13 +1171,20 @@ router.post('/invoices/:id/push-zoho',
             const options = {
                 salespersonId: (req.body && req.body.salesperson_id) || null,
                 locationId: (req.body && req.body.zoho_location_id) || null,
+                isAdmin: isFullAdmin(req.user && req.user.role),
             };
             const result = await billingZohoService.pushInvoiceToZoho(id, req.user.id, options);
+            const state = result.zohoState;
+            const stateMsg = state === 'approved' ? 'created & approved in Zoho'
+                : state === 'submitted' ? 'created & submitted for admin approval in Zoho'
+                : state === 'sent' ? 'created in Zoho'
+                : 'pushed to Zoho';
             res.json({
                 success: true,
-                message: 'Invoice pushed to Zoho',
+                message: `Invoice ${stateMsg}`,
                 zoho_invoice_id: result.zohoInvoiceId,
                 zoho_invoice_number: result.zohoInvoiceNumber,
+                zoho_state: state || null,
                 salesperson_name: result.salespersonName || null,
                 location_name: result.locationName || null,
                 points_result: result.pointsResult || null

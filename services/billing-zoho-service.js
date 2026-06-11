@@ -211,6 +211,11 @@ async function pushInvoiceToZoho(invoiceId, userId, options = {}) {
     const zohoInvoiceId = zohoInvoice.invoice_id;
     const zohoInvoiceNumber = zohoInvoice.invoice_number;
 
+    // Take it OUT OF DRAFT (owner 2026-06-12): a staff push is submitted for the
+    // admin's Zoho approval; an admin push is approved directly. Done before
+    // recording any payment (Zoho won't accept a payment on a draft invoice).
+    const finalizeState = (await zohoAPI.finalizeDocument('invoice', zohoInvoiceId, !!options.isAdmin)).state;
+
     // 6. Award painter points if applicable
     let pointsResult = null;
     if (invoice.customer_type === 'painter' && invoice.painter_id && pointsEngine) {
@@ -268,7 +273,7 @@ async function pushInvoiceToZoho(invoiceId, userId, options = {}) {
     );
 
     // 9. Return result
-    return { zohoInvoiceId, zohoInvoiceNumber, salespersonId, salespersonName, locationId, locationName, pointsResult };
+    return { zohoInvoiceId, zohoInvoiceNumber, salespersonId, salespersonName, locationId, locationName, zohoState: finalizeState, pointsResult };
 }
 
 module.exports = { setPool, setPointsEngine, resolveZohoContact, pushInvoiceToZoho };

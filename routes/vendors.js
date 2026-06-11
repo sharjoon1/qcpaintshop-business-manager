@@ -8,7 +8,7 @@
 const express = require('express');
 const router = express.Router();
 const { z } = require('zod');
-const { requirePermission } = require('../middleware/permissionMiddleware');
+const { requirePermission, isFullAdmin } = require('../middleware/permissionMiddleware');
 const { validate, validateQuery, validateParams } = require('../middleware/validate');
 const { uploadVendorBill } = require('../config/uploads');
 const vendorBillAI = require('../services/vendor-bill-ai-service');
@@ -1073,12 +1073,22 @@ router.post('/bills/:id/push-zoho',
             });
 
             const zohoBillId = zohoResp.bill?.bill_id;
+
+            // Take it OUT OF DRAFT (owner 2026-06-12): a staff push lands in the
+            // admin's Zoho approval queue; an admin push is approved directly.
+            const admin = isFullAdmin(req.user && req.user.role);
+            const fin = await zohoAPI.finalizeDocument('bill', zohoBillId, admin);
+
             await pool.query(
                 `UPDATE vendor_bills SET zoho_status = 'pushed', zoho_bill_id = ?, zoho_location_id = ?, zoho_location_name = ? WHERE id = ?`,
                 [zohoBillId || null, pushLocationId, pushLocationName, id]
             );
 
-            res.json({ success: true, message: 'Bill pushed to Zoho', zoho_bill_id: zohoBillId });
+            const stateMsg = fin.state === 'approved' ? 'created & approved in Zoho'
+                : fin.state === 'submitted' ? 'created & submitted for admin approval in Zoho'
+                : fin.state === 'open' ? 'created in Zoho'
+                : 'pushed to Zoho (draft — approval step failed, finalize it in Zoho)';
+            res.json({ success: true, message: `Bill ${stateMsg}`, zoho_bill_id: zohoBillId, zoho_state: fin.state });
         } catch (error) {
             console.error('Push bill to Zoho error:', error);
             res.status(500).json({ success: false, message: 'Failed to push bill to Zoho' });
