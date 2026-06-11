@@ -264,6 +264,12 @@ router.get('/missed-b2b', requirePermission('zoho', 'view'), async (req, res) =>
     try {
         const [from] = monthRange(req.query.month); // candidates must precede this month
         const search = `%${req.query.search || ''}%`;
+        const params = [from, from, search, search];
+        let extra = '';
+        if (req.query.from_date) { extra += ' AND zi.invoice_date >= ?'; params.push(req.query.from_date); }
+        if (req.query.to_date) { extra += ' AND zi.invoice_date <= ?'; params.push(req.query.to_date); }
+        const minAmount = parseFloat(req.query.min_amount);
+        if (Number.isFinite(minAmount)) { extra += ' AND zi.total >= ?'; params.push(minAmount); }
         const [rows] = await pool.query(
             `SELECT zi.zoho_invoice_id, zi.invoice_number, zi.invoice_date, zi.customer_name,
                     zi.total, TRIM(zcm.zoho_gst_no) AS gstin
@@ -274,10 +280,10 @@ router.get('/missed-b2b', requirePermission('zoho', 'view'), async (req, res) =>
                AND zi.status <> 'void'
                AND TRIM(COALESCE(zcm.zoho_gst_no, '')) <> ''
                AND adj.zoho_invoice_id IS NULL
-               AND (zi.invoice_number LIKE ? OR zi.customer_name LIKE ?)
+               AND (zi.invoice_number LIKE ? OR zi.customer_name LIKE ?)${extra}
              ORDER BY zi.invoice_date DESC
-             LIMIT 100`,
-            [from, from, search, search]
+             LIMIT 500`,
+            params
         );
         res.json({ success: true, candidates: rows });
     } catch (err) {
@@ -310,6 +316,34 @@ router.post('/carry-forward', requirePermission('zoho', 'edit'), async (req, res
         res.json({ success: true, invoice_number: inv.invoice_number, original_month: originalMonth, filed_in_month });
     } catch (err) {
         console.error('GST carry-forward error:', err);
+        res.status(400).json({ success: false, message: err.message });
+    }
+});
+
+router.post('/carry-forward/bulk', requirePermission('zoho', 'edit'), async (req, res) => {
+    try {
+        const { filed_in_month, note } = req.body;
+        const ids = Array.isArray(req.body.zoho_invoice_ids) ? req.body.zoho_invoice_ids : [];
+        if (!ids.length) {
+            return res.status(400).json({ success: false, message: 'No invoices selected' });
+        }
+        const [rows] = await pool.query(
+            'SELECT zoho_invoice_id, invoice_number, invoice_date FROM zoho_invoices WHERE zoho_invoice_id IN (?)',
+            [ids]
+        );
+        const { valid, skipped } = planBulkCarry(ids, rows, filed_in_month);
+        if (valid.length) {
+            const values = valid.map(v => [v.zoho_invoice_id, v.original_month, filed_in_month, note || null, req.user.id]);
+            await pool.query(
+                `INSERT INTO gst_filing_adjustments (zoho_invoice_id, original_month, filed_in_month, note, created_by)
+                 VALUES ?
+                 ON DUPLICATE KEY UPDATE filed_in_month = VALUES(filed_in_month), note = VALUES(note), created_by = VALUES(created_by)`,
+                [values]
+            );
+        }
+        res.json({ success: true, carried: valid.length, skipped });
+    } catch (err) {
+        console.error('GST carry-forward bulk error:', err);
         res.status(400).json({ success: false, message: err.message });
     }
 });
