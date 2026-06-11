@@ -51,11 +51,24 @@ async function scanBillImage(imagePath) {
         { role: 'user', content: `[IMAGE: data:${mimeType};base64,${base64}]\n\nExtract all data from this vendor bill image. Return JSON only.` }
     ];
 
-    const response = await aiEngine.generate(messages, {
-        provider: 'clawdbot',
-        maxTokens: 4096,
-        temperature: 0.1
-    });
+    // clawdbot (KAI) first; when its gateway is down (a recurring prod state)
+    // fall back to Gemini — buildGeminiPayload converts the [IMAGE: ...]
+    // convention into an inline_data vision part.
+    let response;
+    try {
+        response = await aiEngine.generate(messages, {
+            provider: 'clawdbot',
+            maxTokens: 4096,
+            temperature: 0.1
+        });
+    } catch (clawErr) {
+        console.warn('[VendorBillAI] clawdbot scan failed, falling back to gemini:', clawErr.message);
+        response = await aiEngine.generate(messages, {
+            provider: 'gemini',
+            maxTokens: 4096,
+            temperature: 0.1
+        });
+    }
 
     // Extract text from response
     const text = typeof response === 'string' ? response : (response.text || response.content || '');

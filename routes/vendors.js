@@ -1075,10 +1075,20 @@ router.post('/purchase-orders/:id/push-zoho',
                 rate: it.unit_price
             }));
 
+            // expected_date arrives as a JS Date from mysql2 — serialized raw it
+            // becomes an ISO timestamp Zoho rejects ("Invalid value passed for
+            // Delivery Date"). Send YYYY-MM-DD, and omit entirely when unset.
+            let deliveryDate = null;
+            if (po.expected_date) {
+                const d = new Date(po.expected_date);
+                if (!isNaN(d)) {
+                    deliveryDate = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+                }
+            }
             const zohoResp = await zohoAPI.createPurchaseOrder({
                 vendor_id: zohoContactId,
                 purchaseorder_number: po.po_number,
-                delivery_date: po.expected_date,
+                ...(deliveryDate ? { delivery_date: deliveryDate } : {}),
                 line_items: lineItems
             });
 

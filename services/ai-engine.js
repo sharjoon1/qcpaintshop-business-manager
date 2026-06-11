@@ -236,6 +236,25 @@ function httpsRequest(options, body) {
 
 // ─── Gemini provider ───────────────────────────────────────────
 
+// Convert message content into Gemini parts. Supports the clawdbot-style
+// inline image convention `[IMAGE: data:<mime>;base64,<data>]` so vision
+// callers (vendor bill scan) work when the clawdbot gateway is down.
+function geminiParts(content) {
+    const parts = [];
+    const re = /\[IMAGE:\s*data:([a-z/+.-]+);base64,([A-Za-z0-9+/=]+)\]/gi;
+    let last = 0;
+    let m;
+    while ((m = re.exec(content)) !== null) {
+        const before = content.slice(last, m.index).trim();
+        if (before) parts.push({ text: before });
+        parts.push({ inline_data: { mime_type: m[1], data: m[2] } });
+        last = m.index + m[0].length;
+    }
+    const tail = content.slice(last).trim();
+    if (tail || !parts.length) parts.push({ text: tail || content });
+    return parts;
+}
+
 function buildGeminiPayload(messages, temperature, maxTokens) {
     const contents = [];
     let systemInstruction = null;
@@ -246,7 +265,7 @@ function buildGeminiPayload(messages, temperature, maxTokens) {
         } else {
             contents.push({
                 role: msg.role === 'assistant' ? 'model' : 'user',
-                parts: [{ text: msg.content }]
+                parts: geminiParts(String(msg.content || ''))
             });
         }
     }
@@ -657,5 +676,6 @@ module.exports = {
     getSystemPrompt,
     getChatSystemPrompt,
     getConfig,
-    clearConfigCache
+    clearConfigCache,
+    geminiParts // exported for unit tests
 };
