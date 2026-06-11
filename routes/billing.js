@@ -919,7 +919,11 @@ router.delete('/invoices/:id',
             if (pushed) {
                 try { await zohoAPI.voidInvoice(inv.zoho_invoice_id); }
                 catch (zErr) {
-                    return res.status(400).json({ success: false, code: 'ZOHO_VOID_FAILED', message: 'Zoho would not void this invoice: ' + (zErr.message || zErr) });
+                    // Already gone from Zoho (deleted there directly — error 1002
+                    // "Invoice does not exist") → remove locally instead of blocking.
+                    if (!/does not exist|1002/i.test(zErr.message || '')) {
+                        return res.status(400).json({ success: false, code: 'ZOHO_VOID_FAILED', message: 'Zoho would not void this invoice: ' + (zErr.message || zErr) });
+                    }
                 }
             }
 
