@@ -166,7 +166,12 @@ function renderFiling() {
                 <option value="">All customers</option>
                 ${customers.map(c => `<option value="${escAttr(c)}" ${c === b2bCustomerFilter ? 'selected' : ''}>${escHtml(c)}</option>`).join('')}
             </select>
-            <button class="btn" onclick="exportB2B()">⬇ Invoices CSV</button>
+            <select onchange="runB2BExport(this.value); this.selectedIndex=0" style="padding:6px 10px;border:1px solid #d1d5db;border-radius:8px;font-size:13px">
+                <option value="">⬇ Export ▾</option>
+                <option value="overall">Overall (full list)</option>
+                <option value="customerwise">Customer-wise (grouped)</option>
+                <option value="hsn">Customer invoice-wise + HSN</option>
+            </select>
             <button class="btn" onclick="loadB2BItems('filing')">📦 Item-wise (HSN)</button>
             <button class="btn gray" onclick="toggleMissedPanel()">➕ Missed invoice</button></div>
         ${b2bCustomerFilter ? (() => { const t = b2bRows.reduce((a, i) => ({ s: a.s + (+i.sub_total || 0), g: a.g + (+i.tax_total || 0), t: a.t + (+i.total || 0) }), { s: 0, g: 0, t: 0 }); return `
@@ -203,12 +208,71 @@ function renderFiling() {
         </tbody></table></div>`;
 }
 
-function exportB2B() {
+function runB2BExport(kind) {
+    if (kind === 'overall') exportB2BOverall();
+    else if (kind === 'customerwise') exportB2BCustomerwise();
+    else if (kind === 'hsn') exportB2BCustomerHSN();
+}
+
+// Natural-month B2B + carried-forward B2B, each tagged with carried_from.
+function b2bMerged() {
     const d = cache.filing;
-    const suffix = b2bCustomerFilter ? '-' + b2bCustomerFilter.replace(/[^\w]+/g, '_').slice(0, 30) : '';
-    csvDownload(`gst-filing-b2b-${d.month}${suffix}.csv`,
-        ['Invoice Date', 'Invoice Number', 'Customer', 'GSTIN', 'Taxable Value', 'GST', 'Total'],
-        filteredB2B().map(i => [String(i.invoice_date).slice(0, 10), i.invoice_number, i.customer_name, i.gstin, i.sub_total, i.tax_total, i.total]));
+    const natural = (d.b2b || []).map(i => ({ ...i, carried_from: '' }));
+    const carried = (d.carried || []).map(i => ({ ...i, carried_from: i.original_month }));
+    return [...natural, ...carried];
+}
+
+const B2B_EXPORT_HEAD = ['Carried From', 'Invoice Date', 'Invoice Number', 'Customer', 'GSTIN', 'Taxable', 'GST', 'Total'];
+const b2bRow = i => [i.carried_from, String(i.invoice_date).slice(0, 10), i.invoice_number, i.customer_name, i.gstin, i.sub_total, i.tax_total, i.total];
+
+function exportB2BOverall() {
+    const d = cache.filing;
+    const rows = b2bMerged();
+    const t = rows.reduce((a, i) => ({ s: a.s + (+i.sub_total || 0), g: a.g + (+i.tax_total || 0), t: a.t + (+i.total || 0) }), { s: 0, g: 0, t: 0 });
+    csvDownload(`gst-filing-b2b-overall-${d.month}.csv`, B2B_EXPORT_HEAD,
+        [...rows.map(b2bRow), ['', '', '', '', 'TOTAL', t.s, t.g, t.t]]);
+}
+
+function exportB2BCustomerwise() {
+    const d = cache.filing;
+    const rows = b2bMerged().slice().sort((a, b) =>
+        (a.customer_name || '').localeCompare(b.customer_name || '') ||
+        String(a.invoice_date).localeCompare(String(b.invoice_date)));
+    const out = [];
+    let cur = null, sub = { s: 0, g: 0, t: 0 };
+    const grand = { s: 0, g: 0, t: 0 };
+    const flushSub = () => { if (cur !== null) out.push(['', '', '', cur + ' — subtotal', '', sub.s, sub.g, sub.t]); };
+    for (const i of rows) {
+        if (i.customer_name !== cur) { flushSub(); cur = i.customer_name; sub = { s: 0, g: 0, t: 0 }; }
+        out.push(b2bRow(i));
+        sub.s += +i.sub_total || 0; sub.g += +i.tax_total || 0; sub.t += +i.total || 0;
+        grand.s += +i.sub_total || 0; grand.g += +i.tax_total || 0; grand.t += +i.total || 0;
+    }
+    flushSub();
+    out.push(['', '', '', 'GRAND TOTAL', '', grand.s, grand.g, grand.t]);
+    csvDownload(`gst-filing-b2b-customerwise-${d.month}.csv`, B2B_EXPORT_HEAD, out);
+}
+
+async function exportB2BCustomerHSN() {
+    const month = document.getElementById('month').value;
+    const box = document.getElementById('b2bItems');
+    box.innerHTML = '<div class="muted" style="padding:14px">Item-wise + HSN ஏற்றுகிறது… (முதல்முறை Zoho-ல இருந்து வரும் — நிமிடம் ஆகலாம்)</div>';
+    let d;
+    try {
+        d = await api('/api/gst-reports/b2b-items?month=' + month); // no customer filter → all customers
+    } catch (e) { box.innerHTML = '<div class="banner-warn">' + escHtml(e.message) + '</div>'; return; }
+    box.innerHTML = '';
+    const invs = (d.invoices || []).slice().sort((a, b) =>
+        (a.customer_name || '').localeCompare(b.customer_name || '') ||
+        String(a.invoice_date).localeCompare(String(b.invoice_date)));
+    const rows = [];
+    for (const inv of invs) for (const it of (inv.items || [])) {
+        rows.push([inv.carried_from || '', inv.customer_name, inv.gstin, String(inv.invoice_date).slice(0, 10),
+            inv.invoice_number, it.name, it.hsn, it.quantity, it.rate, it.item_total]);
+    }
+    csvDownload(`gst-filing-b2b-customer-invoice-hsn-${d.month}.csv`,
+        ['Carried From', 'Customer', 'GSTIN', 'Invoice Date', 'Invoice Number', 'Item', 'HSN', 'Qty', 'Rate', 'Amount'],
+        rows);
 }
 
 // mode: 'filing' (actual rates) | 'cost' (purchase-cost view, internal)
@@ -249,10 +313,20 @@ async function toggleMissedPanel() {
     const p = document.getElementById('missedPanel');
     if (p.style.display !== 'none') { p.style.display = 'none'; return; }
     p.style.display = '';
+    const month = document.getElementById('month').value;
     p.innerHTML = `
         <div style="background:#fffbeb;border:1px solid #f59e0b;border-radius:10px;padding:12px;margin-bottom:12px">
             <div style="font-weight:700;margin-bottom:8px">முந்தைய மாதங்களில் filing-ல் விடுபட்ட B2B invoice-ஐ இந்த மாதக் கணக்கில் சேர்க்க</div>
             <input class="searchbox" id="missedSearch" placeholder="Invoice # / customer search…" oninput="debounceMissed()">
+            <div style="display:flex;gap:8px;flex-wrap:wrap;margin:8px 0">
+                <label style="font-size:12px">From <input type="date" id="missedFrom" onchange="renderMissed(missedSearchVal())"></label>
+                <label style="font-size:12px">To <input type="date" id="missedTo" onchange="renderMissed(missedSearchVal())"></label>
+                <label style="font-size:12px">Min ₹ <input type="number" id="missedMin" style="width:90px" onchange="renderMissed(missedSearchVal())"></label>
+            </div>
+            <div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin-bottom:8px">
+                <label style="font-size:13px"><input type="checkbox" id="missedSelectAll" onchange="toggleSelectAllMissed(this.checked)"> Select all</label>
+                <button class="btn" onclick="carrySelected()">Carry selected to ${escHtml(month)}</button>
+            </div>
             <div id="missedList" class="muted">கடந்த 6 மாத B2B invoices (carry ஆகாதவை) தேடுங்க…</div>
         </div>`;
     renderMissed('');
@@ -263,12 +337,36 @@ function debounceMissed() { clearTimeout(missedTimer); missedTimer = setTimeout(
 
 async function renderMissed(search) {
     const month = document.getElementById('month').value;
-    const d = await api('/api/gst-reports/missed-b2b?month=' + month + '&search=' + encodeURIComponent(search));
+    const fd = (document.getElementById('missedFrom') || {}).value || '';
+    const td = (document.getElementById('missedTo') || {}).value || '';
+    const ma = (document.getElementById('missedMin') || {}).value || '';
+    const q = '/api/gst-reports/missed-b2b?month=' + month + '&search=' + encodeURIComponent(search)
+        + (fd ? '&from_date=' + fd : '') + (td ? '&to_date=' + td : '') + (ma ? '&min_amount=' + encodeURIComponent(ma) : '');
+    const d = await api(q);
+    const sa = document.getElementById('missedSelectAll'); if (sa) sa.checked = false;
     document.getElementById('missedList').innerHTML = d.candidates.length ? `
-        <div class="tbl-scroll"><table class="m-cards"><thead><tr><th>Date</th><th>Invoice #</th><th>Customer</th><th>GSTIN</th><th class="num">Total</th><th></th></tr></thead><tbody>
-        ${d.candidates.map(c => `<tr><td data-l="Date">${escHtml(String(c.invoice_date).slice(0, 10))}</td><td data-l="Invoice #"><b>${escHtml(c.invoice_number)}</b></td><td data-l="Customer">${escHtml(c.customer_name)}</td><td data-l="GSTIN">${escHtml(c.gstin)}</td><td class="num" data-l="Total">${fmtINR(c.total)}</td>
+        <div class="tbl-scroll"><table class="m-cards"><thead><tr><th></th><th>Date</th><th>Invoice #</th><th>Customer</th><th>GSTIN</th><th class="num">Total</th><th></th></tr></thead><tbody>
+        ${d.candidates.map(c => `<tr><td><input type="checkbox" class="missedChk" value="${escAttr(c.zoho_invoice_id)}"></td><td data-l="Date">${escHtml(String(c.invoice_date).slice(0, 10))}</td><td data-l="Invoice #"><b>${escHtml(c.invoice_number)}</b></td><td data-l="Customer">${escHtml(c.customer_name)}</td><td data-l="GSTIN">${escHtml(c.gstin)}</td><td class="num" data-l="Total">${fmtINR(c.total)}</td>
             <td><button class="btn" onclick="addCarry('${escJS(c.zoho_invoice_id)}')">Include in ${escHtml(month)}</button></td></tr>`).join('')}
         </tbody></table></div>` : '<div class="muted">Match இல்லை (carry ஆனவை இங்கு வராது)</div>';
+}
+
+function missedSearchVal() { return (document.getElementById('missedSearch') || {}).value || ''; }
+function toggleSelectAllMissed(on) { document.querySelectorAll('.missedChk').forEach(c => { c.checked = on; }); }
+
+async function carrySelected() {
+    const month = document.getElementById('month').value;
+    const ids = [...document.querySelectorAll('.missedChk:checked')].map(c => c.value);
+    if (!ids.length) { alert('Invoice தேர்ந்தெடுக்கவில்லை'); return; }
+    const res = await fetch('/api/gst-reports/carry-forward/bulk', {
+        method: 'POST',
+        headers: { Authorization: 'Bearer ' + token, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ zoho_invoice_ids: ids, filed_in_month: month }),
+    });
+    const d = await res.json();
+    if (!d.success) { alert(d.message || 'Failed'); return; }
+    alert(`${d.carried} invoice(s) carried to ${month}` + (d.skipped && d.skipped.length ? `, ${d.skipped.length} skipped` : ''));
+    loadActive();
 }
 
 async function addCarry(zohoInvoiceId) {
