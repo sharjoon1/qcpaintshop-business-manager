@@ -275,7 +275,11 @@ function buildGeminiPayload(messages, temperature, maxTokens) {
     return {
         contents,
         ...(systemInstruction ? { systemInstruction } : {}),
-        generationConfig: { temperature, maxOutputTokens: maxTokens }
+        // thinkingBudget:0 disables 2.5-flash's reasoning pass — otherwise it
+        // spends the whole maxOutputTokens budget "thinking" and returns an
+        // EMPTY text part (a 200 with no output). Harmless on models that
+        // don't support thinking.
+        generationConfig: { temperature, maxOutputTokens: maxTokens, thinkingConfig: { thinkingBudget: 0 } }
     };
 }
 
