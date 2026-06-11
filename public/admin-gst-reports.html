@@ -119,6 +119,7 @@ async function loadFiling(month) {
     const el = document.getElementById('tab-filing');
     el.innerHTML = `
         <div class="banner-info">Actual sale values for <b>${escHtml(month)}</b> — this is the report for your auditor / GSTR-1. Every non-void invoice is included at its real value.</div>
+        ${d.tax_note ? `<div class="banner-info" style="background:#fffbeb;border-color:#f59e0b;color:#92400e">ⓘ ${escHtml(d.tax_note)}</div>` : ''}
         <div class="cards">
             <div class="card"><div class="lbl">Invoices</div><div class="val">${d.totals.invoice_count}</div></div>
             <div class="card"><div class="lbl">Taxable (sub total)</div><div class="val">${fmtINR(d.totals.sub_total)}</div></div>

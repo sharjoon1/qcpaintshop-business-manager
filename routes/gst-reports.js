@@ -60,6 +60,23 @@ function resolveCostRate(item) {
 
 const r2 = n => Math.round(n * 100) / 100;
 
+const GST_RATE = 0.18; // paints/putty are uniformly 18% (the §6 DPL formula's 1.18)
+
+/**
+ * Zoho's invoice LIST sync stores only `total` (sub_total/tax_total arrive as
+ * 0 on every row — verified 0/15,527 on prod). When that happens, derive the
+ * split from the GST-inclusive total at the uniform 18% rate and say so.
+ * Returns { taxable, gst, derived }.
+ */
+function deriveTax(total, subTotal, taxTotal) {
+    const tot = parseFloat(total) || 0;
+    const sub = parseFloat(subTotal) || 0;
+    const tax = parseFloat(taxTotal) || 0;
+    if (sub > 0 || tax > 0) return { taxable: r2(sub), gst: r2(tax), derived: false };
+    const taxable = r2(tot / (1 + GST_RATE));
+    return { taxable, gst: r2(tot - taxable), derived: true };
+}
+
 // ── GST FILING (actual sales) ────────────────────────────────────────────────
 
 router.get('/filing', requirePermission('zoho', 'view'), async (req, res) => {
@@ -82,13 +99,19 @@ router.get('/filing', requirePermission('zoho', 'view'), async (req, res) => {
 
         const b2b = [];
         const b2c = { invoice_count: 0, sub_total: 0, tax_total: 0, total: 0 };
+        let anyDerived = false;
         for (const inv of invoices) {
+            const t = deriveTax(inv.total, inv.sub_total, inv.tax_total);
+            anyDerived = anyDerived || t.derived;
+            inv.sub_total = t.taxable;
+            inv.tax_total = t.gst;
+            inv.tax_derived = t.derived;
             if (isB2B(inv.gstin)) {
                 b2b.push(inv);
             } else {
                 b2c.invoice_count++;
-                b2c.sub_total += parseFloat(inv.sub_total) || 0;
-                b2c.tax_total += parseFloat(inv.tax_total) || 0;
+                b2c.sub_total += t.taxable;
+                b2c.tax_total += t.gst;
                 b2c.total += parseFloat(inv.total) || 0;
             }
         }
@@ -119,7 +142,12 @@ router.get('/filing', requirePermission('zoho', 'view'), async (req, res) => {
             total: r2(invoices.reduce((s, i) => s + (parseFloat(i.total) || 0), 0)),
         };
 
-        res.json({ success: true, month: req.query.month, totals, b2b, b2c, hsn });
+        res.json({
+            success: true, month: req.query.month, totals, b2b, b2c, hsn,
+            tax_note: anyDerived
+                ? 'Taxable/GST split derived from the GST-inclusive total at a uniform 18% (Zoho line-level tax is not synced). Cross-check totals against Zoho Books’ own GSTR-1 before filing.'
+                : null,
+        });
     } catch (err) {
         console.error('GST filing report error:', err);
         res.status(400).json({ success: false, message: err.message });
@@ -263,12 +291,14 @@ router.get('/profitability', requirePermission('zoho', 'view'), async (req, res)
     try {
         const [from, to] = monthRange(req.query.month);
 
-        const [[sales]] = await pool.query(
+        const [[salesRaw]] = await pool.query(
             `SELECT COALESCE(SUM(sub_total), 0) AS taxable, COALESCE(SUM(tax_total), 0) AS gst,
                     COALESCE(SUM(total), 0) AS total, COUNT(*) AS invoices
              FROM zoho_invoices WHERE invoice_date BETWEEN ? AND ? AND status <> 'void'`,
             [from, to]
         );
+        const salesTax = deriveTax(salesRaw.total, salesRaw.taxable, salesRaw.gst);
+        const sales = { invoices: salesRaw.invoices, taxable: salesTax.taxable, gst: salesTax.gst, total: r2(parseFloat(salesRaw.total)) };
 
         // True COGS: every sold item at cost, regardless of the gst_purchase flag
         const [costRows] = await pool.query(
@@ -297,21 +327,21 @@ router.get('/profitability', requirePermission('zoho', 'view'), async (req, res)
             [req.query.month]
         );
 
-        const taxable = r2(parseFloat(sales.taxable));
         const cogsR = r2(cogs);
-        const grossMargin = r2(taxable - cogsR);
+        const grossMargin = r2(sales.taxable - cogsR);
         const commissionTotal = r2(parseFloat(commission.total));
         const salaryTotal = r2(parseFloat(salary.total));
 
         res.json({
             success: true, month: req.query.month,
-            sales: { invoices: sales.invoices, taxable, gst: r2(parseFloat(sales.gst)), total: r2(parseFloat(sales.total)) },
+            sales,
             cogs: cogsR, uncosted_items: uncosted,
             gross_margin: grossMargin,
             painter_commission: commissionTotal,
             staff_salary: salaryTotal,
             indicative_net: r2(grossMargin - commissionTotal - salaryTotal),
-            note: 'Indicative only — rent and other expenses are outside this system; your auditor finalizes the P&L.',
+            note: 'Indicative only — rent and other expenses are outside this system; your auditor finalizes the P&L.'
+                + (salesTax.derived ? ' Taxable derived from totals at a uniform 18% GST.' : ''),
         });
     } catch (err) {
         console.error('GST profitability error:', err);
@@ -319,4 +349,4 @@ router.get('/profitability', requirePermission('zoho', 'view'), async (req, res)
     }
 });
 
-module.exports = { router, setPool, monthRange, isB2B, resolveCostRate };
+module.exports = { router, setPool, monthRange, isB2B, resolveCostRate, deriveTax };

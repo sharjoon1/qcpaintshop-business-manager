@@ -6,7 +6,7 @@
  * gst_purchase flag and cost restatement exist ONLY in the internal
  * cost-analysis report.
  */
-const { monthRange, isB2B, resolveCostRate } = require('../../routes/gst-reports');
+const { monthRange, isB2B, resolveCostRate, deriveTax } = require('../../routes/gst-reports');
 
 describe('monthRange', () => {
     it('expands YYYY-MM to first/last day (leap-aware)', () => {
@@ -30,6 +30,24 @@ describe('isB2B (GSTIN split)', () => {
         expect(isB2B('   ')).toBe(false);
         expect(isB2B(null)).toBe(false);
         expect(isB2B(undefined)).toBe(false);
+    });
+});
+
+describe('deriveTax (Zoho header sync stores only total)', () => {
+    it('uses real sub_total/tax_total when the sync has them', () => {
+        expect(deriveTax(1180, 1000, 180)).toEqual({ taxable: 1000, gst: 180, derived: false });
+    });
+
+    it('derives the split from the GST-inclusive total at 18% when both are 0', () => {
+        const t = deriveTax(1180, 0, 0);
+        expect(t).toEqual({ taxable: 1000, gst: 180, derived: true });
+        // derived parts must reconcile back to the total
+        expect(t.taxable + t.gst).toBeCloseTo(1180, 2);
+    });
+
+    it('zero/empty total stays zero', () => {
+        expect(deriveTax(0, 0, 0)).toEqual({ taxable: 0, gst: 0, derived: true });
+        expect(deriveTax(null, null, null)).toEqual({ taxable: 0, gst: 0, derived: true });
     });
 });
 
