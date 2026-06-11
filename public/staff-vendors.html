@@ -206,8 +206,8 @@
         <div class="qc-tabs-wrap mb-4">
         <div class="qc-tabs scroll-hide">
             <button onclick="switchTab('vendors')" id="tabVendors" class="tab-active px-4 py-3 text-sm whitespace-nowrap transition-all">Vendors</button>
-            <button onclick="switchTab('bills')" id="tabBills" class="tab-inactive px-4 py-3 text-sm whitespace-nowrap transition-all">Bills</button>
             <button onclick="switchTab('purchaseOrders')" id="tabPurchaseOrders" class="tab-inactive px-4 py-3 text-sm whitespace-nowrap transition-all">Purchase Orders</button>
+            <button onclick="switchTab('bills')" id="tabBills" class="tab-inactive px-4 py-3 text-sm whitespace-nowrap transition-all">Bills</button>
             <button onclick="switchTab('payments')" id="tabPayments" class="tab-inactive px-4 py-3 text-sm whitespace-nowrap transition-all">Payments</button>
         </div>
         </div>
@@ -419,12 +419,16 @@
                 </button>
             </div>
             <form id="billForm" onsubmit="event.preventDefault()" class="p-5 space-y-4 max-h-[70vh] overflow-y-auto" style="min-height:0;">
-                <!-- Vendor Select -->
+                <!-- Vendor Select (searchable) -->
                 <div>
                     <label class="qc-label block mb-1">Vendor *</label>
-                    <select id="bfVendor" class="qc-input w-full" required>
-                        <option value="">Select vendor...</option>
-                    </select>
+                    <div class="relative">
+                        <input type="text" id="bfVendorSearch" class="qc-input w-full" placeholder="Search vendor by name..." autocomplete="off"
+                            oninput="vendorTypeahead('bf', this.value)" onfocus="vendorTypeahead('bf', this.value)"
+                            onblur="setTimeout(() => document.getElementById('bfVendorSuggestions').classList.add('hidden'), 150)">
+                        <div id="bfVendorSuggestions" class="suggestion-list hidden"></div>
+                    </div>
+                    <input type="hidden" id="bfVendor">
                 </div>
 
                 <!-- Bill Number & Dates -->
@@ -540,12 +544,16 @@
             </div>
             <form id="poForm" onsubmit="event.preventDefault()" class="p-5 space-y-4 max-h-[70vh] overflow-y-auto" style="min-height:0;">
                 <input type="hidden" id="poEditId">
-                <!-- Vendor Select -->
+                <!-- Vendor Select (searchable) -->
                 <div>
                     <label class="qc-label block mb-1">Vendor *</label>
-                    <select id="pfVendor" class="qc-input w-full" required>
-                        <option value="">Select vendor...</option>
-                    </select>
+                    <div class="relative">
+                        <input type="text" id="pfVendorSearch" class="qc-input w-full" placeholder="Search vendor by name..." autocomplete="off"
+                            oninput="vendorTypeahead('pf', this.value)" onfocus="vendorTypeahead('pf', this.value)"
+                            onblur="setTimeout(() => document.getElementById('pfVendorSuggestions').classList.add('hidden'), 150)">
+                        <div id="pfVendorSuggestions" class="suggestion-list hidden"></div>
+                    </div>
+                    <input type="hidden" id="pfVendor">
                 </div>
 
                 <!-- Expected Date + Location -->
@@ -873,16 +881,45 @@ async function loadAllVendorsForDropdowns() {
 
 function populateVendorDropdowns() {
     const opts = allVendors.map(v => `<option value="${v.id}">${esc(v.vendor_name)}</option>`).join('');
-    // Bill vendor filter
+    // List filters + payment picker stay plain selects
     document.getElementById('billVendorFilter').innerHTML = '<option value="">All Vendors</option>' + opts;
-    // Payments tab vendor filter
     document.getElementById('paymentVendorFilter').innerHTML = '<option value="">All Vendors</option>' + opts;
-    // Bill form vendor
-    document.getElementById('bfVendor').innerHTML = '<option value="">Select vendor...</option>' + opts;
-    // PO form vendor
-    document.getElementById('pfVendor').innerHTML = '<option value="">Select vendor...</option>' + opts;
-    // Payment vendor
     document.getElementById('pmVendor').innerHTML = '<option value="">Select vendor...</option>' + opts;
+    // Bill form (#bfVendor) + PO form (#pfVendor) are now searchable typeaheads
+    // backed by the cached allVendors[] — no <option> injection needed.
+}
+
+// Searchable vendor picker for the bill + PO create forms. prefix is 'bf'|'pf';
+// the hidden input that submit reads keeps the original id (bfVendor/pfVendor).
+function vendorTypeahead(prefix, q) {
+    const box = document.getElementById(prefix + 'VendorSuggestions');
+    if (!box) return;
+    const term = (q || '').trim().toLowerCase();
+    const list = (term
+        ? allVendors.filter(v => (v.vendor_name || '').toLowerCase().includes(term))
+        : allVendors).slice(0, 12);
+    if (!list.length) {
+        box.innerHTML = '<div class="suggestion-item text-gray-400">No vendors found</div>';
+        box.classList.remove('hidden');
+        return;
+    }
+    const attr = s => esc(s).replace(/"/g, '&quot;');   // esc() leaves quotes — escape for the attribute
+    box.innerHTML = list.map(v =>
+        `<div class="suggestion-item" data-id="${v.id}" data-name="${attr(v.vendor_name)}" onmousedown="pickVendor('${prefix}', this)">${esc(v.vendor_name)}</div>`
+    ).join('');
+    box.classList.remove('hidden');
+}
+function pickVendor(prefix, el) {
+    document.getElementById(prefix + 'Vendor').value = el.dataset.id;          // hidden id submit reads
+    document.getElementById(prefix + 'VendorSearch').value = el.dataset.name;  // visible text
+    document.getElementById(prefix + 'VendorSuggestions').classList.add('hidden');
+}
+// Set/clear the typeahead display + hidden value (used on form open/reset/edit).
+function setVendorPick(prefix, id, name) {
+    const hid = document.getElementById(prefix + 'Vendor');
+    const txt = document.getElementById(prefix + 'VendorSearch');
+    if (hid) hid.value = id || '';
+    if (txt) txt.value = name || '';
 }
 
 // =============================================
@@ -1898,7 +1935,7 @@ function openBillModal() {
     createdBillId = null;
     billImagePath = null;
     aiExtractedData = null;
-    document.getElementById('bfVendor').value = '';
+    setVendorPick('bf', '', '');
     document.getElementById('bfBillNumber').value = '';
     document.getElementById('bfBillDate').value = new Date().toISOString().split('T')[0];
     document.getElementById('bfDueDate').value = '';
@@ -2309,7 +2346,7 @@ function openPoModal(editData = null, editItems = null) {
     }));
     document.getElementById('poEditId').value = '';
     document.getElementById('poFormTitle').textContent = 'New Purchase Order';
-    document.getElementById('pfVendor').value = '';
+    setVendorPick('pf', '', '');
     document.getElementById('pfExpectedDate').value = '';
     document.getElementById('pfDiscount').value = '0';
     document.getElementById('pfNotes').value = '';
@@ -2320,7 +2357,7 @@ function openPoModal(editData = null, editItems = null) {
     if (editData) {
         document.getElementById('poEditId').value = editData.id;
         document.getElementById('poFormTitle').textContent = 'Edit Purchase Order';
-        document.getElementById('pfVendor').value = editData.vendor_id;
+        setVendorPick('pf', editData.vendor_id, editData.vendor_name || '');
         document.getElementById('pfExpectedDate').value = editData.expected_date ? String(editData.expected_date).split('T')[0] : '';
         document.getElementById('pfDiscount').value = editData.discount_amount || 0;
         document.getElementById('pfNotes').value = editData.notes || '';

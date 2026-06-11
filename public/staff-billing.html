@@ -177,14 +177,31 @@
         <!-- Tab Bar -->
         <div class="qc-tabs-wrap mb-4">
         <div class="qc-tabs scroll-hide">
-            <button onclick="switchTab('estimates')" id="tabEstimates" class="tab-active px-4 py-3 text-sm whitespace-nowrap transition-all">Estimates</button>
+            <button onclick="switchTab('customers')" id="tabCustomers" class="tab-active px-4 py-3 text-sm whitespace-nowrap transition-all">Customers</button>
+            <button onclick="switchTab('estimates')" id="tabEstimates" class="tab-inactive px-4 py-3 text-sm whitespace-nowrap transition-all">Estimates</button>
             <button onclick="switchTab('invoices')" id="tabInvoices" class="tab-inactive px-4 py-3 text-sm whitespace-nowrap transition-all">Invoices</button>
             <button onclick="switchTab('payments')" id="tabPayments" class="tab-inactive px-4 py-3 text-sm whitespace-nowrap transition-all">Payments</button>
         </div>
         </div>
 
+        <!-- ==================== CUSTOMERS TAB (credit limits) ==================== -->
+        <div id="panelCustomers">
+            <div class="qc-toolbar">
+                <div class="qc-search flex-1">
+                    <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-4.35-4.35M11 19a8 8 0 100-16 8 8 0 000 16z"/></svg>
+                    <input id="customerSearch" type="text" placeholder="Search customer name or phone..." class="qc-input w-full" oninput="debounceCustomerListSearch()">
+                </div>
+                <div class="qc-toolbar-actions">
+                    <button id="custRequestsBtn" onclick="toggleCreditRequests()" class="btn-secondary px-4 py-2 rounded-lg text-sm font-medium hidden">Requests <span id="custPendingBadge" class="qc-tab-badge hidden">0</span></button>
+                </div>
+            </div>
+            <div id="creditRequestsPanel" class="hidden mb-4"></div>
+            <div id="customerCreditList" class="space-y-3"></div>
+            <div id="customerCreditPagination" class="mt-4"></div>
+        </div>
+
         <!-- ==================== ESTIMATES TAB ==================== -->
-        <div id="panelEstimates">
+        <div id="panelEstimates" class="hidden">
             <div class="flex flex-col sm:flex-row gap-3 mb-3">
                 <div class="flex-1">
                     <input id="estimateSearch" type="text" placeholder="Search estimates..." class="qc-input w-full" oninput="debounceEstimateSearch()">
@@ -283,13 +300,14 @@
                     <div class="flex gap-4">
                         <label class="flex items-center gap-2 cursor-pointer">
                             <input type="radio" name="customer_type" value="customer" checked onchange="toggleCustomerType()">
-                            <span class="text-sm">Customer</span>
+                            <span class="text-sm">Regular Customer</span>
                         </label>
                         <label class="flex items-center gap-2 cursor-pointer">
                             <input type="radio" name="customer_type" value="painter" onchange="toggleCustomerType()">
-                            <span class="text-sm">Painter</span>
+                            <span class="text-sm">Loyalty Painter (earns points)</span>
                         </label>
                     </div>
+                    <p class="text-xs text-gray-400 mt-1">Both are billed as Zoho customers. Choosing <b>Loyalty Painter</b> additionally awards loyalty points and credits that painter as the Zoho salesperson.</p>
                 </div>
 
                 <!-- Customer Section -->
@@ -451,6 +469,39 @@
         </div>
     </div>
 
+    <!-- ==================== SET / APPROVE CREDIT LIMIT MODAL ==================== -->
+    <div id="creditModal" class="modal-overlay" onclick="if(event.target===this)closeCreditModal()">
+        <div class="modal-card bg-white rounded-2xl shadow-xl w-full max-w-md mt-16 overflow-hidden">
+            <div class="flex items-center justify-between px-5 py-4 border-b flex-shrink-0">
+                <h3 id="creditModalTitle" class="text-lg font-bold text-gray-800">Set Credit Limit</h3>
+                <button onclick="closeCreditModal()" class="p-2 hover:bg-gray-100 rounded-full" aria-label="Close">
+                    <svg class="w-5 h-5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+                </button>
+            </div>
+            <div class="modal-body p-5 space-y-4">
+                <input type="hidden" id="creditCustomerId">
+                <input type="hidden" id="creditRequestId">
+                <div class="bg-gray-50 rounded-lg p-3 text-sm">
+                    <span class="text-gray-500">Customer</span>
+                    <div id="creditCustomerName" class="font-medium"></div>
+                </div>
+                <div id="creditRequestInfo" class="hidden text-sm bg-amber-50 border border-amber-200 rounded-lg p-3"></div>
+                <div>
+                    <label class="qc-label block mb-1" id="creditAmountLabel">Credit Limit (₹) *</label>
+                    <input type="number" id="creditAmount" class="qc-input w-full" min="0" step="1" placeholder="0">
+                </div>
+                <div>
+                    <label class="qc-label block mb-1">Note</label>
+                    <input type="text" id="creditReason" class="qc-input w-full" placeholder="Reason (optional)">
+                </div>
+                <div class="flex gap-2">
+                    <button type="button" id="creditRejectBtn" onclick="rejectCreditRequest()" class="btn-danger px-4 py-2 rounded-lg text-sm font-medium hidden">Reject</button>
+                    <button type="button" id="creditSaveBtn" onclick="saveCreditLimit()" class="btn-green flex-1 py-2.5 rounded-lg text-sm font-medium">Save</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
 <script>
 // ═══════════════════════════════════════════
 // CONFIG
@@ -509,7 +560,7 @@ function confirmDialog(opts) {
 // ═══════════════════════════════════════════
 document.addEventListener('DOMContentLoaded', () => {
     loadStats();
-    loadEstimates(1);
+    loadCreditCustomers(1);   // Customers is the first/landing tab
 });
 
 // ═══════════════════════════════════════════
@@ -517,15 +568,231 @@ document.addEventListener('DOMContentLoaded', () => {
 // ═══════════════════════════════════════════
 function switchTab(tab) {
     currentTab = tab;
-    ['estimates', 'invoices', 'payments'].forEach(t => {
+    ['customers', 'estimates', 'invoices', 'payments'].forEach(t => {
         document.getElementById('tab' + t.charAt(0).toUpperCase() + t.slice(1)).className =
             t === tab ? 'tab-active px-4 py-3 text-sm whitespace-nowrap transition-all' : 'tab-inactive px-4 py-3 text-sm whitespace-nowrap transition-all';
         document.getElementById('panel' + t.charAt(0).toUpperCase() + t.slice(1)).classList.toggle('hidden', t !== tab);
     });
 
-    if (tab === 'estimates') loadEstimates(estimatePage);
+    if (tab === 'customers') loadCreditCustomers(1);
+    else if (tab === 'estimates') loadEstimates(estimatePage);
     else if (tab === 'invoices') loadInvoices(invoicePage);
     else if (tab === 'payments') loadPayments(paymentPage);
+}
+
+// ═══════════════════════════════════════════
+// CUSTOMERS TAB — credit limits (reuses /api/credit-limits backend)
+// ═══════════════════════════════════════════
+const CREDIT_API = '/api/credit-limits';
+let creditCustomers = [];
+let creditRequests = [];
+let creditListSearchTimer = null;
+function creditCanManage() {
+    try { const u = (window.getCurrentUser && getCurrentUser()) || null; return !!u && window.isAdminLevelRole && isAdminLevelRole(u.role); }
+    catch { return false; }
+}
+
+function debounceCustomerListSearch() {
+    clearTimeout(creditListSearchTimer);
+    creditListSearchTimer = setTimeout(() => loadCreditCustomers(1), 300);
+}
+
+async function loadCreditCustomers() {
+    const list = document.getElementById('customerCreditList');
+    list.innerHTML = skeletons ? skeletons(4) : '';
+    const isAdmin = creditCanManage();
+    // Admin sees the pending-requests button (with count); staff doesn't.
+    document.getElementById('custRequestsBtn').classList.toggle('hidden', !isAdmin);
+    try {
+        const search = document.getElementById('customerSearch')?.value || '';
+        const qs = new URLSearchParams(); if (search) qs.set('search', search);
+        const res = await fetch(`${CREDIT_API}/customers?${qs}`, { headers });
+        // Staff without the credit_limits:view permission can't use this tab —
+        // hide it and drop them onto Estimates instead of showing a raw error.
+        if (res.status === 403) {
+            const t = document.getElementById('tabCustomers'); if (t) t.style.display = 'none';
+            if (currentTab === 'customers') switchTab('estimates');
+            return;
+        }
+        const data = await res.json();
+        if (!data.success) throw new Error(data.message || data.error || 'Failed to load customers');
+        creditCustomers = data.data || [];
+        renderCreditCustomers(creditCustomers, isAdmin);
+        if (isAdmin) loadCreditPendingCount();
+    } catch (e) {
+        list.innerHTML = `<div class="text-center text-sm text-red-600 py-6">${esc(e.message)}</div>`;
+    }
+}
+
+function utilBar(util) {
+    const u = Math.max(0, Math.min(100, Number(util) || 0));
+    const color = u > 80 ? '#B91C1C' : (u >= 50 ? '#B45309' : '#15803D');
+    return `<div style="height:6px;background:#F1F5F9;border-radius:999px;overflow:hidden;margin-top:8px">
+        <div style="height:100%;width:${u}%;background:${color};border-radius:999px"></div></div>`;
+}
+
+function renderCreditCustomers(rows, isAdmin) {
+    const list = document.getElementById('customerCreditList');
+    if (!rows.length) {
+        list.innerHTML = (typeof emptyState === 'function')
+            ? emptyState({ icon: 'users', title: 'No customers', message: 'Customers synced from Zoho will appear here with their credit limits.' })
+            : '<div class="text-center text-sm text-gray-400 py-8">No customers found.</div>';
+        return;
+    }
+    list.innerHTML = rows.slice(0, 100).map(c => {
+        const limit = Number(c.credit_limit) || 0;
+        const used = Number(c.credit_used) || 0;
+        const avail = Number(c.credit_available) || 0;
+        const util = Number(c.utilization) || 0;
+        const over = limit > 0 && used > limit;
+        return `<div class="qc-list-card">
+            <div class="flex items-start justify-between gap-3">
+                <div class="min-w-0">
+                    <div class="qc-entity">${esc(c.name || 'Unnamed')}</div>
+                    <div class="qc-entity-meta">${c.phone ? esc(c.phone) : '<span class="text-gray-400">no phone</span>'}${c.branch_name ? ' · ' + esc(c.branch_name) : ''}</div>
+                </div>
+                <div class="text-right flex-shrink-0">
+                    <div class="text-xs text-gray-500">Credit Limit</div>
+                    <div class="font-bold qc-tnums">${limit > 0 ? formatCurrency(limit) : '<span class="text-gray-400">Not set</span>'}</div>
+                </div>
+            </div>
+            <div class="qc-kv">
+                <div><div class="qc-kv-l">Used</div><div class="qc-kv-v">${formatCurrency(used)}</div></div>
+                <div><div class="qc-kv-l">Available</div><div class="qc-kv-v" style="color:${avail < 0 ? '#B91C1C' : '#0F172A'}">${formatCurrency(avail)}</div></div>
+            </div>
+            ${limit > 0 ? utilBar(util) + `<div class="text-xs ${over ? 'text-red-600 font-semibold' : 'text-gray-500'} mt-1">${util}% utilised${over ? ' — over limit' : ''}</div>` : ''}
+            <div class="flex gap-2 mt-3">
+                ${isAdmin
+                    ? `<button onclick="openCreditModalSet(${c.id})" class="btn-green-outline px-3 py-1.5 rounded-lg text-xs font-medium">Set Limit</button>`
+                    : `<button onclick="requestCreditLimit(${c.id})" class="btn-green-outline px-3 py-1.5 rounded-lg text-xs font-medium">Request Limit</button>`}
+            </div>
+        </div>`;
+    }).join('') + (rows.length > 100 ? `<div class="text-center text-xs text-gray-400 py-2">Showing 100 of ${rows.length} — refine your search.</div>` : '');
+}
+
+async function loadCreditPendingCount() {
+    try {
+        const res = await fetch(`${CREDIT_API}/requests?status=pending`, { headers });
+        const data = await res.json();
+        const n = data.pending_count != null ? data.pending_count : (data.data || []).length;
+        const badge = document.getElementById('custPendingBadge');
+        badge.textContent = n;
+        badge.classList.toggle('hidden', !n);
+    } catch { /* ignore */ }
+}
+
+let creditRequestsOpen = false;
+async function toggleCreditRequests() {
+    const panel = document.getElementById('creditRequestsPanel');
+    creditRequestsOpen = !creditRequestsOpen;
+    if (!creditRequestsOpen) { panel.classList.add('hidden'); return; }
+    panel.classList.remove('hidden');
+    panel.innerHTML = skeletons ? skeletons(2) : 'Loading...';
+    try {
+        const res = await fetch(`${CREDIT_API}/requests?status=pending`, { headers });
+        const data = await res.json();
+        if (!data.success) throw new Error(data.message || data.error || 'Failed');
+        creditRequests = data.data || [];
+        if (!creditRequests.length) { panel.innerHTML = '<div class="qc-list-card text-sm text-gray-500">No pending credit-limit requests.</div>'; return; }
+        panel.innerHTML = '<div class="qc-section-title mb-2">Pending credit-limit requests</div>' + creditRequests.map(r => `
+            <div class="qc-list-card mb-2">
+                <div class="flex items-start justify-between gap-3">
+                    <div class="min-w-0">
+                        <div class="qc-entity">${esc(r.customer_name || r.zoho_contact_name || 'Customer')}</div>
+                        <div class="qc-entity-meta">Requested ${formatCurrency(r.requested_amount)}${r.current_limit != null ? ' (now ' + formatCurrency(r.current_limit) + ')' : ''}${r.requested_by_name ? ' · by ' + esc(r.requested_by_name) : ''}</div>
+                        ${r.reason ? `<div class="text-xs text-gray-500 mt-1">${esc(r.reason)}</div>` : ''}
+                    </div>
+                    <div class="flex gap-2 flex-shrink-0">
+                        <button onclick="openCreditModalApprove(${r.id})" class="btn-green px-3 py-1.5 rounded-lg text-xs font-medium">Approve</button>
+                        <button onclick="rejectCreditRequestDirect(${r.id})" class="btn-danger px-3 py-1.5 rounded-lg text-xs font-medium">Reject</button>
+                    </div>
+                </div>
+            </div>`).join('');
+    } catch (e) {
+        panel.innerHTML = `<div class="text-sm text-red-600">${esc(e.message)}</div>`;
+    }
+}
+
+// mode: 'set' (admin sets a customer's limit) | 'approve' (admin approves a request) | 'request' (staff files a request)
+function openCreditModal(mode, customer, request) {
+    document.getElementById('creditModalTitle').textContent =
+        mode === 'approve' ? 'Approve Credit Limit' : (mode === 'request' ? 'Request Credit Limit' : 'Set Credit Limit');
+    document.getElementById('creditCustomerId').value = customer ? customer.id : '';
+    document.getElementById('creditRequestId').value = request ? request.id : '';
+    document.getElementById('creditCustomerName').textContent = (customer && customer.name) || (request && request.customer_name) || '';
+    document.getElementById('creditReason').value = '';
+    document.getElementById('creditAmount').value = request ? (request.requested_amount || '') : (customer ? (customer.credit_limit || '') : '');
+    document.getElementById('creditAmountLabel').textContent = mode === 'request' ? 'Requested Limit (₹) *' : (mode === 'approve' ? 'Approved Limit (₹) *' : 'Credit Limit (₹) *');
+    const info = document.getElementById('creditRequestInfo');
+    if (mode === 'approve' && request) { info.textContent = `Staff requested ${formatCurrency(request.requested_amount)}. Adjust the approved amount if needed.`; info.classList.remove('hidden'); }
+    else info.classList.add('hidden');
+    document.getElementById('creditRejectBtn').classList.toggle('hidden', mode !== 'approve');
+    document.getElementById('creditSaveBtn').dataset.mode = mode;
+    document.getElementById('creditSaveBtn').textContent = mode === 'request' ? 'Submit Request' : (mode === 'approve' ? 'Approve' : 'Save Limit');
+    document.getElementById('creditModal').classList.add('active');
+}
+function closeCreditModal() { document.getElementById('creditModal').classList.remove('active'); }
+
+// id-based wrappers (avoid embedding object JSON in onclick attributes)
+function openCreditModalSet(id) {
+    const c = creditCustomers.find(x => Number(x.id) === Number(id));
+    if (c) openCreditModal('set', { id: c.id, name: c.name, credit_limit: Number(c.credit_limit) || 0 }, null);
+}
+function requestCreditLimit(id) {
+    const c = creditCustomers.find(x => Number(x.id) === Number(id));
+    if (c) openCreditModal('request', { id: c.id, name: c.name, credit_limit: Number(c.credit_limit) || 0 }, null);
+}
+function openCreditModalApprove(id) {
+    const r = creditRequests.find(x => Number(x.id) === Number(id));
+    if (r) openCreditModal('approve', null, { id: r.id, customer_name: r.customer_name || r.zoho_contact_name, requested_amount: r.requested_amount });
+}
+
+async function saveCreditLimit() {
+    const mode = document.getElementById('creditSaveBtn').dataset.mode;
+    const amount = Number(document.getElementById('creditAmount').value);
+    const reason = document.getElementById('creditReason').value.trim();
+    if (!(amount >= 0) || (mode !== 'set' && amount <= 0)) { showToast('Enter a valid amount', 'error'); return; }
+    const btn = document.getElementById('creditSaveBtn'); btn.disabled = true;
+    try {
+        let res;
+        if (mode === 'approve') {
+            const reqId = document.getElementById('creditRequestId').value;
+            res = await fetch(`${CREDIT_API}/requests/${reqId}/approve`, { method: 'PUT', headers, body: JSON.stringify({ approved_amount: amount, review_notes: reason }) });
+        } else if (mode === 'request') {
+            const custId = document.getElementById('creditCustomerId').value;
+            res = await fetch(`${CREDIT_API}/requests`, { method: 'POST', headers: { ...headers, 'Idempotency-Key': newIdemKey() }, body: JSON.stringify({ zoho_customer_map_id: Number(custId), requested_amount: amount, reason }) });
+        } else {
+            const custId = document.getElementById('creditCustomerId').value;
+            res = await fetch(`${CREDIT_API}/${custId}/set-limit`, { method: 'POST', headers, body: JSON.stringify({ credit_limit: amount, reason }) });
+        }
+        const data = await res.json();
+        if (!res.ok || data.success === false) throw new Error(data.message || data.error || 'Failed');
+        showToast(mode === 'request' ? 'Request submitted for admin approval' : (mode === 'approve' ? 'Credit limit approved' : 'Credit limit updated'), 'success');
+        closeCreditModal();
+        loadCreditCustomers();
+        if (creditRequestsOpen) { creditRequestsOpen = false; toggleCreditRequests(); }   // refresh the pending list
+    } catch (e) {
+        showToast(e.message || 'Failed', 'error');
+    } finally { btn.disabled = false; }
+}
+
+async function rejectCreditRequest() {
+    const reqId = document.getElementById('creditRequestId').value;
+    if (reqId) { await doRejectRequest(reqId, document.getElementById('creditReason').value.trim()); closeCreditModal(); }
+}
+async function rejectCreditRequestDirect(reqId) {
+    const ok = await confirmDialog({ title: 'Reject request?', message: 'This credit-limit request will be rejected.', primaryText: 'Reject', danger: true });
+    if (ok) doRejectRequest(reqId, '');
+}
+async function doRejectRequest(reqId, notes) {
+    try {
+        const res = await fetch(`${CREDIT_API}/requests/${reqId}/reject`, { method: 'PUT', headers, body: JSON.stringify({ review_notes: notes }) });
+        const data = await res.json();
+        if (!res.ok || data.success === false) throw new Error(data.message || data.error || 'Failed');
+        showToast('Request rejected', 'success');
+        loadCreditCustomers(1);
+        if (creditRequestsOpen) { creditRequestsOpen = false; toggleCreditRequests(); }
+    } catch (e) { showToast(e.message || 'Failed', 'error'); }
 }
 
 // ═══════════════════════════════════════════
@@ -920,7 +1187,7 @@ async function viewInvoice(id) {
             actions.innerHTML += `<button onclick="closeDetailModal(); editInvoice(${inv.id})" class="btn-green-outline px-4 py-2 rounded-lg text-sm font-medium">Edit</button>`;
         }
         if (inv.zoho_status !== 'pushed') {
-            actions.innerHTML += `<button onclick="closeDetailModal(); pushToZoho(${inv.id}, '${esc(inv.payment_status)}', ${Number(inv.balance_due) || 0})" class="px-4 py-2 rounded-lg text-sm font-medium text-blue-700 hover:bg-blue-50 border border-blue-200">Push to Zoho</button>`;
+            actions.innerHTML += `<button onclick="closeDetailModal(); pushToZoho(${inv.id}, '${esc(inv.payment_status)}', ${Number(inv.balance_due) || 0}, '${esc(inv.customer_type || '')}', '${esc(inv.painter_salesperson_id || '')}')" class="btn-green-outline px-4 py-2 rounded-lg text-sm font-medium">Push to Zoho</button>`;
         }
         actions.classList.toggle('hidden', !actions.innerHTML);
 
@@ -947,16 +1214,14 @@ let zohoLocationsCache = null;
 // Open the push modal: a salesperson is mandatory (owner 2026-06-12), a Zoho
 // location is optional. The server gate (paid OR credit-eligible) stays
 // authoritative; we surface the same warning here before the push.
-async function pushToZoho(invoiceId, paymentStatus, balanceDue) {
+async function pushToZoho(invoiceId, paymentStatus, balanceDue, customerType, painterSalespersonId) {
     document.getElementById('pushInvoiceId').value = invoiceId;
 
     const warn = document.getElementById('pushWarning');
     const due = Number(balanceDue) || 0;
+    let warnMsg = '';
     if (paymentStatus !== 'paid' && due > 0.01) {
-        warn.textContent = `Balance ₹${due.toLocaleString('en-IN')} இன்னும் pending. Payment record செய்யுங்க, அல்லது customer-க்கு credit limit இருந்தால் மட்டும் push ஆகும்.`;
-        warn.classList.remove('hidden');
-    } else {
-        warn.classList.add('hidden');
+        warnMsg = `Balance ₹${due.toLocaleString('en-IN')} இன்னும் pending. Payment record செய்யுங்க, அல்லது customer-க்கு credit limit இருந்தால் மட்டும் push ஆகும்.`;
     }
 
     // Reset selections, then populate both pickers from the local masters.
@@ -967,6 +1232,24 @@ async function pushToZoho(invoiceId, paymentStatus, balanceDue) {
     document.getElementById('pushModal').classList.add('active');
 
     await Promise.all([loadSalespersonsInto(spSel), loadLocationsInto(locSel)]);
+
+    // Painter invoice: the salesperson IS the painter — pre-select that painter's
+    // own mapped Zoho salesperson so staff don't pick blind from the full list.
+    if (customerType === 'painter' && painterSalespersonId) {
+        spSel.value = painterSalespersonId;
+        if (spSel.value !== String(painterSalespersonId)) {
+            // The painter's salesperson isn't in the active master list — add it
+            // so it can still be applied, and flag it.
+            spSel.appendChild(new Option("Painter's mapped salesperson", painterSalespersonId));
+            spSel.value = painterSalespersonId;
+            warnMsg = (warnMsg ? warnMsg + ' ' : '') + "இந்த painter-ஓட salesperson active Zoho list-ல இல்ல — ஆனா அதுவே apply ஆகும்.";
+        } else {
+            warnMsg = (warnMsg ? warnMsg + ' ' : '') + '✓ Painter-ஓட salesperson auto-select ஆயிடுச்சு.';
+        }
+    }
+
+    if (warnMsg) { warn.textContent = warnMsg; warn.classList.remove('hidden'); }
+    else { warn.classList.add('hidden'); }
 }
 
 function closePushModal() {

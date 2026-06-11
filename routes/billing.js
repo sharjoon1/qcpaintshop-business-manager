@@ -848,10 +848,17 @@ router.get('/invoices/:id',
         try {
             const { id } = req.params;
 
+            // Join the painter so the push UI can pre-select the painter's own
+            // mapped Zoho salesperson on a painter invoice (owner 2026-06-12:
+            // for a painter invoice the salesperson IS the painter — don't make
+            // staff pick it blind from the full list).
             const [invoices] = await pool.query(
-                `SELECT bi.*, u.full_name AS created_by_name
+                `SELECT bi.*, u.full_name AS created_by_name,
+                        p.zoho_salesperson_id AS painter_salesperson_id,
+                        p.full_name AS painter_full_name
                  FROM billing_invoices bi
                  LEFT JOIN users u ON bi.created_by = u.id
+                 LEFT JOIN painters p ON bi.painter_id = p.id
                  WHERE bi.id = ?`,
                 [id]
             );
