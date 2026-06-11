@@ -246,10 +246,27 @@ function verifyBillItems(staffItems, aiExtractedData) {
                 message: `Rate mismatch for "${itemName}": AI=${aiRate}, Staff=${staffRate}`
             });
         }
+
+        // Compare HSN (PO→bill conversion flow 2026-06-12): only when BOTH
+        // sides carry one — a missing HSN on either side is not a mismatch
+        // (the submit/push HSN gate handles absence separately).
+        const staffHsn = (staff.hsn_or_sac || '').toString().trim();
+        const aiHsn = (ai.hsn_or_sac || '').toString().trim();
+        if (staffHsn && aiHsn && staffHsn !== aiHsn) {
+            differences.push({
+                field: 'hsn',
+                item_name: itemName,
+                expected: aiHsn,
+                actual: staffHsn,
+                message: `HSN mismatch for "${itemName}": AI=${aiHsn}, Staff=${staffHsn}`
+            });
+        }
     }
 
-    // Compare total
-    const staffTotal = parseFloat(staffItems.reduce((sum, it) => sum + (parseFloat(it.amount) || 0), 0)) || 0;
+    // Compare total. DB rows (vendor_bill_items) carry line_total, not amount —
+    // without the fallback the staff total always computed 0 and false-flagged
+    // a 'total' mismatch on every verify of real DB rows.
+    const staffTotal = parseFloat(staffItems.reduce((sum, it) => sum + (parseFloat(it.amount != null ? it.amount : it.line_total) || 0), 0)) || 0;
     const aiTotal = parseFloat(aiExtractedData.total) || 0;
     if (Math.abs(staffTotal - aiTotal) > 1.0) {
         differences.push({

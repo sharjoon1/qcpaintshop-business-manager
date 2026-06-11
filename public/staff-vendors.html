@@ -924,6 +924,14 @@ async function viewBill(id) {
 
         document.getElementById('billDetailTitle').textContent = `Bill ${bill.bill_number}`;
         document.getElementById('billDetailBody').innerHTML = `
+            ${bill.po_id && bill.ai_verification_status === 'pending' ? `
+            <div class="mb-4 p-3 bg-amber-50 border border-amber-300 rounded-lg">
+                <div class="text-sm font-semibold text-amber-800 mb-2">Upload the bill photo and run AI verify before submitting</div>
+                <div class="flex flex-col sm:flex-row gap-2">
+                    <input type="file" id="vbPhotoInput" accept="image/*" class="qc-input flex-1 text-sm">
+                    <button onclick="scanAndVerifyBill(${bill.id}, ${bill.vendor_id})" id="btnScanVerify" class="btn-green px-4 py-2 rounded-lg text-sm font-medium whitespace-nowrap">Scan &amp; Verify</button>
+                </div>
+            </div>` : ''}
             <div class="flex items-center gap-2 mb-4 flex-wrap">
                 <span class="status-pill status-${bill.payment_status}">${bill.payment_status}</span>
                 ${bill.ai_verification_status ? `<span class="status-pill status-${bill.ai_verification_status === 'verified' ? 'verified' : 'mismatch'}">${bill.ai_verification_status}</span>` : ''}
@@ -1306,6 +1314,9 @@ async function viewPo(id) {
             actionsHtml += `<button onclick="closeModal('billDetailModal'); editPo(${po.id})" class="btn-green-outline px-4 py-2 rounded-lg text-sm font-medium">Edit</button>`;
             actionsHtml += `<button onclick="sendPo(${po.id})" class="btn-green px-4 py-2 rounded-lg text-sm font-medium">Mark as Sent</button>`;
         }
+        if (po.status === 'draft' || po.status === 'sent') {
+            actionsHtml += `<button onclick="convertPoToBill(${po.id})" class="btn-green px-4 py-2 rounded-lg text-sm font-medium">Convert to Bill</button>`;
+        }
         if (po.zoho_status !== 'pushed') {
             actionsHtml += `<button onclick="pushPoToZoho(${po.id})" class="btn-green px-4 py-2 rounded-lg text-sm font-medium">Push to Zoho</button>`;
         }
@@ -1453,6 +1464,66 @@ async function sendPo(poId) {
         loadPurchaseOrders(poPage);
     } catch (e) {
         showToast(e.message || 'Failed to send PO', 'error');
+    }
+}
+
+async function convertPoToBill(poId) {
+    if (!confirm('Convert this PO to a bill?')) return;
+    try {
+        const idemKey = (window.crypto && crypto.randomUUID) ? crypto.randomUUID() : (Date.now() + '-' + Math.random());
+        const res = await fetch(`${API}/purchase-orders/${poId}/convert-to-bill`, { method: 'POST', headers: { ...headers, 'Idempotency-Key': idemKey } });
+        const data = await res.json();
+        if (!data.success) {
+            // Already converted — jump to the existing bill
+            if (data.bill_id) { closeModal('billDetailModal'); viewBill(data.bill_id); }
+            throw new Error(data.message);
+        }
+        showToast(data.message || 'Bill created from PO', 'success');
+        closeModal('billDetailModal');
+        loadPurchaseOrders(poPage);
+        loadStats();
+        viewBill(data.bill_id);
+    } catch (e) {
+        showToast(e.message || 'Failed to convert PO', 'error');
+    }
+}
+
+// Converted-bill verification: upload the physical bill photo, AI-scan it,
+// then verify the scan against the bill lines copied from the PO.
+async function scanAndVerifyBill(billId, vendorId) {
+    const fileInput = document.getElementById('vbPhotoInput');
+    if (!fileInput || !fileInput.files.length) { showToast('Select the bill photo first', 'error'); return; }
+    const btn = document.getElementById('btnScanVerify');
+    btn.disabled = true;
+    btn.textContent = 'AI reading bill...';
+    try {
+        const formData = new FormData();
+        formData.append('bill_image', fileInput.files[0]);
+        if (vendorId) formData.append('vendor_id', vendorId);
+        const scanRes = await fetch(`${API}/bills/scan`, { method: 'POST', headers: { 'Authorization': `Bearer ${token}` }, body: formData });
+        const scanData = await scanRes.json();
+        if (!scanData.success) throw new Error(scanData.message);
+
+        const verifyRes = await fetch(`${API}/bills/${billId}/verify`, {
+            method: 'POST',
+            headers,
+            body: JSON.stringify({ ai_extracted_data: scanData.scan_result, bill_image: scanData.image_path || null })
+        });
+        const verifyData = await verifyRes.json();
+        if (!verifyData.success) throw new Error(verifyData.message);
+
+        const v = verifyData.verification;
+        if (v.status === 'verified') {
+            showToast('Bill verified - matches the bill photo!', 'success');
+        } else {
+            showToast(`${v.differences?.length || 0} difference(s) found. Review the bill.`, 'error');
+        }
+        loadBills(billPage);
+        viewBill(billId);
+    } catch (e) {
+        showToast(e.message || 'Scan & verify failed', 'error');
+        btn.disabled = false;
+        btn.textContent = 'Scan & Verify';
     }
 }
 

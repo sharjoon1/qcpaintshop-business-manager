@@ -914,6 +914,11 @@ router.get('/items', requirePermission('zoho', 'view'), async (req, res) => {
             where += ' AND zim.zoho_category_name LIKE ?';
             params.push(`%${category}%`);
         }
+        // HSN audit filter: items whose local HSN is NULL or blank (the Zoho
+        // LIST sync omits hsn_or_sac, so local edits are the source of truth).
+        if (req.query.missingHsn === '1') {
+            where += " AND COALESCE(zim.zoho_hsn_or_sac, '') = ''";
+        }
 
         const offset = (Math.max(1, parseInt(page)) - 1) * safeLimit;
 

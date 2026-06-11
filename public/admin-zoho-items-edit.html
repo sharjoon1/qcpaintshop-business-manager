@@ -261,6 +261,11 @@
                         <input type="checkbox" id="showInactiveToggle" onchange="currentPage=1;loadItems()" class="w-3.5 h-3.5 rounded border-gray-300 text-red-500 focus:ring-red-400">
                         <span class="text-sm text-gray-600 whitespace-nowrap">Inactive</span>
                     </label>
+                    <label class="flex items-center gap-1.5 px-3 py-2 rounded-lg border border-gray-200 bg-gray-50 cursor-pointer hover:bg-gray-100 transition select-none" title="Show only items with no HSN/SAC code">
+                        <input type="checkbox" id="missingHsnToggle" onchange="onMissingHsnToggle()" class="w-3.5 h-3.5 rounded border-gray-300 text-amber-500 focus:ring-amber-400">
+                        <span class="text-sm text-gray-600 whitespace-nowrap">Missing HSN</span>
+                        <span id="missingHsnCount" class="hidden text-xs font-semibold bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded-full"></span>
+                    </label>
                     <button onclick="clearAllFilters()" class="px-3 py-2 rounded-lg border border-gray-200 bg-gray-50 hover:bg-gray-100 text-sm font-medium text-gray-600 transition whitespace-nowrap">
                         Clear
                     </button>
@@ -774,8 +779,29 @@
         var bf = document.getElementById('brandFilter'); if (bf) bf.value = '';
         var cf = document.getElementById('categoryFilter');
         if (cf) { cf.innerHTML = buildCategoryOptions(_allCatNames); cf.value = ''; }
+        var mh = document.getElementById('missingHsnToggle'); if (mh) mh.checked = false;
         currentPage = 1;
         loadItems();
+    }
+
+    // ============ MISSING HSN FILTER ============
+    function onMissingHsnToggle() {
+        if (document.getElementById('missingHsnToggle').checked) {
+            // Auto-show the HSN/SAC column so the missing values can be filled in
+            var hsnCol = allColumns.find(function(c) { return c.key === 'hsn_or_sac'; });
+            if (hsnCol && !hsnCol.visible) hsnCol.visible = true;
+        }
+        currentPage = 1;
+        loadItems();
+    }
+    async function loadMissingHsnCount() {
+        try {
+            var resp = await fetch('/api/zoho/items?missingHsn=1&limit=1&page=1', { headers: getAuthHeaders() });
+            var data = await resp.json();
+            var total = data.pagination ? data.pagination.total : null;
+            var badge = document.getElementById('missingHsnCount');
+            if (badge && total != null) { badge.textContent = total; badge.classList.remove('hidden'); }
+        } catch (_) { /* non-blocking */ }
     }
 
     // ============ LOAD ITEMS ============
@@ -784,7 +810,8 @@
         var brandF = (document.getElementById('brandFilter') && document.getElementById('brandFilter').value) || '';
         var catF = (document.getElementById('categoryFilter') && document.getElementById('categoryFilter').value) || '';
         var showInactive = document.getElementById('showInactiveToggle') && document.getElementById('showInactiveToggle').checked;
-        var hasAnyFilter = search || brandF || catF;
+        var missingHsn = document.getElementById('missingHsnToggle') && document.getElementById('missingHsnToggle').checked;
+        var hasAnyFilter = search || brandF || catF || missingHsn;
         var hasColumnFilters = Object.keys(columnFilters).length > 0;
         var effectiveLimit = (hasAnyFilter || hasColumnFilters) ? 10000 : PAGE_LIMIT;
         var effectivePage = (hasAnyFilter || hasColumnFilters) ? 1 : currentPage;
@@ -793,6 +820,7 @@
         if (brandF) url += '&brand=' + encodeURIComponent(brandF);
         if (catF) url += '&category=' + encodeURIComponent(catF);
         if (showInactive) url += '&show_inactive=1';
+        if (missingHsn) url += '&missingHsn=1';
 
         document.getElementById('loadingState').classList.remove('hidden');
         document.getElementById('emptyState').classList.add('hidden');
@@ -1221,6 +1249,7 @@
             originalValues.clear();
             updateChangesUI();
             loadItems();
+            loadMissingHsnCount();
         } catch(err){showToast('Push failed: '+err.message,'error');}
         finally{btn.disabled=false;spinner.classList.add('hidden');icon.classList.remove('hidden');text.textContent='Push Changes to Zoho';updateChangesUI();}
     }
@@ -2444,7 +2473,7 @@
         } catch (_) { /* non-blocking */ }
     }
 
-    document.addEventListener('DOMContentLoaded', function() { loadItems(); loadFilterOptions(); updateAiScope(); });
+    document.addEventListener('DOMContentLoaded', function() { loadItems(); loadFilterOptions(); loadMissingHsnCount(); updateAiScope(); });
     window.addEventListener('beforeunload', function(e) { if(getDirtyItemCount()>0){e.preventDefault();e.returnValue='';} });
     // Close dropdowns on outside click
     document.addEventListener('click', function(e) {

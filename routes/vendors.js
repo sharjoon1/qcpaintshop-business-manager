@@ -246,10 +246,12 @@ router.post('/',
         try {
             const { vendor_name, contact_person, phone, email, address, gst_number, payment_terms, notes } = req.body;
 
+            // vendors has no created_by column (prod schema) — the old INSERT
+            // crashed on every manual vendor create.
             const [result] = await pool.query(
-                `INSERT INTO vendors (vendor_name, contact_person, phone, email, address, gst_number, payment_terms, notes, created_by)
-                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-                [vendor_name, contact_person, phone, email, address, gst_number, payment_terms, notes, req.user.id]
+                `INSERT INTO vendors (vendor_name, contact_person, phone, email, address, gst_number, payment_terms, notes)
+                 VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+                [vendor_name, contact_person, phone, email, address, gst_number, payment_terms, notes]
             );
 
             res.json({ success: true, vendor_id: result.insertId, message: 'Vendor created' });
@@ -445,8 +447,9 @@ router.get('/bills/:id',
                 return res.status(404).json({ success: false, message: 'Bill not found' });
             }
 
+            // alias line_total AS amount — the bill detail UI renders i.amount
             const [items] = await pool.query(
-                'SELECT * FROM vendor_bill_items WHERE bill_id = ? ORDER BY id',
+                'SELECT vbi.*, vbi.line_total AS amount FROM vendor_bill_items vbi WHERE vbi.bill_id = ? ORDER BY vbi.id',
                 [id]
             );
 
@@ -530,7 +533,19 @@ router.post('/bills/:id/verify',
             }
 
             const bill = bills[0];
-            const aiData = bill.ai_extracted_data ? JSON.parse(bill.ai_extracted_data) : null;
+
+            // Optional body: a fresh scan result for bills created WITHOUT an
+            // upload (e.g. PO→bill conversion). Persist it first so the bill
+            // carries the photo + extraction it was verified against.
+            const bodyAiData = req.body && req.body.ai_extracted_data ? req.body.ai_extracted_data : null;
+            if (bodyAiData) {
+                await pool.query(
+                    `UPDATE vendor_bills SET ai_extracted_data = ?, bill_image = COALESCE(?, bill_image) WHERE id = ?`,
+                    [JSON.stringify(bodyAiData), req.body.bill_image || null, id]
+                );
+            }
+
+            const aiData = bodyAiData || (bill.ai_extracted_data ? JSON.parse(bill.ai_extracted_data) : null);
 
             const [staffItems] = await pool.query(
                 'SELECT * FROM vendor_bill_items WHERE bill_id = ?',
@@ -736,8 +751,11 @@ router.get('/purchase-orders',
             );
             const total = countRows[0].total;
 
+            // zoho_status is computed (the table has no such column) — the UI
+            // renders a "pushed" pill and hides the push button based on it.
             const [rows] = await pool.query(
-                `SELECT po.*, v.vendor_name, u.full_name AS created_by_name
+                `SELECT po.*, v.vendor_name, u.full_name AS created_by_name,
+                    CASE WHEN po.zoho_po_id IS NULL THEN NULL ELSE 'pushed' END AS zoho_status
                  FROM vendor_purchase_orders po
                  JOIN vendors v ON po.vendor_id = v.id
                  LEFT JOIN users u ON po.created_by = u.id
@@ -779,12 +797,13 @@ router.post('/purchase-orders',
 
             const poId = result.insertId;
 
+            // schema column is line_total, not amount
             for (const item of items) {
-                const amount = item.quantity * item.unit_price;
+                const lineTotal = item.quantity * item.unit_price;
                 await pool.query(
-                    `INSERT INTO vendor_po_items (po_id, zoho_item_id, item_name, quantity, unit_price, amount)
+                    `INSERT INTO vendor_po_items (po_id, zoho_item_id, item_name, quantity, unit_price, line_total)
                      VALUES (?, ?, ?, ?, ?, ?)`,
-                    [poId, item.zoho_item_id || null, item.item_name, item.quantity, item.unit_price, amount]
+                    [poId, item.zoho_item_id || null, item.item_name, item.quantity, item.unit_price, lineTotal]
                 );
             }
 
@@ -821,12 +840,13 @@ router.put('/purchase-orders/:id',
             const subtotal = items.reduce((sum, it) => sum + (it.quantity * it.unit_price), 0);
             const grand_total = subtotal + (tax_amount || 0);
 
+            // schema column is line_total, not amount
             for (const item of items) {
-                const amount = item.quantity * item.unit_price;
+                const lineTotal = item.quantity * item.unit_price;
                 await pool.query(
-                    `INSERT INTO vendor_po_items (po_id, zoho_item_id, item_name, quantity, unit_price, amount)
+                    `INSERT INTO vendor_po_items (po_id, zoho_item_id, item_name, quantity, unit_price, line_total)
                      VALUES (?, ?, ?, ?, ?, ?)`,
-                    [id, item.zoho_item_id || null, item.item_name, item.quantity, item.unit_price, amount]
+                    [id, item.zoho_item_id || null, item.item_name, item.quantity, item.unit_price, lineTotal]
                 );
             }
 
@@ -869,6 +889,95 @@ router.post('/purchase-orders/:id/send',
         } catch (error) {
             console.error('Send PO error:', error);
             res.status(500).json({ success: false, message: 'Failed to send purchase order' });
+        }
+    }
+);
+
+// Convert PO → Bill (owner flow 2026-06-12): copies the PO lines into a new
+// vendor_bill (HSN pulled from zoho_items_map where matched), links it via
+// vendor_bills.po_id (migration 20260612_vendor_po_bill_link) and marks the
+// PO 'received' (the existing status enum's converted state). The response
+// tells the UI to prompt for a bill-photo upload + AI verify.
+router.post('/purchase-orders/:id/convert-to-bill',
+    managePerm,
+    idempotent('vendor.po.convertBill'),
+    validateParams(idParamSchema),
+    async (req, res) => {
+        try {
+            const { id } = req.params;
+
+            const [pos] = await pool.query('SELECT * FROM vendor_purchase_orders WHERE id = ?', [id]);
+            if (!pos.length) {
+                return res.status(404).json({ success: false, message: 'Purchase order not found' });
+            }
+            const po = pos[0];
+            if (po.status === 'cancelled') {
+                return res.status(400).json({ success: false, message: 'Cancelled POs cannot be converted' });
+            }
+
+            const [existing] = await pool.query(
+                'SELECT id, bill_number FROM vendor_bills WHERE po_id = ? LIMIT 1',
+                [id]
+            );
+            if (existing.length) {
+                return res.status(400).json({
+                    success: false,
+                    message: `PO already converted to bill ${existing[0].bill_number}`,
+                    bill_id: existing[0].id
+                });
+            }
+
+            const [poItems] = await pool.query(
+                'SELECT * FROM vendor_po_items WHERE po_id = ? ORDER BY id',
+                [id]
+            );
+            if (!poItems.length) {
+                return res.status(400).json({ success: false, message: 'Purchase order has no items' });
+            }
+
+            // HSN from the Zoho catalog for matched lines
+            const zohoIds = poItems.map(it => it.zoho_item_id).filter(Boolean);
+            const hsnById = new Map();
+            if (zohoIds.length) {
+                const [hsnRows] = await pool.query(
+                    `SELECT zoho_item_id, zoho_hsn_or_sac FROM zoho_items_map WHERE zoho_item_id IN (?)`,
+                    [zohoIds]
+                );
+                for (const r of hsnRows) hsnById.set(r.zoho_item_id, r.zoho_hsn_or_sac || null);
+            }
+
+            const billNumber = await generateNumber('BILL', 'vendor_bills', 'bill_number');
+            const [result] = await pool.query(
+                `INSERT INTO vendor_bills (vendor_id, po_id, bill_number, bill_date, subtotal, tax_amount, grand_total,
+                    balance_due, ai_verification_status, notes, entered_by)
+                 VALUES (?, ?, ?, CURDATE(), ?, ?, ?, ?, 'pending', ?, ?)`,
+                [po.vendor_id, id, billNumber, po.subtotal, po.tax_amount, po.grand_total,
+                 po.grand_total, `Converted from PO ${po.po_number}`, req.user.id]
+            );
+            const billId = result.insertId;
+
+            for (const item of poItems) {
+                await pool.query(
+                    `INSERT INTO vendor_bill_items (bill_id, zoho_item_id, item_name, quantity, unit_price, line_total, hsn_or_sac, ai_matched, ai_confidence)
+                     VALUES (?, ?, ?, ?, ?, ?, ?, 0, NULL)`,
+                    [billId, item.zoho_item_id || null, item.item_name, item.quantity, item.unit_price,
+                     item.line_total, (item.zoho_item_id && hsnById.get(item.zoho_item_id)) || null]
+                );
+            }
+
+            await pool.query(`UPDATE vendor_purchase_orders SET status = 'received' WHERE id = ?`, [id]);
+
+            res.json({
+                success: true,
+                bill_id: billId,
+                bill_number: billNumber,
+                po_id: Number(id),
+                requires_photo_verification: true,
+                message: `Bill ${billNumber} created from PO ${po.po_number}. Upload the bill photo and run AI verify before submitting.`
+            });
+        } catch (error) {
+            console.error('Convert PO to bill error:', error);
+            res.status(500).json({ success: false, message: 'Failed to convert purchase order to bill' });
         }
     }
 );
@@ -929,9 +1038,11 @@ router.post('/purchase-orders/:id/push-zoho',
                 line_items: lineItems
             });
 
+            // vendor_purchase_orders has no zoho_status column (prod schema) —
+            // pushed state is derived from zoho_po_id being set.
             const zohoPOId = zohoResp.purchaseorder?.purchaseorder_id;
             await pool.query(
-                `UPDATE vendor_purchase_orders SET zoho_status = 'pushed', zoho_po_id = ? WHERE id = ?`,
+                `UPDATE vendor_purchase_orders SET zoho_po_id = ? WHERE id = ?`,
                 [zohoPOId || null, id]
             );
 

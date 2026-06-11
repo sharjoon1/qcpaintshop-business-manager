@@ -160,5 +160,50 @@ describe('Vendor System', () => {
             const result = verifyBillItems(staff, ai);
             expect(result.status).toBe('mismatch');
         });
+
+        it('flags an HSN mismatch when both staff and AI lines carry one and they differ', () => {
+            const staff = [{ item_name: 'Paint', quantity: 5, rate: 2000, amount: 10000, hsn_or_sac: '3209' }];
+            const ai = { items: [{ name: 'Paint', quantity: 5, rate: 2000, hsn_or_sac: '3208' }], total: 10000 };
+            const result = verifyBillItems(staff, ai);
+            expect(result.status).toBe('mismatch');
+            const hsnDiff = result.differences.find(d => d.field === 'hsn');
+            expect(hsnDiff).toBeDefined();
+            expect(hsnDiff.expected).toBe('3208');
+            expect(hsnDiff.actual).toBe('3209');
+        });
+
+        it('does NOT flag HSN when either side is missing one (absence is the gate’s job)', () => {
+            const staffNoHsn = [{ item_name: 'Paint', quantity: 5, rate: 2000, amount: 10000 }];
+            const aiWithHsn = { items: [{ name: 'Paint', quantity: 5, rate: 2000, hsn_or_sac: '3208' }], total: 10000 };
+            expect(verifyBillItems(staffNoHsn, aiWithHsn).status).toBe('verified');
+
+            const staffWithHsn = [{ item_name: 'Paint', quantity: 5, rate: 2000, amount: 10000, hsn_or_sac: '3209' }];
+            const aiNoHsn = { items: [{ name: 'Paint', quantity: 5, rate: 2000 }], total: 10000 };
+            expect(verifyBillItems(staffWithHsn, aiNoHsn).status).toBe('verified');
+        });
+
+        it('still verifies clean when matching HSNs are present on both sides', () => {
+            const staff = [{ item_name: 'Paint', quantity: 5, rate: 2000, amount: 10000, hsn_or_sac: '3209' }];
+            const ai = { items: [{ name: 'Paint', quantity: 5, rate: 2000, hsn_or_sac: '3209' }], total: 10000 };
+            const result = verifyBillItems(staff, ai);
+            expect(result.status).toBe('verified');
+        });
+
+        it('computes the staff total from line_total on DB-shaped rows (no amount column)', () => {
+            // vendor_bill_items rows have line_total, NOT amount — before the
+            // fix the staff total computed 0 and false-flagged every verify.
+            const staff = [{ item_name: 'Paint', quantity: 5, unit_price: 2000, line_total: 10000 }];
+            const ai = { items: [{ name: 'Paint', quantity: 5, rate: 2000 }], total: 10000 };
+            const result = verifyBillItems(staff, ai);
+            expect(result.status).toBe('verified');
+            expect(result.differences).toHaveLength(0);
+        });
+    });
+
+    describe('PO→Bill link migration', () => {
+        it('20260612_vendor_po_bill_link exports an up() function', () => {
+            const migration = require('../../migrations/20260612_vendor_po_bill_link.js');
+            expect(typeof migration.up).toBe('function');
+        });
     });
 });

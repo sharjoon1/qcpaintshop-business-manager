@@ -18757,6 +18757,33 @@
         }
       }
     },
+    "/api/vendors/purchase-orders/{id}/convert-to-bill": {
+      "post": {
+        "tags": [
+          "vendors"
+        ],
+        "summary": "POST /api/vendors/purchase-orders/:id/convert-to-bill",
+        "x-source": "routes/vendors.js",
+        "x-auth": [
+          "public"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
     "/api/vendors/purchase-orders/{id}/push-zoho": {
       "post": {
         "tags": [
@@ -20742,6 +20769,206 @@
         }
       }
     },
+    "/api/gst-reports/filing": {
+      "get": {
+        "tags": [
+          "gst-reports"
+        ],
+        "summary": "GET /api/gst-reports/filing",
+        "x-source": "routes/gst-reports.js",
+        "x-auth": [
+          "requirePermission"
+        ],
+        "x-permission": "zoho.view",
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/gst-reports/missed-b2b": {
+      "get": {
+        "tags": [
+          "gst-reports"
+        ],
+        "summary": "GET /api/gst-reports/missed-b2b",
+        "x-source": "routes/gst-reports.js",
+        "x-auth": [
+          "requirePermission"
+        ],
+        "x-permission": "zoho.view",
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/gst-reports/carry-forward": {
+      "post": {
+        "tags": [
+          "gst-reports"
+        ],
+        "summary": "POST /api/gst-reports/carry-forward",
+        "x-source": "routes/gst-reports.js",
+        "x-auth": [
+          "requirePermission"
+        ],
+        "x-permission": "zoho.edit",
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/gst-reports/carry-forward/{zohoInvoiceId}": {
+      "delete": {
+        "tags": [
+          "gst-reports"
+        ],
+        "summary": "DELETE /api/gst-reports/carry-forward/:zohoInvoiceId",
+        "x-source": "routes/gst-reports.js",
+        "x-auth": [
+          "requirePermission"
+        ],
+        "x-permission": "zoho.edit",
+        "parameters": [
+          {
+            "name": "zohoInvoiceId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/gst-reports/b2b-items": {
+      "get": {
+        "tags": [
+          "gst-reports"
+        ],
+        "summary": "GET /api/gst-reports/b2b-items",
+        "x-source": "routes/gst-reports.js",
+        "x-auth": [
+          "requirePermission"
+        ],
+        "x-permission": "zoho.view",
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/gst-reports/cost-analysis": {
+      "get": {
+        "tags": [
+          "gst-reports"
+        ],
+        "summary": "GET /api/gst-reports/cost-analysis",
+        "x-source": "routes/gst-reports.js",
+        "x-auth": [
+          "requirePermission"
+        ],
+        "x-permission": "zoho.view",
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/gst-reports/item-flags": {
+      "get": {
+        "tags": [
+          "gst-reports"
+        ],
+        "summary": "GET /api/gst-reports/item-flags",
+        "x-source": "routes/gst-reports.js",
+        "x-auth": [
+          "requirePermission"
+        ],
+        "x-permission": "zoho.view",
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/gst-reports/item-flags/{zohoItemId}": {
+      "put": {
+        "tags": [
+          "gst-reports"
+        ],
+        "summary": "PUT /api/gst-reports/item-flags/:zohoItemId",
+        "x-source": "routes/gst-reports.js",
+        "x-auth": [
+          "requirePermission"
+        ],
+        "x-permission": "zoho.edit",
+        "parameters": [
+          {
+            "name": "zohoItemId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/gst-reports/commission-expense": {
+      "get": {
+        "tags": [
+          "gst-reports"
+        ],
+        "summary": "GET /api/gst-reports/commission-expense",
+        "x-source": "routes/gst-reports.js",
+        "x-auth": [
+          "requirePermission"
+        ],
+        "x-permission": "zoho.view",
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/gst-reports/profitability": {
+      "get": {
+        "tags": [
+          "gst-reports"
+        ],
+        "summary": "GET /api/gst-reports/profitability",
+        "x-source": "routes/gst-reports.js",
+        "x-auth": [
+          "requirePermission"
+        ],
+        "x-permission": "zoho.view",
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
     "/api/auth/login": {
       "post": {
         "tags": [
@@ -21659,9 +21886,9 @@
     }
   },
   "x-stats": {
-    "operations": 1027,
+    "operations": 1038,
     "shadowedDuplicates": 0,
     "unparsedDynamicPaths": 0,
-    "modules": 49
+    "modules": 50
   }
 }
