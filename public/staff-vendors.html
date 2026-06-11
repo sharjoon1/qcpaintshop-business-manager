@@ -448,7 +448,7 @@
                         <span class="text-sm font-medium text-gray-700">Upload Bill Photo (Optional)</span>
                     </div>
                     <div class="flex flex-col sm:flex-row gap-3">
-                        <input type="file" id="bfBillImage" accept="image/*" class="qc-input flex-1 text-sm">
+                        <input type="file" id="bfBillImage" accept="image/*" multiple class="qc-input flex-1 text-sm">
                         <button type="button" onclick="scanBillWithAI()" id="btnScanAI" class="btn-green-outline px-4 py-2 rounded-lg text-sm font-medium flex items-center gap-1 justify-center whitespace-nowrap">
                             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"/></svg>
                             Scan with AI
@@ -488,14 +488,22 @@
                     </div>
                 </div>
 
-                <!-- Totals -->
+                <!-- Totals: DPL subtotal − discount → +GST (auto-filled from the scanned bill) -->
                 <div class="border-t pt-3 space-y-2">
                     <div class="flex justify-between text-sm">
-                        <span class="text-gray-500">Subtotal</span>
+                        <span class="text-gray-500">Subtotal (DPL × qty)</span>
                         <span id="bfSubtotal" class="font-medium">0.00</span>
                     </div>
                     <div class="flex justify-between items-center text-sm">
-                        <label class="text-gray-500">Tax</label>
+                        <label class="text-gray-500">Discount (whole bill)</label>
+                        <input type="number" id="bfDiscount" class="qc-input w-24 text-right" value="0" min="0" step="0.01" oninput="recalcBillTotals()">
+                    </div>
+                    <div class="flex justify-between text-sm">
+                        <span class="text-gray-500">Taxable</span>
+                        <span id="bfTaxable" class="font-medium">0.00</span>
+                    </div>
+                    <div class="flex justify-between items-center text-sm">
+                        <label class="text-gray-500">GST</label>
                         <input type="number" id="bfTax" class="qc-input w-24 text-right" value="0" min="0" step="0.01" oninput="recalcBillTotals()">
                     </div>
                     <div class="flex justify-between text-base font-bold border-t pt-2">
@@ -1130,7 +1138,7 @@ async function viewBill(id) {
                     ? 'AI found differences — fix the lines or re-scan the bill photo'
                     : 'Upload the bill photo and run AI Verify before submitting'}</div>
                 <div class="flex flex-col sm:flex-row gap-2">
-                    <input type="file" id="vbPhotoInput" accept="image/*" class="qc-input flex-1 text-sm">
+                    <input type="file" id="vbPhotoInput" accept="image/*" multiple class="qc-input flex-1 text-sm">
                     <button onclick="scanAndVerifyBill(${bill.id}, ${bill.vendor_id})" id="btnScanVerify" class="btn-green px-4 py-2 rounded-lg text-sm font-medium whitespace-nowrap">Scan &amp; Verify</button>
                 </div>
             </div>` : ''}
@@ -1272,7 +1280,7 @@ function renderReconcileEditor(bill, recon, payments, needsScan, aiExtracted) {
         <div class="mb-4 p-3 bg-amber-50 border border-amber-300 rounded-lg">
             <div class="text-sm font-semibold text-amber-800 mb-2">Re-scan the bill photo if the AI read it wrong</div>
             <div class="flex flex-col sm:flex-row gap-2">
-                <input type="file" id="vbPhotoInput" accept="image/*" class="qc-input flex-1 text-sm">
+                <input type="file" id="vbPhotoInput" accept="image/*" multiple class="qc-input flex-1 text-sm">
                 <button onclick="scanAndVerifyBill(${bill.id}, ${bill.vendor_id})" id="btnScanVerify" class="btn-green px-4 py-2 rounded-lg text-sm font-medium whitespace-nowrap">Scan &amp; Verify</button>
             </div>
         </div>` : '';
@@ -1847,7 +1855,8 @@ async function scanBillWithAI() {
 
     try {
         const formData = new FormData();
-        formData.append('bill_image', fileInput.files[0]);
+        // multi-page bills: send every selected image under the same field
+        for (const f of fileInput.files) formData.append('bill_image', f);
         if (vendorId) formData.append('vendor_id', vendorId);
 
         const res = await fetch(`${API}/bills/scan`, {
@@ -1874,10 +1883,16 @@ async function scanBillWithAI() {
             ai_confidence: it.ai_confidence || 0
         }));
 
+        // Auto-fill the bill's discount + GST as printed (owner request)
+        const sr = data.scan_result || {};
+        if (document.getElementById('bfDiscount')) document.getElementById('bfDiscount').value = Number(sr.discount) > 0 ? sr.discount : 0;
+        if (document.getElementById('bfTax')) document.getElementById('bfTax').value = Number(sr.tax) > 0 ? sr.tax : 0;
+
         renderBillItems();
         recalcBillTotals();
 
-        document.getElementById('aiScanResult').textContent = `AI found ${aiItems.length} item(s). Review and edit below.`;
+        const pages = (data.image_paths || []).length;
+        document.getElementById('aiScanResult').textContent = `AI found ${aiItems.length} item(s)${pages > 1 ? ` from ${pages} pages` : ''}. Discount/GST auto-filled — review below.`;
         document.getElementById('aiScanResult').classList.remove('hidden');
         document.getElementById('btnVerifyBill').classList.remove('hidden');
     } catch (e) {
@@ -1940,9 +1955,12 @@ function renderBillItems() {
 
 function recalcBillTotals() {
     const subtotal = billItems.reduce((s, i) => s + (i.quantity * i.unit_price), 0);
+    const discount = Math.min(Math.max(Number(document.getElementById('bfDiscount')?.value) || 0, 0), subtotal);
+    const taxable = Math.round((subtotal - discount) * 100) / 100;
     const tax = Number(document.getElementById('bfTax').value) || 0;
     document.getElementById('bfSubtotal').textContent = formatCurrency(subtotal);
-    document.getElementById('bfGrandTotal').textContent = formatCurrency(subtotal + tax);
+    if (document.getElementById('bfTaxable')) document.getElementById('bfTaxable').textContent = formatCurrency(taxable);
+    document.getElementById('bfGrandTotal').textContent = formatCurrency(taxable + tax);
 }
 
 async function verifyBill() {
@@ -1996,6 +2014,7 @@ async function submitBill() {
             ai_confidence: i.ai_confidence || 0
         })),
         tax_amount: Number(document.getElementById('bfTax').value) || 0,
+        discount_amount: Math.max(Number(document.getElementById('bfDiscount')?.value) || 0, 0),
         notes: document.getElementById('bfNotes').value.trim(),
         bill_image: billImagePath || null,
         ai_extracted_data: aiExtractedData || null
@@ -2359,7 +2378,7 @@ async function scanAndVerifyBill(billId, vendorId) {
     btn.textContent = 'AI reading bill...';
     try {
         const formData = new FormData();
-        formData.append('bill_image', fileInput.files[0]);
+        for (const f of fileInput.files) formData.append('bill_image', f);   // multi-page bills
         if (vendorId) formData.append('vendor_id', vendorId);
         const scanRes = await fetch(`${API}/bills/scan`, { method: 'POST', headers: { 'Authorization': `Bearer ${token}` }, body: formData });
         const scanData = await scanRes.json();

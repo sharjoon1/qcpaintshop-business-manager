@@ -13,7 +13,7 @@
 // ai.rate compares against unit_price on DB rows (staff.rate kept for
 // AI-shaped callers).
 const { createVendorSchema, createBillSchema, recordPaymentSchema, listQuerySchema, computeBillTotals } = require('../../routes/vendors');
-const { verifyBillItems, matchProductsToZoho, setPool, buildReconciliation } = require('../../services/vendor-bill-ai-service');
+const { verifyBillItems, matchProductsToZoho, setPool, buildReconciliation, normalizeScan } = require('../../services/vendor-bill-ai-service');
 
 describe('Vendor System', () => {
 
@@ -236,6 +236,30 @@ describe('Vendor System', () => {
             '20260612_vendor_bill_discount.js',
         ])('%s exports an up() function', (file) => {
             expect(typeof require(`../../migrations/${file}`).up).toBe('function');
+        });
+    });
+
+    describe('normalizeScan (pack-count quantity + numeric discount/tax)', () => {
+        it('corrects qty from total-volume to pack count via amount/rate (Berger 100→5)', () => {
+            const d = normalizeScan({ items: [{ name: 'SEAL-O-PRIME 20L', quantity: 100, rate: 3740, amount: 18700 }] });
+            expect(d.items[0].quantity).toBe(5); // 18700 / 3740
+        });
+
+        it('leaves a consistent line alone (qty×rate already = amount)', () => {
+            const d = normalizeScan({ items: [{ name: 'X', quantity: 5, rate: 3740, amount: 18700 }] });
+            expect(d.items[0].quantity).toBe(5);
+        });
+
+        it('does not "correct" when amount/rate is not a clean integer', () => {
+            const d = normalizeScan({ items: [{ name: 'Y', quantity: 3, rate: 100, amount: 257 }] });
+            expect(d.items[0].quantity).toBe(3); // 2.57 → not clean, keep
+        });
+
+        it('coerces bill-level discount/tax/total to numbers', () => {
+            const d = normalizeScan({ items: [], discount: '1823.25', tax: '3037.82', total: '19914.57' });
+            expect(d.discount).toBe(1823.25);
+            expect(d.tax).toBe(3037.82);
+            expect(d.total).toBe(19914.57);
         });
     });
 

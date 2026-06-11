@@ -326,21 +326,24 @@ router.put('/:id',
 // Scan bill image (AI)
 router.post('/bills/scan',
     managePerm,
-    uploadVendorBill.single('bill_image'),
+    uploadVendorBill.array('bill_image', 8),   // multi-page bills: up to 8 images
     async (req, res) => {
         try {
-            if (!req.file) {
+            const files = req.files || [];
+            if (!files.length) {
                 return res.status(400).json({ success: false, message: 'No bill image uploaded' });
             }
 
             const vendorId = req.body.vendor_id ? Number(req.body.vendor_id) : null;
-            const scan_result = await vendorBillAI.scanBillImage(req.file.path);
+            const paths = files.map(f => f.path);
+            const scan_result = await vendorBillAI.scanBillImage(paths);
             const matched_items = await vendorBillAI.matchProductsToZoho(scan_result.items || [], vendorId);
 
             res.json({
                 success: true,
                 scan_result: { ...scan_result, items: matched_items },
-                image_path: req.file.path
+                image_path: paths[0],          // representative image for the bill
+                image_paths: paths
             });
         } catch (error) {
             console.error('Bill scan error:', error);
@@ -668,6 +671,25 @@ router.post('/bills/:id/verify',
                 'SELECT * FROM vendor_bill_items WHERE bill_id = ?',
                 [id]
             );
+
+            // Auto-apply the bill's discount + GST from the AI extraction (owner:
+            // discount/GST should populate as printed). Only seed when the bill
+            // hasn't been given its own values yet, so a manual edit isn't undone.
+            if (aiData) {
+                const aiDiscount = parseFloat(aiData.discount);
+                const aiTax = parseFloat(aiData.tax);
+                const haveDiscount = parseFloat(bill.discount_amount) > 0;
+                const seedDiscount = (!haveDiscount && Number.isFinite(aiDiscount) && aiDiscount > 0) ? aiDiscount : (parseFloat(bill.discount_amount) || 0);
+                const seedTax = (bill.tax_amount == null && Number.isFinite(aiTax) && aiTax > 0) ? aiTax : (bill.tax_amount != null ? parseFloat(bill.tax_amount) : null);
+                if (!haveDiscount && (seedDiscount > 0 || seedTax != null)) {
+                    const t = computeBillTotals(staffItems, seedDiscount, seedTax);
+                    const amountPaid = parseFloat(bill.amount_paid) || 0;
+                    await pool.query(
+                        `UPDATE vendor_bills SET tax_amount = ?, discount_amount = ?, grand_total = ?, balance_due = ? WHERE id = ?`,
+                        [t.tax, t.discount, t.grand, t.grand - amountPaid, id]
+                    );
+                }
+            }
 
             const result = vendorBillAI.verifyBillItems(staffItems, aiData);
 

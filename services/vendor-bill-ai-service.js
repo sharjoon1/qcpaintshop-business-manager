@@ -22,7 +22,7 @@ const MIME_TYPES = {
 
 // ─── scanBillImage ─────────────────────────────────────────────
 
-const BILL_EXTRACT_SYSTEM_PROMPT = `You are an expert at reading vendor bills and invoices. Extract all data from the bill image and return ONLY valid JSON with this structure:
+const BILL_EXTRACT_SYSTEM_PROMPT = `You are an expert at reading Indian GST vendor bills/invoices. The pages of ONE bill may be supplied as multiple images — combine them into a single result. Return ONLY valid JSON:
 {
   "vendor_name": "string",
   "bill_number": "string",
@@ -31,24 +31,66 @@ const BILL_EXTRACT_SYSTEM_PROMPT = `You are an expert at reading vendor bills an
     { "name": "string", "hsn_or_sac": "string or null", "quantity": number, "rate": number, "amount": number }
   ],
   "subtotal": number,
+  "discount": number,
   "tax": number,
   "total": number
 }
-hsn_or_sac is the HSN/SAC code printed on the bill line (Indian GST bills usually have an HSN column, typically 4-8 digits); use null when the line has none.
-Return ONLY the JSON object. No explanations, no markdown formatting.`;
+CRITICAL — quantity is the NUMBER OF PACKS / UNITS / PIECES billed (the count in the NOP / "Qty" / "Pcs" column), NOT the total volume. If a line shows BOTH a pack count (e.g. NOP 5, each 20 Lt) AND a total volume (e.g. 100 Lt), use the PACK COUNT (5). "rate" is the price PER PACK/UNIT, so quantity × rate must equal the line "amount" — if they don't, re-read the columns until they reconcile.
+"discount" is the SUM of ALL discounts on the bill (payment/special/other discounts), as one positive number applied to the bill total before tax; use 0 when there is none.
+"tax" is the total GST (CGST+SGST+IGST). "subtotal" is the gross value before discount; "total" is the final invoice amount.
+hsn_or_sac is the HSN/SAC printed on the line (4-8 digits); null when absent.
+Return ONLY the JSON object. No explanations, no markdown.`;
 
-async function scanBillImage(imagePath) {
-    const fileBuffer = fs.readFileSync(imagePath);
-    const base64 = fileBuffer.toString('base64');
-    const ext = path.extname(imagePath).toLowerCase();
-    const mimeType = MIME_TYPES[ext];
-    if (!mimeType) {
-        throw new Error(`Unsupported image type: ${ext}`);
+/**
+ * Deterministic fix for the "quantity is total volume, not pack count" trap
+ * (Berger etc. print both NOP and a litre total): when a line's rate is the
+ * per-pack price, amount/rate is the true pack count. If quantity×rate doesn't
+ * reconcile to amount but amount/rate rounds to a clean integer, use that.
+ * Also coerces the bill-level discount/tax/total to numbers.
+ */
+function normalizeScan(data) {
+    if (!data || typeof data !== 'object') return data;
+    const n = v => { const x = parseFloat(v); return Number.isFinite(x) ? x : 0; };
+    if (Array.isArray(data.items)) {
+        for (const it of data.items) {
+            const qty = n(it.quantity), rate = n(it.rate), amount = n(it.amount);
+            if (rate > 0 && amount > 0 && Math.abs(qty * rate - amount) > 1) {
+                const derived = amount / rate;
+                const rounded = Math.round(derived);
+                if (rounded > 0 && Math.abs(derived - rounded) < 0.02) {
+                    it.quantity = rounded; // pack count
+                }
+            }
+        }
     }
+    data.discount = n(data.discount);
+    data.tax = n(data.tax);
+    data.total = n(data.total);
+    data.subtotal = n(data.subtotal);
+    return data;
+}
 
+/**
+ * Scan one or more bill images (pages) into a single extraction. Accepts a
+ * single path (string) or an array of paths — multiple images go to the model
+ * as multiple inline parts so a multi-page bill is read as one.
+ */
+async function scanBillImage(imagePaths) {
+    const paths = Array.isArray(imagePaths) ? imagePaths : [imagePaths];
+    if (!paths.length) throw new Error('No bill image provided');
+
+    const imageTokens = paths.map(p => {
+        const ext = path.extname(p).toLowerCase();
+        const mimeType = MIME_TYPES[ext];
+        if (!mimeType) throw new Error(`Unsupported image type: ${ext}`);
+        const base64 = fs.readFileSync(p).toString('base64');
+        return `[IMAGE: data:${mimeType};base64,${base64}]`;
+    }).join('\n');
+
+    const pageNote = paths.length > 1 ? ` These ${paths.length} images are pages of ONE bill — combine them.` : '';
     const messages = [
         { role: 'system', content: BILL_EXTRACT_SYSTEM_PROMPT },
-        { role: 'user', content: `[IMAGE: data:${mimeType};base64,${base64}]\n\nExtract all data from this vendor bill image. Return JSON only.` }
+        { role: 'user', content: `${imageTokens}\n\nExtract all data from this vendor bill.${pageNote} Return JSON only.` }
     ];
 
     // Gemini first — it's the reliable provider (multimodal; buildGeminiPayload
@@ -82,7 +124,7 @@ async function scanBillImage(imagePath) {
     }
 
     try {
-        return JSON.parse(jsonStr);
+        return normalizeScan(JSON.parse(jsonStr));
     } catch (err) {
         throw new Error(`Failed to parse AI response as JSON: ${err.message}\nResponse: ${text.substring(0, 500)}`);
     }
@@ -360,4 +402,4 @@ function buildReconciliation(billItems, aiExtractedData) {
     return { lines, ai_extra: aiExtra, summary };
 }
 
-module.exports = { setPool, scanBillImage, matchProductsToZoho, verifyBillItems, buildReconciliation };
+module.exports = { setPool, scanBillImage, matchProductsToZoho, verifyBillItems, buildReconciliation, normalizeScan };
