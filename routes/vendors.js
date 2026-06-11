@@ -393,9 +393,12 @@ router.post('/bills',
             const subtotal = items.reduce((sum, it) => sum + (it.quantity * it.unit_price), 0);
             const grand_total = subtotal + (tax_amount || 0);
 
+            // Schema columns are entered_by + line_total (the old created_by/
+            // amount names made every INSERT crash — the feature never worked
+            // on prod until this fix).
             const [result] = await pool.query(
                 `INSERT INTO vendor_bills (vendor_id, bill_number, bill_date, due_date, subtotal, tax_amount, grand_total,
-                    balance_due, notes, bill_image, ai_extracted_data, created_by)
+                    balance_due, notes, bill_image, ai_extracted_data, entered_by)
                  VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
                 [vendor_id, finalBillNumber, bill_date || null, due_date || null, subtotal, tax_amount,
                  grand_total, grand_total, notes, bill_image || null,
@@ -406,11 +409,12 @@ router.post('/bills',
 
             // Insert items
             for (const item of items) {
-                const amount = item.quantity * item.unit_price;
+                const lineTotal = item.quantity * item.unit_price;
                 await pool.query(
-                    `INSERT INTO vendor_bill_items (bill_id, zoho_item_id, item_name, quantity, unit_price, amount, ai_matched, ai_confidence)
-                     VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-                    [billId, item.zoho_item_id || null, item.item_name, item.quantity, item.unit_price, amount, item.ai_matched, item.ai_confidence]
+                    `INSERT INTO vendor_bill_items (bill_id, zoho_item_id, item_name, quantity, unit_price, line_total, hsn_or_sac, ai_matched, ai_confidence)
+                     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+                    [billId, item.zoho_item_id || null, item.item_name, item.quantity, item.unit_price, lineTotal,
+                     item.hsn_or_sac || null, item.ai_matched, item.ai_confidence]
                 );
             }
 
@@ -481,14 +485,15 @@ router.put('/bills/:id/items',
             // Delete old items
             await pool.query('DELETE FROM vendor_bill_items WHERE bill_id = ?', [id]);
 
-            // Insert new items
+            // Insert new items (schema column is line_total, not amount)
             const subtotal = items.reduce((sum, it) => sum + (it.quantity * it.unit_price), 0);
             for (const item of items) {
-                const amount = item.quantity * item.unit_price;
+                const lineTotal = item.quantity * item.unit_price;
                 await pool.query(
-                    `INSERT INTO vendor_bill_items (bill_id, zoho_item_id, item_name, quantity, unit_price, amount, ai_matched, ai_confidence)
-                     VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-                    [id, item.zoho_item_id || null, item.item_name, item.quantity, item.unit_price, amount, item.ai_matched, item.ai_confidence]
+                    `INSERT INTO vendor_bill_items (bill_id, zoho_item_id, item_name, quantity, unit_price, line_total, hsn_or_sac, ai_matched, ai_confidence)
+                     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+                    [id, item.zoho_item_id || null, item.item_name, item.quantity, item.unit_price, lineTotal,
+                     item.hsn_or_sac || null, item.ai_matched, item.ai_confidence]
                 );
             }
 
@@ -565,9 +570,27 @@ router.post('/bills/:id/submit',
                 return res.status(400).json({ success: false, message: 'Bill must be verified or corrected before submission' });
             }
 
-            await pool.query(
-                `UPDATE vendor_bills SET ai_verification_status = 'verified', status = 'verified' WHERE id = ?`,
+            // HSN gate (owner requirement 2026-06-12): every line must be
+            // matched to a Zoho item AND carry an HSN before submission.
+            const [badItems] = await pool.query(
+                `SELECT item_name FROM vendor_bill_items
+                 WHERE bill_id = ? AND (zoho_item_id IS NULL OR COALESCE(hsn_or_sac, '') = '')`,
                 [id]
+            );
+            if (badItems.length) {
+                return res.status(400).json({
+                    success: false,
+                    code: 'HSN_GATE',
+                    message: `Cannot submit: ${badItems.length} item(s) missing a Zoho match or HSN code`,
+                    items: badItems.map(i => i.item_name),
+                });
+            }
+
+            // (schema has no `status` column — verified state lives in
+            // ai_verification_status + verified_at/verified_by)
+            await pool.query(
+                `UPDATE vendor_bills SET ai_verification_status = 'verified', verified_at = NOW(), verified_by = ? WHERE id = ?`,
+                [req.user.id, id]
             );
 
             res.json({ success: true, message: 'Bill submitted and marked as verified' });
@@ -599,6 +622,26 @@ router.post('/bills/:id/push-zoho',
             }
 
             const bill = bills[0];
+
+            // Push gates (owner requirement 2026-06-12): the bill must have
+            // passed verification, and every line must be matched + HSN'd —
+            // Zoho admin then approves the pushed bill on the Zoho side.
+            if (bill.ai_verification_status !== 'verified' && bill.ai_verification_status !== 'corrected') {
+                return res.status(400).json({ success: false, message: 'Bill must be verified before pushing to Zoho' });
+            }
+            const [gateItems] = await pool.query(
+                `SELECT item_name FROM vendor_bill_items
+                 WHERE bill_id = ? AND (zoho_item_id IS NULL OR COALESCE(hsn_or_sac, '') = '')`,
+                [id]
+            );
+            if (gateItems.length) {
+                return res.status(400).json({
+                    success: false,
+                    code: 'HSN_GATE',
+                    message: `Cannot push: ${gateItems.length} item(s) missing a Zoho match or HSN code`,
+                    items: gateItems.map(i => i.item_name),
+                });
+            }
 
             // Resolve Zoho contact — create if missing
             let zohoContactId = bill.zoho_contact_id;

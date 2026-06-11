@@ -465,7 +465,7 @@ router.post('/items/zoho-item/:id/push', requirePermission('zoho', 'manage'), as
         if (!id) return res.status(400).json({ success: false, message: 'Invalid item id' });
 
         const [rows] = await pool.query(
-            `SELECT zoho_item_id, zoho_item_name, zoho_sku, zoho_description, zoho_cf_dpl, zoho_rate
+            `SELECT zoho_item_id, zoho_item_name, zoho_sku, zoho_description, zoho_cf_dpl, zoho_rate, zoho_hsn_or_sac
                FROM zoho_items_map WHERE zoho_item_id = ?`, [id]
         );
         if (!rows.length) return res.status(404).json({ success: false, message: 'Item not found' });
@@ -479,6 +479,9 @@ router.post('/items/zoho-item/:id/push', requirePermission('zoho', 'manage'), as
         if (z.zoho_item_name)        changes.name = String(z.zoho_item_name).trim();
         if (z.zoho_sku)              changes.sku = String(z.zoho_sku).trim();
         if (z.zoho_description != null) changes.description = String(z.zoho_description).trim();
+        // Locally-edited HSN rides along (sync can't bring it back — LIST API
+        // omits hsn_or_sac — so the push is HSN's only outbound channel)
+        if (z.zoho_hsn_or_sac)       changes.hsn_or_sac = String(z.zoho_hsn_or_sac).trim();
 
         const result = await createBulkEditJob(
             [{ zoho_item_id: id, item_name: z.zoho_item_name || '', changes }],

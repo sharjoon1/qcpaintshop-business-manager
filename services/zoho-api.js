@@ -1376,7 +1376,10 @@ async function syncItems(triggeredBy = null) {
                         zoho_label_rate = VALUES(zoho_label_rate),
                         zoho_tax_name = VALUES(zoho_tax_name),
                         zoho_tax_percentage = VALUES(zoho_tax_percentage),
-                        zoho_hsn_or_sac = VALUES(zoho_hsn_or_sac),
+                        -- LIST responses omit hsn_or_sac too — COALESCE keeps a
+                        -- locally-backfilled / pushed HSN instead of nulling it
+                        -- on every sync cycle (same trap as the cf_* fields).
+                        zoho_hsn_or_sac = COALESCE(VALUES(zoho_hsn_or_sac), zoho_hsn_or_sac),
                         zoho_brand = VALUES(zoho_brand),
                         zoho_manufacturer = VALUES(zoho_manufacturer),
                         zoho_reorder_level = VALUES(zoho_reorder_level),

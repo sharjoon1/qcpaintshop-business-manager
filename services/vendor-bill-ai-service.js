@@ -28,12 +28,13 @@ const BILL_EXTRACT_SYSTEM_PROMPT = `You are an expert at reading vendor bills an
   "bill_number": "string",
   "bill_date": "YYYY-MM-DD",
   "items": [
-    { "name": "string", "quantity": number, "rate": number, "amount": number }
+    { "name": "string", "hsn_or_sac": "string or null", "quantity": number, "rate": number, "amount": number }
   ],
   "subtotal": number,
   "tax": number,
   "total": number
 }
+hsn_or_sac is the HSN/SAC code printed on the bill line (Indian GST bills usually have an HSN column, typically 4-8 digits); use null when the line has none.
 Return ONLY the JSON object. No explanations, no markdown formatting.`;
 
 async function scanBillImage(imagePath) {
@@ -93,10 +94,23 @@ function wordOverlapScore(a, b) {
 async function matchProductsToZoho(extractedItems, vendorId) {
     if (!extractedItems || extractedItems.length === 0) return [];
 
-    // Load all active Zoho items
+    // Load all active Zoho items (incl. HSN so each matched line carries the
+    // catalog HSN — the owner's gate compares it against the bill's printed HSN)
     const [zohoItems] = await pool.query(
-        `SELECT zoho_item_id, zoho_item_name, zoho_sku AS sku, zoho_brand AS brand, zoho_rate AS rate FROM zoho_items_map WHERE zoho_status = 'active'`
+        `SELECT zoho_item_id, zoho_item_name, zoho_sku AS sku, zoho_brand AS brand, zoho_rate AS rate,
+                zoho_hsn_or_sac AS hsn_or_sac
+         FROM zoho_items_map WHERE zoho_status = 'active'`
     );
+    const hsnById = new Map(zohoItems.map(z => [z.zoho_item_id, z.hsn_or_sac || null]));
+    const withHsn = (item, zohoItemId, fields) => ({
+        ...item,
+        zoho_item_id: zohoItemId,
+        // HSN preference: the catalog's HSN for the matched item; else what the
+        // AI read off the bill. The submit gate requires one of them.
+        hsn_or_sac: (zohoItemId && hsnById.get(zohoItemId)) || item.hsn_or_sac || null,
+        zoho_hsn: zohoItemId ? (hsnById.get(zohoItemId) || null) : null,
+        ...fields,
+    });
 
     // Load vendor history if vendorId provided
     let vendorHistory = [];
@@ -132,12 +146,12 @@ async function matchProductsToZoho(extractedItems, vendorId) {
 
         // Priority 1: Vendor history exact match
         if (historyMap.has(itemName)) {
-            return { ...item, zoho_item_id: historyMap.get(itemName), ai_matched: true, ai_confidence: 0.95 };
+            return withHsn(item, historyMap.get(itemName), { ai_matched: true, ai_confidence: 0.95 });
         }
 
         // Priority 2: Exact match on zoho_item_name
         if (exactNameMap.has(itemName)) {
-            return { ...item, zoho_item_id: exactNameMap.get(itemName), ai_matched: true, ai_confidence: 0.90 };
+            return withHsn(item, exactNameMap.get(itemName), { ai_matched: true, ai_confidence: 0.90 });
         }
 
         // Priority 3: Fuzzy match (contains or word overlap >= 0.5)
@@ -166,11 +180,11 @@ async function matchProductsToZoho(extractedItems, vendorId) {
         }
 
         if (bestMatch) {
-            return { ...item, zoho_item_id: bestMatch, ai_matched: true, ai_confidence: parseFloat((bestScore * 0.8).toFixed(2)) };
+            return withHsn(item, bestMatch, { ai_matched: true, ai_confidence: parseFloat((bestScore * 0.8).toFixed(2)) });
         }
 
         // No match
-        return { ...item, zoho_item_id: null, ai_matched: false, ai_confidence: 0 };
+        return withHsn(item, null, { ai_matched: false, ai_confidence: 0 });
     });
 }
 

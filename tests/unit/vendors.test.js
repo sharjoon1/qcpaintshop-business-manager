@@ -13,7 +13,7 @@
 // ai.rate compares against unit_price on DB rows (staff.rate kept for
 // AI-shaped callers).
 const { createVendorSchema, createBillSchema, recordPaymentSchema } = require('../../routes/vendors');
-const { verifyBillItems } = require('../../services/vendor-bill-ai-service');
+const { verifyBillItems, matchProductsToZoho, setPool } = require('../../services/vendor-bill-ai-service');
 
 describe('Vendor System', () => {
 
@@ -105,6 +105,29 @@ describe('Vendor System', () => {
             const result = verifyBillItems(staff, ai);
             expect(result.status).toBe('mismatch');
             expect(result.differences.some(d => d.field === 'rate')).toBe(true);
+        });
+
+        it('matchProductsToZoho attaches the catalog HSN to matched lines and keeps the bill HSN otherwise', async () => {
+            setPool({
+                query: jest.fn(async (sql) => {
+                    if (/FROM zoho_items_map/i.test(sql)) {
+                        return [[{ zoho_item_id: 'Z1', zoho_item_name: 'apex ultima 10l', sku: 'AP1', brand: 'Asian', rate: 2000, hsn_or_sac: '3209' }]];
+                    }
+                    return [[]];
+                }),
+            });
+            const out = await matchProductsToZoho([
+                { name: 'APEX ULTIMA 10L', hsn_or_sac: '9999', quantity: 1, rate: 1800, amount: 1800 },
+                { name: 'totally unknown thing', hsn_or_sac: '3208', quantity: 1, rate: 100, amount: 100 },
+            ], null);
+            // matched line: catalog HSN WINS over what the AI read off the bill
+            expect(out[0].zoho_item_id).toBe('Z1');
+            expect(out[0].hsn_or_sac).toBe('3209');
+            expect(out[0].zoho_hsn).toBe('3209');
+            // unmatched line: keeps the bill's printed HSN so the staff can fix the match
+            expect(out[1].zoho_item_id).toBeNull();
+            expect(out[1].hsn_or_sac).toBe('3208');
+            expect(out[1].ai_matched).toBe(false);
         });
 
         it('should detect quantity mismatch', () => {

@@ -1051,6 +1051,7 @@ async function scanBillWithAI() {
             quantity: it.quantity || 1,
             unit_price: it.unit_price || it.rate || 0,
             zoho_item_id: it.zoho_item_id || null,
+            hsn_or_sac: it.hsn_or_sac || '',
             ai_matched: it.ai_matched || false,
             ai_confidence: it.ai_confidence || 0
         }));
@@ -1070,7 +1071,7 @@ async function scanBillWithAI() {
 }
 
 function addBillItemRow() {
-    billItems.push({ item_name: '', quantity: 1, unit_price: 0, zoho_item_id: null, ai_matched: false, ai_confidence: 0 });
+    billItems.push({ item_name: '', quantity: 1, unit_price: 0, zoho_item_id: null, hsn_or_sac: '', ai_matched: false, ai_confidence: 0 });
     renderBillItems();
 }
 
@@ -1081,7 +1082,7 @@ function removeBillItem(idx) {
 }
 
 function updateBillItemField(idx, field, value) {
-    if (field === 'item_name') {
+    if (field === 'item_name' || field === 'hsn_or_sac') {
         billItems[idx][field] = value;
     } else {
         billItems[idx][field] = Number(value) || 0;
@@ -1101,7 +1102,11 @@ function renderBillItems() {
         <tr id="billItemRow${idx}" class="border-b border-gray-50">
             <td class="px-2 py-2">
                 <input type="text" value="${esc(item.item_name)}" class="qc-input w-full text-sm" placeholder="Item name" onchange="updateBillItemField(${idx},'item_name',this.value)">
-                ${item.ai_matched ? `<span class="ai-badge mt-1 inline-block">AI ${Math.round((item.ai_confidence || 0) * 100)}%</span>` : ''}
+                <div class="flex items-center gap-1 mt-1">
+                    ${item.ai_matched ? `<span class="ai-badge inline-block">AI ${Math.round((item.ai_confidence || 0) * 100)}%</span>` : '<span class="inline-block text-xs px-1.5 py-0.5 rounded bg-red-100 text-red-700">Unmatched</span>'}
+                    <input type="text" value="${esc(item.hsn_or_sac || '')}" class="qc-input text-xs" style="width:90px" placeholder="HSN" title="HSN/SAC — required before submit" onchange="updateBillItemField(${idx},'hsn_or_sac',this.value)">
+                    ${!(item.hsn_or_sac) ? '<span class="text-xs text-red-600 font-medium">HSN?</span>' : ''}
+                </div>
             </td>
             <td class="px-2 py-2"><input type="number" value="${item.quantity}" min="1" step="1" class="qc-input w-full text-center text-sm" onchange="updateBillItemField(${idx},'quantity',this.value)"></td>
             <td class="px-2 py-2"><input type="number" value="${item.unit_price}" min="0" step="0.01" class="qc-input w-full text-right text-sm" onchange="updateBillItemField(${idx},'unit_price',this.value)"></td>
@@ -1164,6 +1169,7 @@ async function submitBill() {
             item_name: i.item_name,
             quantity: Number(i.quantity) || 1,
             unit_price: Number(i.unit_price) || 0,
+            hsn_or_sac: (i.hsn_or_sac || '').trim() || null,
             ai_matched: i.ai_matched || false,
             ai_confidence: i.ai_confidence || 0
         })),

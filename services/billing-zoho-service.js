@@ -116,21 +116,36 @@ async function pushInvoiceToZoho(invoiceId, userId) {
         customerPhone: invoice.customer_phone
     });
 
-    // 4. Credit limit check (non-blocking)
-    try {
-        const { checkCreditBeforeInvoice } = require('../routes/credit-limits');
-        const creditResult = await checkCreditBeforeInvoice(pool, zohoContactId, invoice.grand_total);
-        if (creditResult && !creditResult.allowed) {
-            if (creditResult.reason && (creditResult.reason.includes('Credit limit') || creditResult.reason.includes('credit'))) {
-                throw new Error(creditResult.reason);
-            }
+    // 4. Push eligibility gate (owner policy 2026-06-12): an invoice may be
+    // pushed ONLY when it is fully PAID, or the customer has enough available
+    // credit limit to cover the outstanding balance. (Earlier the credit check
+    // was "non-blocking" and customers outside the credit system passed —
+    // unpaid zero-credit invoices could be pushed.)
+    const balanceDue = parseFloat(invoice.balance_due != null
+        ? invoice.balance_due
+        : (invoice.grand_total - (invoice.amount_paid || 0))) || 0;
+    if (invoice.payment_status !== 'paid' && balanceDue > 0.01) {
+        let credit = { allowed: false, reason: 'Customer is not in the credit system' };
+        try {
+            const { checkCreditBeforeInvoice } = require('../routes/credit-limits');
+            const result = await checkCreditBeforeInvoice(pool, zohoContactId, balanceDue);
+            if (result) credit = result;
+        } catch (err) {
+            credit = { allowed: false, reason: 'Credit check failed: ' + err.message };
         }
-    } catch (err) {
-        // Only re-throw credit-related errors
-        if (err.message && (err.message.includes('Credit limit') || err.message.includes('credit'))) {
-            throw err;
+        // checkCreditBeforeInvoice returns allowed:true for customers NOT in
+        // the credit system (permissive default other callers rely on). For
+        // the push gate, eligibility requires an actual evaluated limit —
+        // detected structurally by the credit_limit field being present.
+        const creditEligible = credit.allowed === true && credit.credit_limit != null;
+        if (!creditEligible) {
+            const gateErr = new Error(
+                `Invoice is not paid (balance ₹${balanceDue.toFixed(2)}) and the customer has no eligible credit — ${credit.reason}. ` +
+                'Record the payment first, or set a credit limit for this customer.'
+            );
+            gateErr.code = 'PUSH_GATE';
+            throw gateErr;
         }
-        // Swallow other errors (non-blocking)
     }
 
     // 5. Create Zoho invoice
