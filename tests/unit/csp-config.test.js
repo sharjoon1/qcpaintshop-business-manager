@@ -32,7 +32,9 @@ describe('STRICT_ENFORCED_PATHS allowlist', () => {
         expect(STRICT_ENFORCED_PATHS).toBeInstanceOf(Set);
         for (const p of STRICT_ENFORCED_PATHS) expect(p.startsWith('/')).toBe(true);
     });
-    it('includes the migrated estimate-edit.html shim', () => {
-        expect(STRICT_ENFORCED_PATHS.has('/estimate-edit.html')).toBe(true);
+    it('includes the migrated pages (estimate-edit shim + batch 1)', () => {
+        for (const p of ['/estimate-edit.html', '/forgot-password.html', '/reset-password.html', '/payment.html']) {
+            expect(STRICT_ENFORCED_PATHS.has(p)).toBe(true);
+        }
     });
 });

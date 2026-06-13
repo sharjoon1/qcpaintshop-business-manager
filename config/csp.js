@@ -64,7 +64,13 @@ const cspStrictDirectives = {
 // including any injected via innerHTML) + confirming ZERO Report-Only violations
 // for its path. Each entry is an exact req.path (leading slash).
 const STRICT_ENFORCED_PATHS = new Set([
-    '/estimate-edit.html', // redirect-only shim; inline script externalized 2026-06-13
+    '/estimate-edit.html',   // redirect-only shim; inline script externalized 2026-06-13
+    // Batch 1 (2026-06-13) — 0 inline on*= handlers, single inline <script>
+    // externalized to /js/pages/<name>.js; already used addEventListener + same-origin
+    // fetch. Each verified: 0 inline scripts remain, no on*= substring anywhere.
+    '/forgot-password.html',
+    '/reset-password.html',
+    '/payment.html',
 ]);
 
 module.exports = { SCRIPT_CDNS, cspDirectives, cspStrictDirectives, STRICT_ENFORCED_PATHS };
