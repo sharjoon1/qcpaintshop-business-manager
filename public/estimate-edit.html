@@ -8,15 +8,10 @@
     <meta http-equiv="Pragma" content="no-cache">
     <meta http-equiv="Expires" content="0">
     <title>Edit Estimate - Quality Colors</title>
-    <script>
-        // estimate-edit.html is superseded by estimate-create-new.html — this page
-        // only forwards (preserving ?id=). PAGE-050: its old inline editor was
-        // unreachable dead code (this redirect runs before <body>) that recomputed
-        // GST at 18%, violating the GST-INCLUSIVE policy (gst_amount must stay 0).
-        // Removed so that math can never be reached, re-enabled, or copied.
-        const id = new URLSearchParams(window.location.search).get('id');
-        window.location.replace('estimate-create-new.html' + (id ? '?id=' + id : ''));
-    </script>
+    <!-- Redirect logic externalized (S9+F5 Phase C) so this page runs under the
+         enforced strict CSP — no inline script. Kept in <head> without defer so it
+         still forwards before <body> renders. -->
+    <script src="/js/pages/estimate-edit.js"></script>
 </head>
 <body>
     <noscript><a href="estimate-create-new.html">Continue to the estimate editor</a></noscript>

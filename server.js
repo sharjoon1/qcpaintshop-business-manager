@@ -134,59 +134,30 @@ console.error = function(...args) {
 // JIT pipeline; postinstall builds public/css/tailwind.css). If a page
 // regresses to the CDN, the browser will block-and-report, not silently load.
 const helmet = require('helmet');
-// Script CDNs allowed today; shared between the enforced and strict policies.
-const SCRIPT_CDNS = [
-    "https://cdn.jsdelivr.net",
-    "https://cdnjs.cloudflare.com",
-    "https://unpkg.com",
-    "https://cdn.quilljs.com",
-    "https://cdn.socket.io",
-    "https://www.googletagmanager.com",
-    "https://www.youtube.com"
-];
-const cspDirectives = {
-    "default-src": ["'self'"],
-    "script-src": ["'self'", "'unsafe-inline'", ...SCRIPT_CDNS],
-    "script-src-attr": ["'unsafe-inline'"],
-    "style-src": [
-        "'self'", "'unsafe-inline'",
-        "https://fonts.googleapis.com",
-        "https://cdnjs.cloudflare.com",
-        "https://cdn.jsdelivr.net",
-        "https://cdn.quilljs.com",
-        "https://unpkg.com"
-    ],
-    "font-src": ["'self'", "data:", "https://fonts.gstatic.com", "https://cdnjs.cloudflare.com"],
-    "img-src": ["'self'", "data:", "blob:", "https:"],
-    "media-src": ["'self'", "blob:", "https:"],
-    "connect-src": ["'self'", "wss:", "https:"],
-    "frame-src": ["'self'", "https://www.youtube.com", "https://wa.me"],
-    "frame-ancestors": ["'self'"],
-    "object-src": ["'none'"],
-    "base-uri": ["'self'"],
-    "upgrade-insecure-requests": []
-};
+const { cspDirectives, cspStrictDirectives, STRICT_ENFORCED_PATHS } = require('./config/csp');
+
+// 1) Enforced, permissive (global) — still allows the inline scripts/handlers the
+//    un-migrated pages rely on. 'unsafe-eval' already dropped (Phase A).
 app.use(helmet({ contentSecurityPolicy: { useDefaults: true, directives: cspDirectives } }));
 
-// S9+F5 Phase A — Report-Only STRICT policy. Same as enforced but with the TARGET
-// script rules: no 'unsafe-inline' in script-src, and script-src-attr 'none' (no
-// inline on*= handlers). The browser does NOT block under Report-Only — it POSTs a
-// violation to report-uri, giving an exact, page-by-page inventory of every inline
-// script / handler that must be migrated before the enforced policy can be tightened
-// (Phases C/D). Remove this once enforced strict ships.
-const cspStrictDirectives = {
-    ...cspDirectives,
-    "script-src": ["'self'", "'report-sample'", ...SCRIPT_CDNS],
-    "script-src-attr": ["'none'"],
-    // Phase B target: drop the blanket wss:/https:. Audit (2026-06-13) found every
-    // browser network call is same-origin (/api/*) + socket.io to same origin
-    // ('self' covers same-origin ws/wss per CSP3); qrserver is an <img>, wa.me is
-    // navigation — neither is connect-src. Report-Only first so a missed target
-    // (e.g. a socket.io wss upgrade in some browser) reports instead of breaking.
-    "connect-src": ["'self'"],
-    "report-uri": ["/api/csp-report"]
-};
+// 2) Report-Only STRICT (global) — the TARGET policy: no 'unsafe-inline' in
+//    script-src, script-src-attr 'none', tightened connect-src. Browsers report
+//    (don't block) to /api/csp-report, building the exact page-by-page worklist of
+//    inline scripts/handlers to migrate (Phases C/D).
 app.use(helmet.contentSecurityPolicy({ useDefaults: true, reportOnly: true, directives: cspStrictDirectives }));
+
+// 3) Enforced STRICT (per-path, Phase E) — for pages already migrated to the
+//    strict policy (config/csp.js STRICT_ENFORCED_PATHS), upgrade the enforced
+//    header to strict and drop the now-redundant Report-Only one. Runs after the
+//    two global helmet middlewares so it overwrites the permissive enforced header.
+const cspStrictEnforced = helmet.contentSecurityPolicy({ useDefaults: true, directives: cspStrictDirectives });
+app.use((req, res, next) => {
+    if (STRICT_ENFORCED_PATHS.has(req.path)) {
+        res.removeHeader('Content-Security-Policy-Report-Only');
+        return cspStrictEnforced(req, res, next);
+    }
+    next();
+});
 
 // gzip / br response compression for /api/*
 app.use(require('compression')());
