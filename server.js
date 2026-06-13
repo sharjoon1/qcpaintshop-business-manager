@@ -122,50 +122,65 @@ console.error = function(...args) {
 // ========================================
 
 // Helmet sets security headers (X-Content-Type-Options, X-Frame-Options, etc.)
-// plus a permissive Content-Security-Policy that whitelists the third-party
-// CDNs in active use across the public/ pages. Stricter CSP (drop
-// 'unsafe-inline' / 'unsafe-eval', narrow connect-src) is a follow-up that
-// requires migrating remaining inline-script handlers first.
+// plus a Content-Security-Policy that whitelists the third-party CDNs in active
+// use across the public/ pages. S9+F5 hardening (docs/plans/2026-06-13-s9-f5-csp-
+// hardening-plan.md) Phase A: 'unsafe-eval' is DROPPED from the enforced policy
+// (audited: 0 eval/new Function in public/). 'unsafe-inline' still required by the
+// 152 inline <script> blocks + 2,863 inline on*= handlers — its removal is gated
+// on externalizing those (Phases C/D). A Report-Only STRICT policy (below) reports
+// what would break under the target policy so we can inventory the work precisely.
 // NOTE: CSP is allowlist-based, so any host NOT in script-src/style-src is
 // blocked by default — this includes cdn.tailwindcss.com (we use the local
 // JIT pipeline; postinstall builds public/css/tailwind.css). If a page
 // regresses to the CDN, the browser will block-and-report, not silently load.
-app.use(require('helmet')({
-    contentSecurityPolicy: {
-        useDefaults: true,
-        directives: {
-            "default-src": ["'self'"],
-            "script-src": [
-                "'self'", "'unsafe-inline'", "'unsafe-eval'",
-                "https://cdn.jsdelivr.net",
-                "https://cdnjs.cloudflare.com",
-                "https://unpkg.com",
-                "https://cdn.quilljs.com",
-                "https://cdn.socket.io",
-                "https://www.googletagmanager.com",
-                "https://www.youtube.com"
-            ],
-            "script-src-attr": ["'unsafe-inline'"],
-            "style-src": [
-                "'self'", "'unsafe-inline'",
-                "https://fonts.googleapis.com",
-                "https://cdnjs.cloudflare.com",
-                "https://cdn.jsdelivr.net",
-                "https://cdn.quilljs.com",
-                "https://unpkg.com"
-            ],
-            "font-src": ["'self'", "data:", "https://fonts.gstatic.com", "https://cdnjs.cloudflare.com"],
-            "img-src": ["'self'", "data:", "blob:", "https:"],
-            "media-src": ["'self'", "blob:", "https:"],
-            "connect-src": ["'self'", "wss:", "https:"],
-            "frame-src": ["'self'", "https://www.youtube.com", "https://wa.me"],
-            "frame-ancestors": ["'self'"],
-            "object-src": ["'none'"],
-            "base-uri": ["'self'"],
-            "upgrade-insecure-requests": []
-        }
-    }
-}));
+const helmet = require('helmet');
+// Script CDNs allowed today; shared between the enforced and strict policies.
+const SCRIPT_CDNS = [
+    "https://cdn.jsdelivr.net",
+    "https://cdnjs.cloudflare.com",
+    "https://unpkg.com",
+    "https://cdn.quilljs.com",
+    "https://cdn.socket.io",
+    "https://www.googletagmanager.com",
+    "https://www.youtube.com"
+];
+const cspDirectives = {
+    "default-src": ["'self'"],
+    "script-src": ["'self'", "'unsafe-inline'", ...SCRIPT_CDNS],
+    "script-src-attr": ["'unsafe-inline'"],
+    "style-src": [
+        "'self'", "'unsafe-inline'",
+        "https://fonts.googleapis.com",
+        "https://cdnjs.cloudflare.com",
+        "https://cdn.jsdelivr.net",
+        "https://cdn.quilljs.com",
+        "https://unpkg.com"
+    ],
+    "font-src": ["'self'", "data:", "https://fonts.gstatic.com", "https://cdnjs.cloudflare.com"],
+    "img-src": ["'self'", "data:", "blob:", "https:"],
+    "media-src": ["'self'", "blob:", "https:"],
+    "connect-src": ["'self'", "wss:", "https:"],
+    "frame-src": ["'self'", "https://www.youtube.com", "https://wa.me"],
+    "frame-ancestors": ["'self'"],
+    "object-src": ["'none'"],
+    "base-uri": ["'self'"],
+    "upgrade-insecure-requests": []
+};
+app.use(helmet({ contentSecurityPolicy: { useDefaults: true, directives: cspDirectives } }));
+
+// S9+F5 Phase A — Report-Only STRICT policy. Same as enforced but with the TARGET
+// script rules: no 'unsafe-inline' in script-src, and script-src-attr 'none' (no
+// inline on*= handlers). The browser does NOT block under Report-Only — it POSTs a
+// violation to report-uri, giving an exact, page-by-page inventory of every inline
+// script / handler that must be migrated before the enforced policy can be tightened
+// (Phases C/D). Remove this once enforced strict ships.
+const cspStrictDirectives = {
+    ...cspDirectives,
+    "script-src": ["'self'", "'report-sample'", ...SCRIPT_CDNS],
+    "script-src-attr": ["'none'"],
+    "report-uri": ["/api/csp-report"]
+};
+app.use(helmet.contentSecurityPolicy({ useDefaults: true, reportOnly: true, directives: cspStrictDirectives }));
 
 // gzip / br response compression for /api/*
 app.use(require('compression')());
@@ -212,6 +227,43 @@ app.use(cors({
 }));
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ limit: '10mb', extended: true }));
+
+// S9+F5 Phase A — CSP violation sink for the Report-Only strict policy above.
+// Deduped by (page, directive, sample) with a hit counter so the 2,863 inline
+// handlers don't flood; capped buffer. Read via GET /api/csp-report (admin) to
+// build the Phase C/D migration worklist. Mounted BEFORE the global limiter so a
+// burst of legitimate reports isn't throttled; its own body cap bounds abuse.
+global._cspReportBuffer = global._cspReportBuffer || new Map();
+app.post('/api/csp-report',
+    express.json({ type: ['application/csp-report', 'application/reports+json', 'application/json'], limit: '64kb' }),
+    (req, res) => {
+        try {
+            const body = req.body || {};
+            // Classic report-uri shape: { "csp-report": {...} }. report-to shape:
+            // [{ type:'csp-violation', body:{...} }]. Normalize both.
+            const reports = Array.isArray(body)
+                ? body.map(r => r && r.body).filter(Boolean)
+                : [body['csp-report'] || body];
+            for (const r of reports) {
+                if (!r) continue;
+                const page = r['document-uri'] || r.documentURL || 'unknown';
+                const directive = r['violated-directive'] || r['effective-directive'] || r.effectiveDirective || 'unknown';
+                const sample = (r['script-sample'] || r.sample || r['blocked-uri'] || r.blockedURL || '').toString().slice(0, 120);
+                const key = `${directive} | ${page.replace(/^https?:\/\/[^/]+/, '')} | ${sample}`;
+                const prev = global._cspReportBuffer.get(key);
+                if (prev) { prev.count++; prev.last = new Date().toISOString(); }
+                else if (global._cspReportBuffer.size < 1000) {
+                    global._cspReportBuffer.set(key, { directive, page, sample, count: 1, last: new Date().toISOString() });
+                }
+            }
+        } catch { /* never let a malformed report 500 */ }
+        res.status(204).end();
+    }
+);
+app.get('/api/csp-report', requireAuth, requireRole('admin', 'administrator', 'super_admin'), (req, res) => {
+    const rows = Array.from(global._cspReportBuffer.values()).sort((a, b) => b.count - a.count);
+    res.json({ success: true, total: rows.length, violations: rows });
+});
 
 // Rate limiting — global on all API routes
 app.use('/api', globalLimiter);
