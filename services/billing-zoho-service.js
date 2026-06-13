@@ -6,6 +6,7 @@
  */
 
 const zohoAPI = require('./zoho-api');
+const { logCreditViolation } = require('./credit-violation-log');
 
 let pool;
 let pointsEngine;
@@ -187,6 +188,24 @@ async function pushInvoiceToZoho(invoiceId, userId, options = {}) {
         // detected structurally by the credit_limit field being present.
         const creditEligible = credit.allowed === true && credit.credit_limit != null;
         if (!creditEligible) {
+            // Leave an audit trail of the refused push (owner queued follow-up).
+            // Best-effort — a logging failure must never mask the gate decision.
+            try {
+                await logCreditViolation(pool, {
+                    customerId: invoice.customer_id,
+                    zohoCustomerMapId: credit.zoho_customer_map_id,
+                    invoiceNumber: invoice.invoice_number,
+                    attemptedAmount: balanceDue,
+                    creditLimit: credit.credit_limit,
+                    creditUsed: credit.outstanding,
+                    availableCredit: credit.available,
+                    staffId: userId,
+                    branchId: invoice.branch_id,
+                    actionTaken: 'blocked',
+                });
+            } catch (logErr) {
+                console.error('[billing-zoho] credit violation log failed:', logErr.message);
+            }
             const gateErr = new Error(
                 `Invoice is not paid (balance ₹${balanceDue.toFixed(2)}) and the customer has no eligible credit — ${credit.reason}. ` +
                 'Record the payment first, or set a credit limit for this customer.'
@@ -278,13 +297,33 @@ async function pushInvoiceToZoho(invoiceId, userId, options = {}) {
         `UPDATE billing_invoices
          SET zoho_status = ?, zoho_invoice_id = ?, zoho_invoice_number = ?,
              zoho_salesperson_id = ?, zoho_salesperson_name = ?,
-             zoho_location_id = ?, zoho_location_name = ?
+             zoho_location_id = ?, zoho_location_name = ?, zoho_approval_state = ?
          WHERE id = ?`,
-        ['pushed', zohoInvoiceId, zohoInvoiceNumber, salespersonId, salespersonName, locationId, locationName, invoiceId]
+        ['pushed', zohoInvoiceId, zohoInvoiceNumber, salespersonId, salespersonName, locationId, locationName, finalizeState, invoiceId]
     );
 
     // 9. Return result
     return { zohoInvoiceId, zohoInvoiceNumber, salespersonId, salespersonName, locationId, locationName, zohoState: finalizeState, pointsResult };
 }
 
-module.exports = { setPool, setPointsEngine, resolveZohoContact, pushInvoiceToZoho };
+/**
+ * Approval sync-back: pull a pushed invoice's CURRENT Zoho lifecycle status and
+ * store it locally, so an admin approving a staff-submitted invoice in Zoho's own
+ * UI is reflected here. No-op (returns null) for invoices not yet pushed to Zoho.
+ * @param {number} invoiceId - billing_invoices.id
+ * @returns {Promise<string|null>} the refreshed Zoho status, or null
+ */
+async function syncInvoiceApprovalState(invoiceId) {
+    const [rows] = await pool.query(
+        'SELECT zoho_invoice_id FROM billing_invoices WHERE id = ?',
+        [invoiceId]
+    );
+    if (!rows.length || !rows[0].zoho_invoice_id) return null;
+    const state = await zohoAPI.getDocumentStatus('invoice', rows[0].zoho_invoice_id);
+    if (state) {
+        await pool.query('UPDATE billing_invoices SET zoho_approval_state = ? WHERE id = ?', [state, invoiceId]);
+    }
+    return state;
+}
+
+module.exports = { setPool, setPointsEngine, resolveZohoContact, pushInvoiceToZoho, syncInvoiceApprovalState };

@@ -1277,6 +1277,26 @@ router.post('/invoices/:id/push-zoho',
     }
 );
 
+// Approval sync-back: pull a pushed invoice's current Zoho lifecycle status (an
+// admin may have approved a staff-submitted invoice in Zoho's own UI) and reflect
+// it locally on billing_invoices.zoho_approval_state.
+router.post('/invoices/:id/sync-zoho-status',
+    requirePermission('billing', 'invoice'),
+    validateParams(idParamSchema),
+    async (req, res) => {
+        try {
+            const state = await billingZohoService.syncInvoiceApprovalState(req.params.id);
+            if (!state) {
+                return res.status(400).json({ success: false, message: 'Invoice is not pushed to Zoho yet' });
+            }
+            res.json({ success: true, zoho_approval_state: state, message: `Zoho status: ${state}` });
+        } catch (error) {
+            console.error('Sync invoice Zoho status error:', error);
+            res.status(500).json({ success: false, message: error.message || 'Failed to sync Zoho status' });
+        }
+    }
+);
+
 // ═══════════════════════════════════════════
 
 // calculateTotals + schemas + paymentExceedsBalance exported for unit testing

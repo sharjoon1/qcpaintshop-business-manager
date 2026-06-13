@@ -1089,8 +1089,8 @@ router.post('/bills/:id/push-zoho',
             const fin = await zohoAPI.finalizeDocument('bill', zohoBillId, admin);
 
             await pool.query(
-                `UPDATE vendor_bills SET zoho_status = 'pushed', zoho_bill_id = ?, zoho_location_id = ?, zoho_location_name = ? WHERE id = ?`,
-                [zohoBillId || null, pushLocationId, pushLocationName, id]
+                `UPDATE vendor_bills SET zoho_status = 'pushed', zoho_bill_id = ?, zoho_location_id = ?, zoho_location_name = ?, zoho_approval_state = ? WHERE id = ?`,
+                [zohoBillId || null, pushLocationId, pushLocationName, fin.state, id]
             );
 
             const stateMsg = fin.state === 'approved' ? 'created & approved in Zoho'
@@ -1101,6 +1101,31 @@ router.post('/bills/:id/push-zoho',
         } catch (error) {
             console.error('Push bill to Zoho error:', error);
             res.status(500).json({ success: false, message: 'Failed to push bill to Zoho' });
+        }
+    }
+);
+
+// Approval sync-back: pull a pushed bill's current Zoho lifecycle status (an admin
+// may have approved a staff-submitted bill in Zoho's own UI) and reflect it
+// locally on vendor_bills.zoho_approval_state.
+router.post('/bills/:id/sync-zoho-status',
+    managePerm,
+    validateParams(idParamSchema),
+    async (req, res) => {
+        try {
+            const [rows] = await pool.query('SELECT zoho_bill_id FROM vendor_bills WHERE id = ? AND deleted_at IS NULL', [req.params.id]);
+            if (!rows.length || !rows[0].zoho_bill_id) {
+                return res.status(400).json({ success: false, message: 'Bill is not pushed to Zoho yet' });
+            }
+            const state = await zohoAPI.getDocumentStatus('bill', rows[0].zoho_bill_id);
+            if (!state) {
+                return res.status(502).json({ success: false, message: 'Could not read status from Zoho' });
+            }
+            await pool.query('UPDATE vendor_bills SET zoho_approval_state = ? WHERE id = ?', [state, req.params.id]);
+            res.json({ success: true, zoho_approval_state: state, message: `Zoho status: ${state}` });
+        } catch (error) {
+            console.error('Sync bill Zoho status error:', error);
+            res.status(500).json({ success: false, message: 'Failed to sync Zoho status' });
         }
     }
 );

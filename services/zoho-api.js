@@ -2513,6 +2513,26 @@ async function finalizeDocument(kind, docId, isAdmin) {
     }
 }
 
+// Read a pushed doc's CURRENT lifecycle status from Zoho (approval sync-back):
+// after a staff push the doc is "submitted"; an admin approving it in Zoho's own
+// UI flips it to "approved"/"open" — this lets us pull that back locally. Returns
+// Zoho's status string (e.g. draft|submitted|approved|open|sent|overdue|paid|void)
+// or null if it can't be read.
+async function getDocumentStatus(kind, docId) {
+    if (!docId) return null;
+    try {
+        if (kind === 'bill') {
+            const r = await getBill(docId);
+            return (r && r.bill && r.bill.status) || null;
+        }
+        const r = await getInvoice(docId);
+        return (r && r.invoice && r.invoice.status) || null;
+    } catch (err) {
+        console.error(`Zoho getDocumentStatus ${kind} ${docId} failed:`, err.message);
+        return null;
+    }
+}
+
 async function getPurchaseOrders(params = {}) {
     const orgId = process.env.ZOHO_ORGANIZATION_ID;
     return await apiGet('/purchaseorders', { organization_id: orgId, ...params });
@@ -2684,6 +2704,7 @@ module.exports = {
     approveInvoice,
     markInvoiceSent,
     finalizeDocument,
+    getDocumentStatus,
     voidInvoice,
     voidBill,
     markPOCancelled,

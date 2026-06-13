@@ -19,6 +19,7 @@ const { generatePainterEstimatePDF } = require('../painter-estimate-pdf-generato
 const attendanceService = require('../../services/painter-attendance-service');
 const audit = require('../../services/audit-log');
 const { logEstimateStatusChange, toISTDateString } = require('./shared');
+const { logCreditViolation } = require('../../services/credit-violation-log');
 
 let pool;
 let sessionManager;
@@ -2018,14 +2019,20 @@ router.post('/estimates/:estimateId/push-zoho', requirePermission('painters', 'e
             const { checkCreditBeforeInvoice } = require('../credit-limits');
             const creditCheck = await checkCreditBeforeInvoice(pool, zohoContactId, parseFloat(estimate.grand_total));
             if (!creditCheck.allowed) {
-                // Log violation
+                // Log violation (real prod columns — see services/credit-violation-log.js;
+                // this path used to insert nonexistent columns and silently throw).
                 try {
-                    await pool.query(
-                        `INSERT INTO credit_limit_violations (zoho_customer_map_id, violation_type, invoice_amount, credit_limit, credit_used, staff_id)
-                         VALUES (?, ?, ?, ?, ?, ?)`,
-                        [creditCheck.zoho_customer_map_id || null, creditCheck.no_limit_set ? 'no_limit' : 'exceeded',
-                         parseFloat(estimate.grand_total), creditCheck.credit_limit || 0, creditCheck.outstanding || 0, req.user.id]
-                    );
+                    await logCreditViolation(pool, {
+                        zohoCustomerMapId: creditCheck.zoho_customer_map_id,
+                        invoiceNumber: estimate.estimate_number,
+                        attemptedAmount: parseFloat(estimate.grand_total),
+                        creditLimit: creditCheck.credit_limit,
+                        creditUsed: creditCheck.outstanding,
+                        availableCredit: creditCheck.available,
+                        staffId: req.user.id,
+                        branchId: estimate.branch_id,
+                        actionTaken: creditCheck.no_limit_set ? 'no_limit' : 'blocked',
+                    });
                 } catch (logErr) { console.error('Credit violation log error:', logErr.message); }
 
                 return res.status(403).json({

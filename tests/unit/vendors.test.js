@@ -260,8 +260,26 @@ describe('Vendor System', () => {
             '20260612_vendor_bill_discount.js',
             '20260612_zoho_location_salesperson.js',
             '20260612_soft_delete_invoices_bills.js',
+            '20260613_zoho_approval_state.js',
         ])('%s exports an up() function', (file) => {
             expect(typeof require(`../../migrations/${file}`).up).toBe('function');
+        });
+
+        it('20260613_zoho_approval_state up() adds the column only when missing (idempotent)', async () => {
+            const ddl = [];
+            const pool = {
+                query: async (sql) => {
+                    const s = String(sql);
+                    if (/information_schema\.TABLES/.test(s)) return [[{ 1: 1 }]];        // table exists
+                    if (/information_schema\.COLUMNS/.test(s)) return [[]];               // column missing
+                    if (/^ALTER TABLE/.test(s)) { ddl.push(s); return [{}]; }
+                    return [[]];
+                }
+            };
+            await require('../../migrations/20260613_zoho_approval_state.js').up(pool);
+            // one ALTER per table (billing_invoices + vendor_bills)
+            expect(ddl.length).toBe(2);
+            expect(ddl.every(s => /ADD COLUMN zoho_approval_state VARCHAR\(20\)/.test(s))).toBe(true);
         });
     });
 

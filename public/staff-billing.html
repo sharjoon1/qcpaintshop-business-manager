@@ -1145,6 +1145,7 @@ async function viewInvoice(id) {
             <div class="flex items-center gap-2 flex-wrap mb-4">
                 <span class="status-pill status-${inv.payment_status}">${inv.payment_status}</span>
                 ${inv.zoho_status ? `<span class="status-pill status-${esc(inv.zoho_status)}">zoho ${esc(inv.zoho_status)}</span>` : ''}
+                ${inv.zoho_status === 'pushed' && inv.zoho_approval_state ? `<span class="status-pill status-${esc(inv.zoho_approval_state)}">approval: ${esc(inv.zoho_approval_state)}</span>` : ''}
                 ${inv.zoho_invoice_number ? `<span class="status-pill status-pushed">${esc(inv.zoho_invoice_number)}</span>` : ''}
                 <span class="text-sm text-gray-500">${formatDate(inv.created_at)}</span>
                 ${inv.created_by_name ? `<span class="text-sm text-gray-400">&middot; ${esc(inv.created_by_name)}</span>` : ''}
@@ -1209,6 +1210,8 @@ async function viewInvoice(id) {
         }
         if (inv.zoho_status !== 'pushed') {
             actions.innerHTML += `<button onclick="closeDetailModal(); pushToZoho(${inv.id}, '${esc(inv.payment_status)}', ${Number(inv.balance_due) || 0}, '${esc(inv.customer_type || '')}', '${esc(inv.painter_salesperson_id || '')}')" class="btn-green-outline px-4 py-2 rounded-lg text-sm font-medium">Push to Zoho</button>`;
+        } else {
+            actions.innerHTML += `<button onclick="syncInvoiceZohoStatus(${inv.id})" class="btn-green-outline px-4 py-2 rounded-lg text-sm font-medium">↻ Sync Zoho status</button>`;
         }
         // Delete/Void — only for unpaid invoices (a paid one can't be removed).
         if (inv.payment_status === 'unpaid') {
@@ -1304,6 +1307,20 @@ async function deleteInvoice(invoiceId, pushed) {
         loadInvoices(invoicePage);
     } catch (e) {
         showToast(e.message || 'Delete failed', 'error');
+    }
+}
+
+// Pull the invoice's current approval state from Zoho (an admin may have approved
+// a staff-submitted invoice in Zoho's own UI) and refresh the detail view.
+async function syncInvoiceZohoStatus(invoiceId) {
+    try {
+        const res = await fetch(`${API}/invoices/${invoiceId}/sync-zoho-status`, { method: 'POST', headers });
+        const data = await res.json();
+        if (!data.success) throw new Error(data.message || 'Sync failed');
+        showToast(data.message || 'Zoho status refreshed', 'success');
+        viewInvoice(invoiceId);
+    } catch (e) {
+        showToast(e.message || 'Sync failed', 'error');
     }
 }
 
