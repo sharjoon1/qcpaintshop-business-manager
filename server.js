@@ -178,6 +178,12 @@ const cspStrictDirectives = {
     ...cspDirectives,
     "script-src": ["'self'", "'report-sample'", ...SCRIPT_CDNS],
     "script-src-attr": ["'none'"],
+    // Phase B target: drop the blanket wss:/https:. Audit (2026-06-13) found every
+    // browser network call is same-origin (/api/*) + socket.io to same origin
+    // ('self' covers same-origin ws/wss per CSP3); qrserver is an <img>, wa.me is
+    // navigation — neither is connect-src. Report-Only first so a missed target
+    // (e.g. a socket.io wss upgrade in some browser) reports instead of breaking.
+    "connect-src": ["'self'"],
     "report-uri": ["/api/csp-report"]
 };
 app.use(helmet.contentSecurityPolicy({ useDefaults: true, reportOnly: true, directives: cspStrictDirectives }));
