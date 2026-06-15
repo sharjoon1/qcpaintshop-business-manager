@@ -11,7 +11,7 @@
     <link rel="apple-touch-icon" href="/icons/icon-192x192.png">
     <title>My Estimates - Staff Portal</title>
     <script src="/js/auth-helper.js?v=7101c516"></script>
-    <script>checkAuthOrRedirect();</script>
+    <script src="/js/pages/staff-estimates-authguard.js"></script>
     <link rel="stylesheet" href="/css/tailwind.css?v=849f1b5c">
     <style>
         .gradient-bg {
@@ -73,15 +73,7 @@
         </div>
     </div>
 
-    <script>
-        document.getElementById('mobileMenuBtn').addEventListener('click', function() {
-            document.getElementById('mobileMenu').classList.toggle('hidden');
-        });
-
-        document.getElementById('profileBtn').addEventListener('click', function() {
-            document.getElementById('profileDropdown').classList.toggle('hidden');
-        });
-    </script>
+    <script src="/js/pages/staff-estimates.js"></script>
     <script src="/components/logo-loader.js"></script>
 </body>
 </html>

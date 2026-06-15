@@ -37,4 +37,17 @@ describe('STRICT_ENFORCED_PATHS allowlist', () => {
             expect(STRICT_ENFORCED_PATHS.has(p)).toBe(true);
         }
     });
+    it('includes the batch-2 pages (zero-handler, audited + adversarially verified)', () => {
+        for (const p of [
+            '/404.html', '/privacy-policy.html', '/birla-opus-report.html',
+            '/', '/index.html',
+            '/engineer-cart.html', '/engineer-login.html', '/engineer-profile.html', '/engineer-register.html',
+            '/staff-estimates.html',
+        ]) {
+            expect(STRICT_ENFORCED_PATHS.has(p)).toBe(true);
+        }
+    });
+    it('still EXCLUDES admin-reports.html (blocked on shared nav externalization)', () => {
+        expect(STRICT_ENFORCED_PATHS.has('/admin-reports.html')).toBe(false);
+    });
 });

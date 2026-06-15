@@ -71,6 +71,26 @@ const STRICT_ENFORCED_PATHS = new Set([
     '/forgot-password.html',
     '/reset-password.html',
     '/payment.html',
+    // Batch 2 (2026-06-15) — 9 zero-handler pages, audited + adversarially verified
+    // (full JS-graph scan: no runtime-injected on*= handlers, all calls same-origin,
+    // no eval, only allowlisted/self script srcs). Pure-static (no JS at all):
+    '/404.html',
+    '/privacy-policy.html',
+    '/birla-opus-report.html',
+    // Single inline <script> externalized to /js/pages/<name>.js (verbatim moves):
+    '/',                       // root serves index.html (express.static default)
+    '/index.html',
+    '/engineer-cart.html',     // each loads engineer-portal.js (terminal, clean) + page JS
+    '/engineer-login.html',
+    '/engineer-profile.html',
+    '/engineer-register.html',
+    // Two inline scripts externalized: a SYNC auth-guard (staff-estimates-authguard.js,
+    // non-deferred, runs after auth-helper.js) + the header UI wiring (staff-estimates.js):
+    '/staff-estimates.html',
+    // NOTE: admin-reports.html is deliberately EXCLUDED — it loads universal-nav-loader.js,
+    // which re-injects component inline <script> blocks (script-src violation) and injects
+    // 22+ inline on*= handlers from /components/*.html nav fragments. It cannot flip to
+    // strict until the shared nav infra is externalized (separate S9+F5 task).
 ]);
 
 module.exports = { SCRIPT_CDNS, cspDirectives, cspStrictDirectives, STRICT_ENFORCED_PATHS };
