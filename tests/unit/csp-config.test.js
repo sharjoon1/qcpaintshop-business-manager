@@ -1,7 +1,10 @@
 /**
  * Locks the CSP hardening invariants (S9+F5) so a future edit can't silently
- * re-loosen the strict policy or flip a page to enforced-strict before it's clean.
+ * re-loosen the strict policy, flip a page to enforced-strict before it's clean,
+ * or re-introduce inline scripts/handlers into the shared-nav fragments.
  */
+const fs = require('fs');
+const path = require('path');
 const { cspDirectives, cspStrictDirectives, STRICT_ENFORCED_PATHS } = require('../../config/csp');
 
 describe('CSP enforced (permissive) policy', () => {
@@ -47,7 +50,28 @@ describe('STRICT_ENFORCED_PATHS allowlist', () => {
             expect(STRICT_ENFORCED_PATHS.has(p)).toBe(true);
         }
     });
-    it('still EXCLUDES admin-reports.html (blocked on shared nav externalization)', () => {
-        expect(STRICT_ENFORCED_PATHS.has('/admin-reports.html')).toBe(false);
+    it('now INCLUDES admin-reports.html (shared-nav externalization complete — N5 proof flip)', () => {
+        expect(STRICT_ENFORCED_PATHS.has('/admin-reports.html')).toBe(true);
     });
+});
+
+describe('Shared-nav externalization (N1-N4)', () => {
+    const ROOT = path.join(__dirname, '..', '..');
+    // Every nav component whose inline <script> was externalized to /js/nav/<name>.js.
+    const CASES = [
+        'header-v2', 'sidebar-complete', 'staff-sidebar',
+        'zoho-subnav', 'whatsapp-subnav', 'system-subnav', 'staff-work-subnav',
+        'sales-subnav', 'salary-subnav', 'products-subnav', 'painters-subnav',
+        'marketing-subnav', 'leads-subnav', 'branches-subnav', 'attendance-subnav',
+    ];
+    for (const name of CASES) {
+        it(`components/${name}.html is strict-clean (0 inline <script>, 0 on*=)`, () => {
+            const frag = fs.readFileSync(path.join(ROOT, 'public', 'components', name + '.html'), 'utf8');
+            expect((frag.match(/<script/g) || []).length).toBe(0);
+            expect((frag.match(/on(click|change|input|submit|focus|blur|keydown|keyup|keypress|load)=/g) || []).length).toBe(0);
+        });
+        it(`js/nav/${name}.js exists (externalized JS)`, () => {
+            expect(fs.existsSync(path.join(ROOT, 'public', 'js', 'nav', name + '.js'))).toBe(true);
+        });
+    }
 });

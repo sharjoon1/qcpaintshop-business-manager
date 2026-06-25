@@ -87,10 +87,13 @@ const STRICT_ENFORCED_PATHS = new Set([
     // Two inline scripts externalized: a SYNC auth-guard (staff-estimates-authguard.js,
     // non-deferred, runs after auth-helper.js) + the header UI wiring (staff-estimates.js):
     '/staff-estimates.html',
-    // NOTE: admin-reports.html is deliberately EXCLUDED — it loads universal-nav-loader.js,
-    // which re-injects component inline <script> blocks (script-src violation) and injects
-    // 22+ inline on*= handlers from /components/*.html nav fragments. It cannot flip to
-    // strict until the shared nav infra is externalized (separate S9+F5 task).
+    // Shared-nav externalization (2026-06-25): universal-nav-loader.js now loads every nav
+    // component's JS as a real external <script src> (no inline re-injection), so nav-loader
+    // pages are strict-clean. admin-reports.html — the canonical previously-blocked page — is
+    // flipped here as proof; its 2 inline auth-guard <script> blocks were externalized to
+    // /js/pages/admin-reports-authguard.js. The remaining ~100 nav-loader pages flip per-path
+    // as each page's own inline JS is externalized (Phase E, incremental).
+    '/admin-reports.html',
 ]);
 
 module.exports = { SCRIPT_CDNS, cspDirectives, cspStrictDirectives, STRICT_ENFORCED_PATHS };
