@@ -61,8 +61,9 @@
         '/components/leads-subnav.html':       '/js/nav/leads-subnav.js',
         '/components/branches-subnav.html':    '/js/nav/branches-subnav.js',
         '/components/attendance-subnav.html':  '/js/nav/attendance-subnav.js',
-        // Header externalized in N4 (uncomment then):
-        // '/components/header-v2.html':        '/js/nav/header-v2.js',
+        // Header + sidebars externalized (N2-N4). All 15 nav components now load
+        // their JS as external <script src> — strict-CSP-legal end to end.
+        '/components/header-v2.html':        '/js/nav/header-v2.js',
         '/components/sidebar-complete.html': '/js/nav/sidebar-complete.js',
         '/components/staff-sidebar.html':    '/js/nav/staff-sidebar.js',
     };
