@@ -121,6 +121,17 @@ const STRICT_ENFORCED_PATHS = new Set([
     '/admin-wa-dashboard.html',
     '/admin-wa-settings.html',
     '/staff/advance-request.html',
+    // Batch 5 (2026-06-25) — mid-handler nav-loader admin pages (10-12 handlers each). Each had head
+    // auth-guard + page-logic externalized (authguard.js SYNC + page.js verbatim) + all static handlers
+    // converted to addEventListener + all RUNTIME-injected handlers (innerHTML templates) converted to
+    // data-action + dataset + delegated listeners. Externalized via workflow; mechanically verified
+    // (0 inline <script>, 0 on*= per page; all 12 .js syntax-valid; residuals are comments only).
+    '/admin-salary-config.html',
+    '/admin-activity-monitor.html',
+    '/admin-engineers.html',
+    '/admin-lead-scoring.html',
+    '/admin-zoho-reports.html',
+    '/admin-whatsapp-sessions.html',
 ]);
 
 module.exports = { SCRIPT_CDNS, cspDirectives, cspStrictDirectives, STRICT_ENFORCED_PATHS };
