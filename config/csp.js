@@ -168,6 +168,19 @@ const STRICT_ENFORCED_PATHS = new Set([
     '/admin-branches.html',
     '/admin-categories.html',
     '/admin-customers.html',
+    // Batch 10 (2026-06-25) — 7 more mid-handler nav-loader pages (7-8 handlers). Same pattern:
+    // head auth-guard + page-logic externalized (authguard.js SYNC + page.js verbatim); all static
+    // handlers → addEventListener, all runtime-injected handlers → data-action + dataset + delegated
+    // listeners. One page (admin-brands) also delegates a capture-phase `error` listener for the
+    // runtime-rendered brand-logo <img> fallback (error events don't bubble). Mechanically verified
+    // (0 inline <script>, 0 live on*= per page; all 14 .js syntax-valid; residuals are comments only).
+    '/admin-roles.html',
+    '/admin-role-permissions.html',
+    '/admin-zoho-bulk-jobs.html',
+    '/admin-zoho-expenses.html',
+    '/staff/agreement.html',
+    '/staff/clock-in.html',
+    '/admin-brands.html',
 ]);
 
 module.exports = { SCRIPT_CDNS, cspDirectives, cspStrictDirectives, STRICT_ENFORCED_PATHS };
