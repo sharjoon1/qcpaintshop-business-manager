@@ -94,6 +94,24 @@ const STRICT_ENFORCED_PATHS = new Set([
     // /js/pages/admin-reports-authguard.js. The remaining ~100 nav-loader pages flip per-path
     // as each page's own inline JS is externalized (Phase E, incremental).
     '/admin-reports.html',
+    // Batch 3 (2026-06-25) — non-navloader pages. Each had its inline <script>(s) externalized
+    // to /js/pages/<name>.js (verbatim) and its inline on*= handlers (static + runtime-injected)
+    // converted to addEventListener / data-action+delegation. Audited + externalized via
+    // workflows; mechanically verified (0 inline <script>, 0 on*= per page; .js syntax valid;
+    // residual on*= strings are comments only). offline.html deliberately EXCLUDED (its inline
+    // onclick is load-bearing for the offline fallback — an external JS would not load offline).
+    '/docs/wa-marketing-guide.html',     // pure static, no JS
+    '/docs/attendance-guide-tamil.html', // 1 print handler -> addEventListener
+    '/share/painter-estimate.html',
+    '/share/estimate.html',
+    '/share/design-request.html',
+    '/engineer-catalog.html',
+    '/engineer-dashboard.html',
+    '/engineer-new-quote.html',
+    '/payment-receipt.html',
+    '/customer-dashboard.html',
+    '/customer-login.html',
+    '/painter-profile.html',
 ]);
 
 module.exports = { SCRIPT_CDNS, cspDirectives, cspStrictDirectives, STRICT_ENFORCED_PATHS };
