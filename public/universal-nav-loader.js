@@ -64,7 +64,7 @@
         // Header + sidebars externalized in N2-N4 (uncomment then):
         // '/components/header-v2.html':        '/js/nav/header-v2.js',
         // '/components/sidebar-complete.html': '/js/nav/sidebar-complete.js',
-        // '/components/staff-sidebar.html':    '/js/nav/staff-sidebar.js',
+        '/components/staff-sidebar.html':    '/js/nav/staff-sidebar.js',
     };
 
     // Map data-page values to subnav component paths
