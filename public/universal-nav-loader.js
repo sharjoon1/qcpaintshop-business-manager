@@ -48,10 +48,23 @@
     // the permissive enforced policy). Entries are added incrementally as each
     // component's inline JS is externalized to /js/nav/<name>.js.
     const COMPONENT_JS = {
+        // 12 subnavs externalized (N1). Each loads its JS as a real external <script src>.
+        '/components/zoho-subnav.html':        '/js/nav/zoho-subnav.js',
+        '/components/whatsapp-subnav.html':    '/js/nav/whatsapp-subnav.js',
+        '/components/system-subnav.html':      '/js/nav/system-subnav.js',
+        '/components/staff-work-subnav.html':  '/js/nav/staff-work-subnav.js',
+        '/components/sales-subnav.html':       '/js/nav/sales-subnav.js',
+        '/components/salary-subnav.html':      '/js/nav/salary-subnav.js',
+        '/components/products-subnav.html':    '/js/nav/products-subnav.js',
+        '/components/painters-subnav.html':    '/js/nav/painters-subnav.js',
+        '/components/marketing-subnav.html':   '/js/nav/marketing-subnav.js',
+        '/components/leads-subnav.html':       '/js/nav/leads-subnav.js',
+        '/components/branches-subnav.html':    '/js/nav/branches-subnav.js',
+        '/components/attendance-subnav.html':  '/js/nav/attendance-subnav.js',
+        // Header + sidebars externalized in N2-N4 (uncomment then):
         // '/components/header-v2.html':        '/js/nav/header-v2.js',
         // '/components/sidebar-complete.html': '/js/nav/sidebar-complete.js',
         // '/components/staff-sidebar.html':    '/js/nav/staff-sidebar.js',
-        // '/components/<name>-subnav.html':    '/js/nav/<name>-subnav.js',
     };
 
     // Map data-page values to subnav component paths
