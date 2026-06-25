@@ -149,6 +149,16 @@ const STRICT_ENFORCED_PATHS = new Set([
     '/admin-whatsapp-chat.html',
     '/admin-zoho-invoices.html',
     '/estimate-create-new.html',
+    // Batch 8 (2026-06-25) — 8 low-handler nav-loader pages (2-5 handlers). Highest-blast pages
+    // (login, admin-dashboard, dashboard) deliberately EXCLUDED for isolated care later.
+    '/admin-agreements.html',
+    '/admin-engineer-catalog.html',
+    '/estimate-settings.html',
+    '/staff/salary.html',
+    '/admin-monitoring.html',
+    '/admin-geofence-logs.html',
+    '/staff/history.html',
+    '/admin-zoho-salesorders.html',
 ]);
 
 module.exports = { SCRIPT_CDNS, cspDirectives, cspStrictDirectives, STRICT_ENFORCED_PATHS };
