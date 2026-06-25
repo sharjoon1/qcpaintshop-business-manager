@@ -132,6 +132,15 @@ const STRICT_ENFORCED_PATHS = new Set([
     '/admin-lead-scoring.html',
     '/admin-zoho-reports.html',
     '/admin-whatsapp-sessions.html',
+    // Batch 6 (2026-06-25) — 6 more mid-handler nav-loader pages (10-17 handlers). Same pattern:
+    // authguard + page-logic externalized, all static + runtime handlers converted. Also caught +
+    // fixed a javascript: URI (CSP-blocked like inline handlers) in daily-tasks error template.
+    '/staff/daily-tasks.html',
+    '/staff/tasks.html',
+    '/admin-estimate-requests.html',
+    '/admin-zoho-settings.html',
+    '/admin-tasks.html',
+    '/admin-daily-tasks.html',
 ]);
 
 module.exports = { SCRIPT_CDNS, cspDirectives, cspStrictDirectives, STRICT_ENFORCED_PATHS };
