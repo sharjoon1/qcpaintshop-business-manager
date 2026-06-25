@@ -112,6 +112,15 @@ const STRICT_ENFORCED_PATHS = new Set([
     '/customer-dashboard.html',
     '/customer-login.html',
     '/painter-profile.html',
+    // Batch 4 (2026-06-25) — first nav-loader functional admin pages flipped (proves the shared-nav
+    // externalization unlocks real working pages, not just admin-reports). Each had its head auth-guard
+    // externalized SYNC to /js/pages/<name>-authguard.js + its page-logic script to /js/pages/<name>.js
+    // (verbatim) + its 1 inline handler converted to addEventListener. Externalized via workflow;
+    // mechanically verified (0 inline <script>, 0 on*= per page; .js syntax valid; residuals are comments).
+    '/admin-live-dashboard.html',
+    '/admin-wa-dashboard.html',
+    '/admin-wa-settings.html',
+    '/staff/advance-request.html',
 ]);
 
 module.exports = { SCRIPT_CDNS, cspDirectives, cspStrictDirectives, STRICT_ENFORCED_PATHS };
