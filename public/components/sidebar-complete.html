@@ -550,7 +550,7 @@
 </style>
 
 <!-- Overlay -->
-<div class="qc-sidebar-overlay" id="sidebarOverlay" onclick="closeSidebar()"></div>
+<div class="qc-sidebar-overlay" id="sidebarOverlay"></div>
 
 <!-- Sidebar -->
 <aside class="qc-sidebar" id="mainSidebar">
@@ -567,7 +567,7 @@
             <span></span><span></span><span></span>
         </button>
         <!-- Mobile: × close button -->
-        <button class="qc-sidebar-close" onclick="closeSidebar()" title="Close menu">&times;</button>
+        <button class="qc-sidebar-close" title="Close menu">&times;</button>
     </div>
 
     <!-- Navigation -->
@@ -604,7 +604,7 @@
 
         <!-- Sales & Estimates -->
         <div class="qc-nav-section" data-roles="admin,manager,staff">
-            <button type="button" class="qc-nav-section-toggle" data-section="sales" aria-expanded="false" onclick="qcToggleNavSection(this)">
+            <button type="button" class="qc-nav-section-toggle" data-section="sales" aria-expanded="false">
                 <span class="qc-nav-section-label">Sales & Estimates</span>
                 <svg class="qc-nav-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><polyline points="9 18 15 12 9 6"/></svg>
             </button>
@@ -634,7 +634,7 @@
 
         <!-- Products & Inventory -->
         <div class="qc-nav-section" data-roles="admin,manager,staff">
-            <button type="button" class="qc-nav-section-toggle" data-section="products" aria-expanded="false" onclick="qcToggleNavSection(this)">
+            <button type="button" class="qc-nav-section-toggle" data-section="products" aria-expanded="false">
                 <span class="qc-nav-section-label">Products & Inventory</span>
                 <svg class="qc-nav-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><polyline points="9 18 15 12 9 6"/></svg>
             </button>
@@ -659,7 +659,7 @@
 
         <!-- Customers -->
         <div class="qc-nav-section" data-roles="admin,manager,staff">
-            <button type="button" class="qc-nav-section-toggle" data-section="customers" aria-expanded="false" onclick="qcToggleNavSection(this)">
+            <button type="button" class="qc-nav-section-toggle" data-section="customers" aria-expanded="false">
                 <span class="qc-nav-section-label">Customers</span>
                 <svg class="qc-nav-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><polyline points="9 18 15 12 9 6"/></svg>
             </button>
@@ -684,7 +684,7 @@
 
         <!-- Leads -->
         <div class="qc-nav-section" data-roles="admin,manager">
-            <button type="button" class="qc-nav-section-toggle" data-section="leads" aria-expanded="false" onclick="qcToggleNavSection(this)">
+            <button type="button" class="qc-nav-section-toggle" data-section="leads" aria-expanded="false">
                 <span class="qc-nav-section-label">Leads & CRM</span>
                 <svg class="qc-nav-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><polyline points="9 18 15 12 9 6"/></svg>
             </button>
@@ -704,7 +704,7 @@
 
         <!-- Branches & Staff -->
         <div class="qc-nav-section" data-roles="admin">
-            <button type="button" class="qc-nav-section-toggle" data-section="branches" aria-expanded="false" onclick="qcToggleNavSection(this)">
+            <button type="button" class="qc-nav-section-toggle" data-section="branches" aria-expanded="false">
                 <span class="qc-nav-section-label">Branches & Staff</span>
                 <svg class="qc-nav-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><polyline points="9 18 15 12 9 6"/></svg>
             </button>
@@ -744,7 +744,7 @@
 
         <!-- HR & Attendance -->
         <div class="qc-nav-section">
-            <button type="button" class="qc-nav-section-toggle" data-section="hr" aria-expanded="false" onclick="qcToggleNavSection(this)">
+            <button type="button" class="qc-nav-section-toggle" data-section="hr" aria-expanded="false">
                 <span class="qc-nav-section-label">HR & Attendance</span>
                 <svg class="qc-nav-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><polyline points="9 18 15 12 9 6"/></svg>
             </button>
@@ -814,7 +814,7 @@
 
         <!-- Salary -->
         <div class="qc-nav-section" data-roles="admin,manager,accountant,staff">
-            <button type="button" class="qc-nav-section-toggle" data-section="salary" aria-expanded="false" onclick="qcToggleNavSection(this)">
+            <button type="button" class="qc-nav-section-toggle" data-section="salary" aria-expanded="false">
                 <span class="qc-nav-section-label">Salary & Payroll</span>
                 <svg class="qc-nav-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><polyline points="9 18 15 12 9 6"/></svg>
             </button>
@@ -859,7 +859,7 @@
 
         <!-- Zoho Books -->
         <div class="qc-nav-section" data-roles="admin">
-            <button type="button" class="qc-nav-section-toggle" data-section="zoho" aria-expanded="false" onclick="qcToggleNavSection(this)">
+            <button type="button" class="qc-nav-section-toggle" data-section="zoho" aria-expanded="false">
                 <span class="qc-nav-section-label">Zoho Books</span>
                 <svg class="qc-nav-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><polyline points="9 18 15 12 9 6"/></svg>
             </button>
@@ -966,7 +966,7 @@
 
         <!-- WhatsApp -->
         <div class="qc-nav-section" data-roles="admin">
-            <button type="button" class="qc-nav-section-toggle" data-section="whatsapp" aria-expanded="false" onclick="qcToggleNavSection(this)">
+            <button type="button" class="qc-nav-section-toggle" data-section="whatsapp" aria-expanded="false">
                 <span class="qc-nav-section-label">WhatsApp</span>
                 <svg class="qc-nav-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><polyline points="9 18 15 12 9 6"/></svg>
             </button>
@@ -1018,7 +1018,7 @@
 
         <!-- Billing -->
         <div class="qc-nav-section">
-            <button type="button" class="qc-nav-section-toggle" data-section="billing" aria-expanded="false" onclick="qcToggleNavSection(this)">
+            <button type="button" class="qc-nav-section-toggle" data-section="billing" aria-expanded="false">
                 <span class="qc-nav-section-label">Billing</span>
                 <svg class="qc-nav-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><polyline points="9 18 15 12 9 6"/></svg>
             </button>
@@ -1040,7 +1040,7 @@
 
         <!-- Painters -->
         <div class="qc-nav-section" data-roles="admin">
-            <button type="button" class="qc-nav-section-toggle" data-section="painters" aria-expanded="false" onclick="qcToggleNavSection(this)">
+            <button type="button" class="qc-nav-section-toggle" data-section="painters" aria-expanded="false">
                 <span class="qc-nav-section-label">Painters</span>
                 <svg class="qc-nav-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><polyline points="9 18 15 12 9 6"/></svg>
             </button>
@@ -1080,7 +1080,7 @@
 
         <!-- Engineers -->
         <div class="qc-nav-section" data-roles="admin">
-            <button type="button" class="qc-nav-section-toggle" data-section="engineers" aria-expanded="false" onclick="qcToggleNavSection(this)">
+            <button type="button" class="qc-nav-section-toggle" data-section="engineers" aria-expanded="false">
                 <span class="qc-nav-section-label">Engineers</span>
                 <svg class="qc-nav-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><polyline points="9 18 15 12 9 6"/></svg>
             </button>
@@ -1107,7 +1107,7 @@
 
         <!-- System -->
         <div class="qc-nav-section">
-            <button type="button" class="qc-nav-section-toggle" data-section="system" aria-expanded="false" onclick="qcToggleNavSection(this)">
+            <button type="button" class="qc-nav-section-toggle" data-section="system" aria-expanded="false">
                 <span class="qc-nav-section-label">System</span>
                 <svg class="qc-nav-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><polyline points="9 18 15 12 9 6"/></svg>
             </button>
@@ -1173,7 +1173,7 @@
 
     <!-- Footer -->
     <div class="qc-sidebar-footer">
-        <button class="qc-sidebar-logout" onclick="logoutUser()">
+        <button class="qc-sidebar-logout">
             <svg viewBox="0 0 24 24"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
             <span class="qc-sidebar-logout-text">Logout</span>
         </button>
@@ -1202,316 +1202,10 @@
             <svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
             <span>Estimates</span>
         </a>
-        <button class="qc-quickbar-item" onclick="toggleSidebar()" aria-label="Open menu">
+        <button class="qc-quickbar-item" data-action="toggle-sidebar" aria-label="Open menu">
             <div class="qc-quickbar-menu-icon"><span></span><span></span><span></span></div>
             <span>Menu</span>
         </button>
     </div>
 </div>
 
-<script>
-// ═══════════════════════════════════════════════════════════════
-// SIDEBAR CONTROLS  –  Hover-to-preview  +  Click-to-pin
-//
-// DESKTOP (≥ 768 px):
-//   • Sidebar starts as a collapsed 60 px icon rail.
-//   • Hovering ANYWHERE on the rail (top to bottom) auto-expands
-//     the sidebar to full width.  It stays open while the cursor
-//     is inside the sidebar area.
-//   • Moving the cursor out collapses it back (after a short
-//     debounce to avoid flicker).
-//   • Clicking the 3-dash toggle button inside the sidebar header
-//     PINS the sidebar open.  It stays expanded until:
-//       – the user clicks the toggle again, OR
-//       – the user clicks anywhere on the dashboard area.
-//   • The 3-dash toggle replaces the old header hamburger on
-//     desktop.  It lives inside the sidebar itself.
-//
-// MOBILE (< 768 px):
-//   • Header hamburger opens / closes the slide-in sidebar +
-//     overlay (unchanged).
-// ═══════════════════════════════════════════════════════════════
-
-let sidebarPinned  = false;   // true = click-locked open
-let hoverActive    = false;   // true = expanded via hover
-let hoverLeaveTimer = null;
-const HOVER_DELAY  = 200;     // ms debounce before collapsing
-
-// ── helpers ──
-
-function expandSidebar() {
-    const s = document.getElementById('mainSidebar');
-    s.classList.remove('collapsed');
-    document.body.classList.remove('sidebar-collapsed');
-}
-
-function collapseSidebar() {
-    const s = document.getElementById('mainSidebar');
-    s.classList.add('collapsed');
-    document.body.classList.add('sidebar-collapsed');
-}
-
-// ── toggle (click the 3-dash button inside sidebar) ──
-
-function toggleSidebar() {
-    const sidebar  = document.getElementById('mainSidebar');
-    const overlay  = document.getElementById('sidebarOverlay');
-    const isDesktop = window.innerWidth >= 768;
-
-    if (isDesktop) {
-        if (sidebarPinned) {
-            // unpin → collapse
-            sidebarPinned = false;
-            hoverActive   = false;
-            collapseSidebar();
-            localStorage.setItem('sidebarCollapsed', 'true');
-            document.removeEventListener('click', handleClickOutside, true);
-        } else {
-            // pin open
-            clearTimeout(hoverLeaveTimer);
-            sidebarPinned = true;
-            hoverActive   = false;
-            expandSidebar();
-            localStorage.setItem('sidebarCollapsed', 'false');
-            setTimeout(() => {
-                document.addEventListener('click', handleClickOutside, true);
-            }, 60);
-        }
-    } else {
-        // mobile slide-in toggle
-        sidebar.classList.toggle('open');
-        overlay.classList.toggle('show');
-    }
-}
-
-function closeSidebar() {
-    const sidebar = document.getElementById('mainSidebar');
-    const overlay = document.getElementById('sidebarOverlay');
-    const isDesktop = window.innerWidth >= 768;
-
-    if (isDesktop) {
-        sidebarPinned = false;
-        hoverActive   = false;
-        collapseSidebar();
-        localStorage.setItem('sidebarCollapsed', 'true');
-        document.removeEventListener('click', handleClickOutside, true);
-    } else {
-        sidebar.classList.remove('open');
-        overlay.classList.remove('show');
-    }
-}
-
-// ── click-outside (active only when pinned) ──
-
-function handleClickOutside(e) {
-    const sidebar = document.getElementById('mainSidebar');
-    if (!sidebar || window.innerWidth < 768) return;
-
-    if (sidebar.classList.contains('collapsed')) {
-        sidebarPinned = false;
-        document.removeEventListener('click', handleClickOutside, true);
-        return;
-    }
-
-    // click inside sidebar → ignore
-    if (sidebar.contains(e.target)) return;
-
-    // click on mobile hamburger in header → let toggleSidebar handle it
-    const headerHamburger = document.getElementById('hamburgerBtn');
-    if (headerHamburger && headerHamburger.contains(e.target)) return;
-
-    // click on dashboard → unpin & collapse
-    closeSidebar();
-}
-
-// ── hover on the sidebar rail (desktop) ──
-
-function onSidebarMouseEnter() {
-    if (window.innerWidth < 768 || sidebarPinned) return;
-    clearTimeout(hoverLeaveTimer);
-    hoverActive = true;
-    expandSidebar();
-}
-
-function onSidebarMouseLeave() {
-    if (window.innerWidth < 768 || sidebarPinned) return;
-
-    hoverLeaveTimer = setTimeout(() => {
-        if (!sidebarPinned && hoverActive) {
-            hoverActive = false;
-            collapseSidebar();
-        }
-    }, HOVER_DELAY);
-}
-
-// ── wire up all listeners ──
-
-function attachSidebarListeners() {
-    const sidebar       = document.getElementById('mainSidebar');
-    const toggleBtn     = document.getElementById('sidebarToggleBtn');
-    const headerHamburger = document.getElementById('hamburgerBtn');
-
-    if (!sidebar) return;
-
-    // Sidebar toggle button (inside sidebar header) – click to pin/unpin
-    if (toggleBtn) {
-        toggleBtn.addEventListener('click', function(e) {
-            e.stopPropagation();
-            toggleSidebar();
-        });
-    }
-
-    // Header hamburger (mobile fallback) – click to open/close
-    if (headerHamburger) {
-        headerHamburger.addEventListener('click', function(e) {
-            e.stopPropagation();
-            toggleSidebar();
-        });
-    }
-
-    // Hover on the ENTIRE sidebar (whether collapsed rail or expanded)
-    sidebar.addEventListener('mouseenter', onSidebarMouseEnter);
-    sidebar.addEventListener('mouseleave', onSidebarMouseLeave);
-}
-
-// ── restore persisted state ──
-
-function restoreSidebarState() {
-    if (window.innerWidth < 768) return;
-
-    const saved = localStorage.getItem('sidebarCollapsed');
-    const shouldCollapse = saved !== 'false';   // default = collapsed
-
-    if (shouldCollapse) {
-        collapseSidebar();
-        sidebarPinned = false;
-    } else {
-        expandSidebar();
-        sidebarPinned = true;
-        setTimeout(() => {
-            document.addEventListener('click', handleClickOutside, true);
-        }, 100);
-    }
-}
-
-// ── highlight active page ──
-
-function highlightActiveSidebarPage() {
-    const path = window.location.pathname;
-    document.querySelectorAll('.qc-nav-item[data-page]').forEach(item => {
-        if (path.includes(item.getAttribute('data-page'))) {
-            item.classList.add('active');
-        }
-    });
-}
-
-// ── logout ──
-
-function logoutUser() {
-    if (confirm('Are you sure you want to logout?')) {
-        localStorage.removeItem('auth_token');
-        localStorage.removeItem('user');
-        window.location.href = '/login.html';
-    }
-}
-
-// ── responsive resize ──
-
-window.addEventListener('resize', function() {
-    const sidebar = document.getElementById('mainSidebar');
-    const isDesktop = window.innerWidth >= 768;
-
-    if (!isDesktop) {
-        document.removeEventListener('click', handleClickOutside, true);
-        sidebar.classList.remove('collapsed');
-        document.body.classList.remove('sidebar-collapsed');
-        sidebarPinned = false;
-        hoverActive   = false;
-        clearTimeout(hoverLeaveTimer);
-    } else {
-        sidebar.classList.remove('open');
-        document.getElementById('sidebarOverlay').classList.remove('show');
-        restoreSidebarState();
-    }
-});
-
-// ── role-based nav filtering ──
-
-function filterNavByRole() {
-    let userRole = null;
-    try {
-        const user = JSON.parse(localStorage.getItem('user'));
-        userRole = user && user.role ? String(user.role).toLowerCase() : null;
-    } catch (e) {}
-
-    // Admin / administrator / super_admin see everything — no filtering needed.
-    const FULL_ADMIN = ['admin', 'administrator', 'super_admin'];
-    if (!userRole || FULL_ADMIN.includes(userRole)) return;
-
-    // For role matching, treat administrator+super_admin as 'admin' so that
-    // any data-roles="admin,..." entries are visible to them too.
-    const matchRole = userRole;
-
-    // Hide sections restricted to other roles
-    document.querySelectorAll('.qc-nav-section[data-roles]').forEach(section => {
-        const allowed = section.getAttribute('data-roles').split(',').map(s => s.trim().toLowerCase());
-        if (!allowed.includes(matchRole)) {
-            section.style.display = 'none';
-        }
-    });
-
-    // Hide individual items restricted to other roles
-    document.querySelectorAll('.qc-nav-item[data-roles]').forEach(item => {
-        const allowed = item.getAttribute('data-roles').split(',').map(s => s.trim().toLowerCase());
-        if (!allowed.includes(matchRole)) {
-            item.style.display = 'none';
-        }
-    });
-
-    // Hide dividers that are next to hidden sections
-    document.querySelectorAll('.qc-nav-divider').forEach(divider => {
-        const next = divider.nextElementSibling;
-        const prev = divider.previousElementSibling;
-        const nextHidden = next && next.style.display === 'none';
-        const prevHidden = prev && prev.style.display === 'none';
-        if (nextHidden || prevHidden) {
-            divider.style.display = 'none';
-        }
-    });
-
-    // Hide section titles if all visible items in that section are gone
-    document.querySelectorAll('.qc-nav-section').forEach(section => {
-        if (section.style.display === 'none') return;
-        const visibleItems = section.querySelectorAll('.qc-nav-item:not([style*="display: none"])');
-        if (visibleItems.length === 0) {
-            section.style.display = 'none';
-        }
-    });
-}
-
-// ── init ──
-
-function highlightQuickbar() {
-    const path = window.location.pathname;
-    document.querySelectorAll('.qc-quickbar-item[data-qb-page]').forEach(item => {
-        const page = item.getAttribute('data-qb-page');
-        if (path.includes(page)) {
-            item.classList.add('active');
-        }
-    });
-}
-
-function initSidebar() {
-    filterNavByRole();
-    restoreSidebarState();
-    highlightActiveSidebarPage();
-    highlightQuickbar();
-    attachSidebarListeners();
-}
-
-if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', initSidebar);
-} else {
-    initSidebar();
-}
-</script>

@@ -61,9 +61,9 @@
         '/components/leads-subnav.html':       '/js/nav/leads-subnav.js',
         '/components/branches-subnav.html':    '/js/nav/branches-subnav.js',
         '/components/attendance-subnav.html':  '/js/nav/attendance-subnav.js',
-        // Header + sidebars externalized in N2-N4 (uncomment then):
+        // Header externalized in N4 (uncomment then):
         // '/components/header-v2.html':        '/js/nav/header-v2.js',
-        // '/components/sidebar-complete.html': '/js/nav/sidebar-complete.js',
+        '/components/sidebar-complete.html': '/js/nav/sidebar-complete.js',
         '/components/staff-sidebar.html':    '/js/nav/staff-sidebar.js',
     };
 
