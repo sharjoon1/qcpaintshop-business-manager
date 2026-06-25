@@ -11,21 +11,7 @@
     <link rel="apple-touch-icon" href="/icons/icon-192x192.png">
     <title>Settings - Quality Colours Business Manager</title>
     <script src="/js/auth-helper.js?v=7101c516"></script>
-    <script>
-        requireAdminOrRedirect();
-        // Settings page is admin-only (admin / administrator / super_admin)
-        (function() {
-            try {
-                const user = JSON.parse(localStorage.getItem('user') || '{}');
-                const role = (user.role || '').toLowerCase();
-                const FULL_ADMIN = ['admin', 'administrator', 'super_admin'];
-                if (role && !FULL_ADMIN.includes(role)) {
-                    window.location.href = (role === 'staff' || role === 'accountant')
-                        ? '/staff/dashboard.html' : '/dashboard.html';
-                }
-            } catch(e) {}
-        })();
-    </script>
+    <script src="/js/pages/admin-settings-authguard.js"></script>
     <link rel="stylesheet" href="/css/tailwind.css?v=849f1b5c">
     <link rel="stylesheet" href="/css/design-system.css?v=876c7d73">
     <script src="/universal-nav-loader.js?v=fb16cb40"></script>
@@ -37,19 +23,19 @@
             <!-- Tab Navigation -->
             <div class="border-b border-gray-200 bg-gray-50">
                 <div class="flex overflow-x-auto">
-                    <button onclick="showTab('business')" id="tab-business" class="tab-button px-6 py-4 text-sm font-semibold border-b-2 border-purple-600 text-purple-600">
+                    <button data-tab="business" id="tab-business" class="tab-button px-6 py-4 text-sm font-semibold border-b-2 border-purple-600 text-purple-600">
                         🏢 Business Info
                     </button>
-                    <button onclick="showTab('tax')" id="tab-tax" class="tab-button px-6 py-4 text-sm font-semibold border-b-2 border-transparent text-gray-600 hover:text-gray-900">
+                    <button data-tab="tax" id="tab-tax" class="tab-button px-6 py-4 text-sm font-semibold border-b-2 border-transparent text-gray-600 hover:text-gray-900">
                         💰 Tax & GST
                     </button>
-                    <button onclick="showTab('estimate')" id="tab-estimate" class="tab-button px-6 py-4 text-sm font-semibold border-b-2 border-transparent text-gray-600 hover:text-gray-900">
+                    <button data-tab="estimate" id="tab-estimate" class="tab-button px-6 py-4 text-sm font-semibold border-b-2 border-transparent text-gray-600 hover:text-gray-900">
                         📋 Estimate Settings
                     </button>
-                    <button onclick="showTab('sms')" id="tab-sms" class="tab-button px-6 py-4 text-sm font-semibold border-b-2 border-transparent text-gray-600 hover:text-gray-900">
+                    <button data-tab="sms" id="tab-sms" class="tab-button px-6 py-4 text-sm font-semibold border-b-2 border-transparent text-gray-600 hover:text-gray-900">
                         📱 SMS/Notifications
                     </button>
-                    <button onclick="showTab('system')" id="tab-system" class="tab-button px-6 py-4 text-sm font-semibold border-b-2 border-transparent text-gray-600 hover:text-gray-900">
+                    <button data-tab="system" id="tab-system" class="tab-button px-6 py-4 text-sm font-semibold border-b-2 border-transparent text-gray-600 hover:text-gray-900">
                         🔧 System
                     </button>
                 </div>
@@ -108,7 +94,7 @@
                                 </div>
                                 <label class="cursor-pointer bg-purple-600 text-white px-4 py-2 rounded-lg hover:bg-purple-700 text-sm font-semibold">
                                     Upload Logo
-                                    <input type="file" id="businessLogo" accept="image/*" class="hidden" onchange="handleLogoUpload(event)">
+                                    <input type="file" id="businessLogo" accept="image/*" class="hidden">
                                 </label>
                             </div>
                         </div>
@@ -316,261 +302,7 @@
         </div>
     </div>
 
-    <script>
-        // Get auth token
-        function getAuthToken() {
-            return localStorage.getItem('auth_token');
-        }
-
-        // Tab switching
-        function showTab(tabName) {
-            // Hide all tabs
-            document.querySelectorAll('.tab-content').forEach(content => {
-                content.classList.add('hidden');
-            });
-            
-            // Remove active state from all buttons
-            document.querySelectorAll('.tab-button').forEach(button => {
-                button.classList.remove('border-purple-600', 'text-purple-600');
-                button.classList.add('border-transparent', 'text-gray-600');
-            });
-            
-            // Show selected tab
-            document.getElementById(`content-${tabName}`).classList.remove('hidden');
-            
-            // Add active state to selected button
-            const activeButton = document.getElementById(`tab-${tabName}`);
-            activeButton.classList.remove('border-transparent', 'text-gray-600');
-            activeButton.classList.add('border-purple-600', 'text-purple-600');
-        }
-
-        // Handle logo upload
-        async function handleLogoUpload(event) {
-            const file = event.target.files[0];
-            if (!file) return;
-            
-            if (!file.type.startsWith('image/')) {
-                alert('❌ Please select an image file');
-                return;
-            }
-            
-            // Show preview immediately (temporary)
-            const reader = new FileReader();
-            reader.onload = (e) => {
-                document.getElementById('logoPreview').src = e.target.result;
-                document.getElementById('logoPreview').classList.remove('hidden');
-                document.getElementById('logoPlaceholder').classList.add('hidden');
-            };
-            reader.readAsDataURL(file);
-            
-            // Upload file to server
-            const formData = new FormData();
-            formData.append('logo', file);
-            
-            try {
-                const token = getAuthToken();
-                const response = await fetch('/api/upload/logo', {
-                    method: 'POST',
-                    headers: {
-                        'Authorization': `Bearer ${token}`
-                    },
-                    body: formData
-                });
-                
-                const data = await response.json();
-                console.log('Logo upload response:', data);
-                
-                if (response.ok && data.success) {
-                    // Update preview with server URL
-                    const logoPreview = document.getElementById('logoPreview');
-                    logoPreview.src = data.logoUrl;
-                    logoPreview.dataset.logoUrl = data.logoUrl;
-                    logoPreview.classList.remove('hidden');
-                    document.getElementById('logoPlaceholder').classList.add('hidden');
-                    
-                    console.log('Logo saved to:', data.logoUrl);
-                    alert('✅ Logo uploaded successfully!');
-                } else {
-                    alert(`❌ Failed to upload logo: ${data.error || 'Unknown error'}`);
-                    console.error('Logo upload failed:', data);
-                }
-            } catch (error) {
-                console.error('Logo upload error:', error);
-                alert('❌ Error uploading logo. Please try again.');
-            }
-        }
-
-        // Load settings on page load
-        async function loadSettings() {
-            try {
-                const token = getAuthToken();
-                const response = await fetch('/api/settings', {
-                    headers: {
-                        'Authorization': `Bearer ${token}`
-                    }
-                });
-                if (response.status === 403) {
-                    alert('Access denied. Only administrators can access Company Settings.');
-                    window.location.href = '/staff/dashboard.html';
-                    return;
-                }
-                const settings = await response.json();
-
-                console.log('Loaded settings:', settings);
-                
-                // Populate business info
-                if (settings.business_name) document.getElementById('businessName').value = settings.business_name;
-                if (settings.business_type) document.getElementById('businessType').value = settings.business_type;
-                if (settings.business_address) document.getElementById('businessAddress').value = settings.business_address;
-                if (settings.business_phone) document.getElementById('businessPhone').value = settings.business_phone;
-                if (settings.business_email) document.getElementById('businessEmail').value = settings.business_email;
-                
-                // Load logo if exists
-                if (settings.business_logo) {
-                    const logoPreview = document.getElementById('logoPreview');
-                    logoPreview.src = settings.business_logo;
-                    logoPreview.dataset.logoUrl = settings.business_logo; // Store the server path
-                    logoPreview.classList.remove('hidden');
-                    document.getElementById('logoPlaceholder').classList.add('hidden');
-                    console.log('Logo loaded from settings:', settings.business_logo);
-                } else {
-                    console.log('No logo found in settings');
-                }
-                
-                // Populate tax settings
-                if (settings.gst_number) document.getElementById('gstNumber').value = settings.gst_number;
-                if (settings.pan_number) document.getElementById('panNumber').value = settings.pan_number;
-                if (settings.enable_gst) document.getElementById('enableGST').checked = settings.enable_gst === 'true';
-                if (settings.cgst_rate) document.getElementById('cgstRate').value = settings.cgst_rate;
-                if (settings.sgst_rate) document.getElementById('sgstRate').value = settings.sgst_rate;
-                if (settings.igst_rate) document.getElementById('igstRate').value = settings.igst_rate;
-                
-                // Populate estimate settings
-                if (settings.estimate_prefix) document.getElementById('estimatePrefix').value = settings.estimate_prefix;
-                if (settings.estimate_validity) document.getElementById('estimateValidity').value = settings.estimate_validity;
-                if (settings.estimate_terms) document.getElementById('termsConditions').value = settings.estimate_terms;
-                if (settings.show_brand_logo) document.getElementById('showBrandLogo').checked = settings.show_brand_logo === 'true';
-                
-            } catch (error) {
-                console.error('Error loading settings:', error);
-            }
-        }
-
-        // Form submissions
-        document.getElementById('businessForm').addEventListener('submit', async function(e) {
-            e.preventDefault();
-            
-            const logoPreview = document.getElementById('logoPreview');
-            // ONLY use dataset.logoUrl (server path), never use data URL
-            const logoUrl = logoPreview.dataset.logoUrl || null;
-            
-            const businessData = {
-                business_name: document.getElementById('businessName').value,
-                business_type: document.getElementById('businessType').value,
-                business_address: document.getElementById('businessAddress').value,
-                business_phone: document.getElementById('businessPhone').value,
-                business_email: document.getElementById('businessEmail').value,
-                business_logo: logoUrl
-            };
-            
-            console.log('Saving business data:', businessData);
-            console.log('Logo URL being saved:', logoUrl);
-            
-            try {
-                const token = getAuthToken();
-                const response = await fetch('/api/settings', {
-                    method: 'POST',
-                    headers: { 
-                        'Content-Type': 'application/json',
-                        'Authorization': `Bearer ${token}`
-                    },
-                    body: JSON.stringify(businessData)
-                });
-                
-                const result = await response.json();
-                console.log('Save response:', result);
-                
-                if (response.ok && result.success) {
-                    alert('✅ Business information saved successfully!');
-                    // Reload settings to show saved data
-                    await loadSettings();
-                } else {
-                    alert(`❌ Failed to save business information: ${result.error || result.message}`);
-                }
-            } catch (error) {
-                console.error('Error saving business info:', error);
-                alert('❌ Error saving business information');
-            }
-        });
-
-        document.getElementById('taxForm').addEventListener('submit', async function(e) {
-            e.preventDefault();
-            
-            const taxData = {
-                gst_number: document.getElementById('gstNumber').value,
-                pan_number: document.getElementById('panNumber').value,
-                enable_gst: document.getElementById('enableGST').checked ? 'true' : 'false',
-                cgst_rate: document.getElementById('cgstRate').value,
-                sgst_rate: document.getElementById('sgstRate').value,
-                igst_rate: document.getElementById('igstRate').value
-            };
-            
-            try {
-                const token = getAuthToken();
-                const response = await fetch('/api/settings', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-                    body: JSON.stringify(taxData)
-                });
-
-                if (response.ok) {
-                    alert('✅ Tax settings saved successfully!');
-                } else {
-                    alert('❌ Failed to save tax settings');
-                }
-            } catch (error) {
-                console.error('Error saving tax settings:', error);
-                alert('❌ Error saving tax settings');
-            }
-        });
-
-        document.getElementById('estimateForm').addEventListener('submit', async function(e) {
-            e.preventDefault();
-            
-            const estimateData = {
-                estimate_prefix: document.getElementById('estimatePrefix').value,
-                estimate_validity: document.getElementById('estimateValidity').value,
-                estimate_terms: document.getElementById('termsConditions').value,
-                show_brand_logo: document.getElementById('showBrandLogo').checked ? 'true' : 'false'
-            };
-            
-            try {
-                const token = getAuthToken();
-                const response = await fetch('/api/settings', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-                    body: JSON.stringify(estimateData)
-                });
-
-                if (response.ok) {
-                    alert('✅ Estimate settings saved successfully!');
-                } else {
-                    alert('❌ Failed to save estimate settings');
-                }
-            } catch (error) {
-                console.error('Error saving estimate settings:', error);
-                alert('❌ Error saving estimate settings');
-            }
-        });
-
-        // Check authentication
-        if (!localStorage.getItem('auth_token')) {
-            window.location.href = '/login.html';
-        }
-        
-        // Load settings on page load
-        loadSettings();
-    </script>
+    <script src="/js/pages/admin-settings.js"></script>
     <script src="/components/logo-loader.js"></script>
 </body>
 </html>

@@ -159,6 +159,15 @@ const STRICT_ENFORCED_PATHS = new Set([
     '/admin-geofence-logs.html',
     '/staff/history.html',
     '/admin-zoho-salesorders.html',
+    // Batch 9 (2026-06-25) — 8 more mid-handler nav-loader pages (6-7 handlers).
+    '/admin-customer-types.html',
+    '/admin-salary-reports.html',
+    '/admin-settings.html',
+    '/admin-stock-migration.html',
+    '/staff/activities.html',
+    '/admin-branches.html',
+    '/admin-categories.html',
+    '/admin-customers.html',
 ]);
 
 module.exports = { SCRIPT_CDNS, cspDirectives, cspStrictDirectives, STRICT_ENFORCED_PATHS };

@@ -11,7 +11,7 @@
     <link rel="apple-touch-icon" href="/icons/icon-192x192.png">
     <title>Category Management - Quality Colours</title>
     <script src="/js/auth-helper.js?v=7101c516"></script>
-    <script>requireAdminOrRedirect();</script>
+    <script src="/js/pages/admin-categories-authguard.js"></script>
     <link rel="stylesheet" href="/css/tailwind.css?v=849f1b5c">
     <link rel="stylesheet" href="/css/design-system.css?v=876c7d73">
     <script src="/universal-nav-loader.js?v=fb16cb40"></script>
@@ -24,7 +24,7 @@
                 <h1 class="text-2xl font-bold text-gray-800">Category Management</h1>
                 <p class="text-gray-600 text-sm mt-1">Manage product categories</p>
             </div>
-            <button onclick="openAddModal()" class="bg-purple-600 text-white px-6 py-3 rounded-lg hover:bg-purple-700 font-semibold flex items-center gap-2">
+            <button id="addCategoryBtn" class="bg-purple-600 text-white px-6 py-3 rounded-lg hover:bg-purple-700 font-semibold flex items-center gap-2">
                 <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path>
                 </svg>
@@ -67,7 +67,7 @@
                 </svg>
                 <h3 class="text-lg font-semibold text-gray-800 mb-2">No categories found</h3>
                 <p class="text-gray-600 mb-4">Add your first category to get started</p>
-                <button onclick="openAddModal()" class="bg-purple-600 text-white px-6 py-3 rounded-lg hover:bg-purple-700 font-semibold">
+                <button id="emptyAddCategoryBtn" class="bg-purple-600 text-white px-6 py-3 rounded-lg hover:bg-purple-700 font-semibold">
                     Add Category
                 </button>
             </div>
@@ -79,14 +79,14 @@
         <div class="bg-white rounded-xl shadow-2xl max-w-md w-full p-6">
             <div class="flex items-center justify-between mb-4">
                 <h3 class="text-xl font-bold text-gray-800" id="modalTitle">Add New Category</h3>
-                <button onclick="closeModal()" class="text-gray-400 hover:text-gray-600">
+                <button id="modalCloseBtn" class="text-gray-400 hover:text-gray-600">
                     <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
                     </svg>
                 </button>
             </div>
 
-            <form id="categoryForm" onsubmit="saveCategory(event)">
+            <form id="categoryForm">
                 <input type="hidden" id="categoryId">
                 
                 <div class="mb-4">
@@ -108,7 +108,7 @@
                 </div>
 
                 <div class="flex gap-3">
-                    <button type="button" onclick="closeModal()" class="flex-1 px-4 py-2 border-2 border-gray-300 rounded-lg hover:bg-gray-50 font-semibold">
+                    <button type="button" id="modalCancelBtn" class="flex-1 px-4 py-2 border-2 border-gray-300 rounded-lg hover:bg-gray-50 font-semibold">
                         Cancel
                     </button>
                     <button type="submit" class="flex-1 bg-purple-600 text-white px-4 py-2 rounded-lg hover:bg-purple-700 font-semibold">
@@ -119,181 +119,7 @@
         </div>
     </div>
 
-    <script>
-        let categories = [];
-        let editingCategoryId = null;
-
-        function esc(s){if(s==null)return '';const d=document.createElement('div');d.textContent=String(s);return d.innerHTML;}
-
-        // Load categories
-        async function loadCategorys() {
-            try {
-                const response = await fetch('/api/categories', { headers: getAuthHeaders() });
-                categories = await response.json();
-                
-                document.getElementById('loadingState').classList.add('hidden');
-                
-                if (categories.length === 0) {
-                    document.getElementById('emptyState').classList.remove('hidden');
-                    document.getElementById('categoriesTable').classList.add('hidden');
-                } else {
-                    document.getElementById('emptyState').classList.add('hidden');
-                    document.getElementById('categoriesTable').classList.remove('hidden');
-                    renderCategorys();
-                }
-            } catch (error) {
-                console.error('Error loading categories:', error);
-                alert('Failed to load categories');
-            }
-        }
-
-        // Render categories table
-        function renderCategorys() {
-            const tbody = document.getElementById('categoriesBody');
-            tbody.innerHTML = categories.map(category => `
-                <tr class="hover:bg-gray-50">
-                    <td class="px-4 py-3 text-sm font-medium text-gray-900">${esc(category.id)}</td>
-                    <td class="px-4 py-3 text-sm font-semibold text-gray-900">${esc(category.name)}</td>
-                    <td class="px-4 py-3">
-                        <span class="px-3 py-1 text-xs font-semibold rounded-full ${
-                            category.status === 'active' 
-                                ? 'bg-green-100 text-green-800' 
-                                : 'bg-gray-100 text-gray-800'
-                        }">
-                            ${category.status === 'active' ? '● Active' : '○ Inactive'}
-                        </span>
-                    </td>
-                    <td class="px-4 py-3 text-center">
-                        <button onclick="editCategory(${category.id})" class="text-blue-600 hover:text-blue-800 font-semibold text-sm mr-3">
-                            Edit
-                        </button>
-                        <button onclick="deleteCategory(${category.id})" class="text-red-600 hover:text-red-800 font-semibold text-sm">
-                            Delete
-                        </button>
-                    </td>
-                </tr>
-            `).join('');
-        }
-
-        // Open add modal
-        function openAddModal() {
-            editingCategoryId = null;
-            document.getElementById('modalTitle').textContent = 'Add New Category';
-            document.getElementById('categoryForm').reset();
-            document.getElementById('categoryId').value = '';
-            document.getElementById('categoryStatus').value = 'active';
-            document.getElementById('categoryModal').classList.remove('hidden');
-        }
-
-        // Edit category
-        function editCategory(id) {
-            const category = categories.find(b => b.id === id);
-            if (!category) return;
-
-            editingCategoryId = id;
-            document.getElementById('modalTitle').textContent = 'Edit Category';
-            document.getElementById('categoryId').value = category.id;
-            document.getElementById('categoryName').value = category.name;
-            document.getElementById('categoryDescription').value = category.description || '';
-            document.getElementById('categoryStatus').value = category.status;
-            document.getElementById('categoryModal').classList.remove('hidden');
-        }
-
-        // Close modal
-        function closeModal() {
-            document.getElementById('categoryModal').classList.add('hidden');
-            document.getElementById('categoryForm').reset();
-            editingCategoryId = null;
-        }
-
-        // Save category
-        async function saveCategory(event) {
-            event.preventDefault();
-
-            const token = localStorage.getItem('auth_token');
-            if (!token) {
-                alert('❌ Not authenticated. Please login again.');
-                window.location.href = '/login.html';
-                return;
-            }
-
-            const categoryData = {
-                name: document.getElementById('categoryName').value.trim(),
-                description: document.getElementById('categoryDescription').value.trim() || null,
-                status: document.getElementById('categoryStatus').value
-            };
-
-            try {
-                let response;
-                if (editingCategoryId) {
-                    // Update
-                    response = await fetch(`/api/categories/${editingCategoryId}`, {
-                        method: 'PUT',
-                        headers: { 
-                            'Content-Type': 'application/json',
-                            'Authorization': `Bearer ${token}`
-                        },
-                        body: JSON.stringify(categoryData)
-                    });
-                } else {
-                    // Create
-                    response = await fetch('/api/categories', {
-                        method: 'POST',
-                        headers: { 
-                            'Content-Type': 'application/json',
-                            'Authorization': `Bearer ${token}`
-                        },
-                        body: JSON.stringify(categoryData)
-                    });
-                }
-
-                const result = await response.json();
-
-                if (response.ok && result.success) {
-                    alert(`✅ Category ${editingCategoryId ? 'updated' : 'created'} successfully!`);
-                    closeModal();
-                    loadCategorys();
-                } else {
-                    const errorMsg = result.error || result.message || 'Failed to save category';
-                    console.error('Save category error:', result);
-                    alert(`❌ Error: ${errorMsg}`);
-                }
-            } catch (error) {
-                console.error('Error saving category:', error);
-                alert(`❌ Failed to save category: ${error.message}`);
-            }
-        }
-
-        // Delete category
-        async function deleteCategory(id) {
-            if (!confirm('⚠️ Are you sure you want to delete this category?')) return;
-
-            try {
-                const token = localStorage.getItem('auth_token');
-                const response = await fetch(`/api/categories/${id}`, {
-                    method: 'DELETE',
-                    headers: {
-                        'Authorization': `Bearer ${token}`
-                    }
-                });
-
-                const result = await response.json();
-
-                if (response.ok && result.success) {
-                    alert('✅ Category deleted successfully!');
-                    loadCategorys();
-                } else {
-                    alert(`❌ Failed to delete category: ${result.error || result.message}`);
-                }
-            } catch (error) {
-                console.error('Error deleting category:', error);
-                alert('❌ Failed to delete category. Please try again.');
-            }
-        }
-
-        // Initialize
-        loadCategorys();
-    </script>
+    <script src="/js/pages/admin-categories.js"></script>
     <script src="/components/logo-loader.js"></script>
 </body>
 </html>

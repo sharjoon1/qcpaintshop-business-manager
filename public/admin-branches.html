@@ -14,7 +14,7 @@
     <meta http-equiv="Expires" content="0">
     <title>Admin Dashboard - Quality Colours Manager</title>
     <script src="/js/auth-helper.js?v=7101c516"></script>
-    <script>requireAdminOrRedirect();</script>
+    <script src="/js/pages/admin-branches-authguard.js?v=8d3a2c01"></script>
     <link rel="stylesheet" href="/css/tailwind.css?v=849f1b5c">
     <link rel="stylesheet" href="/css/design-system.css?v=876c7d73">
     <script src="/universal-nav-loader.js?v=fb16cb40"></script>
@@ -25,7 +25,7 @@
         <!-- Header -->
         <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 mb-6">
             <h2 class="text-3xl font-bold text-gray-800">Branch Management</h2>
-            <button onclick="openAddModal()" class="bg-purple-600 text-white px-4 py-2 sm:px-6 sm:py-3 rounded-lg hover:bg-purple-700 font-semibold shadow-lg text-sm sm:text-base">
+            <button id="addBranchBtn" class="bg-purple-600 text-white px-4 py-2 sm:px-6 sm:py-3 rounded-lg hover:bg-purple-700 font-semibold shadow-lg text-sm sm:text-base">
                 + Add Branch
             </button>
         </div>
@@ -61,10 +61,10 @@
         <div class="bg-white rounded-xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto p-6 my-8">
             <div class="flex justify-between items-center mb-6">
                 <h3 id="modalTitle" class="text-2xl font-bold text-gray-800">Add Branch</h3>
-                <button onclick="closeModal()" class="text-gray-500 hover:text-gray-700 text-2xl">×</button>
+                <button id="modalCloseBtn" class="text-gray-500 hover:text-gray-700 text-2xl">×</button>
             </div>
 
-            <form id="branchForm" onsubmit="saveBranch(event)">
+            <form id="branchForm">
                 <input type="hidden" id="branchId">
 
                 <div class="mb-4">
@@ -111,7 +111,7 @@
                 <div class="mb-4 p-4 bg-blue-50 rounded-lg border border-blue-200">
                     <div class="flex justify-between items-center mb-3">
                         <label class="block text-sm font-semibold text-gray-700">Geo-Fence Configuration</label>
-                        <button type="button" onclick="useMyLocation()" class="text-xs bg-blue-600 text-white px-3 py-1 rounded-lg hover:bg-blue-700">
+                        <button type="button" id="useMyLocationBtn" class="text-xs bg-blue-600 text-white px-3 py-1 rounded-lg hover:bg-blue-700">
                             Use My Location
                         </button>
                     </div>
@@ -133,7 +133,7 @@
                 </div>
 
                 <div class="flex gap-3 pt-4">
-                    <button type="button" onclick="closeModal()" class="flex-1 px-4 py-2 border-2 border-gray-300 rounded-lg hover:bg-gray-50 font-semibold">
+                    <button type="button" id="modalCancelBtn" class="flex-1 px-4 py-2 border-2 border-gray-300 rounded-lg hover:bg-gray-50 font-semibold">
                         Cancel
                     </button>
                     <button type="submit" class="flex-1 bg-purple-600 text-white px-4 py-2 rounded-lg hover:bg-purple-700 font-semibold">
@@ -144,212 +144,6 @@
         </div>
     </div>
 
-    <script>
-        let branches = [];
-        let editingBranchId = null;
-
-        function escHtml(s){ if(s==null) return ''; const d=document.createElement('div'); d.textContent=String(s); return d.innerHTML; }
-
-        // Get auth headers
-        function getAuthHeaders() {
-            const token = localStorage.getItem('auth_token');
-            return {
-                'Content-Type': 'application/json',
-                'Authorization': token ? `Bearer ${token}` : ''
-            };
-        }
-
-        // Load all branches
-        async function loadBranches() {
-            try {
-                const response = await fetch('/api/branches', { headers: getAuthHeaders() });
-                const result = await response.json();
-
-                if (result.success && result.data) {
-                    branches = result.data;
-                } else {
-                    branches = [];
-                }
-
-                renderBranches();
-            } catch (error) {
-                console.error('Error loading branches:', error);
-                alert('Failed to load branches');
-            }
-        }
-
-        // Render branches table
-        function renderBranches() {
-            const tbody = document.getElementById('branchesTableBody');
-            
-            if (branches.length === 0) {
-                tbody.innerHTML = '<tr><td colspan="8" class="text-center py-8 text-gray-500">No branches found</td></tr>';
-                return;
-            }
-
-            tbody.innerHTML = branches.map(branch => `
-                <tr class="hover:bg-gray-50">
-                    <td class="px-6 py-4 text-sm font-semibold text-gray-900 hidden sm:table-cell">${branch.id}</td>
-                    <td class="px-6 py-4 text-sm font-semibold text-gray-900">${escHtml(branch.name)}</td>
-                    <td class="px-6 py-4 text-sm">
-                        <span class="px-3 py-1 bg-purple-100 text-purple-800 rounded-full font-semibold">${escHtml(branch.code)}</span>
-                    </td>
-                    <td class="px-6 py-4 text-sm text-gray-700 hidden sm:table-cell">${escHtml(branch.city) || '-'}</td>
-                    <td class="px-6 py-4 text-sm text-gray-700">${escHtml(branch.phone) || '-'}</td>
-                    <td class="px-6 py-4 text-sm text-gray-700 hidden sm:table-cell">${branch.opened_date ? new Date(branch.opened_date).toLocaleDateString() : '-'}</td>
-                    <td class="px-6 py-4">
-                        <span class="px-3 py-1 text-xs font-semibold rounded-full ${
-                            branch.status === 'active' ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'
-                        }">
-                            ${branch.status === 'active' ? '● Active' : '○ Inactive'}
-                        </span>
-                    </td>
-                    <td class="px-6 py-4 text-center whitespace-nowrap">
-                        <button onclick="editBranch(${branch.id})" class="text-blue-600 hover:text-blue-800 font-semibold text-sm mr-3">
-                            Edit
-                        </button>
-                        <button onclick="deleteBranch(${branch.id})" class="text-red-600 hover:text-red-800 font-semibold text-sm">
-                            Delete
-                        </button>
-                    </td>
-                </tr>
-            `).join('');
-        }
-
-        // Open add modal
-        function openAddModal() {
-            editingBranchId = null;
-            document.getElementById('modalTitle').textContent = 'Add Branch';
-            document.getElementById('branchForm').reset();
-            document.getElementById('branchId').value = '';
-            document.getElementById('branchStatus').value = 'active';
-            document.getElementById('branchModal').classList.remove('hidden');
-        }
-
-        // Edit branch
-        function editBranch(id) {
-            const branch = branches.find(b => b.id === id);
-            if (!branch) return;
-
-            editingBranchId = id;
-            document.getElementById('modalTitle').textContent = 'Edit Branch';
-            document.getElementById('branchId').value = branch.id;
-            document.getElementById('branchName').value = branch.name;
-            document.getElementById('branchCode').value = branch.code;
-            document.getElementById('branchCity').value = branch.city || '';
-            document.getElementById('branchPhone').value = branch.phone || '';
-            document.getElementById('branchAddress').value = branch.address || '';
-            document.getElementById('branchOpenedDate').value = branch.opened_date || '';
-            document.getElementById('branchStatus').value = branch.status;
-            document.getElementById('branchLatitude').value = branch.latitude || '';
-            document.getElementById('branchLongitude').value = branch.longitude || '';
-            document.getElementById('branchGeoRadius').value = branch.geo_fence_radius_meters || branch.geo_fence_radius || 500;
-            document.getElementById('branchModal').classList.remove('hidden');
-        }
-
-        // Use current location for geo-fence
-        function useMyLocation() {
-            if (!navigator.geolocation) {
-                alert('Geolocation is not supported by your browser');
-                return;
-            }
-            navigator.geolocation.getCurrentPosition(
-                (pos) => {
-                    document.getElementById('branchLatitude').value = pos.coords.latitude.toFixed(8);
-                    document.getElementById('branchLongitude').value = pos.coords.longitude.toFixed(8);
-                },
-                (err) => {
-                    alert('Failed to get location: ' + err.message);
-                },
-                { enableHighAccuracy: true, timeout: 10000 }
-            );
-        }
-
-        // Close modal
-        function closeModal() {
-            document.getElementById('branchModal').classList.add('hidden');
-            document.getElementById('branchForm').reset();
-            editingBranchId = null;
-        }
-
-        // Save branch
-        async function saveBranch(event) {
-            event.preventDefault();
-
-            const latVal = document.getElementById('branchLatitude').value;
-            const lngVal = document.getElementById('branchLongitude').value;
-            const radiusVal = document.getElementById('branchGeoRadius').value;
-
-            const branchData = {
-                name: document.getElementById('branchName').value.trim(),
-                code: document.getElementById('branchCode').value.trim().toUpperCase(),
-                city: document.getElementById('branchCity').value.trim() || null,
-                phone: document.getElementById('branchPhone').value.trim() || null,
-                address: document.getElementById('branchAddress').value.trim() || null,
-                status: document.getElementById('branchStatus').value,
-                latitude: latVal ? parseFloat(latVal) : null,
-                longitude: lngVal ? parseFloat(lngVal) : null,
-                geo_fence_radius_meters: radiusVal ? parseInt(radiusVal) : 500
-            };
-
-            try {
-                let response;
-                if (editingBranchId) {
-                    response = await fetch(`/api/branches/${editingBranchId}`, {
-                        method: 'PUT',
-                        headers: getAuthHeaders(),
-                        body: JSON.stringify(branchData)
-                    });
-                } else {
-                    response = await fetch('/api/branches', {
-                        method: 'POST',
-                        headers: getAuthHeaders(),
-                        body: JSON.stringify(branchData)
-                    });
-                }
-
-                if (response.ok) {
-                    alert(editingBranchId ? 'Branch updated successfully!' : 'Branch created successfully!');
-                    closeModal();
-                    loadBranches();
-                } else {
-                    const error = await response.json();
-                    alert('Error: ' + (error.message || 'Failed to save branch'));
-                }
-            } catch (error) {
-                console.error('Error saving branch:', error);
-                alert('Failed to save branch. Please try again.');
-            }
-        }
-
-        // Delete branch
-        async function deleteBranch(id) {
-            const branch = branches.find(b => b.id === id);
-            if (!branch) return;
-
-            if (!confirm(`Are you sure you want to delete "${branch.name}" branch?\n\nThis action cannot be undone!`)) return;
-
-            try {
-                const response = await fetch(`/api/branches/${id}`, {
-                    method: 'DELETE',
-                    headers: getAuthHeaders()
-                });
-
-                if (response.ok) {
-                    alert('Branch deleted successfully!');
-                    loadBranches();
-                } else {
-                    const error = await response.json();
-                    alert('Failed to delete branch: ' + (error.message || 'Unknown error'));
-                }
-            } catch (error) {
-                console.error('Error deleting branch:', error);
-                alert('Failed to delete branch. Please try again.');
-            }
-        }
-
-        // Initialize
-        loadBranches();
-    </script>
+    <script src="/js/pages/admin-branches.js?v=8d3a2c01"></script>
 </body>
 </html>
