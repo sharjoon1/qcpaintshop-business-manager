@@ -14,7 +14,7 @@
     <meta http-equiv="Expires" content="0">
     <title>Admin Dashboard - Quality Colours Manager</title>
     <script src="/js/auth-helper.js?v=7101c516"></script>
-    <script>checkAuthOrRedirect();</script>
+    <script src="/js/pages/estimate-actions-authguard.js"></script>
     <link rel="stylesheet" href="/css/tailwind.css?v=849f1b5c">
     <script src="/universal-nav-loader.js?v=6b4a6dbe"></script>
 </head>
@@ -22,7 +22,7 @@
 <!-- Main Content -->
     <div class="lg:ml-64 min-h-screen p-4 sm:p-6 lg:p-8">
         <!-- Back Button -->
-        <button onclick="history.back()" class="mb-6 flex items-center text-gray-600 hover:text-gray-900">
+        <button id="backBtn" class="mb-6 flex items-center text-gray-600 hover:text-gray-900">
             <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"></path>
             </svg>
@@ -43,7 +43,7 @@
                 <!-- Action Buttons Grid -->
                 <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                     <!-- Approve -->
-                    <button onclick="changeStatus('approved')" class="flex items-center justify-center bg-green-600 text-white px-6 py-4 rounded-lg hover:bg-green-700 transition shadow-lg" id="btnApprove">
+                    <button class="flex items-center justify-center bg-green-600 text-white px-6 py-4 rounded-lg hover:bg-green-700 transition shadow-lg" id="btnApprove">
                         <svg class="w-6 h-6 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
                         </svg>
@@ -51,7 +51,7 @@
                     </button>
 
                     <!-- Reject -->
-                    <button onclick="changeStatus('rejected')" class="flex items-center justify-center bg-red-600 text-white px-6 py-4 rounded-lg hover:bg-red-700 transition shadow-lg" id="btnReject">
+                    <button class="flex items-center justify-center bg-red-600 text-white px-6 py-4 rounded-lg hover:bg-red-700 transition shadow-lg" id="btnReject">
                         <svg class="w-6 h-6 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
                         </svg>
@@ -59,7 +59,7 @@
                     </button>
 
                     <!-- Mark as Sent -->
-                    <button onclick="changeStatus('sent')" class="flex items-center justify-center bg-blue-600 text-white px-6 py-4 rounded-lg hover:bg-blue-700 transition shadow-lg">
+                    <button id="btnSent" class="flex items-center justify-center bg-blue-600 text-white px-6 py-4 rounded-lg hover:bg-blue-700 transition shadow-lg">
                         <svg class="w-6 h-6 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"></path>
                         </svg>
@@ -67,7 +67,7 @@
                     </button>
 
                     <!-- Convert to Invoice -->
-                    <button onclick="convertToInvoice()" class="flex items-center justify-center bg-purple-600 text-white px-6 py-4 rounded-lg hover:bg-purple-700 transition shadow-lg">
+                    <button id="btnConvert" class="flex items-center justify-center bg-purple-600 text-white px-6 py-4 rounded-lg hover:bg-purple-700 transition shadow-lg">
                         <svg class="w-6 h-6 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
                         </svg>
@@ -75,7 +75,7 @@
                     </button>
 
                     <!-- Download PDF -->
-                    <button onclick="downloadPDF()" class="flex items-center justify-center bg-gray-700 text-white px-6 py-4 rounded-lg hover:bg-gray-800 transition shadow-lg">
+                    <button id="btnDownload" class="flex items-center justify-center bg-gray-700 text-white px-6 py-4 rounded-lg hover:bg-gray-800 transition shadow-lg">
                         <svg class="w-6 h-6 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
                         </svg>
@@ -83,7 +83,7 @@
                     </button>
 
                     <!-- Duplicate -->
-                    <button onclick="duplicate()" class="flex items-center justify-center bg-indigo-600 text-white px-6 py-4 rounded-lg hover:bg-indigo-700 transition shadow-lg">
+                    <button id="btnDuplicate" class="flex items-center justify-center bg-indigo-600 text-white px-6 py-4 rounded-lg hover:bg-indigo-700 transition shadow-lg">
                         <svg class="w-6 h-6 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"></path>
                         </svg>
@@ -118,185 +118,16 @@
             </div>
             
             <div class="flex gap-3">
-                <button onclick="closeModal()" class="flex-1 px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition">
+                <button id="modalCancelBtn" class="flex-1 px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition">
                     Cancel
                 </button>
-                <button onclick="confirmStatusChange()" id="confirmBtn" class="flex-1 px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition">
+                <button id="confirmBtn" class="flex-1 px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition">
                     Confirm
                 </button>
             </div>
         </div>
     </div>
 
-    <script>
-        function esc(s){if(s==null)return '';const d=document.createElement('div');d.textContent=String(s);return d.innerHTML;}
-        const urlParams = new URLSearchParams(window.location.search);
-        const estimateId = urlParams.get('id');
-        let currentNewStatus = '';
-
-        // Mobile menu
-        document.getElementById('mobileMenuBtn')?.addEventListener('click', () => {
-            document.getElementById('sidebar')?.classList.toggle('-translate-x-full');
-        });
-
-        function logout() {
-            localStorage.removeItem('auth_token');
-            localStorage.removeItem('user');
-            window.location.href = '/login.html';
-        }
-
-        // Load estimate info
-        async function loadEstimate() {
-            try {
-                const response = await apiRequest(`/api/estimates/${estimateId}`);
-                const data = await response.json();
-                
-                document.getElementById('estimateTitle').textContent = `Estimate #${data.estimate_number}`;
-                document.getElementById('customerName').textContent = data.customer_name;
-                document.getElementById('currentStatus').innerHTML = getStatusBadge(data.status);
-                
-                // Hide buttons based on current status
-                if (data.status === 'approved') {
-                    document.getElementById('btnApprove').classList.add('hidden');
-                } else if (data.status === 'rejected') {
-                    document.getElementById('btnReject').classList.add('hidden');
-                }
-                
-                loadHistory();
-            } catch (error) {
-                console.error('Error loading estimate:', error);
-            }
-        }
-
-        // Load status history
-        async function loadHistory() {
-            try {
-                const response = await apiRequest(`/api/estimates/${estimateId}/history`);
-                const history = await response.json();
-                
-                const container = document.getElementById('historyContainer');
-                
-                if (history.length === 0) {
-                    container.innerHTML = '<div class="text-center py-8 text-gray-500">No status changes yet</div>';
-                    return;
-                }
-                
-                container.innerHTML = history.map(h => `
-                    <div class="flex items-start border-l-4 ${getStatusColor(h.new_status)} pl-4 py-2">
-                        <div class="flex-1">
-                            <div class="flex items-center gap-2 mb-1">
-                                ${getStatusBadge(h.new_status)}
-                                ${h.old_status ? `<span class="text-sm text-gray-500">from ${esc(h.old_status)}</span>` : ''}
-                            </div>
-                            ${h.reason ? `<p class="text-sm text-gray-700 mb-1"><strong>Reason:</strong> ${esc(h.reason)}</p>` : ''}
-                            ${h.notes ? `<p class="text-sm text-gray-600 mb-1">${esc(h.notes)}</p>` : ''}
-                            <p class="text-xs text-gray-500">
-                                By ${esc(h.changed_by_name) || 'System'} • ${formatDate(h.timestamp)}
-                            </p>
-                        </div>
-                    </div>
-                `).join('');
-                
-            } catch (error) {
-                console.error('Error loading history:', error);
-            }
-        }
-
-        function getStatusBadge(status) {
-            const badges = {
-                'draft': '<span class="px-3 py-1 text-xs font-semibold rounded-full bg-gray-100 text-gray-800">🆕 Draft</span>',
-                'sent': '<span class="px-3 py-1 text-xs font-semibold rounded-full bg-blue-100 text-blue-800">📧 Sent</span>',
-                'pending_approval': '<span class="px-3 py-1 text-xs font-semibold rounded-full bg-yellow-100 text-yellow-800">⏳ Pending</span>',
-                'approved': '<span class="px-3 py-1 text-xs font-semibold rounded-full bg-green-100 text-green-800">✅ Approved</span>',
-                'rejected': '<span class="px-3 py-1 text-xs font-semibold rounded-full bg-red-100 text-red-800">❌ Rejected</span>',
-                'converted': '<span class="px-3 py-1 text-xs font-semibold rounded-full bg-purple-100 text-purple-800">📄 Converted</span>',
-                'expired': '<span class="px-3 py-1 text-xs font-semibold rounded-full bg-orange-100 text-orange-800">⌛ Expired</span>'
-            };
-            return badges[status] || badges['draft'];
-        }
-
-        function getStatusColor(status) {
-            const colors = {
-                'approved': 'border-green-500',
-                'rejected': 'border-red-500',
-                'sent': 'border-blue-500',
-                'pending_approval': 'border-yellow-500',
-                'converted': 'border-purple-500',
-                'draft': 'border-gray-500',
-                'expired': 'border-orange-500'
-            };
-            return colors[status] || 'border-gray-500';
-        }
-
-        function formatDate(dateString) {
-            const date = new Date(dateString);
-            return date.toLocaleString('en-IN');
-        }
-
-        // Change status
-        function changeStatus(newStatus) {
-            currentNewStatus = newStatus;
-            const titles = {
-                'approved': 'Approve Estimate',
-                'rejected': 'Reject Estimate',
-                'sent': 'Mark as Sent',
-                'pending_approval': 'Mark as Pending Approval'
-            };
-            document.getElementById('modalTitle').textContent = titles[newStatus] || 'Change Status';
-            document.getElementById('statusModal').classList.remove('hidden');
-        }
-
-        function closeModal() {
-            document.getElementById('statusModal').classList.add('hidden');
-            document.getElementById('statusReason').value = '';
-            document.getElementById('statusNotes').value = '';
-        }
-
-        async function confirmStatusChange() {
-            const reason = document.getElementById('statusReason').value;
-            const notes = document.getElementById('statusNotes').value;
-            
-            try {
-                const response = await apiRequest(`/api/estimates/${estimateId}/status`, {
-                    method: 'PATCH',
-                    body: JSON.stringify({ status: currentNewStatus, reason, notes })
-                });
-                
-                if (response.ok) {
-                    closeModal();
-                    loadEstimate();
-                    alert('Status updated successfully!');
-                } else {
-                    alert('Failed to update status');
-                }
-            } catch (error) {
-                console.error('Error updating status:', error);
-                alert('Error updating status');
-            }
-        }
-
-        // Other actions
-        function convertToInvoice() {
-            // Not wired yet — show an honest message instead of a confirm() that does nothing.
-            alert('Convert to Invoice is coming soon.');
-        }
-
-        function downloadPDF() {
-            window.open(`estimate-view.html?id=${estimateId}`, '_blank');
-            setTimeout(() => window.print(), 500);
-        }
-
-        function duplicate() {
-            alert('Duplicate is coming in a future update.');
-        }
-
-        // Load on page load
-        if (!estimateId) {
-            alert('No estimate ID');
-            window.location.href = 'estimates.html';
-        } else {
-            loadEstimate();
-        }
-    </script>
+    <script src="/js/pages/estimate-actions.js"></script>
 </body>
 </html>

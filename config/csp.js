@@ -181,6 +181,20 @@ const STRICT_ENFORCED_PATHS = new Set([
     '/staff/agreement.html',
     '/staff/clock-in.html',
     '/admin-brands.html',
+    // Batch 11 (2026-06-25) — 9 more mid-handler nav-loader pages (5-9 handlers). Same pattern
+    // (authguard.js SYNC + page.js verbatim; static → addEventListener, runtime → data-action +
+    // delegated listeners). admin-staff + admin-photos each also delegate a capture-phase `error`
+    // listener for runtime-rendered <img> fallbacks (error events don't bubble). admin-profile's
+    // known broken aadhar-<img> preview is a SEPARATE auth-header bug, deliberately untouched.
+    '/staff/permission-request.html',
+    '/staff-daily-work.html',
+    '/staff-painter-marketing.html',
+    '/admin-staff.html',
+    '/admin-zoho-locations.html',
+    '/staff-incentives.html',
+    '/admin-photos.html',
+    '/admin-profile.html',
+    '/estimate-actions.html',
 ]);
 
 module.exports = { SCRIPT_CDNS, cspDirectives, cspStrictDirectives, STRICT_ENFORCED_PATHS };
