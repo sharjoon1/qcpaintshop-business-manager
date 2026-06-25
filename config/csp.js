@@ -141,6 +141,14 @@ const STRICT_ENFORCED_PATHS = new Set([
     '/admin-zoho-settings.html',
     '/admin-tasks.html',
     '/admin-daily-tasks.html',
+    // Batch 7 (2026-06-25) — 6 high-traffic nav-loader pages. Same pattern; the agent self-check now
+    // also catches javascript: URIs (none found in this batch). Tight-grep verified: 0 live handlers.
+    '/chat.html',
+    '/admin-dpl-match.html',
+    '/admin-painter-catalog.html',
+    '/admin-whatsapp-chat.html',
+    '/admin-zoho-invoices.html',
+    '/estimate-create-new.html',
 ]);
 
 module.exports = { SCRIPT_CDNS, cspDirectives, cspStrictDirectives, STRICT_ENFORCED_PATHS };

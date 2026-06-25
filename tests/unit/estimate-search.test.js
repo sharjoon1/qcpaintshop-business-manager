@@ -1,20 +1,20 @@
 // Unit tests for estimate area-mode pack combination.
 //
 // T2: tests the REAL calculatePackCombo() — the production implementation
-// lives in the inline <script> of public/estimate-create-new.html (frontend
-// only; there is no server-side copy). Previously this file re-implemented a
-// mirrored copy. We extract the actual function source from the page and
-// evaluate it, so the assertions run against production code.
+// lives in public/js/pages/estimate-create-new.js (S9+F5: externalized from the
+// page's former inline <script>; frontend only, no server-side copy). Previously
+// this file re-implemented a mirrored copy. We extract the actual function source
+// and evaluate it, so the assertions run against production code.
 const fs = require('fs');
 const path = require('path');
 const vm = require('vm');
 
 function loadCalculatePackCombo() {
     const html = fs.readFileSync(
-        path.join(__dirname, '..', '..', 'public', 'estimate-create-new.html'), 'utf8'
+        path.join(__dirname, '..', '..', 'public', 'js', 'pages', 'estimate-create-new.js'), 'utf8'
     );
     const start = html.indexOf('function calculatePackCombo');
-    if (start === -1) throw new Error('calculatePackCombo not found in estimate-create-new.html');
+    if (start === -1) throw new Error('calculatePackCombo not found in estimate-create-new.js');
     let depth = 0, end = -1;
     for (let i = html.indexOf('{', start); i < html.length; i++) {
         if (html[i] === '{') depth++;
