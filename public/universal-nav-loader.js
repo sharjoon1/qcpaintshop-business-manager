@@ -40,6 +40,20 @@
         RETRY_DELAY: 1000
     };
 
+    // Externalized component JS (S9+F5 CSP hardening). Maps a component's HTML path
+    // to its externalized JS file. When a component is listed here, the loader loads
+    // its JS as a real external <script src> (strict-CSP-legal) instead of re-injecting
+    // the fragment's inline <script> via textContent (which strict CSP blocks silently).
+    // Components NOT listed keep the historical textContent re-injection (works under
+    // the permissive enforced policy). Entries are added incrementally as each
+    // component's inline JS is externalized to /js/nav/<name>.js.
+    const COMPONENT_JS = {
+        // '/components/header-v2.html':        '/js/nav/header-v2.js',
+        // '/components/sidebar-complete.html': '/js/nav/sidebar-complete.js',
+        // '/components/staff-sidebar.html':    '/js/nav/staff-sidebar.js',
+        // '/components/<name>-subnav.html':    '/js/nav/<name>-subnav.js',
+    };
+
     // Map data-page values to subnav component paths
     const SUBNAV_MAP = {
         // Leads & CRM
@@ -164,7 +178,27 @@
     // State
     let loadAttempts = 0;
     let componentsLoaded = false;
-    
+
+    /**
+     * Load an external <script src>. Used for externalized nav components so their
+     * JS runs as a real external script (CSP-legal under the strict policy) instead
+     * of a re-injected inline block. Resolves true on load, false on error (never
+     * rejects — a failed script load must NOT trigger the component retry path,
+     * which would re-insert the HTML and duplicate the nav).
+     */
+    function loadExternalScript(src) {
+        return new Promise((resolve) => {
+            const el = document.createElement('script');
+            el.src = src + (src.includes('?') ? '&' : '?') + '_v=' + Date.now();
+            el.onload = () => resolve(true);
+            el.onerror = () => {
+                console.error('❌ Failed to load external nav script:', src);
+                resolve(false);
+            };
+            document.body.appendChild(el);
+        });
+    }
+
     /**
      * Load a component with retry logic
      */
@@ -209,17 +243,25 @@
                 insertBefore.parentNode.insertBefore(container.firstChild, insertBefore);
             }
             
-            // Execute scripts
-            scripts.forEach(scriptText => {
-                try {
-                    const scriptEl = document.createElement('script');
-                    scriptEl.textContent = scriptText;
-                    document.body.appendChild(scriptEl);
-                } catch (execError) {
-                    console.error('Script execution error:', execError);
-                }
-            });
-            
+            // Execute the component's JS. Externalized components (listed in
+            // COMPONENT_JS) load a real external <script src> — strict-CSP-legal.
+            // Components not yet externalized keep the historical textContent
+            // re-injection (works under the permissive enforced policy).
+            const jsPath = COMPONENT_JS[url];
+            if (jsPath) {
+                await loadExternalScript(jsPath);
+            } else {
+                scripts.forEach(scriptText => {
+                    try {
+                        const scriptEl = document.createElement('script');
+                        scriptEl.textContent = scriptText;
+                        document.body.appendChild(scriptEl);
+                    } catch (execError) {
+                        console.error('Script execution error:', execError);
+                    }
+                });
+            }
+
             console.log(`✅ Successfully loaded: ${url}`);
             return true;
             
