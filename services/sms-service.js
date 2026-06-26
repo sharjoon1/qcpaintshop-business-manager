@@ -1,11 +1,17 @@
 /**
  * SMS gateway client (Nettyfish RetailSMS).
  *
- * Always POSTs — credentials must not appear in URL query strings so
- * they don't end up in access logs / proxy logs / browser history /
- * metric dashboards. Until 2026-05 the codebase had 5 copies of the
- * same `https.get(url-with-creds-in-query)` pattern; this is the one
- * place to call now.
+ * Sends via GET with all params (including credentials) in the URL query
+ * string — Nettyfish's /api/mt/SendSMS reads them from the query, NOT from
+ * a POST body. A 2026-05 change that switched this to POST (to keep creds
+ * out of URL logs) broke every SMS with
+ *   {"ErrorCode":"1","ErrorMessage":"login details cannot be blank"}
+ * so it was reverted to the query-string form the gateway requires.
+ *
+ * Credential-log hygiene: only the gateway RESPONSE is logged (`[${label}]
+ * gateway resp:`) — the request URL (which carries user/password) is never
+ * logged here. Verified 2026-06-26: GET reaches auth (template validation);
+ * POST body does not.
  *
  * Reads SMS_USER, SMS_PASSWORD, SMS_SENDER_ID from process.env. If
  * either of the first two is missing, the call is a no-op (returns
@@ -36,7 +42,7 @@ function sendSms({ number, text, label = 'SMS' }) {
             return;
         }
 
-        const body = querystring.stringify({
+        const qs = querystring.stringify({
             user:     process.env.SMS_USER,
             password: process.env.SMS_PASSWORD,
             senderid: process.env.SMS_SENDER_ID || 'QUALTQ',
@@ -47,31 +53,19 @@ function sendSms({ number, text, label = 'SMS' }) {
             text,
             route:    '4',
         });
+        const url = `https://${GATEWAY_HOST}${GATEWAY_PATH}?${qs}`;
 
-        const req = https.request({
-            host:   GATEWAY_HOST,
-            path:   GATEWAY_PATH,
-            method: 'POST',
-            headers: {
-                'Content-Type':   'application/x-www-form-urlencoded',
-                'Content-Length': Buffer.byteLength(body),
-            },
-        }, (res) => {
+        https.get(url, (res) => {
             let data = '';
             res.on('data', chunk => { data += chunk; });
             res.on('end', () => {
                 console.log(`[${label}] gateway resp:`, data.slice(0, 200));
                 resolve(data);
             });
-        });
-
-        req.on('error', (err) => {
+        }).on('error', (err) => {
             console.error(`[${label}] gateway error:`, err.message);
             resolve(null);
         });
-
-        req.write(body);
-        req.end();
     });
 }
 
