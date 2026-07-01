@@ -7,6 +7,8 @@
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <link rel="manifest" href="/manifest.json">
+    <link rel="icon" type="image/png" sizes="192x192" href="/icons/icon-192x192.png">
+    <link rel="apple-touch-icon" href="/icons/icon-192x192.png">
     <title>Painter Marketing — QC</title>
     <link rel="stylesheet" href="/css/tailwind.css?v=849f1b5c">
     <link rel="stylesheet" href="/css/design-system.css?v=876c7d73">
@@ -14,14 +16,90 @@
     <script src="/js/auth-helper.js?v=7101c516"></script>
     <script src="/js/pages/staff-painter-marketing-authguard.js"></script>
     <style>
-        .badge-new           { background:#dbeafe; color:#1e40af; }
-        .badge-interested    { background:#dcfce7; color:#166534; }
-        .badge-in_progress   { background:#fef3c7; color:#92400e; }
-        .badge-unreachable   { background:#fee2e2; color:#991b1b; }
-        .badge-not_interested{ background:#f3f4f6; color:#4b5563; }
-        .badge-wrong_number  { background:#fecaca; color:#7f1d1d; }
-        .badge-converted     { background:#e9d5ff; color:#6b21a8; }
+        /* ─── Brand palette (green + gold) ─── */
         .pill-filter.active  { background:#1B5E3B !important; color:#fff !important; border-color:#1B5E3B !important; }
+        .brand-bg            { background:#1B5E3B; }
+        .brand-bg-dark       { background:linear-gradient(135deg,#0D3D23 0%,#1B5E3B 100%); }
+        .brand-text          { color:#1B5E3B; }
+        .brand-border        { border-color:#1B5E3B; }
+        .brand-accent        { color:#D4A24E; }
+        .brand-accent-bg     { background:#D4A24E; }
+
+        /* ─── Status pill colors (mobile-first compact) ─── */
+        .badge-new             { background:#dbeafe; color:#1e40af; }
+        .badge-interested      { background:#dcfce7; color:#166534; }
+        .badge-in_progress     { background:#fef3c7; color:#92400e; }
+        .badge-invited         { background:#e0e7ff; color:#3730a3; }
+        .badge-registered      { background:#cffafe; color:#155e75; }
+        .badge-converted       { background:#fef3c7; color:#92400e; }
+        .badge-active_painter  { background:#dcfce7; color:#14532d; }
+        .badge-not_interested  { background:#f3f4f6; color:#4b5563; }
+        .badge-unreachable     { background:#fee2e2; color:#991b1b; }
+        .badge-wrong_number    { background:#fecaca; color:#7f1d1d; }
+        .badge-duplicate       { background:#e2e8f0; color:#475569; }
+        .badge-snoozed         { background:#e0e7ff; color:#3730a3; }
+
+        /* ─── Lead card lift (mobile tap) ─── */
+        .lead-card {
+            transition: transform 0.18s ease, box-shadow 0.18s ease;
+            -webkit-tap-highlight-color: transparent;
+        }
+        .lead-card:active { transform: scale(0.985); }
+
+        /* ─── Bottom-sheet modal positioning (respects mobile nav) ─── */
+        .modal-sheet {
+            position: fixed;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            z-index: 9999;
+            background: white;
+            border-radius: 1rem 1rem 0 0;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            max-height: 80vh;
+        }
+        .modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.5);
+            z-index: 9998;
+        }
+
+        /* ─── Action button tap feedback ─── */
+        .action-btn {
+            position: relative;
+            overflow: hidden;
+        }
+        .action-btn::after {
+            content: '';
+            position: absolute;
+            inset: 0;
+            background: currentColor;
+            opacity: 0;
+            transition: opacity 0.2s;
+        }
+        .action-btn:active::after { opacity: 0.08; }
+
+        /* ─── Toast (lightweight) ─── */
+        .toast-enter { animation: toast-in 0.3s ease forwards; }
+        .toast-exit  { animation: toast-out 0.25s ease forwards; }
+        @keyframes toast-in {
+            from { opacity: 0; transform: translateY(12px) scale(0.95); }
+            to   { opacity: 1; transform: translateY(0) scale(1); }
+        }
+        @keyframes toast-out {
+            from { opacity: 1; transform: translateY(0) scale(1); }
+            to   { opacity: 0; transform: translateY(8px) scale(0.95); }
+        }
+
+        /* ─── Hide horizontal scrollbar on filter chips ─── */
+        .scroll-hide::-webkit-scrollbar { display: none; }
+        .scroll-hide { -ms-overflow-style: none; scrollbar-width: none; }
     </style>
 </head>
 <body class="bg-gray-50" data-page="painter-marketing">
@@ -29,29 +107,33 @@
 <div id="mainContent" class="px-4 sm:px-6 py-4 pb-20 max-w-2xl mx-auto">
 
     <!-- Header card -->
-    <div class="relative overflow-hidden rounded-2xl p-4 mb-4 text-white" style="background:linear-gradient(135deg,#0D3D23 0%,#1B5E3B 100%)">
+    <div class="relative overflow-hidden rounded-2xl p-4 mb-4 text-white brand-bg-dark">
         <div class="absolute -top-6 -right-6 w-28 h-28 bg-white/5 rounded-full pointer-events-none"></div>
         <div class="flex items-center justify-between mb-3 relative">
-            <h1 class="text-lg font-bold">Today's Painter Calls</h1>
+            <h1 id="pageTitle" class="text-lg font-bold">Painter Marketing</h1>
             <span id="progressBadge" class="text-xs font-semibold px-3 py-1 rounded-full bg-white/20">0/0</span>
         </div>
         <div class="h-2 rounded-full overflow-hidden bg-white/20 relative">
             <div id="progressFill" class="h-full rounded-full bg-white transition-all duration-300" style="width:0%"></div>
         </div>
-        <p id="summary" class="text-xs mt-2 text-green-100">Loading…</p>
+        <p id="summary" class="text-xs mt-2 text-green-100">Loading your painter leads…</p>
     </div>
 
-    <!-- Filter pills -->
-    <div class="flex gap-2 mb-4 overflow-x-auto pb-1">
+    <!-- Filter chips -->
+    <div id="filterBar" class="flex gap-2 mb-4 overflow-x-auto pb-1 scroll-hide">
         <button class="pill-filter active flex-shrink-0 px-4 py-1.5 rounded-full text-sm font-medium bg-white border border-gray-200 text-gray-600" data-filter="all">All</button>
+        <button class="pill-filter flex-shrink-0 px-4 py-1.5 rounded-full text-sm font-medium bg-white border border-gray-200 text-gray-600" data-filter="today">Today</button>
         <button class="pill-filter flex-shrink-0 px-4 py-1.5 rounded-full text-sm font-medium bg-white border border-gray-200 text-gray-600" data-filter="pending">Pending</button>
-        <button class="pill-filter flex-shrink-0 px-4 py-1.5 rounded-full text-sm font-medium bg-white border border-gray-200 text-gray-600" data-filter="done">Done</button>
+        <button class="pill-filter flex-shrink-0 px-4 py-1.5 rounded-full text-sm font-medium bg-white border border-gray-200 text-gray-600" data-filter="interested">Interested</button>
+        <button class="pill-filter flex-shrink-0 px-4 py-1.5 rounded-full text-sm font-medium bg-white border border-gray-200 text-gray-600" data-filter="invited">Invited</button>
+        <button class="pill-filter flex-shrink-0 px-4 py-1.5 rounded-full text-sm font-medium bg-white border border-gray-200 text-gray-600" data-filter="registered">Registered</button>
     </div>
 
     <!-- Lead list -->
     <div id="list"></div>
 </div>
 
+<!-- Modal root: followup + invite sheets get appended here at runtime -->
 <div id="modalRoot"></div>
 
 <script src="/js/pages/staff-painter-marketing.js"></script>

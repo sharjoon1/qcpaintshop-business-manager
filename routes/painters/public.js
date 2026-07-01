@@ -29,13 +29,45 @@ function setSessionManager(sm) { sessionManager = sm; }
 // Register a new painter
 router.post('/register', async (req, res) => {
     try {
-        const { full_name, phone, email, city, district, experience_years, specialization, referral_code, aadhar_number, pan_number, address, pincode } = req.body;
+        const { full_name, phone, email, city, district, experience_years, specialization, referral_code, aadhar_number, pan_number, address, pincode, invite_token } = req.body;
 
         if (!full_name || !phone) return res.status(400).json({ success: false, message: 'Name and phone are required' });
+
+        // Normalize phone to last 10 digits for consistent duplicate / lead matching.
+        const digits = String(phone).replace(/\D/g, '');
+        if (digits.length < 10) {
+            return res.status(400).json({ success: false, message: 'Phone must contain at least 10 digits' });
+        }
+        const phoneLast10 = digits.slice(-10);
 
         const [existing] = await pool.query('SELECT id, status FROM painters WHERE phone = ?', [phone]);
         if (existing.length > 0) {
             return res.status(400).json({ success: false, message: `Phone already registered (status: ${existing[0].status})` });
+        }
+
+        // Validate optional invite token against an active painter_lead.
+        // Valid statuses: interested, invited (per design spec). A lead whose
+        // status is already 'registered' / 'converted' / terminal means the
+        // token has been used or the lead was disposed — reject to prevent
+        // double-link and impersonation.
+        let leadRow = null;
+        if (invite_token) {
+            const [leadRows] = await pool.query(
+                `SELECT id, status, assigned_to, invited_by, full_name, phone, branch_id
+                 FROM painter_leads
+                 WHERE invite_token = ?
+                   AND status IN ('interested','invited')
+                 LIMIT 1`,
+                [String(invite_token)]
+            );
+            if (leadRows.length === 0) {
+                return res.status(400).json({
+                    success: false,
+                    code: 'INVALID_INVITE_TOKEN',
+                    message: 'Invalid or expired invite token',
+                });
+            }
+            leadRow = leadRows[0];
         }
 
         let myReferralCode = pointsEngine.generateReferralCode(full_name);
@@ -51,18 +83,113 @@ router.post('/register', async (req, res) => {
             if (referrer.length > 0) referredBy = referrer[0].id;
         }
 
+        const invitedByStaffId = leadRow ? (leadRow.invited_by || leadRow.assigned_to || null) : null;
+        const painterLeadId = leadRow ? leadRow.id : null;
+
         const [result] = await pool.query(
-            `INSERT INTO painters (full_name, phone, email, city, district, experience_years, specialization, referral_code, referred_by, aadhar_number, pan_number, address, pincode)
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+            `INSERT INTO painters (full_name, phone, email, city, district, experience_years, specialization, referral_code, referred_by, aadhar_number, pan_number, address, pincode, painter_lead_id, invited_by_staff_id)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
             [full_name, phone, email || null, city || null, district || null, experience_years || 0,
-             specialization || 'both', myReferralCode, referredBy, aadhar_number || null, pan_number || null, address || null, pincode || null]
+             specialization || 'both', myReferralCode, referredBy, aadhar_number || null, pan_number || null, address || null, pincode || null,
+             painterLeadId, invitedByStaffId]
         );
 
         if (referredBy) {
             await pool.query('INSERT INTO painter_referrals (referrer_id, referred_id, status) VALUES (?, ?, "pending")', [referredBy, result.insertId]);
         }
 
-        // Fire-and-forget Zoho customer + salesperson sync
+        // Link the painter_lead back to the new painter and move it to 'registered'.
+        // Done in a separate statement (not transaction) so an unrelated failure
+        // here cannot roll back the painters row the user already received.
+        if (leadRow) {
+            try {
+                await pool.query(
+                    `UPDATE painter_leads
+                     SET painter_id = ?, status = 'registered'
+                     WHERE id = ? AND status IN ('interested','invited')`,
+                    [result.insertId, leadRow.id]
+                );
+                // Mark the invite row as registered if we can match the token.
+                await pool.query(
+                    `UPDATE painter_lead_invites
+                     SET registered_at = NOW(), status = 'registered'
+                     WHERE invite_token = ? AND registered_at IS NULL`,
+                    [String(invite_token)]
+                );
+            } catch (linkErr) {
+                console.error('[painters] invite lead link error:', linkErr.message);
+            }
+        }
+
+        // ──────────────────────────────────────────────────────────────
+        // Zoho auto-link: query zoho_customers_map by last 10 digits of phone.
+        // If we find an existing Zoho customer, reuse them so we don't create
+        // a duplicate contact. Otherwise enqueue and let the create-flow run.
+        // All Zoho work is fire-and-forget / best-effort — never blocks the
+        // user-visible registration response.
+        // ──────────────────────────────────────────────────────────────
+        let zohoLinkOk = false;
+        try {
+            const [zcmRows] = await pool.query(
+                `SELECT zoho_contact_id
+                 FROM zoho_customers_map
+                 WHERE RIGHT(REPLACE(REPLACE(REPLACE(REPLACE(zoho_phone, ' ', ''), '-', ''), '+', ''), '/', ''), 10) = ?
+                 LIMIT 1`,
+                [phoneLast10]
+            );
+            if (zcmRows.length > 0 && zcmRows[0].zoho_contact_id) {
+                const zcid = String(zcmRows[0].zoho_contact_id);
+                try {
+                    await pool.query(
+                        `UPDATE painters SET zoho_contact_id = ? WHERE id = ?`,
+                        [zcid, result.insertId]
+                    );
+                    if (leadRow) {
+                        await pool.query(
+                            `UPDATE painter_leads SET zoho_contact_id = ? WHERE id = ?`,
+                            [zcid, leadRow.id]
+                        );
+                    }
+                } catch (linkErr) {
+                    console.error('[painters] zoho contact link write error:', linkErr.message);
+                }
+                // Best-effort: mark the existing Zoho contact as painter. Never
+                // throw — failure here only means we fall through to create flow.
+                try {
+                    await zohoAPI.updateContact(zcid, {
+                        custom_fields: [
+                            { api_name: 'cf_painter', value: true },
+                        ],
+                    });
+                    zohoLinkOk = true;
+                } catch (updErr) {
+                    console.error('[painters] zoho updateContact failed (will queue):', updErr.message);
+                }
+            }
+        } catch (linkLookupErr) {
+            console.error('[painters] zoho_customers_map lookup error:', linkLookupErr.message);
+        }
+
+        // Enqueue retry when we couldn't auto-link (no match or updateContact
+        // failed). The queue row carries sync_type='customer' so the existing
+        // retry worker can handle it through the same path.
+        if (!zohoLinkOk) {
+            try {
+                await pool.query(
+                    `INSERT INTO painter_zoho_sync_queue
+                        (painter_id, sync_type, status, attempts, last_error, next_retry_at)
+                     VALUES (?, 'customer', 'pending', 0, ?, DATE_ADD(NOW(), INTERVAL 5 MINUTE))`,
+                    [result.insertId, zohoLinkOk ? null : 'auto_link_miss_or_update_failed']
+                );
+            } catch (qErr) {
+                console.error('[painters] zoho sync queue enqueue error:', qErr.message);
+            }
+        }
+
+        // Fire-and-forget Zoho customer + salesperson sync (existing flow).
+        // Safe to run after auto-link because syncPainterToZoho skips when both
+        // zoho_customer_id and zoho_salesperson_id are present, and the
+        // salesperson block still runs to provision a salesperson record.
         try {
             const painterZohoSync = require('../../services/painter-zoho-sync-service');
             painterZohoSync.syncPainterToZoho(result.insertId, { pool, zohoApi: zohoAPI })

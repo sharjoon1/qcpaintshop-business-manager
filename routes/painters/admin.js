@@ -8,7 +8,7 @@
 const express = require('express');
 const router = express.Router();
 const crypto = require('crypto');
-const { requirePermission, requireAuth } = require('../../middleware/permissionMiddleware');
+const { requirePermission, requireAuth, requireAnyPermission, isFullAdmin } = require('../../middleware/permissionMiddleware');
 const pointsEngine = require('../../services/painter-points-engine');
 const zohoAPI = require('../../services/zoho-api');
 const { uploadProductImage, uploadOfferBanner, uploadTraining, uploadPainterVisualization } = require('../../config/uploads');
@@ -2604,22 +2604,95 @@ router.put('/:id', requirePermission('painters', 'manage'), async (req, res) => 
 });
 
 // Approve/reject painter
-router.put('/:id/approve', requirePermission('painters', 'manage'), async (req, res) => {
+// Permission: painters.manage (admin/manager) OR painters.approve (inviting staff only).
+// Staff with `painters.approve` must additionally be the inviting staff
+// (`painters.invited_by_staff_id = req.user.id`); admins/managers bypass that
+// owner check via the role gate above.
+router.put('/:id/approve', requireAnyPermission([
+    { module: 'painters', action: 'manage' },
+    { module: 'painters', action: 'approve' },
+]), async (req, res) => {
     try {
         const { action } = req.body;
         const status = action === 'approve' ? 'approved' : 'rejected';
-        const [beforeRows] = await pool.query('SELECT id, status, full_name, phone FROM painters WHERE id = ?', [req.params.id]);
+        // Pull more columns than the original SELECT: we need invited_by_staff_id
+        // to enforce the owner check for staff with painters.approve.
+        const [beforeRows] = await pool.query(
+            'SELECT id, status, full_name, phone, invited_by_staff_id, painter_lead_id FROM painters WHERE id = ?',
+            [req.params.id]
+        );
+        if (beforeRows.length === 0) {
+            return res.status(404).json({ success: false, message: 'Painter not found' });
+        }
+        const before = beforeRows[0];
+
+        // Owner check: full admin and manager pass; everyone else with
+        // painters.approve permission must be the staff who invited the painter.
+        const isFullAdminRole = isFullAdmin(req.user.role);
+        const isManager = req.user.role === 'manager';
+        if (!isFullAdminRole && !isManager) {
+            if (Number(before.invited_by_staff_id) !== Number(req.user.id)) {
+                return res.status(403).json({
+                    success: false,
+                    code: 'NOT_INVITING_STAFF',
+                    message: 'You can only approve painters you invited',
+                });
+            }
+        }
+
         await pool.query('UPDATE painters SET status = ?, approved_by = ?, approved_at = NOW() WHERE id = ?', [status, req.user.id, req.params.id]);
         await audit.record(req, {
             action: `painter.${status}`,
             entity_type: 'painter',
             entity_id: req.params.id,
-            before: beforeRows[0],
-            after: { ...beforeRows[0], status, approved_by: req.user.id }
+            before,
+            after: { ...before, status, approved_by: req.user.id }
         });
+
+        // Mirror approval onto the originating painter_lead row when present,
+        // so the funnel dashboard reflects the approval.
+        if (before.painter_lead_id) {
+            try {
+                await pool.query(
+                    `UPDATE painter_leads
+                     SET approved_by = ?, approved_at = NOW(),
+                         status = CASE WHEN ? = 'approved' THEN 'active_painter' ELSE status END
+                     WHERE id = ?`,
+                    [req.user.id, status, before.painter_lead_id]
+                );
+            } catch (leadErr) {
+                console.error('[painters] approve lead update error:', leadErr.message);
+            }
+        }
 
         if (action === 'approve') {
             await pool.query('UPDATE painter_referrals SET status = "active" WHERE referred_id = ?', [req.params.id]);
+        }
+
+        // Fire-and-forget: re-sync painter to Zoho + backfill historical points.
+        // Triggered on approve AND reject? Only on approve — rejecting doesn't
+        // unlock a Zoho contact or backfill historicals.
+        if (action === 'approve') {
+            try {
+                const painterZohoSync = require('../../services/painter-zoho-sync-service');
+                const backfill = require('../../services/painter-points-backfill-service');
+                painterZohoSync.syncPainterToZoho(Number(req.params.id), { pool, zohoApi: zohoAPI })
+                    .then(() => {
+                        // backfillPainter expects the painter to be activated;
+                        // the activate endpoint stamps activated_at. Approve
+                        // doesn't, so backfill will skip via its internal
+                        // 'not_activated' guard. Run anyway for symmetry — if
+                        // a future change activates on approve, backfill picks
+                        // it up automatically.
+                        if (typeof backfill.backfillPainter === 'function') {
+                            return backfill.backfillPainter(Number(req.params.id), '2025-12-01', { pool });
+                        }
+                        return null;
+                    })
+                    .catch(err => console.error('[painters] approve sync chain failed', err.message));
+            } catch (modErr) {
+                console.error('[painters] approve sync module load failed', modErr.message);
+            }
         }
 
         // WhatsApp notification to painter

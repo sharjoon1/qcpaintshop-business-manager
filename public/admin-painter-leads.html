@@ -1,0 +1,369 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="theme-color" content="#667eea">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <link rel="manifest" href="/manifest.json">
+    <link rel="icon" type="image/png" sizes="192x192" href="/icons/icon-192x192.png">
+    <link rel="apple-touch-icon" href="/icons/icon-192x192.png">
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <meta http-equiv="Pragma" content="no-cache">
+    <meta http-equiv="Expires" content="0">
+    <title>Painter Lead Management - Quality Colours Manager</title>
+    <link rel="stylesheet" href="/css/tailwind.css?v=849f1b5c">
+    <link rel="stylesheet" href="/css/design-system.css?v=876c7d73">
+    <script src="/universal-nav-loader.js?v=6b4a6dbe"></script>
+    <script src="/js/auth-helper.js?v=7101c516"></script>
+    <script>requireAdminOrRedirect();</script>
+    <style>
+        body { background: #f9fafb; }
+
+        /* ─── Funnel stat cards ─── */
+        .stat-card {
+            background: #fff;
+            border-radius: 12px;
+            padding: 1.25rem;
+            border: 1px solid #e8ecf1;
+            box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
+            transition: transform 0.15s, box-shadow 0.15s;
+        }
+        .stat-card:hover { transform: translateY(-1px); box-shadow: 0 4px 12px rgba(15, 23, 42, 0.06); }
+        .stat-value { font-size: 1.75rem; font-weight: 700; color: #1e293b; line-height: 1.2; }
+        .stat-label { font-size: 0.8125rem; color: #64748b; margin-top: 4px; font-weight: 500; }
+        .stat-accent-bar {
+            height: 3px; border-radius: 9999px; margin-bottom: 0.75rem;
+            background: linear-gradient(90deg, #667eea, #764ba2);
+        }
+        .stat-card.unassigned .stat-accent-bar { background: linear-gradient(90deg, #f59e0b, #f97316); }
+        .stat-card.new .stat-accent-bar { background: linear-gradient(90deg, #3b82f6, #6366f1); }
+        .stat-card.interested .stat-accent-bar { background: linear-gradient(90deg, #10b981, #059669); }
+        .stat-card.invited .stat-accent-bar { background: linear-gradient(90deg, #8b5cf6, #7c3aed); }
+        .stat-card.registered .stat-accent-bar { background: linear-gradient(90deg, #06b6d4, #0891b2); }
+        .stat-card.active .stat-accent-bar { background: linear-gradient(90deg, #16a34a, #15803d); }
+
+        /* ─── Status pill colors ─── */
+        .status-new        { background: #dbeafe; color: #1e40af; }
+        .status-in_progress{ background: #fef9c3; color: #854d0e; }
+        .status-interested { background: #d1fae5; color: #065f46; }
+        .status-invited    { background: #ede9fe; color: #5b21b6; }
+        .status-registered { background: #cffafe; color: #155e75; }
+        .status-converted  { background: #e9d5ff; color: #6b21a8; }
+        .status-active_painter { background: #dcfce7; color: #14532d; }
+        .status-not_interested { background: #fee2e2; color: #991b1b; }
+        .status-unreachable    { background: #fde68a; color: #92400e; }
+        .status-wrong_number   { background: #fecaca; color: #7f1d1d; }
+        .status-duplicate      { background: #e2e8f0; color: #475569; }
+        .status-snoozed        { background: #e0e7ff; color: #3730a3; }
+
+        /* ─── Filters ─── */
+        .filter-select {
+            padding: 0.5rem 0.875rem;
+            border: 1px solid #d1d5db;
+            border-radius: 0.5rem;
+            font-size: 0.875rem;
+            background: #fff;
+            color: #374151;
+            min-height: 40px;
+            min-width: 140px;
+        }
+        .filter-select:focus { outline: none; border-color: #667eea; box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1); }
+
+        /* ─── Tables ─── */
+        .data-table { width: 100%; border-collapse: collapse; }
+        .data-table th {
+            text-align: left;
+            padding: 0.75rem 1rem;
+            font-size: 0.75rem;
+            font-weight: 600;
+            color: #64748b;
+            text-transform: uppercase;
+            letter-spacing: 0.025em;
+            border-bottom: 2px solid #e8ecf1;
+            background: #f8fafc;
+        }
+        .data-table td {
+            padding: 0.75rem 1rem;
+            font-size: 0.875rem;
+            border-bottom: 1px solid #f1f5f9;
+            color: #1e293b;
+        }
+        .data-table tbody tr:hover { background: #fafbfd; }
+
+        .badge {
+            display: inline-flex;
+            align-items: center;
+            padding: 2px 10px;
+            border-radius: 9999px;
+            font-size: 0.75rem;
+            font-weight: 600;
+        }
+
+        /* ─── Bulk action bar ─── */
+        .bulk-bar {
+            display: none;
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            color: #fff;
+            padding: 0.625rem 1rem;
+            border-radius: 0.5rem;
+            margin-bottom: 0.75rem;
+            align-items: center;
+            justify-content: space-between;
+            flex-wrap: wrap;
+            gap: 0.5rem;
+            font-size: 0.875rem;
+        }
+        .bulk-bar.active { display: flex; }
+
+        /* ─── Buttons ─── */
+        .btn {
+            padding: 0.4375rem 0.875rem;
+            border-radius: 0.4375rem;
+            font-size: 0.8125rem;
+            font-weight: 600;
+            cursor: pointer;
+            border: 1px solid transparent;
+            transition: all 0.15s;
+            min-height: 36px;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.375rem;
+        }
+        .btn-primary { background: linear-gradient(135deg, #667eea, #764ba2); color: #fff; }
+        .btn-primary:hover { box-shadow: 0 4px 10px rgba(102,126,234,0.35); transform: translateY(-1px); }
+        .btn-outline { background: #fff; border-color: #d1d5db; color: #374151; }
+        .btn-outline:hover { background: #f9fafb; }
+        .btn-sm { padding: 0.3125rem 0.625rem; font-size: 0.75rem; min-height: 30px; }
+
+        /* ─── Skeleton ─── */
+        .skeleton {
+            background: linear-gradient(90deg, #f1f5f9 25%, #e2e8f0 50%, #f1f5f9 75%);
+            background-size: 200% 100%;
+            animation: shimmer 1.4s infinite;
+            border-radius: 0.375rem;
+        }
+        @keyframes shimmer { 0%{background-position:200% 0} 100%{background-position:-200% 0} }
+
+        /* ─── Toast ─── */
+        .toast {
+            position: fixed; bottom: 1.25rem; right: 1.25rem;
+            background: #1e293b; color: #fff;
+            padding: 0.75rem 1.125rem; border-radius: 0.5rem;
+            font-size: 0.875rem; font-weight: 500;
+            box-shadow: 0 8px 24px rgba(15, 23, 42, 0.2);
+            z-index: 9999; opacity: 0; transform: translateY(0.5rem);
+            transition: opacity 0.2s, transform 0.2s;
+            pointer-events: none;
+        }
+        .toast.show { opacity: 1; transform: translateY(0); }
+        .toast.success { background: #059669; }
+        .toast.error { background: #dc2626; }
+
+        /* ─── Mobile ─── */
+        @media (max-width: 767px) {
+            .stat-grid { grid-template-columns: repeat(2, 1fr) !important; }
+            .filter-row { flex-direction: column !important; }
+            .filter-select, .filter-input { width: 100% !important; min-width: 0 !important; }
+            .desktop-table { display: none !important; }
+            .mobile-cards { display: block !important; }
+            .lead-card {
+                background: #fff;
+                border: 1px solid #e8ecf1;
+                border-radius: 0.625rem;
+                padding: 0.875rem;
+                margin-bottom: 0.625rem;
+            }
+        }
+        @media (min-width: 768px) {
+            .mobile-cards { display: none; }
+        }
+    </style>
+</head>
+<body data-page="painter-leads">
+    <div class="min-h-screen bg-gray-50">
+        <div class="max-w-7xl mx-auto px-4 py-6">
+
+            <!-- Header -->
+            <div class="flex flex-wrap items-center justify-between gap-3 mb-6">
+                <div>
+                    <h1 class="text-2xl font-bold text-gray-900" id="pageTitle">Painter Lead Management</h1>
+                    <p class="text-gray-600 text-sm mt-1">Funnel, unassigned pool, and staff performance</p>
+                </div>
+                <div class="flex gap-2">
+                    <button type="button" class="btn btn-outline" id="refreshBtn">Refresh</button>
+                </div>
+            </div>
+
+            <!-- Funnel Stat Cards -->
+            <section aria-label="Funnel statistics" class="stat-grid grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-3 mb-6">
+                <div class="stat-card new">
+                    <div class="stat-accent-bar"></div>
+                    <div class="stat-value" id="statNew" data-stat="new">—</div>
+                    <div class="stat-label">New</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-accent-bar"></div>
+                    <div class="stat-value" id="statInProgress" data-stat="in_progress">—</div>
+                    <div class="stat-label">In Progress</div>
+                </div>
+                <div class="stat-card interested">
+                    <div class="stat-accent-bar"></div>
+                    <div class="stat-value" id="statInterested" data-stat="interested">—</div>
+                    <div class="stat-label">Interested</div>
+                </div>
+                <div class="stat-card invited">
+                    <div class="stat-accent-bar"></div>
+                    <div class="stat-value" id="statInvited" data-stat="invited">—</div>
+                    <div class="stat-label">Invited</div>
+                </div>
+                <div class="stat-card registered">
+                    <div class="stat-accent-bar"></div>
+                    <div class="stat-value" id="statRegistered" data-stat="registered">—</div>
+                    <div class="stat-label">Registered</div>
+                </div>
+                <div class="stat-card active">
+                    <div class="stat-accent-bar"></div>
+                    <div class="stat-value" id="statActive" data-stat="active_painter">—</div>
+                    <div class="stat-label">Active Painter</div>
+                </div>
+                <div class="stat-card unassigned">
+                    <div class="stat-accent-bar"></div>
+                    <div class="stat-value" id="statUnassigned" data-stat="unassigned">—</div>
+                    <div class="stat-label">Unassigned</div>
+                </div>
+            </section>
+
+            <!-- Filters -->
+            <section aria-label="Filters" class="bg-white rounded-xl border border-gray-200 p-3 mb-4">
+                <div class="filter-row flex flex-wrap gap-2">
+                    <select id="filterStatus" class="filter-select" aria-label="Filter by status">
+                        <option value="">All Statuses</option>
+                        <option value="new">New</option>
+                        <option value="in_progress">In Progress</option>
+                        <option value="interested">Interested</option>
+                        <option value="invited">Invited</option>
+                        <option value="registered">Registered</option>
+                        <option value="active_painter">Active Painter</option>
+                        <option value="not_interested">Not Interested</option>
+                        <option value="unreachable">Unreachable</option>
+                        <option value="wrong_number">Wrong Number</option>
+                        <option value="duplicate">Duplicate</option>
+                        <option value="snoozed">Snoozed</option>
+                    </select>
+                    <select id="filterBranch" class="filter-select" aria-label="Filter by branch">
+                        <option value="">All Branches</option>
+                    </select>
+                    <select id="filterAssignedTo" class="filter-select" aria-label="Filter by assigned staff">
+                        <option value="">All Staff</option>
+                        <option value="unassigned">Unassigned</option>
+                    </select>
+                    <input type="date" id="filterDateFrom" class="filter-select filter-input" aria-label="Date from">
+                    <input type="date" id="filterDateTo" class="filter-select filter-input" aria-label="Date to">
+                    <input type="search" id="filterSearch" class="filter-select filter-input" placeholder="Name, phone, lead #…" aria-label="Search" style="min-width:200px;flex:1;">
+                    <button type="button" class="btn btn-primary" id="applyFiltersBtn">Apply</button>
+                    <button type="button" class="btn btn-outline" id="resetFiltersBtn">Reset</button>
+                </div>
+            </section>
+
+            <!-- Unassigned Pool -->
+            <section aria-label="Unassigned pool" class="mb-8">
+                <div class="flex items-center justify-between mb-3">
+                    <h2 class="text-lg font-semibold text-gray-900" id="unassignedHeading">Unassigned Pool</h2>
+                    <span class="text-sm text-gray-500" id="unassignedCount"></span>
+                </div>
+
+                <div class="bulk-bar" id="bulkAssignBar" role="region" aria-live="polite">
+                    <div>
+                        <strong id="bulkSelectedCount">0</strong> lead(s) selected
+                    </div>
+                    <div class="flex items-center gap-2">
+                        <select id="bulkAssignTo" class="filter-select" aria-label="Bulk assign to staff">
+                            <option value="">Choose staff…</option>
+                        </select>
+                        <button type="button" class="btn btn-primary btn-sm" id="bulkAssignBtn" data-action="bulk-assign">Assign Selected</button>
+                        <button type="button" class="btn btn-outline btn-sm" id="bulkClearBtn">Clear</button>
+                    </div>
+                </div>
+
+                <!-- Desktop table -->
+                <div class="desktop-table bg-white rounded-xl border border-gray-200 overflow-hidden">
+                    <div class="overflow-x-auto">
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th style="width:40px;">
+                                        <input type="checkbox" id="selectAllUnassigned" aria-label="Select all unassigned leads">
+                                    </th>
+                                    <th>Lead #</th>
+                                    <th>Name</th>
+                                    <th>Phone</th>
+                                    <th>Branch</th>
+                                    <th>Source</th>
+                                    <th>Created</th>
+                                    <th style="width:180px;">Assign To</th>
+                                </tr>
+                            </thead>
+                            <tbody id="unassignedTableBody">
+                                <tr>
+                                    <td colspan="8" class="text-center py-8 text-gray-400">
+                                        <div class="skeleton h-3 w-1/3 mx-auto mb-2"></div>
+                                        <div class="skeleton h-3 w-1/4 mx-auto"></div>
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- Mobile cards -->
+                <div class="mobile-cards" id="unassignedMobileList"></div>
+
+                <div id="unassignedPagination" class="flex justify-between items-center mt-3 text-sm text-gray-500"></div>
+            </section>
+
+            <!-- Staff Performance -->
+            <section aria-label="Staff performance">
+                <div class="flex items-center justify-between mb-3">
+                    <h2 class="text-lg font-semibold text-gray-900" id="staffHeading">Staff Performance</h2>
+                    <span class="text-sm text-gray-500" id="staffCount"></span>
+                </div>
+
+                <div class="bg-white rounded-xl border border-gray-200 overflow-hidden">
+                    <div class="overflow-x-auto">
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th>Staff</th>
+                                    <th>Branch</th>
+                                    <th class="text-center">Assigned</th>
+                                    <th class="text-center">Contacted</th>
+                                    <th class="text-center">Interested</th>
+                                    <th class="text-center">Invited</th>
+                                    <th class="text-center">Registered</th>
+                                    <th class="text-center">Approved</th>
+                                    <th class="text-center">Conv %</th>
+                                </tr>
+                            </thead>
+                            <tbody id="staffPerfTableBody">
+                                <tr>
+                                    <td colspan="9" class="text-center py-8 text-gray-400">
+                                        <div class="skeleton h-3 w-1/3 mx-auto mb-2"></div>
+                                        <div class="skeleton h-3 w-1/4 mx-auto"></div>
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </section>
+
+        </div>
+    </div>
+
+    <div id="toast" class="toast" role="status" aria-live="polite"></div>
+
+    <script src="/js/pages/admin-painter-leads.js?v=1"></script>
+</body>
+</html>
