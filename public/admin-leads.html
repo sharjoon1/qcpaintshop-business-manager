@@ -1566,23 +1566,51 @@
         // ─── Painter Program Nomination ───
         let ppCurrentLeadId = null;
 
+        function populatePPModalBranches(branchList) {
+            const branchSel = document.getElementById('ppModalBranch');
+            branchSel.innerHTML = '<option value="">Choose branch…</option>';
+            if (!Array.isArray(branchList) || branchList.length === 0) {
+                branchSel.innerHTML += '<option value="" disabled>No branches available</option>';
+                return false;
+            }
+            branchSel.innerHTML += branchList.map(function(b) {
+                return '<option value="' + b.id + '">' + escapeHtml(b.name) + '</option>';
+            }).join('');
+            return true;
+        }
+
         async function showPainterProgramModal(leadId, name, phone) {
             ppCurrentLeadId = leadId;
             document.getElementById('ppModalLeadName').textContent = name;
             document.getElementById('ppModalLeadPhone').textContent = phone;
-            document.getElementById('ppModalStatus').textContent = '';
-            document.getElementById('ppModalStatus').style.color = '';
+            const statusEl = document.getElementById('ppModalStatus');
+            statusEl.textContent = '';
+            statusEl.style.color = '';
 
-            const branchSel = document.getElementById('ppModalBranch');
-            branchSel.innerHTML = '<option value="">Choose branch…</option>';
-            try {
-                const r = await fetch('/api/branches', { headers: getAuthHeaders() }).then(x => x.json());
-                const list = r.data || r.branches || [];
-                list.forEach(function(b) {
-                    branchSel.innerHTML += '<option value="' + b.id + '">' + escapeHtml(b.name) + '</option>';
-                });
-            } catch (e) { console.error('loadBranches', e); }
+            // Prefer the global branches already loaded by loadBranches(); fall back to a fresh fetch.
+            let branchList = Array.isArray(window.branches) && window.branches.length ? window.branches : [];
+            if (!branchList.length) {
+                try {
+                    await loadBranches();
+                    branchList = Array.isArray(window.branches) ? window.branches : [];
+                } catch (e) {
+                    console.error('loadBranches fallback failed:', e);
+                }
+            }
+            if (!branchList.length) {
+                try {
+                    const r = await fetch('/api/branches', { headers: getAuthHeaders() }).then(x => x.json());
+                    branchList = r && r.success && Array.isArray(r.data) ? r.data
+                              : (Array.isArray(r) ? r : []);
+                    if (branchList.length) window.branches = branchList;
+                } catch (e) {
+                    console.error('modal branch fetch failed:', e);
+                    statusEl.textContent = 'Failed to load branches. Please refresh and try again.';
+                    statusEl.style.color = '#dc2626';
+                }
+            }
 
+            populatePPModalBranches(branchList);
             document.getElementById('painterProgramModal').classList.remove('hidden');
         }
 
