@@ -119,10 +119,18 @@
 
         <!-- TAB: Dashboard -->
         <div id="tab-dashboard" class="tab-content">
-            <div class="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
+            <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3 mb-4">
                 <div class="stat-card">
                     <div class="stat-label">Total Sent</div>
                     <div class="stat-value" id="statTotalSent">0</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-label">Delivered</div>
+                    <div class="stat-value text-blue-500" id="statDelivered">0</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-label">Read</div>
+                    <div class="stat-value text-green-600" id="statRead">0</div>
                 </div>
                 <div class="stat-card">
                     <div class="stat-label">Today Sent</div>
@@ -905,6 +913,8 @@ async function loadDashboard() {
         const stats = await statsRes.json();
 
         document.getElementById('statTotalSent').textContent = (dash.messages?.total_sent || 0).toLocaleString();
+        document.getElementById('statDelivered').textContent = (dash.messages?.total_delivered || 0).toLocaleString();
+        document.getElementById('statRead').textContent = (dash.messages?.total_read || 0).toLocaleString();
         document.getElementById('statTodaySent').textContent = (dash.today?.sent || 0).toLocaleString();
         document.getElementById('statRunning').textContent = dash.campaigns?.running || 0;
         document.getElementById('statFailed').textContent = (dash.messages?.total_failed || 0).toLocaleString();

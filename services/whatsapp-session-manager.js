@@ -16,6 +16,7 @@ const path = require('path');
 const fs = require('fs');
 const fsp = require('fs').promises;
 const crypto = require('crypto');
+const { applyMarketingAck } = require('./wa-ack-tracker');
 
 // whatsapp-web.js is an optional dependency — server runs without it
 let Client, LocalAuth, MessageMedia;
@@ -333,6 +334,16 @@ async function connectBranch(branchId, userId) {
                 }
             } catch (err) {
                 console.error(`[WhatsApp Chat] Error handling message_ack:`, err.message);
+            }
+
+            // Marketing Delivered/Read tracking (CM2). Own try/catch so a
+            // marketing bookkeeping error never breaks chat receipts above.
+            // ack < 2 = sent/pending only — no delivery to record.
+            if (!msg.id?._serialized || !pool || ack < 2) return;
+            try {
+                await applyMarketingAck(pool, msg.id._serialized, ack);
+            } catch (err) {
+                console.error(`[WhatsApp Chat] Error applying marketing ack:`, err.message);
             }
         });
 

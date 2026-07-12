@@ -951,27 +951,38 @@ async function processInstantBatch(batchId, branchId, messageTemplate, leads, me
                 index: i + 1, total: shuffled.length, sent, failed
             });
 
-            // Send via WhatsApp session
+            // Send via WhatsApp session. sendMessage/sendMedia return the wwjs
+            // message object on success and `false` when no session is available
+            // — a false was previously mislabeled 'sent' (CM2). Persist the FINAL
+            // message id (the text send for media+text, else the sole send) so
+            // its delivery/read receipt can be matched back to this row.
+            let finalMsgId = null;
             if (mediaUrl && mediaType) {
                 const mediaPath = path.join(__dirname, '..', mediaUrl.startsWith('/') ? mediaUrl.substring(1) : mediaUrl);
-                await sessionManager.sendMedia(branchId, lead.phone, {
+                const mediaResult = await sessionManager.sendMedia(branchId, lead.phone, {
                     type: mediaType,
                     mediaPath,
                     caption: mediaCaption ? campaignEngine.resolveMessage(mediaCaption, lead) : undefined
                 });
+                if (mediaResult === false) throw new Error('WhatsApp session unavailable (media send returned false)');
+                finalMsgId = (mediaResult && mediaResult.id && mediaResult.id._serialized) ? mediaResult.id._serialized : null;
                 // Also send text if message is not just a caption
                 if (messageTemplate.trim() && messageTemplate.trim() !== mediaCaption?.trim()) {
                     await new Promise(r => setTimeout(r, 1000 + Math.random() * 2000));
-                    await sessionManager.sendMessage(branchId, lead.phone, resolvedMsg);
+                    const textResult = await sessionManager.sendMessage(branchId, lead.phone, resolvedMsg);
+                    if (textResult === false) throw new Error('WhatsApp session unavailable (text send returned false)');
+                    finalMsgId = (textResult && textResult.id && textResult.id._serialized) ? textResult.id._serialized : finalMsgId;
                 }
             } else {
-                await sessionManager.sendMessage(branchId, lead.phone, resolvedMsg);
+                const sendResult = await sessionManager.sendMessage(branchId, lead.phone, resolvedMsg);
+                if (sendResult === false) throw new Error('WhatsApp session unavailable (send returned false)');
+                finalMsgId = (sendResult && sendResult.id && sendResult.id._serialized) ? sendResult.id._serialized : null;
             }
 
-            // Mark sent
+            // Mark sent (persist the final message id for ack matching)
             await pool.query(
-                `UPDATE wa_instant_messages SET status = 'sent', sent_at = NOW() WHERE batch_id = ? AND lead_id = ?`,
-                [batchId, lead.id]
+                `UPDATE wa_instant_messages SET status = 'sent', sent_at = NOW(), whatsapp_msg_id = ? WHERE batch_id = ? AND lead_id = ?`,
+                [finalMsgId, batchId, lead.id]
             );
             sent++;
 
@@ -1098,5 +1109,7 @@ module.exports = {
     setCampaignEngine,
     setSessionManager,
     setIO,
-    isAllowedMarketingUpload
+    isAllowedMarketingUpload,
+    // Exported for tests (CM2)
+    processInstantBatch
 };

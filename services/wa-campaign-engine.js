@@ -18,6 +18,7 @@
  */
 
 const { isClusterPrimary } = require('./cluster-guard');
+const { applyMarketingAck } = require('./wa-ack-tracker');
 
 let pool;
 let io;
@@ -202,6 +203,19 @@ async function start() {
     running = true;
     console.log('[WA Campaign Engine] Started');
     await loadSettings();
+    // Restart-orphan recovery (CM2): rows left in 'sending' by a crash/restart
+    // are never re-picked (the next-lead query only selects 'pending'). Reset
+    // them so an interrupted campaign resumes instead of silently stalling.
+    try {
+        const [r] = await pool.query(
+            `UPDATE wa_campaign_leads SET status = 'pending' WHERE status = 'sending'`
+        );
+        if (r && r.affectedRows > 0) {
+            console.log(`[WA Campaign Engine] Recovered ${r.affectedRows} orphaned 'sending' lead(s) → pending`);
+        }
+    } catch (e) {
+        console.error('[WA Campaign Engine] Orphan sweep failed:', e.message);
+    }
     schedulePoll();
 }
 
@@ -354,6 +368,37 @@ async function processCampaign(campaign) {
     }
 }
 
+/**
+ * Persist a successful send: mark the lead 'sent', stamp its whatsapp_msg_id,
+ * bump sent_count, then run an ack-race catch-up (CM2). If the delivery/read
+ * receipt already landed on whatsapp_messages before we stored the id, the
+ * message_ack handler couldn't match it — replay it here so Delivered/Read
+ * counters don't miss the early receipt.
+ */
+async function persistSentMsgId(campaignId, leadId, resolvedMessage, sentMsgId) {
+    await pool.query(
+        `UPDATE wa_campaign_leads SET status = 'sent', resolved_message = ?, sent_at = NOW(), whatsapp_msg_id = ? WHERE id = ?`,
+        [resolvedMessage, sentMsgId, leadId]
+    );
+    await pool.query(
+        'UPDATE wa_campaigns SET sent_count = sent_count + 1 WHERE id = ?',
+        [campaignId]
+    );
+
+    if (!sentMsgId) return;
+    try {
+        const [rows] = await pool.query(
+            `SELECT status FROM whatsapp_messages WHERE whatsapp_msg_id = ? LIMIT 1`,
+            [sentMsgId]
+        );
+        const st = rows[0]?.status;
+        if (st === 'read') await applyMarketingAck(pool, sentMsgId, 3);
+        else if (st === 'delivered') await applyMarketingAck(pool, sentMsgId, 2);
+    } catch (e) {
+        console.error('[WA Campaign Engine] ack read-back failed:', e.message);
+    }
+}
+
 async function sendToLead(campaign, lead, branchId) {
     const leadId = lead.id;
 
@@ -410,14 +455,10 @@ async function sendToLead(campaign, lead, branchId) {
         }
 
         if (sent) {
-            await pool.query(
-                `UPDATE wa_campaign_leads SET status = 'sent', resolved_message = ?, sent_at = NOW() WHERE id = ?`,
-                [resolvedMessage, leadId]
-            );
-            await pool.query(
-                'UPDATE wa_campaigns SET sent_count = sent_count + 1 WHERE id = ?',
-                [campaign.id]
-            );
+            // sessionManager.sendMessage/sendMedia returns the wwjs message
+            // object on success (or bare `true` when the object is absent).
+            const sentMsgId = (sent && sent.id && sent.id._serialized) ? sent.id._serialized : null;
+            await persistSentMsgId(campaign.id, leadId, resolvedMessage, sentMsgId);
             await incrementSendingStat(branchId, false);
 
             emitEvent('wa_campaign_progress', {
@@ -518,5 +559,7 @@ module.exports = {
     resolveSpinText,
     substituteVariables,
     appendInvisibleMarker,
-    resolveMessage
+    resolveMessage,
+    // Exported for tests (CM2)
+    persistSentMsgId
 };
