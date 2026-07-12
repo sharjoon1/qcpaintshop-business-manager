@@ -432,26 +432,49 @@ async function sendToLead(campaign, lead, branchId) {
         const typeMax = getSettingInt('typing_delay_max', 3) * 1000;
         await sleep(typeMin + Math.random() * (typeMax - typeMin));
 
-        // Send message based on type
+        // Send message based on type. Marketing source is load-bearing: without
+        // {source:'campaign'} the opt-out gate in the session manager is bypassed.
         let sent = false;
-        if (campaign.message_type === 'text' || !campaign.media_url) {
-            sent = await sessionManager.sendMessage(branchId, lead.phone, resolvedMessage);
-        } else {
-            const mediaPath = campaign.media_url.startsWith('/')
-                ? require('path').join(process.cwd(), campaign.media_url)
-                : campaign.media_url;
+        try {
+            if (campaign.message_type === 'text' || !campaign.media_url) {
+                sent = await sessionManager.sendMessage(branchId, lead.phone, resolvedMessage, { source: 'campaign' });
+            } else {
+                const mediaPath = campaign.media_url.startsWith('/')
+                    ? require('path').join(process.cwd(), campaign.media_url)
+                    : campaign.media_url;
 
-            // Resolve caption with spin/variables too
-            const resolvedCaption = campaign.media_caption
-                ? resolveMessage(campaign.media_caption, { lead_name: lead.lead_name, name: lead.lead_name, company: lead.company, city: lead.city, phone: lead.phone })
-                : undefined;
+                // Resolve caption with spin/variables too
+                const resolvedCaption = campaign.media_caption
+                    ? resolveMessage(campaign.media_caption, { lead_name: lead.lead_name, name: lead.lead_name, company: lead.company, city: lead.city, phone: lead.phone })
+                    : undefined;
 
-            sent = await sessionManager.sendMedia(branchId, lead.phone, {
-                type: campaign.message_type,
-                mediaPath,
-                caption: resolvedCaption,
-                filename: campaign.media_filename
-            });
+                sent = await sessionManager.sendMedia(branchId, lead.phone, {
+                    type: campaign.message_type,
+                    mediaPath,
+                    caption: resolvedCaption,
+                    filename: campaign.media_filename
+                }, { source: 'campaign' });
+            }
+        } catch (sendErr) {
+            // Opt-out (CM3): this recipient texted STOP. Mark the lead 'skipped'
+            // — NOT 'failed' — with no failed_count bump and no sending-stat bump,
+            // then continue the loop. 'skipped' is safe for the consecutive-
+            // failure auto-pause (it reads status IN ('sent','failed')).
+            if (sendErr && sendErr.code === 'OPTED_OUT') {
+                await pool.query(
+                    `UPDATE wa_campaign_leads SET status = 'skipped' WHERE id = ?`,
+                    [leadId]
+                );
+                emitEvent('wa_campaign_progress', {
+                    campaign_id: campaign.id,
+                    lead_id: leadId,
+                    status: 'skipped',
+                    sent_count: campaign.sent_count,
+                    total_leads: campaign.total_leads
+                });
+                return;
+            }
+            throw sendErr;
         }
 
         if (sent) {
@@ -561,5 +584,7 @@ module.exports = {
     appendInvisibleMarker,
     resolveMessage,
     // Exported for tests (CM2)
-    persistSentMsgId
+    persistSentMsgId,
+    // Exported for tests (CM3)
+    sendToLead
 };

@@ -262,7 +262,8 @@ router.post('/campaigns/:id/populate', managePerm, async (req, res) => {
                         l.email, b.name as branch_name
                  FROM leads l
                  LEFT JOIN branches b ON l.branch_id = b.id
-                 WHERE l.id IN (${placeholders}) AND l.phone IS NOT NULL AND l.phone != ''`,
+                 WHERE l.id IN (${placeholders}) AND l.phone IS NOT NULL AND l.phone != ''
+                   AND NOT EXISTS (SELECT 1 FROM wa_opt_outs o WHERE o.phone_key = RIGHT(REGEXP_REPLACE(l.phone, '[^0-9]', ''), 10))`,
                 lead_ids
             );
         } else {
@@ -782,7 +783,11 @@ router.post('/upload', managePerm, upload.single('media'), async (req, res) => {
 
 function buildLeadFilterQuery(filters, branchId, countOnly = false) {
     const params = [];
-    let where = 'WHERE l.phone IS NOT NULL AND l.phone != ""';
+    // Opt-out audience exclusion (CM3): NOT EXISTS (never NOT IN — a NULL in the
+    // subquery would make NOT IN return no rows). The send-time gate in the
+    // session manager is the real enforcement; this is the courtesy layer.
+    let where = 'WHERE l.phone IS NOT NULL AND l.phone != ""'
+        + " AND NOT EXISTS (SELECT 1 FROM wa_opt_outs o WHERE o.phone_key = RIGHT(REGEXP_REPLACE(l.phone, '[^0-9]', ''), 10))";
 
     if (filters.status) {
         if (Array.isArray(filters.status)) {
@@ -880,7 +885,8 @@ router.post('/instant-send', managePerm, async (req, res) => {
                     l.last_contact_date, b.name as branch_name
              FROM leads l
              LEFT JOIN branches b ON l.branch_id = b.id
-             WHERE l.id IN (${placeholders}) AND l.phone IS NOT NULL AND l.phone != ''`,
+             WHERE l.id IN (${placeholders}) AND l.phone IS NOT NULL AND l.phone != ''
+               AND NOT EXISTS (SELECT 1 FROM wa_opt_outs o WHERE o.phone_key = RIGHT(REGEXP_REPLACE(l.phone, '[^0-9]', ''), 10))`,
             lead_ids
         );
 
@@ -963,18 +969,18 @@ async function processInstantBatch(batchId, branchId, messageTemplate, leads, me
                     type: mediaType,
                     mediaPath,
                     caption: mediaCaption ? campaignEngine.resolveMessage(mediaCaption, lead) : undefined
-                });
+                }, { source: 'instant' });
                 if (mediaResult === false) throw new Error('WhatsApp session unavailable (media send returned false)');
                 finalMsgId = (mediaResult && mediaResult.id && mediaResult.id._serialized) ? mediaResult.id._serialized : null;
                 // Also send text if message is not just a caption
                 if (messageTemplate.trim() && messageTemplate.trim() !== mediaCaption?.trim()) {
                     await new Promise(r => setTimeout(r, 1000 + Math.random() * 2000));
-                    const textResult = await sessionManager.sendMessage(branchId, lead.phone, resolvedMsg);
+                    const textResult = await sessionManager.sendMessage(branchId, lead.phone, resolvedMsg, { source: 'instant' });
                     if (textResult === false) throw new Error('WhatsApp session unavailable (text send returned false)');
                     finalMsgId = (textResult && textResult.id && textResult.id._serialized) ? textResult.id._serialized : finalMsgId;
                 }
             } else {
-                const sendResult = await sessionManager.sendMessage(branchId, lead.phone, resolvedMsg);
+                const sendResult = await sessionManager.sendMessage(branchId, lead.phone, resolvedMsg, { source: 'instant' });
                 if (sendResult === false) throw new Error('WhatsApp session unavailable (send returned false)');
                 finalMsgId = (sendResult && sendResult.id && sendResult.id._serialized) ? sendResult.id._serialized : null;
             }
@@ -993,17 +999,32 @@ async function processInstantBatch(batchId, branchId, messageTemplate, leads, me
             });
 
         } catch (err) {
-            failed++;
-            await pool.query(
-                `UPDATE wa_instant_messages SET status = 'failed', error_message = ? WHERE batch_id = ? AND lead_id = ?`,
-                [(err.message || 'Unknown error').substring(0, 500), batchId, lead.id]
-            ).catch(() => {});
+            // Opt-out (CM3): recipient texted STOP. Mark 'skipped' (ENUM extended
+            // in CM2) — NOT 'failed', and don't count it as a failure.
+            if (err && err.code === 'OPTED_OUT') {
+                await pool.query(
+                    `UPDATE wa_instant_messages SET status = 'skipped', error_message = ? WHERE batch_id = ? AND lead_id = ?`,
+                    ['Recipient opted out of marketing', batchId, lead.id]
+                ).catch(() => {});
 
-            emitInstantProgress(userId, {
-                batch_id: batchId, lead_id: lead.id, lead_name: lead.name,
-                phone: lead.phone, status: 'failed', error: err.message,
-                index: i + 1, total: shuffled.length, sent, failed
-            });
+                emitInstantProgress(userId, {
+                    batch_id: batchId, lead_id: lead.id, lead_name: lead.name,
+                    phone: lead.phone, status: 'skipped',
+                    index: i + 1, total: shuffled.length, sent, failed
+                });
+            } else {
+                failed++;
+                await pool.query(
+                    `UPDATE wa_instant_messages SET status = 'failed', error_message = ? WHERE batch_id = ? AND lead_id = ?`,
+                    [(err.message || 'Unknown error').substring(0, 500), batchId, lead.id]
+                ).catch(() => {});
+
+                emitInstantProgress(userId, {
+                    batch_id: batchId, lead_id: lead.id, lead_name: lead.name,
+                    phone: lead.phone, status: 'failed', error: err.message,
+                    index: i + 1, total: shuffled.length, sent, failed
+                });
+            }
         }
 
         // Anti-block delay: 5-15 seconds between messages
@@ -1111,5 +1132,7 @@ module.exports = {
     setIO,
     isAllowedMarketingUpload,
     // Exported for tests (CM2)
-    processInstantBatch
+    processInstantBatch,
+    // Exported for tests (CM3)
+    buildLeadFilterQuery
 };

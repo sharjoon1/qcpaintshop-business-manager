@@ -462,7 +462,15 @@ router.post('/admin/leads/:id/send-wa', requirePermission('painters', 'marketing
 
         if (!sessionManager) return res.status(503).json({ success: false, error: 'WhatsApp session not available' });
 
-        await sessionManager.sendMessage(0, waPhone + '@c.us', message, { source: 'painter_marketing_admin' });
+        try {
+            await sessionManager.sendMessage(0, waPhone + '@c.us', message, { source: 'painter_marketing_admin' });
+        } catch (sendErr) {
+            // Opt-out (CM3): recipient texted STOP — return a clean 400.
+            if (sendErr && sendErr.code === 'OPTED_OUT') {
+                return res.status(400).json({ success: false, code: 'OPTED_OUT', error: 'Painter has opted out of WhatsApp marketing messages' });
+            }
+            throw sendErr;
+        }
 
         await pool.query(
             `INSERT INTO painter_lead_followups (painter_lead_id, user_id, followup_type, notes)

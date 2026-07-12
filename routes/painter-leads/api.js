@@ -174,6 +174,9 @@ async function trySendWhatsApp(branchId, phone, message) {
         );
         return !!result;
     } catch (err) {
+        // Opt-out (CM3): surface so the caller returns a clean 400 instead of
+        // silently falling back to SMS. All other errors collapse to false.
+        if (err && err.code === 'OPTED_OUT') throw err;
         console.error('[painter-leads] WhatsApp send failed:', err.message);
         return false;
     }
@@ -1035,10 +1038,21 @@ router.post(
 
             // Try WhatsApp first (unless caller pinned channel='sms').
             if (channel !== 'sms') {
-                const waOk = await trySendWhatsApp(sessionBranch, e164 || lead.phone, messageText);
-                if (waOk) {
-                    usedChannel = 'whatsapp';
-                    deliveryStatus = 'sent';
+                try {
+                    const waOk = await trySendWhatsApp(sessionBranch, e164 || lead.phone, messageText);
+                    if (waOk) {
+                        usedChannel = 'whatsapp';
+                        deliveryStatus = 'sent';
+                    }
+                } catch (err) {
+                    if (err && err.code === 'OPTED_OUT') {
+                        return res.status(400).json({
+                            success: false,
+                            code: 'OPTED_OUT',
+                            message: 'Painter has opted out of WhatsApp marketing messages',
+                        });
+                    }
+                    throw err;
                 }
             }
 

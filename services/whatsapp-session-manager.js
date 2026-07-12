@@ -17,6 +17,14 @@ const fs = require('fs');
 const fsp = require('fs').promises;
 const crypto = require('crypto');
 const { applyMarketingAck } = require('./wa-ack-tracker');
+const {
+    detectKeyword,
+    recordOptOut,
+    recordOptIn,
+    assertSendAllowed,
+    OPT_OUT_REPLY,
+    OPT_IN_REPLY,
+} = require('./wa-optout-service');
 
 // whatsapp-web.js is an optional dependency — server runs without it
 let Client, LocalAuth, MessageMedia;
@@ -211,6 +219,34 @@ async function connectBranch(branchId, userId) {
                 const phone = sanitizePhone(msg.from.replace('@c.us', ''));
                 const contact = await msg.getContact();
                 const pushname = contact?.pushname || contact?.name || '';
+
+                // Opt-out / opt-in keyword handling (CM3). Runs before the media
+                // branch so a bare "STOP"/"UNSUBSCRIBE" short-circuits into a
+                // suppression record + confirmation reply, and "START"/"RESUME"
+                // re-enables. Confirmation replies go out via this module's own
+                // sendMessage with source 'optout' so they are recorded in the
+                // chat thread and never themselves suppressed.
+                const optKeyword = detectKeyword(msg.body);
+                if (optKeyword === 'stop') {
+                    try {
+                        await recordOptOut(pool, { phone, source: 'inbound_stop', rawFrom: msg.from, branchId });
+                        await sendMessage(branchId, phone, OPT_OUT_REPLY, { source: 'optout' });
+                        console.log(`[WhatsApp Opt-out] ${phone} opted out (branch ${branchId})`);
+                    } catch (optErr) {
+                        console.error('[WhatsApp Opt-out] STOP handling failed:', optErr.message);
+                    }
+                    return;
+                }
+                if (optKeyword === 'start') {
+                    try {
+                        await recordOptIn(pool, phone);
+                        await sendMessage(branchId, phone, OPT_IN_REPLY, { source: 'optout' });
+                        console.log(`[WhatsApp Opt-out] ${phone} opted back in (branch ${branchId})`);
+                    } catch (optErr) {
+                        console.error('[WhatsApp Opt-out] START handling failed:', optErr.message);
+                    }
+                    return;
+                }
 
                 // Determine message type
                 let messageType = 'text';
@@ -444,6 +480,10 @@ async function sendMessage(branchId, phone, message, metadata = {}) {
     }
     const chatId = normalized + '@c.us';
 
+    // Opt-out enforcement (CM3): marketing sources must not reach an opted-out
+    // number. Throws Error{code:'OPTED_OUT'}; transactional sources pass.
+    await assertSendAllowed(pool, normalized, metadata.source);
+
     const sentMsg = await session.client.sendMessage(chatId, message);
 
     // Record outbound message (use actualBranchId — General if fallback used)
@@ -499,6 +539,10 @@ async function sendMedia(branchId, phone, options = {}, metadata = {}) {
         normalized = '91' + normalized;
     }
     const chatId = normalized + '@c.us';
+
+    // Opt-out enforcement (CM3): marketing sources must not reach an opted-out
+    // number. Throws Error{code:'OPTED_OUT'}; transactional sources pass.
+    await assertSendAllowed(pool, normalized, metadata.source);
 
     const media = MessageMedia.fromFilePath(options.mediaPath);
     if (options.filename) media.filename = options.filename;
