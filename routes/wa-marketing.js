@@ -51,6 +51,40 @@ function setIO(socketIO) { io = socketIO; }
 const viewPerm = requirePermission('marketing', 'view');
 const managePerm = requirePermission('marketing', 'manage');
 
+// ========================================
+// SEND-FROM SESSION (CM4)
+// ========================================
+
+/**
+ * Parse an incoming send_from_branch_id request value.
+ *   '' / null / undefined → null  (inherit the campaign's own branch at send time)
+ *   otherwise             → parseInt (junk → NaN, which the caller rejects with 400)
+ * Pure + sync so it's unit-testable without a DB.
+ */
+function parseSendFrom(v) {
+    if (v === '' || v === null || v === undefined) return null;
+    return parseInt(v, 10);
+}
+
+/**
+ * Validate a parsed send_from value against the allowed set:
+ *   null → inherit branch at send time (always OK)
+ *   0    → General WhatsApp session
+ *   -1   → Admin session
+ *   > 0  → must be an existing ACTIVE branch id
+ * NaN (junk input) → invalid. Returns a boolean.
+ */
+async function validateSendFrom(value) {
+    if (value === null) return true;
+    if (typeof value !== 'number' || Number.isNaN(value)) return false;
+    if (value === 0 || value === -1) return true;
+    const [rows] = await pool.query(
+        "SELECT id FROM branches WHERE id = ? AND status = 'active'",
+        [value]
+    );
+    return rows.length > 0;
+}
+
 // Upload config
 const storage = multer.diskStorage({
     destination: (req, file, cb) => cb(null, 'uploads/wa-marketing'),
@@ -152,7 +186,7 @@ router.get('/campaigns/:id', viewPerm, async (req, res) => {
 router.post('/campaigns', managePerm, async (req, res) => {
     try {
         const {
-            name, description, branch_id, message_type = 'text', message_body,
+            name, description, branch_id, send_from_branch_id, message_type = 'text', message_body,
             media_url, media_filename, media_caption, audience_filter,
             min_delay_seconds, max_delay_seconds, hourly_limit, daily_limit, warm_up_enabled
         } = req.body;
@@ -160,12 +194,18 @@ router.post('/campaigns', managePerm, async (req, res) => {
         if (!name) return res.status(400).json({ error: 'Campaign name is required' });
         if (branch_id == null || branch_id === '') return res.status(400).json({ error: 'Branch is required' });
 
+        // Send-from session (CM4): '' / null / undefined → NULL (inherit branch).
+        const sendFrom = parseSendFrom(send_from_branch_id);
+        if (!(await validateSendFrom(sendFrom))) {
+            return res.status(400).json({ error: 'Invalid send-from session (must be General, Admin, or an active branch)' });
+        }
+
         const [result] = await pool.query(
-            `INSERT INTO wa_campaigns (name, description, branch_id, message_type, message_body,
+            `INSERT INTO wa_campaigns (name, description, branch_id, send_from_branch_id, message_type, message_body,
              media_url, media_filename, media_caption, audience_filter,
              min_delay_seconds, max_delay_seconds, hourly_limit, daily_limit, warm_up_enabled, created_by)
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-            [name, description || null, parseInt(branch_id), message_type, message_body || null,
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+            [name, description || null, parseInt(branch_id), sendFrom, message_type, message_body || null,
              media_url || null, media_filename || null, media_caption || null,
              audience_filter ? JSON.stringify(audience_filter) : null,
              min_delay_seconds || 30, max_delay_seconds || 90,
@@ -208,6 +248,17 @@ router.put('/campaigns/:id', managePerm, async (req, res) => {
                     params.push(req.body[field]);
                 }
             }
+        }
+
+        // Send-from session (CM4): parsed + validated separately so '' clears it
+        // to NULL rather than persisting an empty string.
+        if (req.body.send_from_branch_id !== undefined) {
+            const sendFrom = parseSendFrom(req.body.send_from_branch_id);
+            if (!(await validateSendFrom(sendFrom))) {
+                return res.status(400).json({ error: 'Invalid send-from session (must be General, Admin, or an active branch)' });
+            }
+            updates.push('send_from_branch_id = ?');
+            params.push(sendFrom);
         }
 
         if (updates.length === 0) return res.json({ success: true });
@@ -445,11 +496,11 @@ router.post('/campaigns/:id/duplicate', managePerm, async (req, res) => {
 
         const c = orig[0];
         const [result] = await pool.query(
-            `INSERT INTO wa_campaigns (name, description, branch_id, message_type, message_body,
+            `INSERT INTO wa_campaigns (name, description, branch_id, send_from_branch_id, message_type, message_body,
              media_url, media_filename, media_caption, audience_filter,
              min_delay_seconds, max_delay_seconds, hourly_limit, daily_limit, warm_up_enabled, created_by)
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-            [`${c.name} (Copy)`, c.description, c.branch_id, c.message_type, c.message_body,
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+            [`${c.name} (Copy)`, c.description, c.branch_id, c.send_from_branch_id, c.message_type, c.message_body,
              c.media_url, c.media_filename, c.media_caption, c.audience_filter,
              c.min_delay_seconds, c.max_delay_seconds, c.hourly_limit, c.daily_limit,
              c.warm_up_enabled, req.user.id]
@@ -1134,5 +1185,8 @@ module.exports = {
     // Exported for tests (CM2)
     processInstantBatch,
     // Exported for tests (CM3)
-    buildLeadFilterQuery
+    buildLeadFilterQuery,
+    // Exported for tests (CM4)
+    parseSendFrom,
+    validateSendFrom
 };

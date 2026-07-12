@@ -278,29 +278,39 @@ async function activateScheduledCampaigns() {
 }
 
 async function processCampaign(campaign) {
-    const branchId = campaign.branch_id;
+    // Send-from session (CM4): send_from_branch_id overrides branch_id for the
+    // actual WhatsApp session used to send — and therefore for the connection
+    // check, the hourly/daily rate-limit reads, the send calls, AND the
+    // sending-stat writes. Rate limits MUST key on the real sending session:
+    // if two campaigns share the General session (0) they would otherwise each
+    // get the full anti-block budget and double the block risk. NULL/undefined
+    // inherits the campaign's own branch; 0 = General, -1 = Admin.
+    const effectiveBranchId = (campaign.send_from_branch_id === null || campaign.send_from_branch_id === undefined)
+        ? campaign.branch_id
+        : campaign.send_from_branch_id;
+    const branchId = campaign.branch_id; // audience/{branch} personalization context only
 
-    // Check WhatsApp session
-    if (!sessionManager || !sessionManager.isConnected(branchId)) {
-        console.log(`[WA Campaign Engine] Branch ${branchId} not connected, pausing campaign #${campaign.id}`);
+    // Check WhatsApp session (the SENDING session, not necessarily the audience branch)
+    if (!sessionManager || !sessionManager.isConnected(effectiveBranchId)) {
+        console.log(`[WA Campaign Engine] Send-from session ${effectiveBranchId} not connected, pausing campaign #${campaign.id}`);
         await pauseCampaign(campaign.id, 'WhatsApp session disconnected');
         return;
     }
 
-    // Check rate limits
+    // Check rate limits (keyed on the sending session)
     const hourlyLimit = campaign.hourly_limit || getSettingInt('hourly_limit', 30);
     const dailyLimit = campaign.daily_limit || getSettingInt('daily_limit', 200);
 
-    const hourlySent = await getHourlySent(branchId);
+    const hourlySent = await getHourlySent(effectiveBranchId);
     if (hourlySent >= hourlyLimit) {
-        console.log(`[WA Campaign Engine] Hourly limit reached (${hourlySent}/${hourlyLimit}) for branch ${branchId}`);
+        console.log(`[WA Campaign Engine] Hourly limit reached (${hourlySent}/${hourlyLimit}) for session ${effectiveBranchId}`);
         schedulePoll();
         return;
     }
 
-    const dailySent = await getDailySent(branchId);
+    const dailySent = await getDailySent(effectiveBranchId);
     if (dailySent >= dailyLimit) {
-        console.log(`[WA Campaign Engine] Daily limit reached (${dailySent}/${dailyLimit}) for branch ${branchId}`);
+        console.log(`[WA Campaign Engine] Daily limit reached (${dailySent}/${dailyLimit}) for session ${effectiveBranchId}`);
         schedulePoll();
         return;
     }
@@ -336,8 +346,9 @@ async function processCampaign(campaign) {
     const lead = leads[0];
     let consecutiveFailures = 0;
 
-    // Process this lead
-    await sendToLead(campaign, lead, branchId);
+    // Process this lead via the sending session (send calls + incrementSendingStat
+    // inside sendToLead all key on this branch id).
+    await sendToLead(campaign, lead, effectiveBranchId);
 
     // Check for consecutive failures
     const [recentResults] = await pool.query(
@@ -586,5 +597,7 @@ module.exports = {
     // Exported for tests (CM2)
     persistSentMsgId,
     // Exported for tests (CM3)
-    sendToLead
+    sendToLead,
+    // Exported for tests (CM4)
+    processCampaign
 };
