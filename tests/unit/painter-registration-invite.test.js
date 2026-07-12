@@ -554,3 +554,30 @@ describe('PUT /api/painters/admin/:id/approve — staff approval gate', () => {
         expect(res.statusCode).toBe(404);
     });
 });
+
+// ═════════════════════════════════════════════════════════════════════════
+//  4. Invite link + register-page wiring (content contract)
+//     The invite loop is only usable end-to-end if the invite link points at a
+//     real page and that page forwards the token as invite_token. These are
+//     DOM-independent content checks, mirroring the integration UI convention.
+// ═════════════════════════════════════════════════════════════════════════
+
+describe('invite link + painter-register.html wiring (content contract)', () => {
+    const fs = require('fs');
+    const path = require('path');
+    const API_PATH = path.join(__dirname, '..', '..', 'routes', 'painter-leads', 'api.js');
+    const REGISTER_HTML_PATH = path.join(__dirname, '..', '..', 'public', 'painter-register.html');
+
+    test('painter-leads api.js points invite links at the act register page', () => {
+        const src = fs.readFileSync(API_PATH, 'utf8');
+        expect(src).toContain('https://act.qcpaintshop.com/painter-register.html');
+        // Must NOT still point at the marketing host that has no such page.
+        expect(src).not.toContain("'https://qcpaintshop.com/painter-register'");
+    });
+
+    test('painter-register.html reads the ?token param and posts invite_token', () => {
+        const html = fs.readFileSync(REGISTER_HTML_PATH, 'utf8');
+        expect(html).toMatch(/params\.get\(\s*['"]token['"]\s*\)/);
+        expect(html).toMatch(/invite_token\s*:/);
+    });
+});

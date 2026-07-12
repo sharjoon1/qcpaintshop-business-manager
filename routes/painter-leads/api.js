@@ -72,7 +72,7 @@ const VALID_SOURCES = [
     'painter_referral', 'admin_bulk',
 ];
 
-const PAINTER_REGISTER_URL = 'https://qcpaintshop.com/painter-register';
+const PAINTER_REGISTER_URL = 'https://act.qcpaintshop.com/painter-register.html';
 
 // ─────────────────────────────────────────────────────────────────────────
 //  Helpers

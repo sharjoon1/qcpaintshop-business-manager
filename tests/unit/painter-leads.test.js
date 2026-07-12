@@ -440,7 +440,7 @@ describe('Send-invite endpoint', () => {
         expect(res.body.data.channel).toBe('sms');
         expect(res.body.data.delivery_status).toBe('sent');
         expect(res.body.data.invite_token).toMatch(/^[0-9a-f]{64}$/);
-        expect(res.body.data.invite_url).toContain('painter-register?token=');
+        expect(res.body.data.invite_url).toContain('act.qcpaintshop.com/painter-register.html?token=');
 
         // SMS service must have been called (since wwjs isn't loaded in test env).
         expect(smsService.sendSms).toHaveBeenCalledTimes(1);

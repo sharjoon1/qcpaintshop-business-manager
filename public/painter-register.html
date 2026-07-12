@@ -173,8 +173,9 @@
     const API = '/api/painters';
     let verifiedPhone = '';
     let referralTimer;
+    let inviteToken = '';
 
-    // Auto-fill referral code from URL (?ref=CODE)
+    // Auto-fill referral code from URL (?ref=CODE) and capture staff invite token (?token=...)
     (function autoFillReferral() {
         const params = new URLSearchParams(window.location.search);
         const refCode = params.get('ref') || params.get('referral');
@@ -184,6 +185,10 @@
             // Validate the referral code
             setTimeout(() => validateReferral(), 300);
         }
+        // Staff-sent invite links append ?token=<invite_token>; keep it so we can
+        // link the registration back to the painter_lead on submit.
+        const tok = params.get('token');
+        if (tok) inviteToken = tok;
     })();
 
     // OTP input auto-focus
@@ -332,7 +337,8 @@
                 specialization: document.getElementById('regSpec').value,
                 referral_code: document.getElementById('regReferral').value.trim() || undefined,
                 aadhar_number: document.getElementById('regAadhar').value.trim() || undefined,
-                pan_number: document.getElementById('regPan').value.trim().toUpperCase() || undefined
+                pan_number: document.getElementById('regPan').value.trim().toUpperCase() || undefined,
+                invite_token: inviteToken || undefined
             };
 
             const res = await fetch(`${API}/register`, {
