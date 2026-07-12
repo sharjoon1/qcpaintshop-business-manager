@@ -554,7 +554,7 @@ describe('migration 20260713_painter_followup_enums (CM1)', () => {
         "enum('interested_in_program','already_aware','will_visit_shop','wants_callback','not_interested','wrong_number','no_answer','interested','callback','no_response','converted','unreachable','other')";
     const WIDE_FOLLOWUP = "enum('call','whatsapp','visit','sms')";
 
-    function makeMigrationPool({ outcomeType, followupType }) {
+    function makeMigrationPool({ outcomeType, followupType, outcomeDefault = null }) {
         const calls = [];
         return {
             calls,
@@ -564,7 +564,7 @@ describe('migration 20260713_painter_followup_enums (CM1)', () => {
                 if (/information_schema\.COLUMNS/i.test(s)) {
                     const col = params[1];
                     if (col === 'outcome') {
-                        return [[{ COLUMN_TYPE: outcomeType, IS_NULLABLE: 'YES', COLUMN_DEFAULT: null }]];
+                        return [[{ COLUMN_TYPE: outcomeType, IS_NULLABLE: 'YES', COLUMN_DEFAULT: outcomeDefault }]];
                     }
                     if (col === 'followup_type') {
                         return [[{ COLUMN_TYPE: followupType, IS_NULLABLE: 'NO', COLUMN_DEFAULT: null }]];
@@ -614,6 +614,36 @@ describe('migration 20260713_painter_followup_enums (CM1)', () => {
         const vals = migration.parseEnumValues(PROD_FOLLOWUP);
         expect(vals).toEqual(['call', 'whatsapp', 'visit']);
         expect(migration.buildEnumType(vals)).toBe(PROD_FOLLOWUP);
+    });
+
+    // Regression: MariaDB 10.2+ reports a NULL default as the SQL literal string 'NULL'
+    // (unlike MySQL's SQL NULL). The first prod run generated DEFAULT 'NULL' — an invalid
+    // enum member — and the outcome ALTER failed with "Invalid default value".
+    test("MariaDB 'NULL' string COLUMN_DEFAULT never becomes DEFAULT 'NULL'", async () => {
+        const pool = makeMigrationPool({
+            outcomeType: PROD_OUTCOME,
+            followupType: WIDE_FOLLOWUP,
+            outcomeDefault: 'NULL',
+        });
+        await migration.up(pool);
+
+        const outcomeAlter = pool.calls.find(c => /MODIFY COLUMN outcome/.test(c.s));
+        expect(outcomeAlter).toBeDefined();
+        expect(outcomeAlter.s).not.toContain("DEFAULT 'NULL'");
+        expect(outcomeAlter.s.endsWith('DEFAULT NULL')).toBe(true);
+    });
+
+    test("MariaDB quoted string default ('x') is unwrapped, not double-quoted", async () => {
+        const pool = makeMigrationPool({
+            outcomeType: PROD_OUTCOME,
+            followupType: WIDE_FOLLOWUP,
+            outcomeDefault: "'no_answer'",
+        });
+        await migration.up(pool);
+
+        const outcomeAlter = pool.calls.find(c => /MODIFY COLUMN outcome/.test(c.s));
+        expect(outcomeAlter.s.endsWith("DEFAULT 'no_answer'")).toBe(true);
+        expect(outcomeAlter.s).not.toContain("''no_answer''");
     });
 });
 

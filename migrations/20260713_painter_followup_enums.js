@@ -93,8 +93,19 @@ exports.up = async function up(pool) {
         const target = existing.concat(missing);
         let ddl = `ALTER TABLE ${TABLE} MODIFY COLUMN ${column} ${buildEnumType(target)}`;
         ddl += meta.IS_NULLABLE === 'YES' ? ' NULL' : ' NOT NULL';
-        if (meta.COLUMN_DEFAULT !== null && meta.COLUMN_DEFAULT !== undefined) {
-            ddl += ` DEFAULT '${String(meta.COLUMN_DEFAULT).replace(/'/g, "''")}'`;
+        // MariaDB 10.2+ reports a NULL default as the SQL literal string 'NULL' and wraps
+        // string defaults in single quotes; MySQL returns SQL NULL / bare values. Normalize
+        // both so we never emit DEFAULT 'NULL' (invalid enum member — broke the first prod run).
+        let colDefault = meta.COLUMN_DEFAULT;
+        if (colDefault !== null && colDefault !== undefined) {
+            const s = String(colDefault);
+            if (/^null$/i.test(s)) colDefault = null;
+            else if (s.length >= 2 && s.startsWith("'") && s.endsWith("'")) colDefault = s.slice(1, -1).replace(/''/g, "'");
+        }
+        if (colDefault !== null && colDefault !== undefined) {
+            ddl += ` DEFAULT '${String(colDefault).replace(/'/g, "''")}'`;
+        } else if (meta.IS_NULLABLE === 'YES') {
+            ddl += ' DEFAULT NULL';
         }
 
         await pool.query(ddl);
