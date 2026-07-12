@@ -1694,15 +1694,17 @@ async function getLocationStockDashboard(filters = {}) {
 // ========================================
 
 /**
- * Create a new item in Zoho Books
+ * Wrap any top-level cf_* custom-field keys on a payload into the
+ * custom_fields: [{ api_name, value }] shape Zoho expects.
  *
- * Handles cf_* custom field keys same as updateItem — wraps them into
- * custom_fields: [{ api_name, value }] before sending.
+ * Zoho silently ignores top-level cf_* keys on item create/update, so they
+ * must be moved inside custom_fields. Mutates and returns the given payload.
+ * An existing custom_fields array is preserved and merged: a top-level cf_*
+ * key OVERRIDES an entry with the same api_name (Map dedup by api_name,
+ * insertion order kept). Payloads with no cf_* keys are returned untouched
+ * (no custom_fields key is added).
  */
-async function createItem(data) {
-    const orgId = process.env.ZOHO_ORGANIZATION_ID;
-    const payload = { ...data };
-    // Handle cf_* custom fields same as updateItem
+function wrapCustomFields(payload) {
     const cfKeys = Object.keys(payload).filter(k => k.startsWith('cf_'));
     if (cfKeys.length > 0) {
         const existing = Array.isArray(payload.custom_fields) ? [...payload.custom_fields] : [];
@@ -1713,6 +1715,18 @@ async function createItem(data) {
         }
         payload.custom_fields = Array.from(byApi.values());
     }
+    return payload;
+}
+
+/**
+ * Create a new item in Zoho Books
+ *
+ * Handles cf_* custom field keys same as updateItem — wraps them into
+ * custom_fields: [{ api_name, value }] before sending.
+ */
+async function createItem(data) {
+    const orgId = process.env.ZOHO_ORGANIZATION_ID;
+    const payload = wrapCustomFields({ ...data });
     return await apiPost(`/items?organization_id=${orgId}`, payload);
 }
 
@@ -1725,17 +1739,7 @@ async function createItem(data) {
  */
 async function updateItem(itemId, data) {
     const orgId = process.env.ZOHO_ORGANIZATION_ID;
-    const payload = { ...data };
-    const cfKeys = Object.keys(payload).filter(k => k.startsWith('cf_'));
-    if (cfKeys.length > 0) {
-        const existing = Array.isArray(payload.custom_fields) ? [...payload.custom_fields] : [];
-        const byApi = new Map(existing.map(f => [f.api_name, f]));
-        for (const k of cfKeys) {
-            byApi.set(k, { api_name: k, value: payload[k] });
-            delete payload[k];
-        }
-        payload.custom_fields = Array.from(byApi.values());
-    }
+    const payload = wrapCustomFields({ ...data });
     // Rate limiting now handled centrally in apiPut
     return await apiPut(`/items/${itemId}?organization_id=${orgId}`, payload);
 }
