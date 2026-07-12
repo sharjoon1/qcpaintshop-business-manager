@@ -2028,6 +2028,22 @@ node promote-release.js internal production
 
 ## 8. RECENT UPDATES & CHANGELOG
 
+### 2026-07-12 - Painter onboarding loop closure (frontend fixes)
+
+The onboarding workflow deployed earlier today had three frontend-only gaps closing the
+nomination → invite → register → approve loop (commits `e9ef0dd`, `a7e5ef4`, `1a4a456`):
+- Invite links now point at the real register page (`routes/painter-leads/api.js`
+  `PAINTER_REGISTER_URL` → `https://act.qcpaintshop.com/painter-register.html`; was the
+  marketing-site host with no such page) and `painter-register.html` now reads `?token=` and
+  forwards it as `invite_token` in the register POST (backend already accepted it) — the
+  lead↔painter link + staff approval rights now actually happen.
+- `admin-painter-leads.html` funnel dashboard is now linked in the admin sidebar + painters
+  subnav (was reachable only by typed URL).
+- Painter web dashboard AP hero fixed: called non-existent `/api/me/attendance/*` (silent 404) —
+  now `/api/painters/me/attendance/{month,claim}`; web painters can finally see and claim AP
+  (previously Android-only). All hero fields verified against the real route responses.
+Suite 1,056 → 1,062 tests.
+
 ### 2026-07-12 - SP-1 Payment Settlement Sync (AR + AP) + invoice discount push fix
 
 Payments recorded in-app now reach Zoho Books (previously local-only — the biggest daily
