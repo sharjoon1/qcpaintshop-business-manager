@@ -1244,16 +1244,22 @@ router.post('/invoices/:id/push-zoho',
     async (req, res) => {
         try {
             const { id } = req.params;
+            const admin = isFullAdmin(req.user && req.user.role);
             const options = {
                 salespersonId: (req.body && req.body.salesperson_id) || null,
                 locationId: (req.body && req.body.zoho_location_id) || null,
-                isAdmin: isFullAdmin(req.user && req.user.role),
+                isAdmin: admin,
+                // draft_only (admin-only): create the Zoho invoice as a draft,
+                // skipping finalize + payment forwarding — used for the D1
+                // discount verification before flipping the push flag on.
+                draftOnly: admin && (req.body && req.body.draft_only === true),
             };
             const result = await billingZohoService.pushInvoiceToZoho(id, req.user.id, options);
             const state = result.zohoState;
             const stateMsg = state === 'approved' ? 'created & approved in Zoho'
                 : state === 'submitted' ? 'created & submitted for admin approval in Zoho'
                 : state === 'sent' ? 'created in Zoho'
+                : state === 'draft' ? 'created as a DRAFT in Zoho (not finalized)'
                 : 'pushed to Zoho';
             res.json({
                 success: true,

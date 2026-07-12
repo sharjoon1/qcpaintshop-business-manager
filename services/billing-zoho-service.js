@@ -14,6 +14,22 @@ let pointsEngine;
 function setPool(p) { pool = p; }
 function setPointsEngine(pe) { pointsEngine = pe; }
 
+// Invoice-level discount push is behind an ai_config flag
+// ('billing_invoice_discount_push_enabled', default '0') so it can only be
+// switched on after the D1 draft verification passes on the real Zoho org —
+// flag-off keeps the createInvoice payload byte-identical to today. Best-effort:
+// any read error is treated as disabled. Mirrors resolveDefaultGstTaxId in
+// routes/vendors.js.
+async function isInvoiceDiscountPushEnabled() {
+    try {
+        const [rows] = await pool.query(
+            "SELECT config_value FROM ai_config WHERE config_key = 'billing_invoice_discount_push_enabled' LIMIT 1"
+        );
+        const v = rows.length ? String(rows[0].config_value || '').trim() : '';
+        return v === '1';
+    } catch { return false; }
+}
+
 // ═══════════════════════════════════════════
 // RESOLVE ZOHO CONTACT
 // ═══════════════════════════════════════════
@@ -225,12 +241,27 @@ async function pushInvoiceToZoho(invoiceId, userId, options = {}) {
         rate: parseFloat(item.unit_price)
     }));
 
+    // Invoice-level discount (owner model): applied before tax so Zoho computes
+    // GST on (subtotal − discount), matching the printed invoice — mirrors the
+    // proven bill-push block (routes/vendors.js). Behind the ai_config flag; when
+    // off (default) or discount is zero the payload is byte-identical to today.
+    // No discount_account_id here: sales-side discounts don't require one (that
+    // is a purchase-side concept; if the sales org later demands it, ai_config
+    // 'zoho_sales_discount_account_id' is the ready slot per the plan).
+    const discountPushEnabled = await isInvoiceDiscountPushEnabled();
+    const invDiscount = parseFloat(invoice.discount_amount) || 0;
+
     const zohoResult = await zohoAPI.createInvoice({
         customer_id: zohoContactId,
         date: invoiceDate,
         line_items: lineItems,
         salesperson_id: salespersonId,
-        ...(locationId ? { location_id: locationId } : {})
+        ...(locationId ? { location_id: locationId } : {}),
+        ...(discountPushEnabled && invDiscount > 0 ? {
+            discount: invDiscount,
+            is_discount_before_tax: true,
+            discount_type: 'entity_level'
+        } : {})
     });
 
     const zohoInvoice = zohoResult && zohoResult.invoice;
@@ -244,7 +275,13 @@ async function pushInvoiceToZoho(invoiceId, userId, options = {}) {
     // Take it OUT OF DRAFT (owner 2026-06-12): a staff push is submitted for the
     // admin's Zoho approval; an admin push is approved directly. Done before
     // recording any payment (Zoho won't accept a payment on a draft invoice).
-    const finalizeState = (await zohoAPI.finalizeDocument('invoice', zohoInvoiceId, !!options.isAdmin)).state;
+    // draftOnly (admin-only, for the D1 discount draft check): leave the invoice
+    // as a Zoho draft — skip finalize AND the push-time payment forwarding. A
+    // draft has zero GST impact and is hard-deletable in Zoho.
+    let finalizeState = 'draft';
+    if (!options.draftOnly) {
+        finalizeState = (await zohoAPI.finalizeDocument('invoice', zohoInvoiceId, !!options.isAdmin)).state;
+    }
 
     // 6. Award painter points if applicable
     let pointsResult = null;
@@ -273,9 +310,10 @@ async function pushInvoiceToZoho(invoiceId, userId, options = {}) {
         }
     }
 
-    // 7. Record payment in Zoho if amount_paid > 0
+    // 7. Record payment in Zoho if amount_paid > 0 (skipped for draft-only
+    // pushes: a draft can't take payments and D1 reverses the draft manually).
     const amountPaid = parseFloat(invoice.amount_paid) || 0;
-    if (amountPaid > 0) {
+    if (!options.draftOnly && amountPaid > 0) {
         try {
             await zohoAPI.createPayment({
                 customer_id: zohoContactId,

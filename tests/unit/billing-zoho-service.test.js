@@ -14,21 +14,27 @@ const mockCreateContact = jest.fn(async () => ({ contact: { contact_id: 'NEWCONT
 // Returns a real Zoho payment id so the "id is discarded" characterization is meaningful.
 const mockCreatePayment = jest.fn(async () => ({ payment: { payment_id: 'ZPAY1' } }));
 const mockGetDocumentStatus = jest.fn(async () => 'approved');
+const mockFinalizeDocument = jest.fn(async (_kind, _id, isAdmin) => ({ state: isAdmin ? 'approved' : 'submitted' }));
 jest.mock('../../services/zoho-api', () => ({
     createInvoice: (...a) => mockCreateInvoice(...a),
     createContact: (...a) => mockCreateContact(...a),
     createPayment: (...a) => mockCreatePayment(...a),
-    finalizeDocument: jest.fn(async (_kind, _id, isAdmin) => ({ state: isAdmin ? 'approved' : 'submitted' })),
+    finalizeDocument: (...a) => mockFinalizeDocument(...a),
     getDocumentStatus: (...a) => mockGetDocumentStatus(...a),
 }));
 
 const svc = require('../../services/billing-zoho-service');
 
 // A SQL-substring-dispatching fake pool covering every query pushInvoiceToZoho runs.
-function makePool(invoice, { painterSp = null } = {}) {
+function makePool(invoice, { painterSp = null, discountFlag = null } = {}) {
     return {
         query: async (sql) => {
             const s = String(sql);
+            // ai_config flag for the C3 invoice-discount push. discountFlag null →
+            // no config row (helper reads empty → disabled, as in prod default).
+            if (/FROM ai_config WHERE config_key = 'billing_invoice_discount_push_enabled'/.test(s)) {
+                return [discountFlag != null ? [{ config_value: discountFlag }] : []];
+            }
             if (/FROM billing_invoices WHERE id/.test(s)) return [[invoice]];
             if (/SELECT zoho_salesperson_id FROM painters/.test(s)) return [painterSp ? [{ zoho_salesperson_id: painterSp }] : []];
             if (/FROM zoho_salespersons/.test(s)) return [[{ salesperson_name: 'Ravi Kumar' }]];
@@ -123,19 +129,89 @@ describe('pushInvoiceToZoho — push payload / payment forwarding (SP-1 baseline
     beforeEach(() => {
         mockCreateInvoice.mockClear();
         mockCreatePayment.mockClear();
+        mockFinalizeDocument.mockClear();
         svc.setPointsEngine(null);
     });
 
-    // SP-1 C1 characterization — updated in C3/C4 to lock new behavior
-    it('drops invoice-level discount: createInvoice payload has NO discount keys (live bug)', async () => {
+    // SP-1 C3: with the discount-push flag OFF (default), the createInvoice
+    // payload is byte-identical to pre-C3 — NO discount keys even when the
+    // invoice carries a discount. Locks flag-off = today's behavior.
+    it('flag OFF: createInvoice payload has NO discount keys even with discount_amount > 0', async () => {
         // discount_amount arrives as a mysql2 DECIMAL string ("50.00").
-        svc.setPool(makePool({ ...baseInvoice, discount_amount: '50.00' }));
+        // ai_config flag explicitly disabled ('0').
+        svc.setPool(makePool({ ...baseInvoice, discount_amount: '50.00' }, { discountFlag: '0' }));
         await svc.pushInvoiceToZoho(1, 99, { salespersonId: 'SP' });
         expect(mockCreateInvoice).toHaveBeenCalledTimes(1);
         const payload = mockCreateInvoice.mock.calls[0][0];
         expect(payload).not.toHaveProperty('discount');
         expect(payload).not.toHaveProperty('is_discount_before_tax');
         expect(payload).not.toHaveProperty('discount_type');
+    });
+
+    // Missing ai_config row (prod default) is treated as disabled — same as '0'.
+    it('flag ABSENT (no ai_config row): still no discount keys (fail-safe disabled)', async () => {
+        svc.setPool(makePool({ ...baseInvoice, discount_amount: '50.00' }));
+        await svc.pushInvoiceToZoho(1, 99, { salespersonId: 'SP' });
+        const payload = mockCreateInvoice.mock.calls[0][0];
+        expect(payload).not.toHaveProperty('discount');
+        expect(payload).not.toHaveProperty('is_discount_before_tax');
+        expect(payload).not.toHaveProperty('discount_type');
+    });
+
+    // SP-1 C3: flag ON + a real discount → exactly the three discount keys with
+    // the correct values (mirrors the proven bill-push block; no discount_account_id).
+    it('flag ON + discount 50: payload carries exactly the three discount keys', async () => {
+        svc.setPool(makePool({ ...baseInvoice, discount_amount: '50.00' }, { discountFlag: '1' }));
+        await svc.pushInvoiceToZoho(1, 99, { salespersonId: 'SP' });
+        const payload = mockCreateInvoice.mock.calls[0][0];
+        expect(payload.discount).toBe(50);
+        expect(payload.is_discount_before_tax).toBe(true);
+        expect(payload.discount_type).toBe('entity_level');
+        // no purchase-side account id on the sales path
+        expect(payload).not.toHaveProperty('discount_account_id');
+    });
+
+    // Trimmed '1' (e.g. stored with trailing whitespace) still enables.
+    it('flag " 1 " (whitespace): enabled after trim', async () => {
+        svc.setPool(makePool({ ...baseInvoice, discount_amount: '50.00' }, { discountFlag: ' 1 ' }));
+        await svc.pushInvoiceToZoho(1, 99, { salespersonId: 'SP' });
+        expect(mockCreateInvoice.mock.calls[0][0].discount).toBe(50);
+    });
+
+    // A non-'1' value (e.g. 'true') is NOT enabled — only the literal '1'.
+    it('flag "true" (not the literal 1): disabled, no discount keys', async () => {
+        svc.setPool(makePool({ ...baseInvoice, discount_amount: '50.00' }, { discountFlag: 'true' }));
+        await svc.pushInvoiceToZoho(1, 99, { salespersonId: 'SP' });
+        expect(mockCreateInvoice.mock.calls[0][0]).not.toHaveProperty('discount');
+    });
+
+    // SP-1 C3: flag ON but discount is zero → keys ABSENT (only push when > 0).
+    it('flag ON + discount 0: no discount keys in the payload', async () => {
+        svc.setPool(makePool({ ...baseInvoice, discount_amount: '0.00' }, { discountFlag: '1' }));
+        await svc.pushInvoiceToZoho(1, 99, { salespersonId: 'SP' });
+        const payload = mockCreateInvoice.mock.calls[0][0];
+        expect(payload).not.toHaveProperty('discount');
+        expect(payload).not.toHaveProperty('is_discount_before_tax');
+        expect(payload).not.toHaveProperty('discount_type');
+    });
+
+    // SP-1 C3: draftOnly (admin D1 path) — createInvoice runs, but finalize is
+    // SKIPPED (zohoState 'draft'), the push-time payment forward is SKIPPED, and
+    // the write-back still stamps zoho_status 'pushed' + zoho_approval_state 'draft'.
+    it('draftOnly: finalizeDocument NOT called, createPayment NOT called, stamps zoho_approval_state "draft"', async () => {
+        const pool = makeCapturePool({ ...baseInvoice, amount_paid: '500.00' });
+        svc.setPool(pool);
+        const res = await svc.pushInvoiceToZoho(1, 99, { salespersonId: 'SP', isAdmin: true, draftOnly: true });
+
+        expect(res.zohoState).toBe('draft');
+        expect(mockCreateInvoice).toHaveBeenCalledTimes(1);
+        expect(mockFinalizeDocument).not.toHaveBeenCalled();
+        expect(mockCreatePayment).not.toHaveBeenCalled();
+
+        const upd = pool.queries.find(q => /^\s*UPDATE billing_invoices/i.test(q.sql));
+        expect(upd).toBeTruthy();
+        expect(upd.params[0]).toBe('pushed');   // zoho_status
+        expect(upd.params).toContain('draft');  // zoho_approval_state
     });
 
     // SP-1 C1 characterization — updated in C3/C4 to lock new behavior
