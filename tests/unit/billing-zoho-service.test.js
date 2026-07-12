@@ -11,11 +11,13 @@
 // Mock the Zoho API so no real HTTP happens; capture the createInvoice payload.
 const mockCreateInvoice = jest.fn(async () => ({ invoice: { invoice_id: 'ZINV1', invoice_number: 'INV-0001' } }));
 const mockCreateContact = jest.fn(async () => ({ contact: { contact_id: 'NEWCONTACT' } }));
+// Returns a real Zoho payment id so the "id is discarded" characterization is meaningful.
+const mockCreatePayment = jest.fn(async () => ({ payment: { payment_id: 'ZPAY1' } }));
 const mockGetDocumentStatus = jest.fn(async () => 'approved');
 jest.mock('../../services/zoho-api', () => ({
     createInvoice: (...a) => mockCreateInvoice(...a),
     createContact: (...a) => mockCreateContact(...a),
-    createPayment: jest.fn(async () => ({})),
+    createPayment: (...a) => mockCreatePayment(...a),
     finalizeDocument: jest.fn(async (_kind, _id, isAdmin) => ({ state: isAdmin ? 'approved' : 'submitted' })),
     getDocumentStatus: (...a) => mockGetDocumentStatus(...a),
 }));
@@ -91,6 +93,82 @@ describe('pushInvoiceToZoho — mandatory salesperson', () => {
         svc.setPool(makePool({ ...baseInvoice }));
         const res = await svc.pushInvoiceToZoho(1, 99, { salespersonId: 'SP', isAdmin: false });
         expect(res.zohoState).toBe('submitted');
+    });
+});
+
+// ── SP-1 payment-sync groundwork ──
+// Characterizes the CURRENT (pre-SP-1) push behavior on three money paths that
+// the plan (docs/superpowers/plans/2026-07-12-sp1-payment-sync.md) changes in
+// C3/C4: (a) invoice-level discount is silently dropped from the createInvoice
+// payload — the live bug (Zoho total = app total + discount); (b) amount_paid is
+// forwarded as ONE aggregate 'Cash' payment and the returned Zoho payment id is
+// thrown away (nothing stamped back onto billing_payments); (c) a createPayment
+// failure is swallowed — the push still resolves and the invoice is stamped
+// 'pushed'. These lock today's shape so the C3/C4 rework is a deliberate change.
+describe('pushInvoiceToZoho — push payload / payment forwarding (SP-1 baseline)', () => {
+    // Wraps makePool to record every SQL run, so we can assert on which tables
+    // are (never) touched while still dispatching real return values.
+    function makeCapturePool(invoice, opts = {}) {
+        const queries = [];
+        const base = makePool(invoice, opts);
+        return {
+            queries,
+            query: async (sql, params) => {
+                queries.push({ sql: String(sql), params });
+                return base.query(sql, params);
+            },
+        };
+    }
+
+    beforeEach(() => {
+        mockCreateInvoice.mockClear();
+        mockCreatePayment.mockClear();
+        svc.setPointsEngine(null);
+    });
+
+    // SP-1 C1 characterization — updated in C3/C4 to lock new behavior
+    it('drops invoice-level discount: createInvoice payload has NO discount keys (live bug)', async () => {
+        // discount_amount arrives as a mysql2 DECIMAL string ("50.00").
+        svc.setPool(makePool({ ...baseInvoice, discount_amount: '50.00' }));
+        await svc.pushInvoiceToZoho(1, 99, { salespersonId: 'SP' });
+        expect(mockCreateInvoice).toHaveBeenCalledTimes(1);
+        const payload = mockCreateInvoice.mock.calls[0][0];
+        expect(payload).not.toHaveProperty('discount');
+        expect(payload).not.toHaveProperty('is_discount_before_tax');
+        expect(payload).not.toHaveProperty('discount_type');
+    });
+
+    // SP-1 C1 characterization — updated in C3/C4 to lock new behavior
+    it('forwards amount_paid as ONE aggregate Cash payment and discards the Zoho payment id', async () => {
+        // amount_paid arrives as a mysql2 DECIMAL string ("500.00").
+        const pool = makeCapturePool({ ...baseInvoice, amount_paid: '500.00' });
+        svc.setPool(pool);
+        await svc.pushInvoiceToZoho(1, 99, { salespersonId: 'SP' });
+
+        expect(mockCreatePayment).toHaveBeenCalledTimes(1);
+        const payload = mockCreatePayment.mock.calls[0][0];
+        expect(payload.payment_mode).toBe('Cash');
+        expect(payload.amount).toBe(500);
+        expect(payload.invoices).toEqual([{ invoice_id: 'ZINV1', amount_applied: 500 }]);
+
+        // The returned Zoho payment id ('ZPAY1') is thrown away: nothing is
+        // written back to billing_payments (no per-payment sync exists yet).
+        const touchedPayments = pool.queries.filter(q => /billing_payments/i.test(q.sql));
+        expect(touchedPayments.length).toBe(0);
+    });
+
+    // SP-1 C1 characterization — updated in C3/C4 to lock new behavior
+    it('swallows a createPayment failure: push still resolves and stamps zoho_status="pushed"', async () => {
+        mockCreatePayment.mockRejectedValueOnce(new Error('Zoho customerpayments 500'));
+        const pool = makeCapturePool({ ...baseInvoice, amount_paid: '500.00' });
+        svc.setPool(pool);
+
+        const res = await svc.pushInvoiceToZoho(1, 99, { salespersonId: 'SP' });
+        expect(res.zohoInvoiceId).toBe('ZINV1');
+
+        const upd = pool.queries.find(q => /^\s*UPDATE billing_invoices/i.test(q.sql));
+        expect(upd).toBeTruthy();
+        expect(upd.params[0]).toBe('pushed'); // zoho_status stamped despite payment failure
     });
 });
 
