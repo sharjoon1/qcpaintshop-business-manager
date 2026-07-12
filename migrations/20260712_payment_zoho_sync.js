@@ -23,9 +23,12 @@
  *     push-time forwarding (no regression).
  */
 
-// LEGACY cutoff: rows created before this date are treated as already handled.
-// adjust to the actual prod deploy date before running on prod
-const CUTOFF = '2026-07-13';
+// LEGACY cutoff: rows created before this moment are treated as already handled
+// in Zoho (push-time aggregates / accountant hand-entry). created_at is stored
+// UTC (forced +00:00 session), so this literal is UTC — set to the actual prod
+// deploy moment (2026-07-12 ~20:15 IST). Re-runs stay idempotent: rows after
+// this instant are never stamped LEGACY.
+const CUTOFF = '2026-07-12 14:45:00';
 
 async function columnExists(pool, table, column) {
     const [rows] = await pool.query(
