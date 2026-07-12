@@ -2673,9 +2673,10 @@ async function loadPayments(page = 1) {
         container.innerHTML = data.payments.map(p => `
             <div class="bg-white rounded-xl border border-gray-100 shadow-sm p-4">
                 <div class="flex items-center justify-between mb-1">
-                    <div class="flex items-center gap-2">
+                    <div class="flex items-center gap-2 flex-wrap">
                         <span class="font-bold text-green-700">${formatCurrency(p.amount)}</span>
                         <span class="text-xs text-gray-400 px-2 py-0.5 bg-gray-100 rounded-full">${esc(p.payment_method)}</span>
+                        ${paymentBadge(p)}
                     </div>
                     <span class="text-xs text-gray-400">${formatDate(p.payment_date)}</span>
                 </div>
@@ -2685,12 +2686,55 @@ async function loadPayments(page = 1) {
                     ${p.paid_by_name ? `<span class="mx-1">&middot;</span><span>${esc(p.paid_by_name)}</span>` : ''}
                     ${p.payment_reference ? `<span class="mx-1">&middot;</span><span class="text-gray-400">#${esc(p.payment_reference)}</span>` : ''}
                 </div>
+                ${paymentPending(p) ? `
+                <div class="mt-2 flex justify-end">
+                    <button onclick="pushVendorPayment(${p.id})" class="btn-green-outline px-3 py-1 rounded-lg text-xs font-medium">Push to Zoho</button>
+                </div>` : ''}
             </div>
         `).join('');
 
         renderPagination('paymentPagination', data.pagination, loadPayments);
     } catch (e) {
         container.innerHTML = `<div class="text-center py-8 text-red-500">${esc(e.message)}</div>`;
+    }
+}
+
+// Per-payment Zoho state badge (mirrors staff-billing.html). vp.* surfaces
+// zoho_payment_id + zoho_sync_error from the /payments list.
+function paymentBadge(p) {
+    const z = p.zoho_payment_id;
+    let text, cls;
+    if (z === 'LEGACY') { text = 'legacy'; cls = 'bg-gray-100 text-gray-500'; }
+    else if (z === 'SYNCING') { text = 'syncing'; cls = 'bg-amber-100 text-amber-700'; }
+    else if (z) { text = 'Zoho ✓'; cls = 'bg-green-100 text-green-700'; }
+    else { text = 'Zoho pending'; cls = 'bg-amber-100 text-amber-700'; }
+    const titleAttr = (p.zoho_sync_error && z !== 'LEGACY') ? ` title="${esc(p.zoho_sync_error)}"` : '';
+    return `<span class="text-xs px-2 py-0.5 rounded-full ${cls}"${titleAttr}>${text}</span>`;
+}
+
+// A payment is pushable when it has never reached Zoho (NULL sentinel). A real
+// id, LEGACY or an in-flight SYNCING claim all hide the manual push button.
+function paymentPending(p) {
+    return !p.zoho_payment_id;
+}
+
+// Manually (re-)push a single vendor payment to Zoho.
+async function pushVendorPayment(paymentId) {
+    try {
+        const res = await fetch(`${API}/payments/${paymentId}/push-zoho`, {
+            method: 'POST',
+            headers: { ...headers, 'Idempotency-Key': idemKey() }
+        });
+        const data = await res.json();
+        if (!data.success) throw new Error(apiMessage(data));
+        const zs = data.zoho_sync || {};
+        const msg = zs.status === 'synced' ? 'Payment synced to Zoho'
+            : zs.status === 'skipped' ? `Not synced: ${esc(zs.code || 'skipped')}`
+            : 'Payment sync attempted';
+        showToast(msg, zs.status === 'failed' ? 'error' : 'success');
+        loadPayments(paymentPage);
+    } catch (e) {
+        showToast(e.message || 'Push to Zoho failed', 'error');
     }
 }
 

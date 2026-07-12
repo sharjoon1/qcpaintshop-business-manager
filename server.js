@@ -377,6 +377,7 @@ adminNotificationsRoutes.setPool(pool);
 billingRoutes.setPool(pool);
 billingRoutes.setPointsEngine(require('./services/painter-points-engine'));
 vendorRoutes.setPool(pool);
+require('./services/vendor-zoho-service').setPool(pool); // SP-1 C5: AP payment → Zoho
 painterScheduler.setPool(pool);
 dataRetentionService.setPool(pool);
 require('./services/audit-log').setPool(pool);

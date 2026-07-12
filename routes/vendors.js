@@ -13,12 +13,29 @@ const { validate, validateQuery, validateParams } = require('../middleware/valid
 const { uploadVendorBill } = require('../config/uploads');
 const vendorBillAI = require('../services/vendor-bill-ai-service');
 const zohoAPI = require('../services/zoho-api');
+const vendorZohoService = require('../services/vendor-zoho-service');
+const audit = require('../services/audit-log');
 const { idempotent, setPool: setIdempotencyPool } = require('../middleware/idempotency');
 
 const { computeZohoRate } = require('../services/dpl-catalog');
 
 let pool;
 function setPool(p) { pool = p; vendorBillAI.setPool(p); setIdempotencyPool(p); }
+
+/**
+ * Map a vendor-zoho-service push result (or a caught refusal) to the point-in-time
+ * `zoho_sync` response field. Never throws.
+ * @param {Object|null} result push result: {zohoPaymentId}|{adopted}|{skipped}
+ * @returns {{status:'synced'|'skipped'|'failed'|'not_applicable', detail?:string, code?:string}}
+ */
+function deriveVendorZohoSync(result) {
+    if (!result) return { status: 'not_applicable' };
+    if (result.zohoPaymentId) {
+        return { status: 'synced', detail: result.adopted ? 'adopted existing Zoho payment' : 'payment synced to Zoho' };
+    }
+    if (result.skipped) return { status: 'skipped', code: result.skipped };
+    return { status: 'not_applicable' };
+}
 
 const r2 = n => Math.round((parseFloat(n) || 0) * 100) / 100;
 const GST_RATE = 0.18; // paints/putty: CGST 9 + SGST 9
@@ -1093,11 +1110,22 @@ router.post('/bills/:id/push-zoho',
                 [zohoBillId || null, pushLocationId, pushLocationName, fin.state, id]
             );
 
+            // Now that the bill is in Zoho, best-effort forward its still-pending
+            // payments (SP-1 C5). Never fails the push — payment sync is
+            // duplicate-proof and re-runnable per-payment.
+            let paySyncMsg = '';
+            try {
+                const paySync = await vendorZohoService.syncBillPayments(id);
+                if ((paySync.synced || 0) > 0) paySyncMsg = ` — ${paySync.synced} payment(s) synced`;
+            } catch (err) {
+                console.error('Bill payment sync error:', err.message);
+            }
+
             const stateMsg = fin.state === 'approved' ? 'created & approved in Zoho'
                 : fin.state === 'submitted' ? 'created & submitted for admin approval in Zoho'
                 : fin.state === 'open' ? 'created in Zoho'
                 : 'pushed to Zoho (draft — approval step failed, finalize it in Zoho)';
-            res.json({ success: true, message: `Bill ${stateMsg}`, zoho_bill_id: zohoBillId, zoho_state: fin.state });
+            res.json({ success: true, message: `Bill ${stateMsg}${paySyncMsg}`, zoho_bill_id: zohoBillId, zoho_state: fin.state });
         } catch (error) {
             console.error('Push bill to Zoho error:', error);
             res.status(500).json({ success: false, message: 'Failed to push bill to Zoho' });
@@ -1709,7 +1737,7 @@ router.post('/payments',
             // If bill_id linked, recalculate bill payment totals
             if (bill_id) {
                 const [sumRows] = await pool.query(
-                    `SELECT COALESCE(SUM(amount), 0) AS total_paid FROM vendor_payments WHERE bill_id = ?`,
+                    `SELECT COALESCE(SUM(amount), 0) AS total_paid FROM vendor_payments WHERE bill_id = ? AND deleted_at IS NULL`,
                     [bill_id]
                 );
                 const totalPaid = parseFloat(sumRows[0].total_paid) || 0;
@@ -1727,10 +1755,61 @@ router.post('/payments',
                 }
             }
 
-            res.json({ success: true, payment_id: result.insertId, message: 'Payment recorded' });
+            // Audit the committed local money record (best-effort, never throws).
+            await audit.record(req, {
+                action: 'vendor.payment.create',
+                entity_type: 'vendor_payment',
+                entity_id: result.insertId,
+                before: null,
+                after: { vendor_id, bill_id: bill_id || null, amount, payment_method, payment_reference, payment_date }
+            });
+
+            // Best-effort Zoho sync — a Zoho failure NEVER fails the local record
+            // or the HTTP status. VENDOR_NOT_IN_ZOHO / BILL_NOT_PUSHED surface as
+            // a 'skipped' state (the UI offers a manual "Push to Zoho" later).
+            let zohoSync = { status: 'not_applicable' };
+            try {
+                const pushResult = await vendorZohoService.pushVendorPaymentToZoho(result.insertId);
+                zohoSync = deriveVendorZohoSync(pushResult);
+            } catch (err) {
+                if (err.code === 'VENDOR_NOT_IN_ZOHO' || err.code === 'BILL_NOT_PUSHED') {
+                    zohoSync = { status: 'skipped', code: err.code };
+                } else {
+                    console.error('[vendor.payment] inline Zoho sync error:', err.message);
+                    zohoSync = { status: 'failed', detail: err.message };
+                }
+            }
+
+            res.json({ success: true, payment_id: result.insertId, message: 'Payment recorded', zoho_sync: zohoSync });
         } catch (error) {
             console.error('Record payment error:', error);
             res.status(500).json({ success: false, message: 'Failed to record payment' });
+        }
+    }
+);
+
+// Explicitly (re-)push a single vendor payment to Zoho. Idempotent by header;
+// the two hard-refusal codes map to 400, everything else best-effort.
+router.post('/payments/:id/push-zoho',
+    idempotent('vendor.payment.zohoPush'),
+    managePerm,
+    validateParams(idParamSchema),
+    async (req, res) => {
+        try {
+            const { id } = req.params;
+            const result = await vendorZohoService.pushVendorPaymentToZoho(id);
+            await audit.record(req, {
+                action: 'vendor.payment.zohoPush',
+                entity_type: 'vendor_payment', entity_id: id,
+                before: null, after: result
+            });
+            res.json({ success: true, zoho_sync: deriveVendorZohoSync(result), result });
+        } catch (error) {
+            if (error.code === 'VENDOR_NOT_IN_ZOHO' || error.code === 'BILL_NOT_PUSHED') {
+                return res.status(400).json({ success: false, code: error.code, message: error.message });
+            }
+            console.error('Push vendor payment to Zoho error:', error);
+            res.status(500).json({ success: false, message: error.message || 'Failed to push payment to Zoho' });
         }
     }
 );
