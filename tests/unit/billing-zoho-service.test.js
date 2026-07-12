@@ -11,22 +11,32 @@
 // Mock the Zoho API so no real HTTP happens; capture the createInvoice payload.
 const mockCreateInvoice = jest.fn(async () => ({ invoice: { invoice_id: 'ZINV1', invoice_number: 'INV-0001' } }));
 const mockCreateContact = jest.fn(async () => ({ contact: { contact_id: 'NEWCONTACT' } }));
-// Returns a real Zoho payment id so the "id is discarded" characterization is meaningful.
-const mockCreatePayment = jest.fn(async () => ({ payment: { payment_id: 'ZPAY1' } }));
+// Returns a real Zoho payment id so the stamp-back characterization is meaningful.
+let payIdCounter = 0;
+const mockCreatePayment = jest.fn(async () => ({ payment: { payment_id: `ZPAY${++payIdCounter}` } }));
 const mockGetDocumentStatus = jest.fn(async () => 'approved');
 const mockFinalizeDocument = jest.fn(async (_kind, _id, isAdmin) => ({ state: isAdmin ? 'approved' : 'submitted' }));
+// SP-1 C4: forwardInvoicePayments fetches the Zoho invoice ONCE (customer_id /
+// status / date / balance) and adopt-checks existing payments before creating.
+const mockGetInvoice = jest.fn(async () => ({ invoice: {
+    invoice_id: 'ZINV1', customer_id: 'CONT1', status: 'sent', date: '2026-07-12', balance: 100000,
+} }));
+const mockGetPayments = jest.fn(async () => ({ customerpayments: [] }));
 jest.mock('../../services/zoho-api', () => ({
     createInvoice: (...a) => mockCreateInvoice(...a),
     createContact: (...a) => mockCreateContact(...a),
     createPayment: (...a) => mockCreatePayment(...a),
     finalizeDocument: (...a) => mockFinalizeDocument(...a),
     getDocumentStatus: (...a) => mockGetDocumentStatus(...a),
+    getInvoice: (...a) => mockGetInvoice(...a),
+    getPayments: (...a) => mockGetPayments(...a),
 }));
 
 const svc = require('../../services/billing-zoho-service');
 
 // A SQL-substring-dispatching fake pool covering every query pushInvoiceToZoho runs.
-function makePool(invoice, { painterSp = null, discountFlag = null } = {}) {
+// `payments` seeds the SP-1 C4 per-row forwarding candidate SELECT (default: none).
+function makePool(invoice, { painterSp = null, discountFlag = null, payments = [] } = {}) {
     return {
         query: async (sql) => {
             const s = String(sql);
@@ -41,6 +51,8 @@ function makePool(invoice, { painterSp = null, discountFlag = null } = {}) {
             if (/FROM painter_zoho_salesperson_map/.test(s)) return [[]];
             if (/FROM zoho_locations_map/.test(s)) return [[{ zoho_location_name: 'Main Branch' }]];
             if (/FROM billing_invoice_items/.test(s)) return [[{ zoho_item_id: 'Z1', quantity: 1, unit_price: 1000, line_total: 1000 }]];
+            // SP-1 C4: per-row payment-forwarding candidate SELECT.
+            if (/FROM billing_payments\s+WHERE invoice_id/.test(s)) return [payments.map(p => ({ ...p }))];
             if (/zoho_contact_id.*FROM painters/.test(s)) return [[{ zoho_contact_id: 'CONT1', zoho_customer_id: null, full_name: 'Ravi Kumar', phone: '9000000000' }]];
             if (/FROM zoho_customers_map/.test(s)) return [[{ zoho_contact_id: 'CONT1' }]];
             if (/^\s*UPDATE/i.test(s)) return [{ affectedRows: 1 }];
@@ -130,6 +142,9 @@ describe('pushInvoiceToZoho — push payload / payment forwarding (SP-1 baseline
         mockCreateInvoice.mockClear();
         mockCreatePayment.mockClear();
         mockFinalizeDocument.mockClear();
+        mockGetInvoice.mockClear();
+        mockGetPayments.mockClear();
+        payIdCounter = 0;
         svc.setPointsEngine(null);
     });
 
@@ -214,29 +229,46 @@ describe('pushInvoiceToZoho — push payload / payment forwarding (SP-1 baseline
         expect(upd.params).toContain('draft');  // zoho_approval_state
     });
 
-    // SP-1 C1 characterization — updated in C3/C4 to lock new behavior
-    it('forwards amount_paid as ONE aggregate Cash payment and discards the Zoho payment id', async () => {
-        // amount_paid arrives as a mysql2 DECIMAL string ("500.00").
-        const pool = makeCapturePool({ ...baseInvoice, amount_paid: '500.00' });
+    // SP-1 C4: the old single aggregate 'Cash' forward is REPLACED. Each unsynced
+    // billing_payments row now becomes its own Zoho customerpayment carrying its
+    // true mode + a deterministic reference (ACT-BP-<id>), and the returned Zoho
+    // id is STAMPED BACK onto the row (was previously discarded).
+    it('push forwards each unsynced payment as its own Zoho customerpayment and stamps the id back', async () => {
+        const payments = [
+            { id: 11, invoice_id: 1, amount: '300.00', payment_method: 'cash', payment_reference: '', payment_date: '2026-07-12', created_at: '2026-07-12 05:00:00', zoho_payment_id: null, zoho_claimed_at: null },
+            { id: 12, invoice_id: 1, amount: '200.00', payment_method: 'upi', payment_reference: 'UPI9', payment_date: '2026-07-12', created_at: '2026-07-12 05:00:00', zoho_payment_id: null, zoho_claimed_at: null },
+        ];
+        const pool = makeCapturePool({ ...baseInvoice, amount_paid: '500.00' }, { payments });
         svc.setPool(pool);
         await svc.pushInvoiceToZoho(1, 99, { salespersonId: 'SP' });
 
-        expect(mockCreatePayment).toHaveBeenCalledTimes(1);
-        const payload = mockCreatePayment.mock.calls[0][0];
-        expect(payload.payment_mode).toBe('Cash');
-        expect(payload.amount).toBe(500);
-        expect(payload.invoices).toEqual([{ invoice_id: 'ZINV1', amount_applied: 500 }]);
+        // Two rows → two createPayment calls (NOT one aggregate 'Cash').
+        expect(mockCreatePayment).toHaveBeenCalledTimes(2);
+        const [p1] = mockCreatePayment.mock.calls[0];
+        const [p2] = mockCreatePayment.mock.calls[1];
+        expect(p1.reference_number).toBe('ACT-BP-11');
+        expect(p1.payment_mode).toBe('cash');
+        expect(p1.amount).toBe(300);
+        expect(p1.customer_id).toBe('CONT1'); // from the Zoho invoice, not resolveZohoContact
+        expect(p2.reference_number).toBe('ACT-BP-12');
+        expect(p2.payment_mode).toBe('UPI');
+        expect(p2.amount).toBe(200);
 
-        // The returned Zoho payment id ('ZPAY1') is thrown away: nothing is
-        // written back to billing_payments (no per-payment sync exists yet).
-        const touchedPayments = pool.queries.filter(q => /billing_payments/i.test(q.sql));
-        expect(touchedPayments.length).toBe(0);
+        // Each success stamps the real Zoho id back onto billing_payments.
+        const stamps = pool.queries.filter(q => /UPDATE billing_payments SET zoho_payment_id = \?, zoho_sync_error/i.test(q.sql));
+        expect(stamps.length).toBe(2);
+        expect(String(stamps[0].params[0])).toMatch(/^ZPAY/);
     });
 
-    // SP-1 C1 characterization — updated in C3/C4 to lock new behavior
-    it('swallows a createPayment failure: push still resolves and stamps zoho_status="pushed"', async () => {
+    // SP-1 C4: a per-payment forward failure is best-effort — it NEVER fails the
+    // push (invoice still stamped 'pushed') and the row is released to NULL with
+    // the Zoho error recorded for a later re-sync.
+    it('a payment-forward failure never fails the push and releases the row with an error', async () => {
         mockCreatePayment.mockRejectedValueOnce(new Error('Zoho customerpayments 500'));
-        const pool = makeCapturePool({ ...baseInvoice, amount_paid: '500.00' });
+        const payments = [
+            { id: 21, invoice_id: 1, amount: '500.00', payment_method: 'cash', payment_reference: '', payment_date: '2026-07-12', created_at: '2026-07-12 05:00:00', zoho_payment_id: null, zoho_claimed_at: null },
+        ];
+        const pool = makeCapturePool({ ...baseInvoice, amount_paid: '500.00' }, { payments });
         svc.setPool(pool);
 
         const res = await svc.pushInvoiceToZoho(1, 99, { salespersonId: 'SP' });
@@ -245,6 +277,13 @@ describe('pushInvoiceToZoho — push payload / payment forwarding (SP-1 baseline
         const upd = pool.queries.find(q => /^\s*UPDATE billing_invoices/i.test(q.sql));
         expect(upd).toBeTruthy();
         expect(upd.params[0]).toBe('pushed'); // zoho_status stamped despite payment failure
+
+        const release = pool.queries.find(q => /UPDATE billing_payments SET zoho_payment_id = NULL, zoho_sync_error/i.test(q.sql));
+        expect(release).toBeTruthy();
+        expect(String(release.params[0])).toMatch(/500/);
+
+        // The failure is surfaced in the push result summary.
+        expect(res.paymentSync.failed.length).toBe(1);
     });
 });
 

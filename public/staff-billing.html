@@ -442,6 +442,10 @@
                     </select>
                 </div>
                 <div>
+                    <label class="qc-label block mb-1">Payment Date</label>
+                    <input type="date" id="payDate" class="qc-input w-full">
+                </div>
+                <div>
                     <label class="qc-label block mb-1">Reference</label>
                     <input type="text" id="payReference" class="qc-input w-full" placeholder="Transaction ID, cheque number, etc.">
                 </div>
@@ -1189,6 +1193,7 @@ async function viewInvoice(id) {
                             <span class="font-medium text-green-800">${formatCurrency(p.amount)}</span>
                             <span class="text-gray-500 ml-2">${p.payment_method}</span>
                             ${p.payment_reference ? `<span class="text-gray-400 ml-1">#${esc(p.payment_reference)}</span>` : ''}
+                            <span class="ml-2">${paymentBadge(p)}</span>
                         </div>
                         <span class="text-gray-400 text-xs">${formatDate(p.created_at)}</span>
                     </div>`).join('')}
@@ -1212,6 +1217,7 @@ async function viewInvoice(id) {
             actions.innerHTML += `<button onclick="closeDetailModal(); pushToZoho(${inv.id}, '${esc(inv.payment_status)}', ${Number(inv.balance_due) || 0}, '${esc(inv.customer_type || '')}', '${esc(inv.painter_salesperson_id || '')}')" class="btn-green-outline px-4 py-2 rounded-lg text-sm font-medium">Push to Zoho</button>`;
         } else {
             actions.innerHTML += `<button onclick="syncInvoiceZohoStatus(${inv.id})" class="btn-green-outline px-4 py-2 rounded-lg text-sm font-medium">↻ Sync Zoho status</button>`;
+            actions.innerHTML += `<button onclick="syncInvoicePayments(${inv.id})" class="btn-green-outline px-4 py-2 rounded-lg text-sm font-medium">↻ Sync payments</button>`;
         }
         // Delete/Void — only for unpaid invoices (a paid one can't be removed).
         if (inv.payment_status === 'unpaid') {
@@ -1426,6 +1432,7 @@ async function loadPayments(page = 1) {
                     <div>
                         <span class="text-lg font-bold text-green-700">${formatCurrency(p.amount)}</span>
                         <span class="text-xs text-gray-400 ml-2 px-2 py-0.5 bg-gray-100 rounded-full">${p.payment_method}</span>
+                        <span class="ml-1">${paymentBadge(p)}</span>
                     </div>
                     <span class="text-xs text-gray-400">${formatDate(p.created_at)}</span>
                 </div>
@@ -1631,18 +1638,22 @@ function openPaymentModal(invoiceId, invoiceNum, balanceDue) {
     document.getElementById('payAmount').max = balanceDue;
     document.getElementById('payMethod').value = 'cash';
     document.getElementById('payReference').value = '';
+    // Default to today (IST calendar day — en-CA renders yyyy-mm-dd).
+    document.getElementById('payDate').value = new Date().toLocaleDateString('en-CA');
     document.getElementById('paymentModal').classList.add('active');
 }
 
 async function handlePaymentSubmit(e) {
     e.preventDefault();
     const invoiceId = document.getElementById('payInvoiceId').value;
+    const payDate = document.getElementById('payDate').value;
     const payload = {
         amount: Number(document.getElementById('payAmount').value),
         payment_method: document.getElementById('payMethod').value,
         payment_reference: document.getElementById('payReference').value.trim(),
         notes: ''
     };
+    if (payDate) payload.payment_date = payDate; // yyyy-mm-dd; server defaults to today IST
     try {
         const res = await fetch(`${API}/invoices/${invoiceId}/payment`, {
             method: 'POST',
@@ -1651,7 +1662,13 @@ async function handlePaymentSubmit(e) {
         });
         const data = await res.json();
         if (!data.success) throw new Error(extractApiError(data));
-        showToast('Payment recorded', 'success');
+        // Branch the toast on the point-in-time Zoho sync result (pushed invoices).
+        const zs = data.zoho_sync;
+        if (zs && zs.status && zs.status !== 'not_applicable') {
+            showToast('Payment recorded — ' + zohoSyncMessage(zs), zohoSyncToastType(zs));
+        } else {
+            showToast('Payment recorded', 'success');
+        }
         closePaymentModal();
         loadStats();
         loadInvoices(invoicePage);
@@ -1659,6 +1676,51 @@ async function handlePaymentSubmit(e) {
     } catch (e) {
         showToast(e.message || 'Payment failed', 'error');
     }
+}
+
+// Explicitly (re-)push this invoice's payments to Zoho and refresh the detail.
+async function syncInvoicePayments(invoiceId) {
+    try {
+        const res = await fetch(`${API}/invoices/${invoiceId}/sync-payments`, {
+            method: 'POST',
+            headers: { ...headers, 'Idempotency-Key': newIdemKey() }
+        });
+        const data = await res.json();
+        if (!data.success) throw new Error(data.message || 'Sync failed');
+        showToast(zohoSyncMessage(data.zoho_sync), zohoSyncToastType(data.zoho_sync));
+        viewInvoice(invoiceId);
+    } catch (e) {
+        showToast(e.message || 'Payment sync failed', 'error');
+    }
+}
+
+// Per-payment Zoho state badge, shared by both payment renderings.
+function paymentBadge(p) {
+    const z = p.zoho_payment_id;
+    let text, cls;
+    if (p.payment_method === 'credit') { text = 'local (credit)'; cls = 'bg-gray-100 text-gray-500'; }
+    else if (z === 'LEGACY') { text = 'legacy'; cls = 'bg-gray-100 text-gray-500'; }
+    else if (z === 'SYNCING') { text = 'syncing'; cls = 'bg-amber-100 text-amber-700'; }
+    else if (z) { text = 'Zoho ✓'; cls = 'bg-green-100 text-green-700'; }
+    else { text = 'Zoho pending'; cls = 'bg-amber-100 text-amber-700'; }
+    const titleAttr = (p.zoho_sync_error && z !== 'LEGACY') ? ` title="${esc(p.zoho_sync_error)}"` : '';
+    return `<span class="text-xs px-2 py-0.5 rounded-full ${cls}"${titleAttr}>${text}</span>`;
+}
+
+function zohoSyncMessage(zs) {
+    if (!zs) return 'Payments synced';
+    switch (zs.status) {
+        case 'synced': return 'payments synced to Zoho';
+        case 'partial': return `partial sync (${esc(zs.detail || '')})`;
+        case 'pending': return 'payments waiting on Zoho invoice approval';
+        case 'failed': return `Zoho sync failed (${esc(zs.detail || '')})`;
+        default: return 'no payments to sync';
+    }
+}
+
+function zohoSyncToastType(zs) {
+    if (!zs) return 'success';
+    return (zs.status === 'failed' || zs.status === 'partial') ? 'error' : 'success';
 }
 
 // ═══════════════════════════════════════════

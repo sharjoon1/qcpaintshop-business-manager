@@ -7,7 +7,7 @@
  */
 const {
     createEstimateSchema, recordPaymentSchema, calculateTotals,
-    listQuerySchema, paymentExceedsBalance
+    listQuerySchema, paymentExceedsBalance, computePaymentSettlement, deriveZohoSync
 } = require('../../routes/billing');
 
 describe('Billing System', () => {
@@ -210,6 +210,82 @@ describe('Billing System', () => {
         it('treats a null/invalid balance as 0 (any payment rejected)', () => {
             expect(paymentExceedsBalance(10, null)).toBe(true);
             expect(paymentExceedsBalance(10, undefined)).toBe(true);
+        });
+    });
+
+    // Characterization of the record-payment money math extracted (unchanged)
+    // from the inline handler into computePaymentSettlement for SP-1 C4. Locks
+    // the exact pre-restructure behavior: balance floors at 0, 'paid' within the
+    // 1-paisa tolerance else 'partial', DECIMAL strings coerced.
+    describe('computePaymentSettlement (record-payment settlement math)', () => {
+        it('full payment (equal amounts) → paid, balance 0', () => {
+            expect(computePaymentSettlement(1000, 1000)).toEqual({ balanceDue: 0, paymentStatus: 'paid' });
+        });
+
+        it('partial payment → partial with the remaining balance', () => {
+            expect(computePaymentSettlement(1000, 400)).toEqual({ balanceDue: 600, paymentStatus: 'partial' });
+        });
+
+        it('coerces mysql2 DECIMAL strings on both sides', () => {
+            expect(computePaymentSettlement('1000.00', '1000.00')).toEqual({ balanceDue: 0, paymentStatus: 'paid' });
+        });
+
+        it('keeps the 1-paisa tolerance: a ₹0.01 residue is still paid', () => {
+            const r = computePaymentSettlement(1000, 999.99);
+            expect(r.paymentStatus).toBe('paid');
+        });
+
+        it('a ₹0.02 residue is still partial (outside tolerance)', () => {
+            const r = computePaymentSettlement(1000, 999.98);
+            expect(r.paymentStatus).toBe('partial');
+        });
+
+        it('never returns a negative balance (overpay floors at 0)', () => {
+            expect(computePaymentSettlement(1000, 1200)).toEqual({ balanceDue: 0, paymentStatus: 'paid' });
+        });
+    });
+
+    // deriveZohoSync maps a forwardInvoicePayments summary → the response field.
+    describe('deriveZohoSync (payment sync response field)', () => {
+        const S = (o) => ({ synced: 0, adopted: 0, skipped: 0, pending: 0, failed: [], ...o });
+
+        it('null summary → not_applicable', () => {
+            expect(deriveZohoSync(null).status).toBe('not_applicable');
+        });
+        it('all synced → synced', () => {
+            expect(deriveZohoSync(S({ synced: 2 })).status).toBe('synced');
+        });
+        it('adopted counts as synced', () => {
+            expect(deriveZohoSync(S({ adopted: 1 })).status).toBe('synced');
+        });
+        it('some synced + some failed → partial', () => {
+            expect(deriveZohoSync(S({ synced: 1, failed: [{ payment_id: 2, message: 'x' }] })).status).toBe('partial');
+        });
+        it('only failed → failed', () => {
+            expect(deriveZohoSync(S({ failed: [{ payment_id: 2, message: 'boom' }] })).status).toBe('failed');
+        });
+        it('only pending → pending', () => {
+            expect(deriveZohoSync(S({ pending: 3 })).status).toBe('pending');
+        });
+        it('nothing to do (only skipped) → not_applicable', () => {
+            expect(deriveZohoSync(S({ skipped: 1 })).status).toBe('not_applicable');
+        });
+    });
+
+    describe('Payment Schema — payment_date (SP-1 C4)', () => {
+        it('accepts an optional yyyy-mm-dd payment_date', () => {
+            const r = recordPaymentSchema.safeParse({ amount: 100, payment_method: 'cash', payment_date: '2026-07-10' });
+            expect(r.success).toBe(true);
+            expect(r.data.payment_date).toBe('2026-07-10');
+        });
+        it('omits payment_date when not supplied (defaults applied at handler)', () => {
+            const r = recordPaymentSchema.safeParse({ amount: 100, payment_method: 'cash' });
+            expect(r.success).toBe(true);
+            expect(r.data.payment_date).toBeUndefined();
+        });
+        it('rejects a malformed payment_date', () => {
+            const r = recordPaymentSchema.safeParse({ amount: 100, payment_method: 'cash', payment_date: '10-07-2026' });
+            expect(r.success).toBe(false);
         });
     });
 });

@@ -7,6 +7,7 @@
 
 const zohoAPI = require('./zoho-api');
 const { logCreditViolation } = require('./credit-violation-log');
+const { buildCustomerPaymentPayload, loadModeOverrides } = require('./zoho-payment-mapper');
 
 let pool;
 let pointsEngine;
@@ -310,23 +311,21 @@ async function pushInvoiceToZoho(invoiceId, userId, options = {}) {
         }
     }
 
-    // 7. Record payment in Zoho if amount_paid > 0 (skipped for draft-only
-    // pushes: a draft can't take payments and D1 reverses the draft manually).
-    const amountPaid = parseFloat(invoice.amount_paid) || 0;
-    if (!options.draftOnly && amountPaid > 0) {
+    // 7. Forward per-row payments to Zoho through the shared sync engine (one
+    // code path, one mutex). Replaces the old single aggregate 'Cash' payment:
+    // each local billing_payments row now becomes its own Zoho customerpayment
+    // with a deterministic reference (ACT-BP-<id>) and its true mode/date, and
+    // the returned Zoho id is stamped back onto the row (duplicate-proofing).
+    // Best-effort — a payment-sync failure NEVER fails the push. Skipped for
+    // draft-only pushes (a Zoho draft can't take payments; D1 reverses it
+    // manually). Staff pushes land 'submitted' → the engine leaves the rows
+    // pending and the approval sync-back re-fires them once approved.
+    let paymentSync = null;
+    if (!options.draftOnly) {
         try {
-            await zohoAPI.createPayment({
-                customer_id: zohoContactId,
-                payment_mode: 'Cash',
-                amount: amountPaid,
-                date: invoiceDate,
-                invoices: [{
-                    invoice_id: zohoInvoiceId,
-                    amount_applied: amountPaid
-                }]
-            });
+            paymentSync = await forwardInvoicePayments({ invoiceId, zohoInvoiceId });
         } catch (err) {
-            console.error('[billing-zoho] Payment recording error:', err.message);
+            console.error('[billing-zoho] payment forwarding error:', err.message);
         }
     }
 
@@ -341,7 +340,233 @@ async function pushInvoiceToZoho(invoiceId, userId, options = {}) {
     );
 
     // 9. Return result
-    return { zohoInvoiceId, zohoInvoiceNumber, salespersonId, salespersonName, locationId, locationName, zohoState: finalizeState, pointsResult };
+    return { zohoInvoiceId, zohoInvoiceNumber, salespersonId, salespersonName, locationId, locationName, zohoState: finalizeState, pointsResult, paymentSync };
+}
+
+// ═══════════════════════════════════════════
+// PER-PAYMENT ZOHO SYNC ENGINE (SP-1 C4)
+// ═══════════════════════════════════════════
+
+// Zoho invoice statuses on which we may record a payment. Anything outside this
+// set that is NOT void/draft is treated as "awaiting approval" (pending).
+const GOOD_INVOICE_STATUSES = new Set([
+    'approved', 'sent', 'open', 'overdue', 'partially_paid', 'paid',
+]);
+
+function round2(n) { return Math.round((Number(n) || 0) * 100) / 100; }
+function truncate255(s) { return String(s == null ? '' : s).slice(0, 255); }
+
+/**
+ * Forward an invoice's unsynced local payments to Zoho Books as individual
+ * customerpayments. Idempotent + duplicate-proof by construction:
+ *   - deterministic reference_number `ACT-BP-<billing_payments.id>`,
+ *   - atomic 'SYNCING' claim (a second worker sees affectedRows 0 and skips),
+ *   - adopt-before-create (a matching Zoho payment already exists → stamp it),
+ *   - balance clamp (NIT-1 ≤ ₹1 zone honored, > ₹1 fails soft),
+ *   - mode-fallback retry (a mode-shaped Zoho rejection → retry once as 'others').
+ * A per-row Zoho failure is recorded on the row and never throws.
+ *
+ * @param {Object} args
+ * @param {number} args.invoiceId  billing_invoices.id
+ * @param {string} args.zohoInvoiceId Zoho invoice id to apply payments against
+ * @returns {Promise<{synced:number, adopted:number, skipped:number, pending:number, failed:Array<{payment_id:number, message:string}>}>}
+ */
+async function forwardInvoicePayments({ invoiceId, zohoInvoiceId }) {
+    const summary = { synced: 0, adopted: 0, skipped: 0, pending: 0, failed: [] };
+
+    // Candidate rows: never-synced or stale-'SYNCING' (>5 min → crashed worker),
+    // excluding credit-method and already-stamped (real id / 'LEGACY') rows.
+    const candidateSql =
+        `SELECT id, invoice_id, amount, payment_method, payment_reference, payment_date, created_at,
+                zoho_payment_id, zoho_claimed_at
+           FROM billing_payments
+          WHERE invoice_id = ? AND deleted_at IS NULL AND payment_method != 'credit'
+            AND (zoho_payment_id IS NULL OR (zoho_payment_id = 'SYNCING' AND zoho_claimed_at < NOW() - INTERVAL 5 MINUTE))
+          ORDER BY id`;
+    const [candidates] = await pool.query(candidateSql, [invoiceId]);
+
+    // Fetch the Zoho invoice ONCE — feeds the customer_id / status / date /
+    // balance guards without a second round-trip. A fetch failure is treated as
+    // "invoice unavailable" (fail-soft) rather than thrown.
+    let zohoInvoice = null;
+    let fetchErrMsg = null;
+    try {
+        const resp = await zohoAPI.getInvoice(zohoInvoiceId);
+        zohoInvoice = resp && resp.invoice;
+    } catch (e) {
+        fetchErrMsg = (e && e.message) || String(e);
+    }
+
+    const status = zohoInvoice ? String(zohoInvoice.status || '').toLowerCase() : '';
+    const missing = !zohoInvoice || (fetchErrMsg && /does not exist|1002/i.test(fetchErrMsg));
+
+    // GUARD 1 — invoice missing / void / draft: cannot record a payment. These
+    // candidate rows were never claimed, so just record the error (leave
+    // zoho_payment_id NULL) and report them as failed.
+    if (missing || status === 'void' || status === 'draft') {
+        const reason = missing
+            ? 'Zoho invoice not found — cannot sync payments'
+            : `Zoho invoice is ${status} — cannot record a payment in Zoho`;
+        for (const row of candidates) {
+            await pool.query(
+                'UPDATE billing_payments SET zoho_payment_id = NULL, zoho_sync_error = ? WHERE id = ?',
+                [truncate255(reason), row.id]
+            );
+            summary.failed.push({ payment_id: row.id, message: reason });
+        }
+        return summary;
+    }
+
+    // GUARD 2 — awaiting approval (any status outside the good set): leave the
+    // rows NULL, marked awaiting approval. The approval sync-back re-fires them.
+    if (!GOOD_INVOICE_STATUSES.has(status)) {
+        for (const row of candidates) {
+            await pool.query(
+                'UPDATE billing_payments SET zoho_sync_error = ? WHERE id = ?',
+                ['awaiting Zoho approval', row.id]
+            );
+            summary.pending++;
+        }
+        return summary;
+    }
+
+    // Proceed: use the Zoho invoice's own customer + date + live balance.
+    const customerId = zohoInvoice.customer_id;
+    const minDate = zohoInvoice.date;
+    let localBalance = Number(zohoInvoice.balance);
+    const modeOverrides = await loadModeOverrides(pool);
+
+    for (const row of candidates) {
+        // (i) atomic claim — the WHERE clause is the concurrency lock.
+        const [claim] = await pool.query(
+            `UPDATE billing_payments SET zoho_payment_id = 'SYNCING', zoho_claimed_at = NOW()
+              WHERE id = ? AND (zoho_payment_id IS NULL OR (zoho_payment_id = 'SYNCING' AND zoho_claimed_at < NOW() - INTERVAL 5 MINUTE))`,
+            [row.id]
+        );
+        if (!claim || !claim.affectedRows) { summary.skipped++; continue; }
+
+        // (ii) adopt-before-create — a Zoho payment with our deterministic
+        // reference means a prior run already created it (crash mid-'SYNCING').
+        const ref = `ACT-BP-${row.id}`;
+        try {
+            const found = await zohoAPI.getPayments({ reference_number: ref });
+            const list = (found && (found.customerpayments || found.payments)) || [];
+            const match = list.find(p => p && p.reference_number === ref && p.payment_id);
+            if (match) {
+                await pool.query(
+                    "UPDATE billing_payments SET zoho_payment_id = ?, zoho_sync_error = NULL WHERE id = ? AND zoho_payment_id = 'SYNCING'",
+                    [match.payment_id, row.id]
+                );
+                summary.adopted++;
+                continue;
+            }
+        } catch {
+            // adopt is best-effort — on a lookup error, fall through to create.
+        }
+
+        // (iii) build payload + balance clamp (NIT-1 sub-rupee zone honored,
+        // never "fix" the drift itself).
+        const payload = buildCustomerPaymentPayload({
+            zohoContactId: customerId,
+            zohoInvoiceId,
+            payment: row,
+            modeOverrides,
+            minDate,
+        });
+        if (!payload) {
+            // Defensive: credit is already filtered in SQL, but never leave a
+            // claim dangling if the mapper declines to build a payload.
+            await pool.query(
+                "UPDATE billing_payments SET zoho_payment_id = NULL WHERE id = ? AND zoho_payment_id = 'SYNCING'",
+                [row.id]
+            );
+            summary.skipped++;
+            continue;
+        }
+
+        const amount = Number(row.amount);
+        const delta = round2(amount - localBalance);
+        let clampError = null;
+        if (delta > 1) {
+            const msg = `local amount exceeds Zoho balance by ${delta} — check discount/void state`;
+            await pool.query(
+                "UPDATE billing_payments SET zoho_payment_id = NULL, zoho_sync_error = ? WHERE id = ? AND zoho_payment_id = 'SYNCING'",
+                [truncate255(msg), row.id]
+            );
+            summary.failed.push({ payment_id: row.id, message: msg });
+            continue;
+        } else if (delta > 0) {
+            // 0 < delta ≤ ₹1 — clamp the applied amount to Zoho's balance.
+            payload.amount = localBalance;
+            payload.invoices[0].amount_applied = localBalance;
+            clampError = `clamped by ${delta}`;
+            payload.description = payload.description ? `${payload.description} (${clampError})` : clampError;
+        }
+
+        // (iv) create in Zoho + mode-fallback retry.
+        let created = null;
+        let lastErr = null;
+        try {
+            created = await zohoAPI.createPayment(payload);
+        } catch (e) {
+            lastErr = e;
+            if (/mode/i.test((e && e.message) || '')) {
+                // A mode-shaped rejection → retry ONCE as 'others', keeping the
+                // real method visible in the description for the accountant.
+                try {
+                    const retry = { ...payload, payment_mode: 'others', invoices: payload.invoices.map(x => ({ ...x })) };
+                    const realMethod = String(row.payment_method || '');
+                    if (retry.description && retry.description.indexOf(realMethod) === -1) {
+                        retry.description = `${realMethod} - ${retry.description}`;
+                    } else if (!retry.description) {
+                        retry.description = realMethod;
+                    }
+                    created = await zohoAPI.createPayment(retry);
+                    lastErr = null;
+                } catch (e2) {
+                    lastErr = e2;
+                }
+            }
+        }
+
+        const zpid = created && created.payment && created.payment.payment_id;
+        if (zpid) {
+            await pool.query(
+                "UPDATE billing_payments SET zoho_payment_id = ?, zoho_sync_error = ? WHERE id = ? AND zoho_payment_id = 'SYNCING'",
+                [zpid, clampError, row.id]
+            );
+            localBalance = round2(localBalance - Number(payload.invoices[0].amount_applied));
+            summary.synced++;
+        } else {
+            const msg = truncate255((lastErr && lastErr.message) || 'Zoho createPayment failed');
+            await pool.query(
+                "UPDATE billing_payments SET zoho_payment_id = NULL, zoho_sync_error = ? WHERE id = ? AND zoho_payment_id = 'SYNCING'",
+                [msg, row.id]
+            );
+            summary.failed.push({ payment_id: row.id, message: msg });
+        }
+    }
+
+    return summary;
+}
+
+/**
+ * Sync a single local invoice's payments to Zoho. Throws code
+ * INVOICE_NOT_PUSHED unless the invoice is pushed (zoho_status='pushed' with a
+ * zoho_invoice_id); otherwise delegates to forwardInvoicePayments.
+ * @param {number} invoiceId billing_invoices.id
+ */
+async function syncInvoicePaymentsToZoho(invoiceId) {
+    const [rows] = await pool.query(
+        'SELECT id, zoho_status, zoho_invoice_id FROM billing_invoices WHERE id = ? AND deleted_at IS NULL',
+        [invoiceId]
+    );
+    if (!rows.length || rows[0].zoho_status !== 'pushed' || !rows[0].zoho_invoice_id) {
+        const err = new Error('Invoice is not pushed to Zoho yet');
+        err.code = 'INVOICE_NOT_PUSHED';
+        throw err;
+    }
+    return forwardInvoicePayments({ invoiceId, zohoInvoiceId: rows[0].zoho_invoice_id });
 }
 
 /**
@@ -357,11 +582,25 @@ async function syncInvoiceApprovalState(invoiceId) {
         [invoiceId]
     );
     if (!rows.length || !rows[0].zoho_invoice_id) return null;
-    const state = await zohoAPI.getDocumentStatus('invoice', rows[0].zoho_invoice_id);
+    const zohoInvoiceId = rows[0].zoho_invoice_id;
+    const state = await zohoAPI.getDocumentStatus('invoice', zohoInvoiceId);
     if (state) {
         await pool.query('UPDATE billing_invoices SET zoho_approval_state = ? WHERE id = ?', [state, invoiceId]);
+        // Once an invoice reaches an approved/live state, any payments that were
+        // left pending at push time (staff submission → awaiting approval) can
+        // now flow to Zoho. Best-effort — never let this fail the status sync.
+        if (['approved', 'sent', 'open'].includes(String(state).toLowerCase())) {
+            try {
+                await forwardInvoicePayments({ invoiceId, zohoInvoiceId });
+            } catch (err) {
+                console.error('[billing-zoho] approval re-fire payment sync error:', err.message);
+            }
+        }
     }
     return state;
 }
 
-module.exports = { setPool, setPointsEngine, resolveZohoContact, pushInvoiceToZoho, syncInvoiceApprovalState };
+module.exports = {
+    setPool, setPointsEngine, resolveZohoContact, pushInvoiceToZoho,
+    syncInvoiceApprovalState, forwardInvoicePayments, syncInvoicePaymentsToZoho,
+};

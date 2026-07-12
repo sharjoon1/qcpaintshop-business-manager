@@ -15,6 +15,7 @@ const billingZohoService = require('../services/billing-zoho-service');
 const zohoAPI = require('../services/zoho-api');
 const auditLog = require('../services/audit-log');
 const { idempotent, setPool: setIdempotencyPool } = require('../middleware/idempotency');
+const { istDateString } = require('../services/zoho-payment-mapper');
 
 let pool;
 let pointsEngine = null;
@@ -86,6 +87,48 @@ function paymentExceedsBalance(amount, balanceDue) {
     return Number(amount) > (Number(balanceDue) || 0) + 0.01;
 }
 
+/**
+ * Settle an invoice from its grand total + total paid (both may be mysql2
+ * DECIMAL strings). Extracted from the record-payment handler so the money math
+ * is testable directly (paymentExceedsBalance precedent). Behavior is unchanged
+ * from the pre-SP1 inline logic: balance floors at 0, and a balance within the
+ * 1-paisa rounding tolerance is 'paid', otherwise 'partial' (a payment always
+ * moves the invoice off 'unpaid').
+ */
+function computePaymentSettlement(grandTotal, totalPaid) {
+    const gt = Number(grandTotal) || 0;
+    const paid = Number(totalPaid) || 0;
+    const balanceDue = Math.max(0, gt - paid);
+    const paymentStatus = balanceDue <= 0.01 ? 'paid' : 'partial';
+    return { balanceDue, paymentStatus };
+}
+
+/**
+ * Derive the point-in-time zoho_sync response field from a forwardInvoicePayments
+ * summary. Never throws; a null/absent summary is 'not_applicable'.
+ * @returns {{status:'synced'|'partial'|'failed'|'pending'|'not_applicable', detail:(string|null)}}
+ */
+function deriveZohoSync(summary) {
+    if (!summary) return { status: 'not_applicable', detail: null };
+    const ok = (summary.synced || 0) + (summary.adopted || 0);
+    const failedList = Array.isArray(summary.failed) ? summary.failed : [];
+    const failedCount = failedList.length;
+    const pending = summary.pending || 0;
+    if (ok > 0 && failedCount > 0) {
+        return { status: 'partial', detail: `${ok} synced, ${failedCount} failed` };
+    }
+    if (failedCount > 0) {
+        return { status: 'failed', detail: failedList.map(f => f.message).join('; ').slice(0, 255) };
+    }
+    if (ok > 0) {
+        return { status: 'synced', detail: `${ok} payment(s) synced to Zoho` };
+    }
+    if (pending > 0) {
+        return { status: 'pending', detail: 'Payment(s) waiting on Zoho invoice approval' };
+    }
+    return { status: 'not_applicable', detail: null };
+}
+
 // ═══════════════════════════════════════════
 // ZOD SCHEMAS
 // ═══════════════════════════════════════════
@@ -146,7 +189,9 @@ const recordPaymentSchema = z.object({
     amount: z.number().positive(),
     payment_method: z.enum(['cash', 'upi', 'bank_transfer', 'cheque', 'credit']),
     payment_reference: z.string().optional().default(''),
-    notes: z.string().optional().default('')
+    notes: z.string().optional().default(''),
+    // Optional back-date (yyyy-mm-dd); defaults to today in IST at the handler.
+    payment_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'payment_date must be YYYY-MM-DD').optional()
 });
 
 // ═══════════════════════════════════════════
@@ -1061,52 +1106,65 @@ router.put('/invoices/:id',
 // PAYMENTS
 // ═══════════════════════════════════════════
 
-// Record payment against invoice
+// Record payment against invoice.
+// Local-first: INSERT + re-SUM + header update run inside ONE transaction with
+// SELECT ... FOR UPDATE on the invoice row (closes the read-then-check overpay
+// TOCTOU hole). Only after the local money record is committed do we attempt a
+// best-effort Zoho payment sync — a Zoho failure NEVER affects the local record
+// or the HTTP status; the response's point-in-time `zoho_sync` field reflects it.
 router.post('/invoices/:id/payment',
     idempotent('billing.payment.create'),
     requirePermission('billing', 'payment'),
     validateParams(idParamSchema),
     validate(recordPaymentSchema),
     async (req, res) => {
-        try {
-            const { id } = req.params;
-            const data = req.body;
+        const { id } = req.params;
+        const data = req.body;
+        // yyyy-mm-dd; default to today in IST (server clock IST, DB session UTC).
+        const paymentDate = data.payment_date || istDateString(new Date());
 
-            const [invoices] = await pool.query(
-                'SELECT id, balance_due, payment_status FROM billing_invoices WHERE id = ? AND deleted_at IS NULL', [id]
+        let inserted, totalPaid, balanceDue, paymentStatus, invoicePushed;
+        const connection = await pool.getConnection();
+        try {
+            await connection.beginTransaction();
+
+            const [invoices] = await connection.query(
+                `SELECT id, balance_due, payment_status, grand_total, zoho_status, zoho_invoice_id
+                 FROM billing_invoices WHERE id = ? AND deleted_at IS NULL FOR UPDATE`,
+                [id]
             );
             if (!invoices.length) {
+                await connection.rollback();
                 return res.status(404).json({ success: false, message: 'Invoice not found' });
             }
-
             const invoice = invoices[0];
+
             if (paymentExceedsBalance(data.amount, invoice.balance_due)) {
+                await connection.rollback();
                 return res.status(400).json({
                     success: false,
                     message: `Payment amount exceeds balance due (${Number(invoice.balance_due).toFixed(2)})`
                 });
             }
 
-            await pool.query(
+            const [ins] = await connection.query(
                 `INSERT INTO billing_payments
-                 (invoice_id, amount, payment_method, payment_reference, notes, received_by)
-                 VALUES (?, ?, ?, ?, ?, ?)`,
-                [id, data.amount, data.payment_method, data.payment_reference, data.notes, req.user.id]
+                 (invoice_id, amount, payment_method, payment_reference, payment_date, notes, received_by)
+                 VALUES (?, ?, ?, ?, ?, ?, ?)`,
+                [id, data.amount, data.payment_method, data.payment_reference, paymentDate, data.notes, req.user.id]
             );
 
-            // Recalculate from all payments to avoid floating point drift
-            const [paySum] = await pool.query(
-                'SELECT COALESCE(SUM(amount), 0) AS total_paid FROM billing_payments WHERE invoice_id = ?',
+            // Recalculate from all live payments to avoid floating point drift.
+            const [paySum] = await connection.query(
+                'SELECT COALESCE(SUM(amount), 0) AS total_paid FROM billing_payments WHERE invoice_id = ? AND deleted_at IS NULL',
                 [id]
             );
-            const totalPaid = Number(paySum[0].total_paid);
+            totalPaid = Number(paySum[0].total_paid);
+            const settlement = computePaymentSettlement(invoice.grand_total, totalPaid);
+            balanceDue = settlement.balanceDue;
+            paymentStatus = settlement.paymentStatus;
 
-            const [inv] = await pool.query('SELECT grand_total FROM billing_invoices WHERE id = ? AND deleted_at IS NULL', [id]);
-            const grandTotal = Number(inv[0].grand_total);
-            const balanceDue = Math.max(0, grandTotal - totalPaid);
-            const paymentStatus = balanceDue <= 0.01 ? 'paid' : 'partial';
-
-            await pool.query(
+            await connection.query(
                 `UPDATE billing_invoices SET
                     amount_paid = ?, balance_due = ?, payment_status = ?,
                     updated_at = NOW()
@@ -1114,16 +1172,85 @@ router.post('/invoices/:id/payment',
                 [totalPaid, balanceDue, paymentStatus, id]
             );
 
-            res.json({
-                success: true,
-                message: 'Payment recorded',
-                amount_paid: totalPaid,
-                balance_due: balanceDue,
-                payment_status: paymentStatus
-            });
+            await connection.commit();
+
+            invoicePushed = invoice.zoho_status === 'pushed' && !!invoice.zoho_invoice_id;
+            inserted = {
+                id: ins.insertId, invoice_id: Number(id), amount: data.amount,
+                payment_method: data.payment_method, payment_reference: data.payment_reference,
+                payment_date: paymentDate
+            };
         } catch (error) {
+            try { await connection.rollback(); } catch { /* already rolled back */ }
             console.error('Record payment error:', error);
-            res.status(500).json({ success: false, message: 'Failed to record payment' });
+            return res.status(500).json({ success: false, message: 'Failed to record payment' });
+        } finally {
+            connection.release();
+        }
+
+        // Audit the committed local money record (best-effort, never throws).
+        await auditLog.record(req, {
+            action: 'billing.payment.create',
+            entity_type: 'billing_payment',
+            entity_id: inserted.id,
+            before: null,
+            after: { ...inserted, amount_paid: totalPaid, balance_due: balanceDue, payment_status: paymentStatus }
+        });
+
+        // Best-effort Zoho sync (only for pushed invoices). Never fails the record.
+        let zohoSync = { status: 'not_applicable', detail: null };
+        if (invoicePushed) {
+            try {
+                const summary = await billingZohoService.syncInvoicePaymentsToZoho(id);
+                zohoSync = deriveZohoSync(summary);
+                await auditLog.record(req, {
+                    action: 'billing.payment.zohoSync',
+                    entity_type: 'billing_invoice', entity_id: id,
+                    before: null, after: summary
+                });
+            } catch (err) {
+                if (err.code === 'INVOICE_NOT_PUSHED') {
+                    zohoSync = { status: 'not_applicable', detail: null };
+                } else {
+                    console.error('[billing.payment] inline Zoho sync error:', err.message);
+                    zohoSync = { status: 'failed', detail: err.message };
+                }
+            }
+        }
+
+        res.json({
+            success: true,
+            message: 'Payment recorded',
+            amount_paid: totalPaid,
+            balance_due: balanceDue,
+            payment_status: paymentStatus,
+            zoho_sync: zohoSync
+        });
+    }
+);
+
+// Explicitly (re-)sync a pushed invoice's payments to Zoho. Idempotent by header;
+// returns the forwardInvoicePayments summary. 400 INVOICE_NOT_PUSHED otherwise.
+router.post('/invoices/:id/sync-payments',
+    idempotent('billing.payment.zohoSync'),
+    requirePermission('billing', 'payment'),
+    validateParams(idParamSchema),
+    async (req, res) => {
+        try {
+            const { id } = req.params;
+            const summary = await billingZohoService.syncInvoicePaymentsToZoho(id);
+            await auditLog.record(req, {
+                action: 'billing.payment.zohoSync',
+                entity_type: 'billing_invoice', entity_id: id,
+                before: null, after: summary
+            });
+            res.json({ success: true, zoho_sync: deriveZohoSync(summary), summary });
+        } catch (error) {
+            if (error.code === 'INVOICE_NOT_PUSHED') {
+                return res.status(400).json({ success: false, code: 'INVOICE_NOT_PUSHED', message: 'Invoice is not pushed to Zoho yet' });
+            }
+            console.error('Sync payments error:', error);
+            res.status(500).json({ success: false, message: error.message || 'Failed to sync payments' });
         }
     }
 );
@@ -1269,7 +1396,8 @@ router.post('/invoices/:id/push-zoho',
                 zoho_state: state || null,
                 salesperson_name: result.salespersonName || null,
                 location_name: result.locationName || null,
-                points_result: result.pointsResult || null
+                points_result: result.pointsResult || null,
+                payment_sync: result.paymentSync ? deriveZohoSync(result.paymentSync) : null
             });
         } catch (error) {
             console.error('Push to Zoho error:', error);
@@ -1309,6 +1437,6 @@ router.post('/invoices/:id/sync-zoho-status',
 // only (tests/unit/billing.test.js) — routes still use them directly.
 module.exports = {
     router, setPool, setPointsEngine,
-    calculateTotals, paymentExceedsBalance,
+    calculateTotals, paymentExceedsBalance, computePaymentSettlement, deriveZohoSync,
     createEstimateSchema, recordPaymentSchema, listQuerySchema
 };
