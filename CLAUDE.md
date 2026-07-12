@@ -151,11 +151,27 @@ current behavior **before** editing, then change deliberately.
 
 - Money paths have characterization tests (estimate-pricing, painter-points,
   salary, DPL); the **auth stack, leads, and Zoho sync core remain untested**.
-- Staff logins/failures + permission denials are audited (SYS-009); customer/
-  painter/engineer OTP logins are **not** audited. Session IP/UA captured but
-  never validated.
+- Staff logins/failures + permission denials are audited (SYS-009); painter
+  (`routes/painters/public.js` verify-otp) and engineer (`routes/engineers.js`)
+  OTP logins call `audit.record()` — audited. **Customer OTP logins are not**
+  (`services/customer-auth.js` has zero `audit.record` calls — verified
+  2026-07-02). Session IP/UA captured but never validated.
 - Uploads validated by extension/mimetype only (no magic-byte check).
 - UPI VPA centralized in `services/business-config.js` (`ai_config` keys
   `business_upi_vpa`/`business_upi_payee`); a hardcoded fallback literal remains.
 - Raw session tokens still dual-written (`user_sessions.session_token`,
-  `painter_sessions.token`); painters have no logout endpoint.
+  `painter_sessions.token` — confirmed still written alongside `token_hash` in
+  `routes/painters/public.js`'s session INSERT, verified 2026-07-02). Painters
+  **do** have a logout endpoint (`POST /api/painters/logout`,
+  `routes/painters/painter.js`, shipped as "S3") — the earlier "no logout
+  endpoint" note here was stale.
+
+## Auto-pilot orchestration (read this first, every session)
+- Read orchestration.md before starting any task. Self-select mode + model per its rules.
+- Check .claude-notes/PROJECT-KNOWLEDGE.md before answering any project question or
+  re-discovering anything. Append new findings there after answering.
+- Check .claude-notes/BACKLOG.md for pending work. Process in batches of 5-8 per
+  orchestration.md's guardrails. Stop after each batch for human review.
+- Delegate to .claude/agents/ subagents (nav-scout, builder, money-builder, judge) by
+  name or description match — do not do money-critical or mobile-contract work directly
+  in the main session; delegate to money-builder + judge.

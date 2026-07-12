@@ -2,7 +2,7 @@
 
 > **Platform**: act.qcpaintshop.com
 > **Version**: Web on master HEAD · Staff Android 3.4.0 vc19 (internal) · Painter Android v4.0.1 vc40 (branch design/painter-app-ux-2026-05, APK delivered 2026-05-18 msg_id 299, Play Store upload pending)
-> **Last Updated**: 2026-05-18
+> **Last Updated**: 2026-07-02
 > **Total Codebase**: ~205,000 LOC (web) | 106 frontend pages | Android app (3 flavors: staff / customer / painter)
 
 ---
@@ -374,6 +374,13 @@ Quality Colours Business Manager is a **multi-branch paint shop management platf
 - Image column on Zoho Import table (48x48 clickable thumbnail or "+" placeholder)
 - Upload endpoint: `POST /api/products/:itemId/image`
 - Stores to `zoho_items_map.image_url`
+
+**Item Master & DPL Catalog** (`admin-item-master.html`, `routes/item-master.js`)
+- 5-tab admin page: **Items List** (search/filter Zoho items), **DPL Import** (upload dealer price list PDF, parse, review), **Price Calculator** (per-brand DPL → sales-price preview), **Price History** (audit trail of price changes), **Health Check** (catalog integrity report)
+- `services/dpl-catalog.js` — the `dpl_catalog` table is a **deterministic mediator** between a brand's Dealer Price List and Zoho items (slug-containment + size-tier normalization, e.g. 900ml/0.9L → 1L tier), replacing the older fuzzy DPL→Zoho matching in `services/price-list-parser.js`. Built on top of `computeProposedFields` from the price-list parser.
+- **Canonical DPL rate formula** (§6 money-critical, locked): `ceil(dpl * 1.18 * 1.10)` — 18% GST × 10% markup on the dealer price. Implemented in `routes/item-master.js`.
+- Endpoints: `GET/POST /items`, `GET /summary`, `POST /items/bulk-edit`, `GET/POST/DELETE /naming-rules`, `POST /generate-names`, `GET/POST /dpl-versions`, `POST /dpl-parse`, `POST /dpl-match`, `POST /dpl-apply`, `POST /dpl-notebooklm` (NotebookLM PDF Q&A), `GET /price-history`, `GET /price-history/:itemId`, `GET /health-check`
+- See also §9 Painter Management System's DPL naming/matching entries and the standalone `admin-dpl.html` Zoho-first reconciliation tab, which build on the same `price-list-parser.js` foundation.
 
 **Estimate Calculator**
 - Area-based paint calculation (auto-mix optimization)
@@ -1555,14 +1562,53 @@ Extends the error prevention system with bug tracking, AI-powered fix suggestion
 
 ---
 
+### 2.24 Engineer Quotation Portal
+
+B2B project-buyer accounts (engineers/contractors) — a **4th auth actor** alongside staff, customer, and painter. Mirrors the painter auth pattern (separate identity table, sha256-hashed session token, 30-day session, 10-min OTP).
+
+**Auth**
+- `X-Engineer-Token` header (phone-based OTP login, same NettyFish SMS gateway as customer/painter)
+- `engineer_sessions` table: `token`/`token_hash` (raw token also dual-written, same pattern as painters), `otp`, `otp_expires_at`, `expires_at` (30 days)
+- Middleware in `routes/engineers.js`: `requireEngineerAuth` (approved-only) vs `requireEngineerSession` (pending/suspended too — used by `/me/status` during onboarding)
+- `POST /register`, `POST /send-otp` (rate-limited via `otpLimiter`), `POST /verify-otp`, `POST /logout` (revokes the presented session)
+- OTP logins ARE audited: `verify-otp` calls `audit.record()` on both success and failure paths
+
+**Database Tables**
+- `engineers` — core profile (full_name, phone, company_name, designation, gst_number, branch_id, status ENUM pending/approved/suspended/rejected, credit_enabled/credit_limit/credit_used, zoho_contact_id)
+- `engineer_sessions` — OTP + session tokens
+- `engineer_custom_rates` — per-engineer discount overrides at item/brand/category scope (mirrors `painter_custom_rates`)
+- `engineer_default_rates` — global "all engineers get X% off [scope]" defaults
+- `engineer_hidden_items` — Zoho items hidden from the engineer catalog
+
+**Rate resolution** (`getEngineerRateResolver` in `routes/engineers.js`): priority chain per-engineer item > per-engineer brand > per-engineer category > global default item > global default brand > global default category > 0% (list price)
+
+**Self-service** (`/me/*`, X-Engineer-Token):
+- `GET/PUT /me`, `PUT /me/profile-photo`
+- `POST /me/quotes` — submits a project quote request; writes into the shared `estimate_requests` table with `source='engineer_portal'`, auto-generated `ENG-YYYYMM-####` request number, notifies admin/manager/staff
+- `GET /me/catalog`, `GET /me/catalog-filters`, `GET /me/catalog/:productId` — product browsing with the engineer's resolved discount applied server-side
+- `POST /me/orders` — multi-item cart checkout; server re-resolves each item's discount from `pack_sizes`/`zoho_items_map` (never trusts client-submitted rates), writes a `products_json` line-item snapshot into `estimate_requests` (`source='engineer_portal'`, `request_method='product'`)
+- `GET /me/projects` — lists the engineer's own submitted requests (by phone, from `estimate_requests`)
+
+**Admin** (`engineers.view` / `engineers.manage` permissions):
+- `GET /`, `GET /:id`, `PUT /:id`, `POST /:id/approve`, `POST /:id/reject`, `POST /:id/suspend`, `POST /:id/reinstate`, `PUT /:id/credit`
+- Rate management: `GET/POST/DELETE /:id/rates` (custom), `GET/POST/DELETE /admin/default-rates`, `GET/POST/DELETE /admin/hidden-items`
+- `GET /admin/filters`, `GET /admin/items/search`
+
+**Pages**: `engineer-login.html`, `engineer-register.html`, `engineer-dashboard.html`, `engineer-catalog.html`, `engineer-cart.html`, `engineer-new-quote.html`, `engineer-profile.html`, `admin-engineers.html`, `admin-engineer-catalog.html`
+
+**Route file**: `routes/engineers.js` (mounted `/api/engineers`), `setPool()` + `setSessionManager()` DI. Migrations: `migrate-engineers.js`, `migrate-engineer-rates.js`, `migrate-engineer-catalog.js`.
+
+---
+
 ## 3. MOBILE APPS (Android)
 
 ### Architecture
-- **Type**: Hybrid WebView app (Kotlin + WebView loading web app)
+- **Type**: Hybrid WebView app (Kotlin + WebView loading web app) for 2 of the 3 flavors
 - **Build System**: Gradle 8.11.1, compileSdk 35, minSdk 24
-- **Two Product Flavors**:
-  - `staff` (com.qcpaintshop.staff) -> loads `/login.html`
-  - `customer` (com.qcpaintshop.customer) -> loads `/customer-login.html`
+- **Three Product Flavors**:
+  - `staff` (com.qcpaintshop.staff) -> loads `/login.html` — WebView hybrid
+  - `customer` (com.qcpaintshop.customer) -> loads `/customer-login.html` — WebView hybrid
+  - `painter` (com.qcpaintshop.painter) — **full native Jetpack Compose app**, NOT a WebView wrapper (Hilt DI, Retrofit/OkHttp, Room, DataStore, MVVM). See §9 Painter Management System → Painter Native Android App entries for the complete screen/feature inventory.
 
 ### Features
 - WebView with JavaScript enabled (DOM storage, file access)
@@ -1982,6 +2028,84 @@ node promote-release.js internal production
 
 ## 8. RECENT UPDATES & CHANGELOG
 
+### 2026-07-12 - SP-1 Payment Settlement Sync (AR + AP) + invoice discount push fix
+
+Payments recorded in-app now reach Zoho Books (previously local-only — the biggest daily
+double-entry burden keeping staff in Zoho Books UI). Plan: `docs/superpowers/plans/2026-07-12-sp1-payment-sync.md`.
+Six judge-gated commits `9d8d682..bddb765` (characterization-first; suite 906 → 1,056 tests).
+
+- **AR**: `services/billing-zoho-service.js` `forwardInvoicePayments`/`syncInvoicePaymentsToZoho` —
+  per-payment Zoho customerpayments with real payment mode + date (replaces the push-time aggregate
+  hardcoded `'Cash'`); post-push payments sync inline best-effort at record time; new
+  `POST /api/billing/invoices/:id/sync-payments`; approval sync-back re-fires pending payment sync
+  (staff pushes sit in Zoho approval where payments can't apply — now surfaced, not silent).
+- **AP**: new `services/vendor-zoho-service.js` + `zoho-api.js` `/vendorpayments` methods — vendor
+  payments push bill-linked (location from bill, ≤₹1 NIT-1 clamp) or on-account/unapplied;
+  `paid_through_account_id` from ai_config `zoho_vendor_paid_through_account_id`; new
+  `POST /api/vendors/payments/:id/push-zoho`.
+- **Duplicate-proofing**: deterministic `reference_number` `ACT-BP-<id>`/`ACT-VP-<id>` + atomic
+  `SYNCING` claim (`zoho_claimed_at`, 5-min stale reclaim) + adopt-before-create via GET-by-reference.
+  Pre-POST GET of the Zoho invoice guards void/pending-approval, supplies customer_id (payment path
+  never creates contacts), balance clamp, IST date ≥ invoice date.
+- **Discount fix**: invoice-level discount now sent (`entity_level`, before-tax) — **flag-gated**
+  behind ai_config `billing_invoice_discount_push_enabled` (default OFF until the draft-invoice
+  verification runbook D1 passes). `draft_only` push option (admin) creates an unfinalized Zoho
+  draft for safe verification.
+- **Reversal**: admin-only `DELETE /api/billing/payments/:id` + `/api/vendors/payments/:id` —
+  Zoho-first delete (tolerates already-gone), local soft-delete (`deleted_at`) + shared
+  `recalcInvoicePaymentTotals`/`recalcBillPaymentTotals`; closes the "reverse it first" dead end on
+  invoice/bill deletion. `'credit'`-method payments are never forwarded to Zoho (owner decision).
+- **Migration** `migrations/20260712_payment_zoho_sync.js` (additive): billing_payments
+  +payment_date/zoho_payment_id/zoho_sync_error/zoho_claimed_at/deleted_at; vendor_payments
+  +zoho_sync_error/zoho_claimed_at/deleted_at; stamps `'LEGACY'` sentinels on pre-cutoff rows so
+  historical payments are never re-pushed (cutoff literal must be set to the actual prod deploy
+  date before running there). Mapper: `services/zoho-payment-mapper.js` (mode map + ai_config
+  `zoho_payment_mode_map` override; unknown→`others` retry).
+- **Deploy status**: NOT yet deployed to prod as of 2026-07-12 — needs migration + `_migrations`
+  marker, `zoho_vendor_paid_through_account_id` seeding, and runbook D1-D3 (see plan §Verification)
+  before staff announcement.
+
+### 2026-07-02 - Documentation sync pass (Skills.md refresh)
+
+Pure documentation task — no application code touched. `Skills.md` had drifted since its last real update (header claimed 2026-05-18 while §8 already had 2026-06-11 entries and a further three weeks of shipped work were undocumented). Fixes:
+- Bumped header date; rewrote §10 "Known Issues" (was stale/self-contradictory — claimed no server-side customer auth and no test suite, both fixed months ago and contradicted elsewhere in this same file).
+- Added §2.24 Engineer Quotation Portal (the 4th auth actor — `X-Engineer-Token`/`engineer_sessions`/`routes/engineers.js` — was completely undocumented despite being a real, shipped system).
+- Added Item Master & DPL Catalog subsection under §2.7 (`routes/item-master.js` 5-tab admin page + `services/dpl-catalog.js` deterministic mediator + the canonical `ceil(dpl*1.18*1.10)` rate formula).
+- Fixed §3 Mobile Apps saying "Two Product Flavors" when the painter flavor (native Compose, not WebView) has had its own dedicated §9 write-ups for months.
+- Added the CSP Hardening (S9+F5) and Painter Onboarding Leads entries below.
+- Reconciled the prod `_migrations` "122/0 pending" (06-11) claim against a fresh local-dev-DB check (see the D3 entry below) — found the runner healthy but the local DB genuinely behind, not a tracker-gap false-positive.
+
+### 2026-06-30 → 2026-07-01 - Painter Onboarding & Leads Workflow
+
+Extends the existing PNTR painter-marketing pipeline (§ "PNTR Painter Marketing" further below) with a formal recruitment funnel: staff nominate prospective painters → admin/staff work the lead → an invite link lets the painter self-register pre-linked to the recruiting staff member and (if matched) their Zoho contact.
+
+- **Migration** `migrations/migrate-painter-leads-onboarding.js` (`9fe5311`): extends the existing `painter_leads` table, adds `painter_lead_invites` (invite tokens), extends `painter_lead_followups`.
+- **Routes**: `routes/painter-leads/{api,shared,index}.js` (`1c4627b`, `cab670d`) — mounted per the standard `setPool()` DI pattern; `/api/painter-leads` CRUD, assignment, followup, invite-generation, and funnel stats endpoints. `routes/painters/public.js` extended so registration accepts `invite_token` and auto-links the resulting painter to the inviting staff member + any matched Zoho contact.
+- **UI**: new `public/admin-painter-leads.html` (+ `public/js/pages/admin-painter-leads.js`) — funnel-stats dashboard with lead assignment. `staff-painter-marketing.html` upgraded with lead-workflow actions (nominate, follow up, invite).
+- **Fix** (`ea42fe7`, 07-01): `admin-leads.html` painter-program nomination branch dropdown wasn't populating reliably — now reuses the already-loaded global branches array before falling back to a fresh `/api/branches` fetch, with an explicit error surfaced on load failure.
+- **Tests**: `tests/unit/painter-leads.test.js`, `tests/unit/painter-registration-invite.test.js`, `tests/integration/painter-leads-ui.test.js`, `tests/integration/staff-painter-marketing-ui.test.js`.
+- Spec + plan: `docs/superpowers/specs/2026-06-30-painter-onboarding-marketing-design.md`, `docs/superpowers/plans/2026-06-30-painter-onboarding-marketing-plan.md`.
+
+### 2026-06-13 → 2026-06-25 - CSP Hardening (S9+F5)
+
+Multi-week, multi-batch effort to move the app off `unsafe-inline`/`unsafe-eval` Content-Security-Policy and onto an enforced-strict policy, page by page. Plan: `docs/plans/2026-06-13-s9-f5-csp-hardening-plan.md`. Central config: `config/csp.js` (wired in `server.js`).
+
+**Mechanism** — three CSP layers stacked in `server.js`:
+1. `cspDirectives` — enforced globally, still permissive (`'unsafe-inline'` allowed; `'unsafe-eval'` already dropped in Phase A).
+2. `cspStrictDirectives` — Report-Only globally (the target policy: no `unsafe-inline` in `script-src`, `script-src-attr: 'none'`, tightened `connect-src: 'self'`, reports to `/api/csp-report`). This is how the migration worklist gets built — browsers report violations without breaking pages.
+3. Per-path enforced-strict override: any path in `STRICT_ENFORCED_PATHS` (a `Set` in `config/csp.js`) gets the strict policy actually enforced (Report-Only header removed) instead of the permissive one.
+
+**Proven per-page pattern** (repeated ~11 batches): externalize the page's inline `<script>` block(s) to `/js/pages/<name>.js`; convert every `on*=` handler (`onclick=`, `onchange=`, etc. — including ones injected via `innerHTML`) to `data-action` attributes + a single delegated event listener; also watch for `javascript:` URI handlers (a second, easy-to-miss inline-execution vector). A page is only added to `STRICT_ENFORCED_PATHS` after confirming zero Report-Only CSP violations for its path.
+- **Phase A** (`76bbe59`) — dropped `'unsafe-eval'` from the enforced policy; stood up the Report-Only strict policy + `/api/csp-report` violation sink.
+- **Phase B** (`3dabc87`) — tightened `connect-src` in the Report-Only policy after an audit confirmed all browser network calls are same-origin `/api/*` + same-origin Socket.io.
+- **Phase C/D** — externalize inline scripts + remove inline handlers, page by page (`d90a550` first migrated page, then batches of increasing size).
+- **Nav externalization (N0–N5)** — the shared nav components (loaded on nearly every page) had to be fixed once, centrally: backward-compatible loader keystone, 12 subnav fragments, `staff-sidebar.html`, `sidebar-complete.html` (admin), `header-v2.html` (last component), then `admin-reports.html` flipped as the first page proving the nav-loader pages could go strict.
+- **Phase E batches 1–11** (2026-06-13 → 2026-06-25) — incremental page-by-page flips, smallest/most-used first: non-nav-loader pages, then nav-loader admin pages in increasing handler-count order.
+- **Current state**: **81 pages on enforced-strict CSP** (`STRICT_ENFORCED_PATHS.size === 81` as of this writing).
+- **Deliberately not yet touched — "held trio"**: `login.html`, `admin-dashboard.html`, `dashboard.html` — highest blast radius of any page in the app; queued for human browser-smoke before flipping.
+- **"Mega mountain" — fully pending, each needs its own dedicated plan**: `admin-products.html` (~150 inline handlers), `staff-vendors.html` (~116), `admin-zoho-reorder.html` (~113), `admin-dpl.html` (5,490 lines), `admin-painters.html` (5,396 lines), `staff/dashboard.html` (3,798 lines).
+- Batches 10–11 (`6adfa82`, `37e9828`) are committed to `master` but had not yet been deployed to prod as of this writing — confirm prod's actual deployed commit before assuming these are live.
+
 ### 2026-04-14/15 - Reorder Intelligence (Branch-wise Sales → Auto Reorder → Daily Report)
 
 Full spec + plan under `docs/superpowers/specs/` + `docs/superpowers/plans/`. Detailed memory at `memory/project_reorder_intelligence.md`.
@@ -2116,9 +2240,10 @@ Full spec + plan under `docs/superpowers/specs/` + `docs/superpowers/plans/`. De
 1. **A1: server.js endpoint extraction** — 46 inline endpoints moved verbatim into 4 new route modules: `routes/auth.js` (14: `/api/auth/*` + `/api/otp/*`), `routes/paint-colors.js` (6: `/api/paint-colors/*` + design-request visualize/auto-visualize, incl. the paint-catalog cache + auto-viz helpers), `routes/products.js` (16: `/api/products/*` — static paths registered before `/:id`, order load-bearing), `routes/customer-portal.js` (10: `/api/customer/auth/*` + `/api/customer/me/*`). Each mounts `app.use('/api', x.router)` at the exact original inline position so Express matching order is unchanged; route inventory verified identical (100 method+path pairs) before/after. server.js ~4,430 → ~2,360 lines.
 2. **A2: auth LRU cache** — `middleware/permissionMiddleware.js`: single `resolveStaffSession()` (was copy-pasted 5×) + 45s/500-entry caches for sessions (keyed sha256(token)) and role-permission verdicts. Immediate invalidation hooks: logout → `invalidateSessionToken`, password reset/deactivation → `invalidateUser`, role-permission edits (`routes/roles.js`) → `clearPermissionCache`. Misses never cached.
 3. **D1: prod schema snapshot** — `docs/schema/prod-schema-2026-06-11.sql` (226 tables, reference-only, regen instructions in header). **D3**: prod `_migrations` audited backfill → `migrate.js --status` = 122 applied / 0 pending. **D2**: the 11 side-effects-on-require migration files normalized to `exports.up(pool)`.
+   - **Reconciliation (2026-07-02)**: the "122/0 pending" figure above is PROD's state as of 06-11 and has **not** been independently re-verified since — don't assume it's still current without a fresh check (see §7 for the separate, still-valid "tracker only logs Apr 30+ entries" caveat on prod). Running `node migrate.js --status` against the **local dev DB** this session shows 112 applied / 19 pending (`migrate-promise-reminders.js`, `migrate-whatsapp-idempotency.js`, `migrate-dpl-catalog.js` + its 2 follow-ups, `20260610_painter_points_phase2.js`, `20260610_salary_ot_split.js`, `20260610_otp_hash_attempts.js`, five `20260612_*` GST/vendor-PO/Zoho migrations, `20260613_zoho_approval_state.js`, `20260519_update_payment_links.js`, `add-system-ai-permission.js`, `add-zoho-dpl-disposition.js`) — confirmed genuinely unapplied (e.g. `dpl_catalog` table does not exist locally), not a tracker-gap false-positive. The runner mechanics themselves are healthy; this local dev DB is simply behind and needs `node migrate.js` run to catch up before relying on it for DPL-catalog/painter-points-phase2/GST-filing work.
 4. **T2/T3/T4: tests** — auth stack first coverage (`tests/unit/auth-middleware.test.js`, 31 cases incl. cache behavior); 4 mirror tests de-mirrored to real-module imports (test-only exports in billing/vendors/painters); Zoho cf_* wrap + rate-limiter math + lead auto-assign round-robin characterized (`zoho-api-cf-wrap`, `zoho-rate-limiter`, `leads-logic` test files).
 5. **F1: shared escaper** — `public/js/qc-escape.js` (`escHtml`/`escAttr`/`escJS`, non-clobbering); 7 escaper-less pages wired (incl. fixing a bypassable onclick-string escape in `share/design-request.html` and JS-arg escaping in `admin-stock-check.html`).
-6. **Known follow-up (NOT fixed)**: `services/vendor-bill-ai-service.js` `verifyBillItems` reads `staff.rate`/`staff.amount` but `routes/vendors.js` feeds DB rows with `unit_price` — rate comparison sees 0 and can false-flag mismatches. Needs its own test-first fix.
+6. ~~**Known follow-up (NOT fixed)**: `services/vendor-bill-ai-service.js` `verifyBillItems` reads `staff.rate`/`staff.amount` but `routes/vendors.js` feeds DB rows with `unit_price` — rate comparison sees 0 and can false-flag mismatches. Needs its own test-first fix.~~ **FIXED 2026-06-12** (the day after this entry was written) — see `tests/unit/vendors.test.js:7` ("T2 finding, FIXED 2026-06-12") and `services/vendor-bill-ai-service.js:311`, which now reads `staff.rate != null ? staff.rate : staff.unit_price`. Confirmed still correct and test-locked as of 2026-07-02 — do not re-flag this as open.
 
 ### 2026-02-25 - BMAD Sprint 1: Technical Foundation
 Implemented foundational infrastructure improvements as part of the BMAD (Breakthrough Method for Agile AI-Driven Development) initiative:
@@ -3144,9 +3269,14 @@ Default grants: manager gets all 4, staff gets view/contact/convert. Run `node m
 ## 10. KNOWN ISSUES & ROADMAP
 
 ### Known Issues
-- Customer auth token not stored in DB (localStorage only - no server-side validation)
-- Pollinations AI kontext model moved to paid-only (using flux text-to-image as fallback)
-- No automated test suite
+*(Refreshed 2026-07-02 — the two items previously listed here, "customer auth token not stored in DB" and "no automated test suite," are both stale and contradicted elsewhere in this file: customer Bearer-token auth via `customer_sessions` shipped 2026-04-30/05-01 as U-CRITICAL-1, and there is a 70-file Jest suite as of this session (`npx jest --listTests`). Current gaps, verified 2026-07-02:)*
+- **Customer OTP logins are not audited** — `services/customer-auth.js` has no `audit.record()` calls. By contrast, painter OTP logins (`routes/painters/public.js` verify-otp) and engineer OTP logins (`routes/engineers.js` verify-otp, §2.24) both call `audit.record()` on success and failure.
+- **Session IP/User-Agent captured but never validated** — `customer_sessions`/`painter_sessions`/`engineer_sessions` all store `ip_address`/`user_agent` at login time, but no code path re-checks them on subsequent requests (session hijacking via stolen token is not detected).
+- **Raw session tokens still dual-written** — `painter_sessions` INSERT (`routes/painters/public.js`) writes both `token` and `token_hash` columns, not just the hash (same pattern in `engineer_sessions`). Painters DO now have a logout endpoint (`POST /api/painters/logout`, "S3", in `routes/painters/painter.js` — revokes the presented session) — engineers also have one (`POST /api/engineers/logout`).
+- **Uploads validated by extension/mimetype only** — no magic-byte (file-type) check on any upload path.
+- **CSP mega-mountain pages remain on permissive CSP** — 81 pages are enforced-strict as of the last shipped batch (2026-06-25), but the 6 largest admin pages (admin-products ~150 handlers, staff-vendors ~116, admin-zoho-reorder ~113, admin-dpl 5,490 lines, admin-painters 5,396 lines, staff/dashboard.html 3,798 lines) are fully pending, each needing its own dedicated migration plan. See the CSP Hardening entry in §8 for the full picture.
+
+*(Correction, 2026-07-02, same session: the `verifyBillItems` field-name-mismatch item listed here minutes earlier was itself stale — re-checking the actual code before acting on it found it was already fixed on 2026-06-12, the day after the Phase 3 report that originally flagged it. See the corrected §8 Phase 3 entry above. Left as a visible correction rather than silently removed, as a reminder to verify a "known gap" against current code before trusting it, even within the same documentation-refresh pass.)*
 
 ### Potential Enhancements
 - [ ] Invoice generation (not just estimates)
