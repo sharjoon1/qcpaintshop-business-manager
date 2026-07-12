@@ -2670,6 +2670,7 @@ async function loadPayments(page = 1) {
             return;
         }
 
+        const canReverse = isFullAdminUser();
         container.innerHTML = data.payments.map(p => `
             <div class="bg-white rounded-xl border border-gray-100 shadow-sm p-4">
                 <div class="flex items-center justify-between mb-1">
@@ -2686,9 +2687,10 @@ async function loadPayments(page = 1) {
                     ${p.paid_by_name ? `<span class="mx-1">&middot;</span><span>${esc(p.paid_by_name)}</span>` : ''}
                     ${p.payment_reference ? `<span class="mx-1">&middot;</span><span class="text-gray-400">#${esc(p.payment_reference)}</span>` : ''}
                 </div>
-                ${paymentPending(p) ? `
-                <div class="mt-2 flex justify-end">
-                    <button onclick="pushVendorPayment(${p.id})" class="btn-green-outline px-3 py-1 rounded-lg text-xs font-medium">Push to Zoho</button>
+                ${(paymentPending(p) || canReverse) ? `
+                <div class="mt-2 flex justify-end gap-2">
+                    ${paymentPending(p) ? `<button onclick="pushVendorPayment(${p.id})" class="btn-green-outline px-3 py-1 rounded-lg text-xs font-medium">Push to Zoho</button>` : ''}
+                    ${canReverse ? `<button onclick="reversePayment(${p.id}, '${esc(p.zoho_payment_id || '')}')" class="px-3 py-1 rounded-lg text-xs font-medium text-red-600 border border-red-200 hover:bg-red-50">Reverse</button>` : ''}
                 </div>` : ''}
             </div>
         `).join('');
@@ -2696,6 +2698,37 @@ async function loadPayments(page = 1) {
         renderPagination('paymentPagination', data.pagination, loadPayments);
     } catch (e) {
         container.innerHTML = `<div class="text-center py-8 text-red-500">${esc(e.message)}</div>`;
+    }
+}
+
+// Full-admin check (mirrors the backend isFullAdmin gate on the reversal route)
+// so a manager isn't shown a Reverse button that would only 403. Reuses the
+// getCurrentUser pattern exposed by /js/auth-helper.js.
+function isFullAdminUser() {
+    try {
+        const u = (window.getCurrentUser && getCurrentUser()) || null;
+        return !!u && ['admin', 'administrator', 'super_admin'].includes(String(u.role || '').toLowerCase());
+    } catch { return false; }
+}
+
+// Admin-only: reverse (soft-delete) a vendor payment. Confirms the Zoho
+// consequence (a synced payment is deleted in Zoho too; a LEGACY one needs a
+// manual Zoho adjustment), DELETEs, toasts, and refreshes the payments list.
+async function reversePayment(paymentId, zohoState) {
+    let consequence;
+    if (zohoState === 'LEGACY') consequence = 'This is a legacy payment — after reversing here you must adjust it in Zoho Books manually.';
+    else if (zohoState === 'SYNCING') consequence = 'This payment is mid-sync to Zoho; the reversal may be blocked until it settles.';
+    else if (zohoState) consequence = 'This will ALSO delete the linked payment in Zoho Books.';
+    else consequence = 'This payment was never sent to Zoho; only the local record is reversed.';
+    if (!confirm(`Reverse this payment?\n\n${consequence}\n\nThis cannot be undone.`)) return;
+    try {
+        const res = await fetch(`${API}/payments/${paymentId}`, { method: 'DELETE', headers });
+        const data = await res.json();
+        if (!data.success) throw new Error(apiMessage(data));
+        showToast(data.message || 'Payment reversed', 'success');
+        loadPayments(paymentPage);
+    } catch (e) {
+        showToast(e.message || 'Reversal failed', 'error');
     }
 }
 

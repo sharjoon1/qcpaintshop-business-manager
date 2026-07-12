@@ -14,6 +14,7 @@ const { uploadVendorBill } = require('../config/uploads');
 const vendorBillAI = require('../services/vendor-bill-ai-service');
 const zohoAPI = require('../services/zoho-api');
 const vendorZohoService = require('../services/vendor-zoho-service');
+const { classifyPaymentReversal } = require('../services/zoho-payment-mapper');
 const audit = require('../services/audit-log');
 const { idempotent, setPool: setIdempotencyPool } = require('../middleware/idempotency');
 
@@ -39,6 +40,115 @@ function deriveVendorZohoSync(result) {
 
 const r2 = n => Math.round((parseFloat(n) || 0) * 100) / 100;
 const GST_RATE = 0.18; // paints/putty: CGST 9 + SGST 9
+
+/**
+ * Re-SUM a bill's live (non-soft-deleted) payments and rewrite its header money
+ * columns. Shared by the record-payment path and the reversal path so the
+ * settlement math + SUM filter live in ONE tested place. `db` is a pool OR a
+ * transaction connection (both expose .query). The SUM excludes soft-deleted
+ * rows (deleted_at IS NULL). Faithful copy of the pre-SP1 inline logic:
+ * balance floors at 0, paid iff balance <= 0, else partial iff any paid, else
+ * unpaid. Returns null when the bill row is gone.
+ * @returns {Promise<{totalPaid:number, balanceDue:number, paymentStatus:string}|null>}
+ */
+async function recalcBillPaymentTotals(db, billId) {
+    const [sumRows] = await db.query(
+        'SELECT COALESCE(SUM(amount), 0) AS total_paid FROM vendor_payments WHERE bill_id = ? AND deleted_at IS NULL',
+        [billId]
+    );
+    const totalPaid = parseFloat(sumRows[0].total_paid) || 0;
+
+    const [bills] = await db.query('SELECT grand_total FROM vendor_bills WHERE id = ?', [billId]);
+    if (!bills.length) return null;
+
+    const grandTotal = parseFloat(bills[0].grand_total) || 0;
+    const balanceDue = grandTotal - totalPaid;
+    const paymentStatus = balanceDue <= 0 ? 'paid' : (totalPaid > 0 ? 'partial' : 'unpaid');
+    await db.query(
+        'UPDATE vendor_bills SET amount_paid = ?, balance_due = ?, payment_status = ? WHERE id = ?',
+        [totalPaid, Math.max(0, balanceDue), paymentStatus, billId]
+    );
+    return { totalPaid, balanceDue: Math.max(0, balanceDue), paymentStatus };
+}
+
+/**
+ * Count a bill's LIVE (non-reversed) payments. The delete/void refusal uses this
+ * so a fully-reversed bill becomes deletable again. Exported for direct testing.
+ */
+async function countLiveBillPayments(db, billId) {
+    const [rows] = await db.query(
+        'SELECT COUNT(*) AS c FROM vendor_payments WHERE bill_id = ? AND deleted_at IS NULL',
+        [billId]
+    );
+    return Number(rows[0].c) || 0;
+}
+
+/**
+ * Reverse (soft-delete) a single vendor payment, Zoho-first. Extracted from the
+ * DELETE handler so it's unit-testable without supertest. Uses module-level
+ * `pool` + `zohoAPI`. Same decision matrix as AR (classifyPaymentReversal):
+ *   - in_flight ('SYNCING')  → throw SYNC_IN_FLIGHT (409); nothing touched.
+ *   - zoho_delete_required   → deleteVendorPayment FIRST; a /does not exist|1002/i
+ *     is tolerated; any other Zoho error → throw ZOHO_DELETE_FAILED (502), NO
+ *     local change.
+ *   - legacy_manual ('LEGACY') → skip Zoho; caller appends the manual-adjust note.
+ *   - local_only (NULL)        → skip Zoho.
+ * Then in ONE transaction: soft-delete + recalc the parent bill totals
+ * (bill-linked only — an on-account reversal has no bill to re-SUM).
+ * @returns {Promise<{payment:Object, zohoDeleted:boolean, legacyManual:boolean, recalced:(Object|null)}>}
+ */
+async function reverseVendorPayment(paymentId) {
+    const [rows] = await pool.query(
+        'SELECT * FROM vendor_payments WHERE id = ? AND deleted_at IS NULL',
+        [paymentId]
+    );
+    if (!rows.length) { const e = new Error('Payment not found'); e.code = 'NOT_FOUND'; throw e; }
+    const payment = rows[0];
+
+    const kind = classifyPaymentReversal(payment.zoho_payment_id);
+    if (kind === 'in_flight') {
+        const e = new Error('This payment is mid-sync to Zoho — retry the reversal in a minute.');
+        e.code = 'SYNC_IN_FLIGHT';
+        throw e;
+    }
+
+    let zohoDeleted = false;
+    let legacyManual = false;
+    if (kind === 'zoho_delete_required') {
+        try {
+            await zohoAPI.deleteVendorPayment(payment.zoho_payment_id);
+            zohoDeleted = true;
+        } catch (zErr) {
+            if (/does not exist|1002/i.test(zErr.message || '')) {
+                zohoDeleted = true;
+            } else {
+                const e = new Error(zErr.message || String(zErr));
+                e.code = 'ZOHO_DELETE_FAILED';
+                throw e; // NO local change on any other Zoho error
+            }
+        }
+    } else if (kind === 'legacy_manual') {
+        legacyManual = true;
+    }
+
+    let recalced = null;
+    const connection = await pool.getConnection();
+    try {
+        await connection.beginTransaction();
+        await connection.query('UPDATE vendor_payments SET deleted_at = NOW() WHERE id = ?', [paymentId]);
+        if (payment.bill_id) {
+            recalced = await recalcBillPaymentTotals(connection, payment.bill_id);
+        }
+        await connection.commit();
+    } catch (txErr) {
+        try { await connection.rollback(); } catch { /* already rolled back */ }
+        throw txErr;
+    } finally {
+        connection.release();
+    }
+
+    return { payment, zohoDeleted, legacyManual, recalced };
+}
 
 // Zoho rejects a raw mysql2 Date (serialized as a full ISO timestamp) with
 // "Invalid value passed for <Date>". It wants a bare YYYY-MM-DD. Format any
@@ -519,7 +629,7 @@ router.get('/bills/:id',
                 `SELECT vp.*, u.full_name AS paid_by_name
                  FROM vendor_payments vp
                  LEFT JOIN users u ON vp.paid_by = u.id
-                 WHERE vp.bill_id = ?
+                 WHERE vp.bill_id = ? AND vp.deleted_at IS NULL
                  ORDER BY vp.payment_date DESC`,
                 [id]
             );
@@ -1170,9 +1280,12 @@ router.delete('/bills/:id',
             if (!bills.length) return res.status(404).json({ success: false, message: 'Bill not found' });
             const bill = bills[0];
 
+            // A fully-reversed bill (all payments soft-deleted) drops to 'unpaid'
+            // with amount_paid 0 and zero live payments — so it becomes deletable
+            // again (closes the "reverse it first" dead end).
             const amountPaid = parseFloat(bill.amount_paid) || 0;
-            const [payCount] = await pool.query('SELECT COUNT(*) AS c FROM vendor_payments WHERE bill_id = ?', [id]);
-            if (amountPaid > 0.01 || bill.payment_status !== 'unpaid' || payCount[0].c > 0) {
+            const liveCount = await countLiveBillPayments(pool, id);
+            if (amountPaid > 0.01 || bill.payment_status !== 'unpaid' || liveCount > 0) {
                 return res.status(400).json({ success: false, code: 'BILL_HAS_PAYMENTS', message: 'This bill has a payment recorded — reverse it first (or handle it in Zoho).' });
             }
 
@@ -1681,7 +1794,7 @@ router.get('/payments',
             const limit = Number(req.query.limit) || 20;
             const offset = (page - 1) * limit;
 
-            let where = 'WHERE 1=1';
+            let where = 'WHERE vp.deleted_at IS NULL';
             const params = [];
 
             if (vendor_id) {
@@ -1734,25 +1847,10 @@ router.post('/payments',
                 [vendor_id, bill_id || null, amount, payment_method, payment_reference, payment_date, notes, req.user.id]
             );
 
-            // If bill_id linked, recalculate bill payment totals
+            // If bill_id linked, recalculate bill payment totals (shared with the
+            // reversal path so the settlement math lives in one tested place).
             if (bill_id) {
-                const [sumRows] = await pool.query(
-                    `SELECT COALESCE(SUM(amount), 0) AS total_paid FROM vendor_payments WHERE bill_id = ? AND deleted_at IS NULL`,
-                    [bill_id]
-                );
-                const totalPaid = parseFloat(sumRows[0].total_paid) || 0;
-
-                const [bills] = await pool.query('SELECT grand_total FROM vendor_bills WHERE id = ?', [bill_id]);
-                if (bills.length) {
-                    const grandTotal = parseFloat(bills[0].grand_total) || 0;
-                    const balanceDue = grandTotal - totalPaid;
-                    const paymentStatus = balanceDue <= 0 ? 'paid' : (totalPaid > 0 ? 'partial' : 'unpaid');
-
-                    await pool.query(
-                        `UPDATE vendor_bills SET amount_paid = ?, balance_due = ?, payment_status = ? WHERE id = ?`,
-                        [totalPaid, Math.max(0, balanceDue), paymentStatus, bill_id]
-                    );
-                }
+                await recalcBillPaymentTotals(pool, bill_id);
             }
 
             // Audit the committed local money record (best-effort, never throws).
@@ -1810,6 +1908,47 @@ router.post('/payments/:id/push-zoho',
             }
             console.error('Push vendor payment to Zoho error:', error);
             res.status(500).json({ success: false, message: error.message || 'Failed to push payment to Zoho' });
+        }
+    }
+);
+
+// Reverse (soft-delete) a vendor payment — admin only (Zoho-first delete). Closes
+// the "reverse it first" dead end: a fully-reversed bill drops back to 'unpaid'
+// and becomes deletable/voidable again. managePerm gates the module; the
+// in-handler isFullAdmin gate makes it admin-only.
+router.delete('/payments/:id',
+    managePerm,
+    validateParams(idParamSchema),
+    async (req, res) => {
+        const { id } = req.params;
+        if (!isFullAdmin(req.user && req.user.role)) {
+            return res.status(403).json({ success: false, message: 'Only an admin can reverse a payment.' });
+        }
+        try {
+            const { payment, zohoDeleted, legacyManual, recalced } = await reverseVendorPayment(id);
+
+            await audit.record(req, {
+                action: 'vendor.payment.delete',
+                entity_type: 'vendor_payment', entity_id: id,
+                before: payment,
+                after: { deleted_at: 'now', zoho_deleted: zohoDeleted, bill_totals: recalced }
+            });
+
+            let message = 'Payment reversed';
+            if (legacyManual) message += ' — adjust the corresponding payment in Zoho Books manually';
+            res.json({ success: true, message, zoho_deleted: zohoDeleted });
+        } catch (error) {
+            if (error.code === 'NOT_FOUND') {
+                return res.status(404).json({ success: false, message: 'Payment not found' });
+            }
+            if (error.code === 'SYNC_IN_FLIGHT') {
+                return res.status(409).json({ success: false, code: 'SYNC_IN_FLIGHT', message: error.message });
+            }
+            if (error.code === 'ZOHO_DELETE_FAILED') {
+                return res.status(502).json({ success: false, code: 'ZOHO_DELETE_FAILED', message: 'Zoho would not delete this payment: ' + error.message });
+            }
+            console.error('Reverse vendor payment error:', error);
+            res.status(500).json({ success: false, message: 'Failed to reverse payment' });
         }
     }
 );
@@ -1879,7 +2018,7 @@ router.get('/:id',
             const [recent_payments] = await pool.query(
                 `SELECT vp.*, u.full_name AS paid_by_name
                  FROM vendor_payments vp LEFT JOIN users u ON vp.paid_by = u.id
-                 WHERE vp.vendor_id = ? ORDER BY vp.payment_date DESC LIMIT 10`, [id]
+                 WHERE vp.vendor_id = ? AND vp.deleted_at IS NULL ORDER BY vp.payment_date DESC LIMIT 10`, [id]
             );
             res.json({ success: true, vendor: vendors[0], recent_bills, recent_payments });
         } catch (error) {
@@ -1891,4 +2030,7 @@ router.get('/:id',
 
 // Zod schemas exported for unit testing only (tests/unit/vendors.test.js) —
 // routes still use them directly via validate().
-module.exports = { router, setPool, createVendorSchema, createBillSchema, recordPaymentSchema, listQuerySchema, computeBillTotals };
+module.exports = {
+    router, setPool, createVendorSchema, createBillSchema, recordPaymentSchema, listQuerySchema, computeBillTotals,
+    recalcBillPaymentTotals, countLiveBillPayments, reverseVendorPayment
+};

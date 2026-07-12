@@ -15,7 +15,7 @@ const billingZohoService = require('../services/billing-zoho-service');
 const zohoAPI = require('../services/zoho-api');
 const auditLog = require('../services/audit-log');
 const { idempotent, setPool: setIdempotencyPool } = require('../middleware/idempotency');
-const { istDateString } = require('../services/zoho-payment-mapper');
+const { istDateString, classifyPaymentReversal } = require('../services/zoho-payment-mapper');
 
 let pool;
 let pointsEngine = null;
@@ -90,17 +90,140 @@ function paymentExceedsBalance(amount, balanceDue) {
 /**
  * Settle an invoice from its grand total + total paid (both may be mysql2
  * DECIMAL strings). Extracted from the record-payment handler so the money math
- * is testable directly (paymentExceedsBalance precedent). Behavior is unchanged
- * from the pre-SP1 inline logic: balance floors at 0, and a balance within the
- * 1-paisa rounding tolerance is 'paid', otherwise 'partial' (a payment always
- * moves the invoice off 'unpaid').
+ * is testable directly (paymentExceedsBalance precedent). Balance floors at 0,
+ * and a balance within the 1-paisa rounding tolerance is 'paid', otherwise
+ * 'partial'.
+ *
+ * SP-1 C6: gained the `totalPaid <= 0 → 'unpaid'` case so that a FULLY-reversed
+ * invoice (all payments soft-deleted) drops back to 'unpaid' — which re-opens
+ * the delete/void path (the "reverse it first" dead end closes). The record path
+ * never hits this branch: a positive payment was just inserted, so totalPaid is
+ * always > 0 there and the paid/partial behavior is byte-identical to pre-SP1.
  */
 function computePaymentSettlement(grandTotal, totalPaid) {
     const gt = Number(grandTotal) || 0;
     const paid = Number(totalPaid) || 0;
     const balanceDue = Math.max(0, gt - paid);
-    const paymentStatus = balanceDue <= 0.01 ? 'paid' : 'partial';
+    let paymentStatus;
+    if (paid <= 0) paymentStatus = 'unpaid';
+    else if (balanceDue <= 0.01) paymentStatus = 'paid';
+    else paymentStatus = 'partial';
     return { balanceDue, paymentStatus };
+}
+
+/**
+ * Re-SUM an invoice's live (non-soft-deleted) payments and rewrite its header
+ * money columns. Shared by the record-payment path and the reversal path so the
+ * settlement math + SUM filter live in ONE tested place. `db` is a pool OR a
+ * transaction connection (both expose .query). The SUM excludes soft-deleted
+ * rows (deleted_at IS NULL) — a reversed payment stops counting immediately.
+ * @returns {Promise<{totalPaid:number, balanceDue:number, paymentStatus:string}>}
+ */
+async function recalcInvoicePaymentTotals(db, invoiceId) {
+    const [paySum] = await db.query(
+        'SELECT COALESCE(SUM(amount), 0) AS total_paid FROM billing_payments WHERE invoice_id = ? AND deleted_at IS NULL',
+        [invoiceId]
+    );
+    const totalPaid = Number(paySum[0].total_paid);
+    const [invRows] = await db.query(
+        'SELECT grand_total FROM billing_invoices WHERE id = ?',
+        [invoiceId]
+    );
+    const grandTotal = invRows.length ? invRows[0].grand_total : 0;
+    const { balanceDue, paymentStatus } = computePaymentSettlement(grandTotal, totalPaid);
+    await db.query(
+        `UPDATE billing_invoices SET
+            amount_paid = ?, balance_due = ?, payment_status = ?, updated_at = NOW()
+         WHERE id = ?`,
+        [totalPaid, balanceDue, paymentStatus, invoiceId]
+    );
+    return { totalPaid, balanceDue, paymentStatus };
+}
+
+/**
+ * Count an invoice's LIVE (non-reversed) payments. The delete/void refusal uses
+ * this so a fully-reversed invoice (all payments soft-deleted) becomes
+ * deletable again. Exported for direct testing (no supertest).
+ */
+async function countLiveInvoicePayments(db, invoiceId) {
+    const [rows] = await db.query(
+        'SELECT COUNT(*) AS c FROM billing_payments WHERE invoice_id = ? AND deleted_at IS NULL',
+        [invoiceId]
+    );
+    return Number(rows[0].c) || 0;
+}
+
+/**
+ * Reverse (soft-delete) a single billing payment, Zoho-first. Extracted from the
+ * DELETE handler so it's unit-testable without supertest (paymentExceedsBalance
+ * precedent). Uses the module-level `pool` + `zohoAPI`.
+ *
+ * Order (mirrors the invoice void flow at routes/billing.js delete-invoice):
+ *   1. Load the live payment (404 → NOT_FOUND).
+ *   2. classifyPaymentReversal(zoho_payment_id):
+ *        - in_flight ('SYNCING')      → throw SYNC_IN_FLIGHT (409); nothing touched.
+ *        - zoho_delete_required       → deleteCustomerPayment FIRST; a
+ *          /does not exist|1002/i is tolerated as already-gone; ANY other Zoho
+ *          error → throw ZOHO_DELETE_FAILED (502) with the Zoho message verbatim
+ *          and NO local change.
+ *        - legacy_manual ('LEGACY')   → skip Zoho; the caller appends the
+ *          "adjust in Zoho manually" note.
+ *        - local_only (NULL)          → skip Zoho.
+ *   3. In ONE transaction: soft-delete the row + recalc the parent invoice
+ *      totals (a full reversal flips it back to 'unpaid').
+ * @returns {Promise<{payment:Object, zohoDeleted:boolean, legacyManual:boolean, recalced:Object}>}
+ */
+async function reverseInvoicePayment(paymentId) {
+    const [rows] = await pool.query(
+        'SELECT * FROM billing_payments WHERE id = ? AND deleted_at IS NULL',
+        [paymentId]
+    );
+    if (!rows.length) { const e = new Error('Payment not found'); e.code = 'NOT_FOUND'; throw e; }
+    const payment = rows[0];
+
+    const kind = classifyPaymentReversal(payment.zoho_payment_id);
+    if (kind === 'in_flight') {
+        const e = new Error('This payment is mid-sync to Zoho — retry the reversal in a minute.');
+        e.code = 'SYNC_IN_FLIGHT';
+        throw e;
+    }
+
+    let zohoDeleted = false;
+    let legacyManual = false;
+    if (kind === 'zoho_delete_required') {
+        try {
+            await zohoAPI.deleteCustomerPayment(payment.zoho_payment_id);
+            zohoDeleted = true;
+        } catch (zErr) {
+            // Already gone from Zoho (deleted there directly — error 1002) → treat
+            // as deleted and proceed locally, exactly like the invoice-void path.
+            if (/does not exist|1002/i.test(zErr.message || '')) {
+                zohoDeleted = true;
+            } else {
+                const e = new Error(zErr.message || String(zErr));
+                e.code = 'ZOHO_DELETE_FAILED';
+                throw e; // NO local change on any other Zoho error
+            }
+        }
+    } else if (kind === 'legacy_manual') {
+        legacyManual = true;
+    }
+
+    let recalced;
+    const connection = await pool.getConnection();
+    try {
+        await connection.beginTransaction();
+        await connection.query('UPDATE billing_payments SET deleted_at = NOW() WHERE id = ?', [paymentId]);
+        recalced = await recalcInvoicePaymentTotals(connection, payment.invoice_id);
+        await connection.commit();
+    } catch (txErr) {
+        try { await connection.rollback(); } catch { /* already rolled back */ }
+        throw txErr;
+    } finally {
+        connection.release();
+    }
+
+    return { payment, zohoDeleted, legacyManual, recalced };
 }
 
 /**
@@ -315,7 +438,8 @@ router.get('/stats',
                 `SELECT COALESCE(SUM(bp.amount), 0) AS today_collected
                  FROM billing_payments bp
                  JOIN billing_invoices bi ON bp.invoice_id = bi.id
-                 WHERE DATE(CONVERT_TZ(bp.created_at, '+00:00', '+05:30')) = DATE(CONVERT_TZ(NOW(), '+00:00', '+05:30'))
+                 WHERE bp.deleted_at IS NULL
+                 AND DATE(CONVERT_TZ(bp.created_at, '+00:00', '+05:30')) = DATE(CONVERT_TZ(NOW(), '+00:00', '+05:30'))
                  ${branchId ? ' AND bi.branch_id = ?' : ''}`,
                 payParams
             );
@@ -921,7 +1045,7 @@ router.get('/invoices/:id',
                 `SELECT bp.*, u.full_name AS received_by_name
                  FROM billing_payments bp
                  LEFT JOIN users u ON bp.received_by = u.id
-                 WHERE bp.invoice_id = ?
+                 WHERE bp.invoice_id = ? AND bp.deleted_at IS NULL
                  ORDER BY bp.created_at DESC`,
                 [id]
             );
@@ -947,11 +1071,13 @@ router.delete('/invoices/:id',
             if (!rows.length) return res.status(404).json({ success: false, message: 'Invoice not found' });
             const inv = rows[0];
 
-            // Gate: never delete an invoice that has a payment (orphans money rows;
-            // Zoho also refuses to void/delete a paid invoice).
+            // Gate: never delete an invoice that has a LIVE payment (orphans money
+            // rows; Zoho also refuses to void/delete a paid invoice). A fully
+            // reversed invoice (all payments soft-deleted) drops to 'unpaid' with
+            // amount_paid 0 and zero live payments — so it becomes deletable again.
             const amountPaid = parseFloat(inv.amount_paid) || 0;
-            const [payCount] = await pool.query('SELECT COUNT(*) AS c FROM billing_payments WHERE invoice_id = ?', [id]);
-            if (inv.payment_status !== 'unpaid' || amountPaid > 0.01 || payCount[0].c > 0) {
+            const liveCount = await countLiveInvoicePayments(pool, id);
+            if (inv.payment_status !== 'unpaid' || amountPaid > 0.01 || liveCount > 0) {
                 return res.status(400).json({ success: false, code: 'INVOICE_HAS_PAYMENTS', message: 'This invoice has a payment recorded — reverse the payment first (or handle it directly in Zoho).' });
             }
 
@@ -1034,7 +1160,7 @@ router.put('/invoices/:id',
 
             // Preserve any existing payments when recalculating balance_due
             const [paySum] = await pool.query(
-                'SELECT COALESCE(SUM(amount), 0) AS total_paid FROM billing_payments WHERE invoice_id = ?',
+                'SELECT COALESCE(SUM(amount), 0) AS total_paid FROM billing_payments WHERE invoice_id = ? AND deleted_at IS NULL',
                 [id]
             );
             const totalPaid = Number(paySum[0].total_paid);
@@ -1154,23 +1280,12 @@ router.post('/invoices/:id/payment',
                 [id, data.amount, data.payment_method, data.payment_reference, paymentDate, data.notes, req.user.id]
             );
 
-            // Recalculate from all live payments to avoid floating point drift.
-            const [paySum] = await connection.query(
-                'SELECT COALESCE(SUM(amount), 0) AS total_paid FROM billing_payments WHERE invoice_id = ? AND deleted_at IS NULL',
-                [id]
-            );
-            totalPaid = Number(paySum[0].total_paid);
-            const settlement = computePaymentSettlement(invoice.grand_total, totalPaid);
-            balanceDue = settlement.balanceDue;
-            paymentStatus = settlement.paymentStatus;
-
-            await connection.query(
-                `UPDATE billing_invoices SET
-                    amount_paid = ?, balance_due = ?, payment_status = ?,
-                    updated_at = NOW()
-                 WHERE id = ?`,
-                [totalPaid, balanceDue, paymentStatus, id]
-            );
+            // Recalculate from all live payments (shared with the reversal path) to
+            // avoid floating point drift. FOR UPDATE above still holds the row.
+            const recalced = await recalcInvoicePaymentTotals(connection, id);
+            totalPaid = recalced.totalPaid;
+            balanceDue = recalced.balanceDue;
+            paymentStatus = recalced.paymentStatus;
 
             await connection.commit();
 
@@ -1267,7 +1382,7 @@ router.get('/payments',
             const branchId = getBranchFilter(req);
             const offset = (page - 1) * limit;
 
-            let where = 'WHERE 1=1';
+            let where = 'WHERE bp.deleted_at IS NULL';
             const params = [];
 
             if (branchId) { where += ' AND bi.branch_id = ?'; params.push(branchId); }
@@ -1308,6 +1423,48 @@ router.get('/payments',
         } catch (error) {
             console.error('List payments error:', error);
             res.status(500).json({ success: false, message: 'Failed to list payments' });
+        }
+    }
+);
+
+// Reverse (soft-delete) a payment — admin only (Zoho-first delete). Closes the
+// "reverse it first" dead end: a fully-reversed invoice drops back to 'unpaid'
+// and becomes deletable/voidable again. requirePermission gates the module; the
+// in-handler isFullAdmin gate makes it admin-only (a payment reversal is a
+// GST-affecting action once the payment lives in Zoho too).
+router.delete('/payments/:id',
+    requirePermission('billing', 'payment'),
+    validateParams(idParamSchema),
+    async (req, res) => {
+        const { id } = req.params;
+        if (!isFullAdmin(req.user && req.user.role)) {
+            return res.status(403).json({ success: false, message: 'Only an admin can reverse a payment.' });
+        }
+        try {
+            const { payment, zohoDeleted, legacyManual, recalced } = await reverseInvoicePayment(id);
+
+            await auditLog.record(req, {
+                action: 'billing.payment.delete',
+                entity_type: 'billing_payment', entity_id: id,
+                before: payment,
+                after: { deleted_at: 'now', zoho_deleted: zohoDeleted, invoice_totals: recalced }
+            });
+
+            let message = 'Payment reversed';
+            if (legacyManual) message += ' — adjust the corresponding payment in Zoho Books manually';
+            res.json({ success: true, message, zoho_deleted: zohoDeleted });
+        } catch (error) {
+            if (error.code === 'NOT_FOUND') {
+                return res.status(404).json({ success: false, message: 'Payment not found' });
+            }
+            if (error.code === 'SYNC_IN_FLIGHT') {
+                return res.status(409).json({ success: false, code: 'SYNC_IN_FLIGHT', message: error.message });
+            }
+            if (error.code === 'ZOHO_DELETE_FAILED') {
+                return res.status(502).json({ success: false, code: 'ZOHO_DELETE_FAILED', message: 'Zoho would not delete this payment: ' + error.message });
+            }
+            console.error('Reverse payment error:', error);
+            res.status(500).json({ success: false, message: 'Failed to reverse payment' });
         }
     }
 );
@@ -1438,5 +1595,6 @@ router.post('/invoices/:id/sync-zoho-status',
 module.exports = {
     router, setPool, setPointsEngine,
     calculateTotals, paymentExceedsBalance, computePaymentSettlement, deriveZohoSync,
+    recalcInvoicePaymentTotals, countLiveInvoicePayments, reverseInvoicePayment,
     createEstimateSchema, recordPaymentSchema, listQuerySchema
 };

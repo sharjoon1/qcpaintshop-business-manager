@@ -243,6 +243,23 @@ describe('Billing System', () => {
         it('never returns a negative balance (overpay floors at 0)', () => {
             expect(computePaymentSettlement(1000, 1200)).toEqual({ balanceDue: 0, paymentStatus: 'paid' });
         });
+
+        // SP-1 C6 extension: a fully-reversed invoice re-SUMs to 0 paid and must
+        // drop back to 'unpaid' so it becomes deletable/voidable again (the
+        // "reverse it first" dead end closes). The record path never hits this —
+        // a positive payment was just inserted, so totalPaid is always > 0 there.
+        it('totalPaid 0 → unpaid, full balance (new after-reversal case)', () => {
+            expect(computePaymentSettlement(1000, 0)).toEqual({ balanceDue: 1000, paymentStatus: 'unpaid' });
+        });
+
+        it('totalPaid 0 with a DECIMAL string → unpaid', () => {
+            expect(computePaymentSettlement('1000.00', '0.00')).toEqual({ balanceDue: 1000, paymentStatus: 'unpaid' });
+        });
+
+        it('a tiny positive residue is still partial, not unpaid (boundary at 0)', () => {
+            const r = computePaymentSettlement(1000, 0.5);
+            expect(r.paymentStatus).toBe('partial');
+        });
     });
 
     // deriveZohoSync maps a forwardInvoicePayments summary → the response field.
