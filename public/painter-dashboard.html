@@ -2422,7 +2422,7 @@
         const tok = localStorage.getItem('painter_token');
         if (!tok) return;
         try {
-            const r = await fetch('/api/me/attendance/month', { headers: { 'X-Painter-Token': tok } });
+            const r = await fetch('/api/painters/me/attendance/month', { headers: { 'X-Painter-Token': tok } });
             if (!r.ok) return;
             const d = await r.json();
             const host = document.getElementById('attendance-hero');
@@ -2447,7 +2447,7 @@
         if (!month) return;
         if (!confirm(`Claim AP for ${month}?`)) return;
         try {
-            const r = await fetch('/api/me/attendance/claim', {
+            const r = await fetch('/api/painters/me/attendance/claim', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json', 'X-Painter-Token': localStorage.getItem('painter_token') },
                 body: JSON.stringify({ month_key: month })
