@@ -117,6 +117,45 @@ async function createPayment(paymentData) {
     return await apiPost(`/customerpayments?organization_id=${orgId}`, paymentData);
 }
 
+/**
+ * Delete a customer payment in Zoho Books (AR reversal)
+ * @param {string} paymentId - Zoho customerpayment id
+ */
+async function deleteCustomerPayment(paymentId) {
+    const orgId = process.env.ZOHO_ORGANIZATION_ID;
+    return await apiDelete(`/customerpayments/${paymentId}`, { organization_id: orgId });
+}
+
+// ========================================
+// VENDOR PAYMENTS (AP)
+// ========================================
+
+/**
+ * Get vendor payments
+ * @param {Object} params - Query params (e.g. reference_number, vendor_id, page, per_page)
+ */
+async function getVendorPayments(params = {}) {
+    const orgId = process.env.ZOHO_ORGANIZATION_ID;
+    return await apiGet('/vendorpayments', { organization_id: orgId, ...params });
+}
+
+/**
+ * Record a vendor payment in Zoho Books
+ */
+async function createVendorPayment(paymentData) {
+    const orgId = process.env.ZOHO_ORGANIZATION_ID;
+    return await apiPost(`/vendorpayments?organization_id=${orgId}`, paymentData);
+}
+
+/**
+ * Delete a vendor payment in Zoho Books (AP reversal)
+ * @param {string} paymentId - Zoho vendorpayment id
+ */
+async function deleteVendorPayment(paymentId) {
+    const orgId = process.env.ZOHO_ORGANIZATION_ID;
+    return await apiDelete(`/vendorpayments/${paymentId}`, { organization_id: orgId });
+}
+
 // ========================================
 // CONTACTS (Customers/Vendors)
 // ========================================
@@ -2638,6 +2677,11 @@ module.exports = {
     getPayments,
     getPayment,
     createPayment,
+    deleteCustomerPayment,
+    // Vendor Payments (AP)
+    getVendorPayments,
+    createVendorPayment,
+    deleteVendorPayment,
     // Contacts
     getContacts,
     getContact,

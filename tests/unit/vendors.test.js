@@ -261,6 +261,7 @@ describe('Vendor System', () => {
             '20260612_zoho_location_salesperson.js',
             '20260612_soft_delete_invoices_bills.js',
             '20260613_zoho_approval_state.js',
+            '20260712_payment_zoho_sync.js',
         ])('%s exports an up() function', (file) => {
             expect(typeof require(`../../migrations/${file}`).up).toBe('function');
         });
@@ -280,6 +281,62 @@ describe('Vendor System', () => {
             // one ALTER per table (billing_invoices + vendor_bills)
             expect(ddl.length).toBe(2);
             expect(ddl.every(s => /ADD COLUMN zoho_approval_state VARCHAR\(20\)/.test(s))).toBe(true);
+        });
+
+        it('20260712_payment_zoho_sync up() adds all payment-sync columns when missing', async () => {
+            const ddl = [];
+            const updates = [];
+            const pool = {
+                query: async (sql, params) => {
+                    const s = String(sql);
+                    if (/information_schema\.TABLES/.test(s)) return [[{ 1: 1 }]];        // every table exists
+                    if (/information_schema\.COLUMNS/.test(s)) return [[]];               // every column missing
+                    if (/^ALTER TABLE/.test(s)) { ddl.push(s); return [{}]; }
+                    if (/^\s*UPDATE/i.test(s)) { updates.push({ s, params }); return [{ affectedRows: 0 }]; }
+                    return [[]];
+                }
+            };
+            await require('../../migrations/20260712_payment_zoho_sync.js').up(pool);
+            // 5 columns on billing_payments + 3 on vendor_payments
+            expect(ddl.length).toBe(8);
+            for (const col of ['payment_date', 'zoho_payment_id', 'zoho_sync_error', 'zoho_claimed_at', 'deleted_at']) {
+                expect(ddl.some(s => s.includes(`ADD COLUMN ${col}`))).toBe(true);
+            }
+            // backfills: payment_date, billing LEGACY, vendor LEGACY (all IS-NULL guarded = idempotent)
+            expect(updates.some(u => /payment_date = DATE\(CONVERT_TZ/.test(u.s))).toBe(true);
+            expect(updates.filter(u => /zoho_payment_id = 'LEGACY'/.test(u.s)).length).toBe(2);
+            expect(updates.every(u => /IS NULL/.test(u.s))).toBe(true);
+        });
+
+        it('20260712_payment_zoho_sync up() runs NO ALTER when the columns already exist', async () => {
+            const ddl = [];
+            const pool = {
+                query: async (sql) => {
+                    const s = String(sql);
+                    if (/information_schema\.TABLES/.test(s)) return [[{ 1: 1 }]];        // tables exist
+                    if (/information_schema\.COLUMNS/.test(s)) return [[{ 1: 1 }]];       // columns already exist
+                    if (/^ALTER TABLE/.test(s)) { ddl.push(s); return [{}]; }
+                    return [[]];
+                }
+            };
+            await require('../../migrations/20260712_payment_zoho_sync.js').up(pool);
+            expect(ddl.length).toBe(0);
+        });
+
+        it('20260712_payment_zoho_sync up() skips a table that is not present', async () => {
+            const ddl = [];
+            const pool = {
+                query: async (sql) => {
+                    const s = String(sql);
+                    // billing_payments/billing_invoices absent, vendor_payments present
+                    if (/information_schema\.TABLES/.test(s)) return [[]];
+                    if (/information_schema\.COLUMNS/.test(s)) return [[]];
+                    if (/^ALTER TABLE/.test(s)) { ddl.push(s); return [{}]; }
+                    return [[]];
+                }
+            };
+            await expect(require('../../migrations/20260712_payment_zoho_sync.js').up(pool)).resolves.toBeUndefined();
+            expect(ddl.length).toBe(0);
         });
     });
 
