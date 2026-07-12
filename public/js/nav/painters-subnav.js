@@ -2,6 +2,7 @@
 (function() {
     var painterPages = [
         { page: 'painters', label: 'Painters', href: '/admin-painters.html', icon: '<path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>' },
+        { page: 'painter-leads', label: 'Painter Leads', href: '/admin-painter-leads.html', icon: '<path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><line x1="19" y1="8" x2="19" y2="14"/><line x1="22" y1="11" x2="16" y2="11"/>' },
         { page: 'painter-points', label: 'Points & Invoices', href: '/admin-painters.html?tab=points', icon: '<polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>' },
         { page: 'painter-rates', label: 'Rates & Slabs', href: '/admin-painters.html?tab=rates', icon: '<line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/>' },
         { page: 'painter-withdrawals', label: 'Withdrawals', href: '/admin-painters.html?tab=withdrawals', icon: '<rect x="1" y="4" width="22" height="16" rx="2" ry="2"/><line x1="1" y1="10" x2="23" y2="10"/>' },

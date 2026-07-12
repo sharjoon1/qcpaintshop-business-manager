@@ -157,3 +157,26 @@ describe('admin painter-leads dashboard (UI)', () => {
         expect(js).toMatch(/function\s+toast\s*\(/);
     });
 });
+
+describe('admin navigation exposes the Painter Leads page', () => {
+    const SUBNAV_JS_PATH = path.join(__dirname, '..', '..', 'public', 'js', 'nav', 'painters-subnav.js');
+    const SIDEBAR_PATH = path.join(__dirname, '..', '..', 'public', 'components', 'sidebar-complete.html');
+
+    let subnavJs;
+    let sidebar;
+
+    beforeAll(() => {
+        subnavJs = fs.readFileSync(SUBNAV_JS_PATH, 'utf8');
+        sidebar = fs.readFileSync(SIDEBAR_PATH, 'utf8');
+    });
+
+    test('painters subnav links to /admin-painter-leads.html', () => {
+        expect(subnavJs).toContain('/admin-painter-leads.html');
+        expect(subnavJs).toMatch(/page:\s*['"]painter-leads['"]/);
+    });
+
+    test('sidebar Painters section links to /admin-painter-leads.html', () => {
+        expect(sidebar).toContain('/admin-painter-leads.html');
+        expect(sidebar).toMatch(/data-page="painter-leads"/);
+    });
+});
