@@ -2061,9 +2061,11 @@ Six judge-gated commits `9d8d682..bddb765` (characterization-first; suite 906 �
   historical payments are never re-pushed (cutoff literal must be set to the actual prod deploy
   date before running there). Mapper: `services/zoho-payment-mapper.js` (mode map + ai_config
   `zoho_payment_mode_map` override; unknown→`others` retry).
-- **Deploy status**: NOT yet deployed to prod as of 2026-07-12 — needs migration + `_migrations`
-  marker, `zoho_vendor_paid_through_account_id` seeding, and runbook D1-D3 (see plan §Verification)
-  before staff announcement.
+- **Deploy status**: DEPLOYED to prod 2026-07-12 ~20:16 IST (prod HEAD `cd86748`, migration run +
+  `_migrations` marker id 131; the painter-onboarding migration also went live in the same deploy,
+  marker id 132). Still pending before staff announcement: seed
+  `zoho_vendor_paid_through_account_id` (accountant) and run runbook D1-D3 (plan §Verification) —
+  discount flag `billing_invoice_discount_push_enabled` stays OFF until D1 passes.
 
 ### 2026-07-02 - Documentation sync pass (Skills.md refresh)
 
