@@ -66,6 +66,7 @@ const VALID_FOLLOWUP_OUTCOMES = [
     'interested', 'not_interested', 'callback', 'no_response',
     'converted', 'wrong_number', 'unreachable', 'other',
 ];
+const VALID_CALL_STATUSES = ['connected', 'not_answered', 'wrong_number', 'switched_off', 'busy'];
 
 const VALID_SOURCES = [
     'zoho_import', 'staff_walk_in', 'staff_referral',
@@ -839,6 +840,14 @@ router.post(
                     message: `outcome must be one of: ${VALID_FOLLOWUP_OUTCOMES.join(', ')}`,
                 });
             }
+            // Validate call_status up front so an out-of-ENUM value returns a clean
+            // 400 instead of a STRICT_TRANS_TABLES 500 inside the transaction.
+            if (call_status != null && call_status !== '' && !VALID_CALL_STATUSES.includes(call_status)) {
+                return res.status(400).json({
+                    success: false,
+                    message: `call_status must be one of: ${VALID_CALL_STATUSES.join(', ')}`,
+                });
+            }
 
             // Map followup outcome → lead status when transitioning forward.
             let newStatus = lead.status;
@@ -907,6 +916,25 @@ router.post(
                         id,
                     ]
                 );
+
+                // PNTR bridge: stamp today's daily-call assignment so the 17:00/18:00
+                // staff/manager alerts and admin/performance metrics reflect this new
+                // followup flow (the old orphaned route was the only writer). Scope to
+                // the lead's assignee (lead.assigned_to, NOT the actor — managers/admins
+                // may act on others' leads). affectedRows 0 = lead isn't in today's call
+                // list, which is fine. contact_outcome is a varchar(50), so the new
+                // outcome value is stored as-is. A same-day second followup overwrites
+                // contact_outcome (last-wins — matches the old route's behavior).
+                const bridgeParams = [outcome || null, id];
+                let bridgeSql =
+                    `UPDATE painter_daily_assignments
+                        SET contacted_at = NOW(), contact_outcome = ?
+                      WHERE painter_lead_id = ? AND assigned_date = CURDATE()`;
+                if (lead.assigned_to != null) {
+                    bridgeSql += ' AND user_id = ?';
+                    bridgeParams.push(lead.assigned_to);
+                }
+                await conn.query(bridgeSql, bridgeParams);
 
                 await conn.commit();
 

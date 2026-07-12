@@ -606,7 +606,7 @@ router.get('/admin/performance', requirePermission('painters', 'marketing_manage
             pda.user_id, u.full_name, pda.branch_id,
             COUNT(*) AS total_assigned,
             SUM(CASE WHEN pda.contacted_at IS NOT NULL THEN 1 ELSE 0 END) AS contacted,
-            SUM(CASE WHEN pda.contact_outcome IN ('interested_in_program') THEN 1 ELSE 0 END) AS interested
+            SUM(CASE WHEN pda.contact_outcome IN ('interested_in_program','interested') THEN 1 ELSE 0 END) AS interested
          FROM painter_daily_assignments pda
          LEFT JOIN users u ON u.id = pda.user_id
          ${where}

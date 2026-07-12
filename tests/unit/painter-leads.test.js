@@ -410,6 +410,214 @@ describe('Followup logging', () => {
 });
 
 // ─────────────────────────────────────────────────────────────────────────
+//  4b. CM1 hotfix — widened ENUMs, call_status validation, PNTR bridge
+// ─────────────────────────────────────────────────────────────────────────
+
+describe('Followup ENUM widening + call_status validation (CM1)', () => {
+    const ALL_OUTCOMES = [
+        'interested', 'not_interested', 'callback', 'no_response',
+        'converted', 'wrong_number', 'unreachable', 'other',
+    ];
+
+    test.each(ALL_OUTCOMES)('outcome "%s" passes validation → 201', async (outcome) => {
+        const pool = makeFakePool();
+        pool.query.mockResolvedValueOnce([[{ id: 3, assigned_to: 10, status: 'in_progress' }]]);
+
+        const app = makeApp(pool);
+        const res = await httpCall(app, {
+            method: 'POST', path: '/api/painter-leads/3/followup',
+            user: STAFF_OWNER,
+            body: { followup_type: 'call', outcome, notes: 'logged' },
+        });
+        expect(res.statusCode).toBe(201);
+        expect(res.body.success).toBe(true);
+    });
+
+    test('followup_type "sms" is accepted → 201', async () => {
+        const pool = makeFakePool();
+        pool.query.mockResolvedValueOnce([[{ id: 3, assigned_to: 10, status: 'in_progress' }]]);
+
+        const app = makeApp(pool);
+        const res = await httpCall(app, {
+            method: 'POST', path: '/api/painter-leads/3/followup',
+            user: STAFF_OWNER,
+            body: { followup_type: 'sms', outcome: 'interested', notes: 'texted' },
+        });
+        expect(res.statusCode).toBe(201);
+        expect(res.body.success).toBe(true);
+    });
+
+    test('invalid call_status → 400 with NO INSERT and no transaction opened', async () => {
+        const pool = makeFakePool();
+        pool.query.mockResolvedValueOnce([[{ id: 3, assigned_to: 10, status: 'new' }]]);
+
+        const app = makeApp(pool);
+        const res = await httpCall(app, {
+            method: 'POST', path: '/api/painter-leads/3/followup',
+            user: STAFF_OWNER,
+            body: { followup_type: 'call', outcome: 'interested', notes: 'n', call_status: 'not_a_status' },
+        });
+        expect(res.statusCode).toBe(400);
+        expect(res.body.success).toBe(false);
+        expect(res.body.message).toMatch(/call_status/);
+
+        // Validation happens before any DB write / transaction.
+        const insert = pool.calls.find(c => /INSERT INTO painter_lead_followups/i.test(c.sql));
+        expect(insert).toBeUndefined();
+        const bridge = pool.calls.find(c => /painter_daily_assignments/i.test(c.sql));
+        expect(bridge).toBeUndefined();
+        expect(pool._connectionCalls()).toBe(0);
+    });
+
+    test('valid call_status "connected" is accepted → 201', async () => {
+        const pool = makeFakePool();
+        pool.query.mockResolvedValueOnce([[{ id: 3, assigned_to: 10, status: 'new' }]]);
+
+        const app = makeApp(pool);
+        const res = await httpCall(app, {
+            method: 'POST', path: '/api/painter-leads/3/followup',
+            user: STAFF_OWNER,
+            body: { followup_type: 'call', outcome: 'interested', notes: 'reached', call_status: 'connected' },
+        });
+        expect(res.statusCode).toBe(201);
+        expect(res.body.success).toBe(true);
+    });
+});
+
+describe('PNTR bridge — painter_daily_assignments stamp inside the tx (CM1)', () => {
+    test('owner followup stamps contacted_at + contact_outcome scoped to lead.assigned_to', async () => {
+        const pool = makeFakePool();
+        pool.query.mockResolvedValueOnce([[{ id: 7, assigned_to: 10, status: 'new' }]]);
+
+        const app = makeApp(pool);
+        const res = await httpCall(app, {
+            method: 'POST', path: '/api/painter-leads/7/followup',
+            user: STAFF_OWNER,
+            body: { followup_type: 'call', outcome: 'interested', notes: 'reached', call_status: 'connected' },
+        });
+        expect(res.statusCode).toBe(201);
+
+        const bridge = pool.calls.find(c => c.kind === 'tx' && /painter_daily_assignments/.test(c.sql));
+        expect(bridge).toBeDefined();
+        expect(bridge.sql).toMatch(/contacted_at = NOW\(\)/);
+        expect(bridge.sql).toMatch(/assigned_date = CURDATE\(\)/);
+        expect(bridge.sql).toMatch(/painter_lead_id = \?/);
+        expect(bridge.sql).toMatch(/user_id = \?/);
+        // params: [outcome, painter_lead_id, user_id(=assigned_to)]
+        expect(bridge.params).toEqual(['interested', 7, 10]);
+    });
+
+    test('manager acting on another user\'s lead binds user_id to lead.assigned_to, not the actor', async () => {
+        const pool = makeFakePool();
+        pool.query.mockResolvedValueOnce([[{ id: 8, assigned_to: 10, status: 'in_progress' }]]);
+
+        const app = makeApp(pool);
+        const res = await httpCall(app, {
+            method: 'POST', path: '/api/painter-leads/8/followup',
+            user: MANAGER_USER, // id 2, acting on staff 10's lead
+            body: { followup_type: 'call', outcome: 'callback', notes: 'will retry' },
+        });
+        expect(res.statusCode).toBe(201);
+
+        const bridge = pool.calls.find(c => c.kind === 'tx' && /painter_daily_assignments/.test(c.sql));
+        expect(bridge).toBeDefined();
+        expect(bridge.params).toEqual(['callback', 8, 10]); // assigned_to's row, not actor 2
+        expect(bridge.params).not.toContain(MANAGER_USER.id);
+    });
+
+    test('lead with no assignee omits the user_id filter (still stamps)', async () => {
+        const pool = makeFakePool();
+        pool.query.mockResolvedValueOnce([[{ id: 9, assigned_to: null, status: 'new' }]]);
+
+        const app = makeApp(pool);
+        const res = await httpCall(app, {
+            method: 'POST', path: '/api/painter-leads/9/followup',
+            user: ADMIN_USER,
+            body: { followup_type: 'whatsapp', outcome: 'no_response', notes: 'no reply' },
+        });
+        expect(res.statusCode).toBe(201);
+
+        const bridge = pool.calls.find(c => c.kind === 'tx' && /painter_daily_assignments/.test(c.sql));
+        expect(bridge).toBeDefined();
+        expect(bridge.sql).not.toMatch(/user_id = \?/);
+        expect(bridge.params).toEqual(['no_response', 9]);
+    });
+});
+
+describe('migration 20260713_painter_followup_enums (CM1)', () => {
+    const migration = require('../../migrations/20260713_painter_followup_enums');
+
+    const PROD_OUTCOME =
+        "enum('interested_in_program','already_aware','will_visit_shop','wants_callback','not_interested','wrong_number','no_answer')";
+    const PROD_FOLLOWUP = "enum('call','whatsapp','visit')";
+    const WIDE_OUTCOME =
+        "enum('interested_in_program','already_aware','will_visit_shop','wants_callback','not_interested','wrong_number','no_answer','interested','callback','no_response','converted','unreachable','other')";
+    const WIDE_FOLLOWUP = "enum('call','whatsapp','visit','sms')";
+
+    function makeMigrationPool({ outcomeType, followupType }) {
+        const calls = [];
+        return {
+            calls,
+            query: jest.fn(async (sql, params) => {
+                const s = String(sql).trim();
+                calls.push({ s, params });
+                if (/information_schema\.COLUMNS/i.test(s)) {
+                    const col = params[1];
+                    if (col === 'outcome') {
+                        return [[{ COLUMN_TYPE: outcomeType, IS_NULLABLE: 'YES', COLUMN_DEFAULT: null }]];
+                    }
+                    if (col === 'followup_type') {
+                        return [[{ COLUMN_TYPE: followupType, IS_NULLABLE: 'NO', COLUMN_DEFAULT: null }]];
+                    }
+                    return [[]];
+                }
+                return [[]];
+            }),
+        };
+    }
+
+    test('exports an up() function', () => {
+        expect(typeof migration.up).toBe('function');
+    });
+
+    test('appends the 6 outcome values + sms at the END, preserving order + nullability', async () => {
+        const pool = makeMigrationPool({ outcomeType: PROD_OUTCOME, followupType: PROD_FOLLOWUP });
+        await migration.up(pool);
+
+        const alters = pool.calls.filter(c => /^ALTER TABLE/i.test(c.s));
+        expect(alters.length).toBe(2);
+
+        const outcomeAlter = alters.find(a => /MODIFY COLUMN outcome/.test(a.s));
+        expect(outcomeAlter).toBeDefined();
+        // existing values preserved in order, new ones appended at the end
+        expect(outcomeAlter.s).toContain(
+            "'no_answer','interested','callback','no_response','converted','unreachable','other')"
+        );
+        expect(outcomeAlter.s.endsWith(' NULL')).toBe(true);   // stays NULLable
+        expect(outcomeAlter.s.includes('NOT NULL')).toBe(false);
+
+        const typeAlter = alters.find(a => /MODIFY COLUMN followup_type/.test(a.s));
+        expect(typeAlter).toBeDefined();
+        expect(typeAlter.s).toContain("'call','whatsapp','visit','sms')");
+        expect(typeAlter.s.endsWith('NOT NULL')).toBe(true);   // stays NOT NULL
+    });
+
+    test('re-run against a DB already reporting the new values is a no-op (no ALTER)', async () => {
+        const pool = makeMigrationPool({ outcomeType: WIDE_OUTCOME, followupType: WIDE_FOLLOWUP });
+        await migration.up(pool);
+
+        const alters = pool.calls.filter(c => /^ALTER TABLE/i.test(c.s));
+        expect(alters.length).toBe(0);
+    });
+
+    test('parseEnumValues / buildEnumType round-trip', () => {
+        const vals = migration.parseEnumValues(PROD_FOLLOWUP);
+        expect(vals).toEqual(['call', 'whatsapp', 'visit']);
+        expect(migration.buildEnumType(vals)).toBe(PROD_FOLLOWUP);
+    });
+});
+
+// ─────────────────────────────────────────────────────────────────────────
 //  5. Invite — token generated, painter_lead_invites row inserted,
 //     lead status moves to 'invited'. WhatsApp unavailable → SMS fallback.
 // ─────────────────────────────────────────────────────────────────────────
