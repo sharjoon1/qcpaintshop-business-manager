@@ -5,9 +5,9 @@
  * vendor-owned items are category-locked — the owner cannot fix their category.
  * For the 46 that still hold stock we:
  *
- *   1. create a new, owner-editable item (same name, sku = "<old_sku>-OWN",
- *      brand ASIAN PAINTS, the approved category_name, rate/purchase_rate/
- *      description/hsn copied from the old item),
+ *   1. create a new, owner-editable item (name = "<old_name> -OWN",
+ *      sku = "<old_sku>-OWN", brand ASIAN PAINTS, the approved category_name,
+ *      rate/purchase_rate/description/hsn copied from the old item),
  *   2. mirror it into zoho_items_map (same INSERT shape as
  *      routes/zoho/items.js POST /items),
  *   3. move the stock across per location with the PROVEN paired-adjustment
@@ -40,6 +40,11 @@
 
 const BRAND = 'ASIAN PAINTS';
 const SKU_SUFFIX = '-OWN';
+// Zoho Books enforces item NAME uniqueness among ACTIVE items, not just SKU
+// uniqueness. The old vendor item is still active when the replacement is
+// created, so the name needs the same suffixing treatment as the SKU
+// (pilot 2026-07-31 failed with: Zoho API error 1001: Item "..." already exists).
+const NAME_SUFFIX = ' -OWN';
 
 /**
  * The 46 stock-holding vendor items to consolidate.
@@ -106,14 +111,19 @@ function newSkuFor(oldSku) {
     return `${oldSku}${SKU_SUFFIX}`;
 }
 
+function newNameFor(oldName) {
+    return `${(oldName || '').trim()}${NAME_SUFFIX}`;
+}
+
 /**
  * Build the Zoho createItem payload for the replacement item.
  * Same field shape as the proven POST /api/zoho/items route (item_type
- * 'inventory', only non-empty keys sent). Name is NOT changed in this pass.
+ * 'inventory', only non-empty keys sent). Both name and sku carry the -OWN
+ * suffix: Zoho rejects a duplicate of EITHER while the old item is still active.
  */
 function buildNewItemPayload(oldItem, entry) {
     const payload = { item_type: 'inventory' };
-    payload.name = (oldItem.zoho_item_name || '').trim();
+    payload.name = newNameFor(oldItem.zoho_item_name);
     payload.sku = newSkuFor(entry.old_sku);
     payload.brand = BRAND;
     payload.category_name = entry.category_assigned;
@@ -461,7 +471,9 @@ module.exports = {
     ITEMS,
     BRAND,
     SKU_SUFFIX,
+    NAME_SUFFIX,
     newSkuFor,
+    newNameFor,
     buildNewItemPayload,
     buildAdjustmentPair,
     parseArgs,

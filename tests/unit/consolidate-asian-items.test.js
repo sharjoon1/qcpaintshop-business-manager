@@ -6,6 +6,8 @@
  * locked here is deliberately strict:
  *   - DRY-RUN IS THE DEFAULT and makes ZERO Zoho calls and ZERO DB writes.
  *   - --apply must be explicit.
+ *   - The replacement item carries the -OWN suffix on BOTH name and sku: Zoho
+ *     enforces uniqueness on each while the old vendor item is still active.
  *   - Apply-mode ordering is mandatory: createItem -> mirror ->
  *     (increase NEW, decrease OLD per location) -> markItemInactive.
  *     The old item is never deactivated before the adjustments succeeded.
@@ -21,7 +23,7 @@
 const script = require('../../scripts/consolidate-asian-items');
 
 const {
-    ITEMS, newSkuFor, buildNewItemPayload, buildAdjustmentPair,
+    ITEMS, newSkuFor, newNameFor, buildNewItemPayload, buildAdjustmentPair,
     parseArgs, selectItems, consolidateItem, run
 } = script;
 
@@ -164,11 +166,11 @@ describe('selectItems', () => {
 // ── payload builders ─────────────────────────────────────────────────────────
 
 describe('buildNewItemPayload', () => {
-    it('builds the owner-editable replacement: -OWN sku, ASIAN PAINTS brand, assigned category, copied fields', () => {
+    it('builds the owner-editable replacement: -OWN name + sku, ASIAN PAINTS brand, assigned category, copied fields', () => {
         const p = buildNewItemPayload(OLD_ITEM_ROW, ENTRY);
         expect(p).toEqual({
             item_type: 'inventory',
-            name: 'AP APEX AB12 900 ML',
+            name: 'AP APEX AB12 900 ML -OWN',
             sku: '00519288237-OWN',
             brand: 'ASIAN PAINTS',
             category_name: 'EXTERIOR EMULSION',
@@ -185,9 +187,29 @@ describe('buildNewItemPayload', () => {
         expect(newSkuFor('00519288237')).toBe('00519288237-OWN');
     });
 
-    it('keeps the old name unchanged (no rename in this pass)', () => {
+    it('newNameFor appends exactly one " -OWN" suffix and trims the source name', () => {
+        expect(newNameFor('AP APEX AB12 900 ML')).toBe('AP APEX AB12 900 ML -OWN');
+        expect(newNameFor('  SOME NAME  ')).toBe('SOME NAME -OWN');
+    });
+
+    it('suffixes the name so it cannot collide with the still-active old item (Zoho 1001)', () => {
+        // Zoho Books enforces NAME uniqueness among active items, not just SKU
+        // uniqueness — the pilot run failed with:
+        //   Zoho API error 1001: Item "AP APEX AB12 900 ML" already exists.
         const p = buildNewItemPayload({ ...OLD_ITEM_ROW, zoho_item_name: '  SOME NAME  ' }, ENTRY);
-        expect(p.name).toBe('SOME NAME');
+        expect(p.name).toBe('SOME NAME -OWN');
+        expect(p.name).not.toBe('SOME NAME');
+        // exactly one suffix on each of the two unique-constrained fields
+        expect(p.name.match(/-OWN/g)).toHaveLength(1);
+        expect(p.sku.match(/-OWN/g)).toHaveLength(1);
+    });
+
+    it('never emits the old item\'s name verbatim for any of the 46 entries', () => {
+        for (const entry of ITEMS) {
+            const p = buildNewItemPayload({ ...OLD_ITEM_ROW, zoho_item_name: `NAME ${entry.old_sku}` }, entry);
+            expect(p.name).not.toBe(`NAME ${entry.old_sku}`);
+            expect(p.name).toBe(`NAME ${entry.old_sku} -OWN`);
+        }
     });
 
     it('omits empty optional fields but always sends rate', () => {
@@ -299,6 +321,8 @@ describe('DRY-RUN mode makes no Zoho calls and no DB writes', () => {
         const printed = log.log.mock.calls.map(c => c[0]).join('\n');
         expect(printed).toContain('PLAN');
         expect(printed).toContain('00519288237-OWN');
+        // the echoed payload shows the real name that will be sent to Zoho
+        expect(printed).toContain('AP APEX AB12 900 ML -OWN');
         expect(printed).toContain('LOC1');
         expect(printed).toContain('markItemInactive');
     });
@@ -353,14 +377,26 @@ describe('APPLY mode', () => {
         expect(mirrorIdx).toBeGreaterThanOrEqual(0);
     });
 
-    it('mirrors the new item into zoho_items_map with the new sku, brand and category', async () => {
+    it('sends the suffixed name to Zoho createItem (no collision with the still-active old item)', async () => {
+        const pool = makePool({ stock: [] });
+        const zohoAPI = makeZoho();
+        await consolidateItem({ pool, zohoAPI, entry: ENTRY, apply: true, log: silentLog() });
+
+        const created = zohoAPI.createItem.mock.calls[0][0];
+        expect(created.name).toBe('AP APEX AB12 900 ML -OWN');
+        expect(created.name).not.toBe(OLD_ITEM_ROW.zoho_item_name);
+        expect(created.sku).toBe('00519288237-OWN');
+    });
+
+    it('mirrors the new item into zoho_items_map with the new name, sku, brand and category', async () => {
         const pool = makePool({ stock: [] });
         await consolidateItem({ pool, zohoAPI: makeZoho(), entry: ENTRY, apply: true, log: silentLog() });
 
         const mirror = pool.queries.find(q => /INSERT INTO zoho_items_map/i.test(q.sql));
         expect(mirror).toBeDefined();
         expect(mirror.params[0]).toBe(NEW_ID);
-        expect(mirror.params[1]).toBe('AP APEX AB12 900 ML');
+        // mirror must match what Zoho actually holds — i.e. the suffixed name
+        expect(mirror.params[1]).toBe('AP APEX AB12 900 ML -OWN');
         expect(mirror.params[2]).toBe('00519288237-OWN');
         expect(mirror.params).toContain('ASIAN PAINTS');
         expect(mirror.params).toContain('EXTERIOR EMULSION');
