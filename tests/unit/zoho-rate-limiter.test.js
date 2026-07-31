@@ -179,6 +179,42 @@ describe('canStartHeavyOperation quota math', () => {
         expect(r.safe).toBe(false);
         expect(r.reason).toMatch(/Another operation in progress: fullSync/);
     });
+
+    // --- owner exemption (P0 stock-sync self-deadlock) ---
+    // executeStockSync acquires the 'stockSync' lock, then re-checks quota mid-run.
+    // Before the fix the re-check saw the caller's OWN lock and refused, so the
+    // per-location stock pull never ran (zoho_location_stock froze since 2026-05-18).
+    it('the lock owner may exempt itself by passing its own operation name', () => {
+        limiter.tryAcquireSyncLock('stockSync');
+        expect(limiter.canStartHeavyOperation(200, 'stockSync')).toEqual({ safe: true, reason: 'OK' });
+    });
+
+    it('a DIFFERENT operation name is still refused while the lock is held', () => {
+        limiter.tryAcquireSyncLock('stockSync');
+        const r = limiter.canStartHeavyOperation(200, 'someOtherOp');
+        expect(r.safe).toBe(false);
+        expect(r.reason).toMatch(/Another operation in progress: stockSync/);
+    });
+
+    it('omitting the owner argument preserves the pre-fix behavior exactly (still refused)', () => {
+        limiter.tryAcquireSyncLock('stockSync');
+        expect(limiter.canStartHeavyOperation(200).safe).toBe(false);
+        expect(limiter.canStartHeavyOperation(200).reason).toMatch(/Another operation in progress: stockSync/);
+    });
+
+    it('owner exemption does NOT bypass quota exhaustion or the daily pause', () => {
+        limiter.tryAcquireSyncLock('stockSync');
+        limiter.dailyUsed = 9400; // 9400 + 200 > 10000 - 500
+        const overQuota = limiter.canStartHeavyOperation(200, 'stockSync');
+        expect(overQuota.safe).toBe(false);
+        expect(overQuota.reason).toMatch(/Not enough quota/);
+
+        limiter.dailyUsed = 0;
+        limiter.dailyPaused = true;
+        const paused = limiter.canStartHeavyOperation(200, 'stockSync');
+        expect(paused.safe).toBe(false);
+        expect(paused.reason).toMatch(/Daily quota near limit/);
+    });
 });
 
 describe('sync lock', () => {

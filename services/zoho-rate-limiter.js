@@ -494,9 +494,13 @@ class ZohoRateLimiter {
     /**
      * Check if it's safe to start a heavy operation
      * @param {number} estimatedCalls - Estimated number of API calls
+     * @param {string|null} ownerOperation - Name of the sync lock the CALLER already
+     *   holds, if any. A caller that owns the lock is not blocked by its own lock
+     *   (a mid-run quota re-check would otherwise deadlock against itself).
+     *   Omit it to keep the strict "any lock blocks" behavior.
      * @returns {{ safe: boolean, reason: string }}
      */
-    canStartHeavyOperation(estimatedCalls = 100) {
+    canStartHeavyOperation(estimatedCalls = 100, ownerOperation = null) {
         this._resetDailyIfNeeded();
 
         if (this.dailyPaused) {
@@ -507,7 +511,7 @@ class ZohoRateLimiter {
             return { safe: false, reason: `Not enough quota: ${this.dailyLimit - this.dailyUsed - this.dailyReserve} calls remaining, need ~${estimatedCalls}` };
         }
 
-        if (this.activeSyncOp) {
+        if (this.activeSyncOp && this.activeSyncOp !== ownerOperation) {
             return { safe: false, reason: `Another operation in progress: ${this.activeSyncOp}` };
         }
 

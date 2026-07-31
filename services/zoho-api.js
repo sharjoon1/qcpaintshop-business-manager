@@ -1422,8 +1422,15 @@ async function syncItems(triggeredBy = null) {
             }
 
             for (const item of response.items) {
-                // Extract custom fields
-                const cfProductName = (item.custom_fields || []).find(f => f.label === 'Product Name' || f.api_name === 'cf_product_name');
+                // Extract custom fields.
+                // The GET /items LIST response carries NO custom_fields array — it exposes
+                // the product-name custom field as flat top-level keys instead. Check the
+                // array form first (the per-item detail path still returns it), then fall
+                // back to the flat keys, otherwise this always bound NULL and the COALESCE
+                // below preserved the existing NULL forever.
+                const cfProductNameValue = (item.custom_fields || [])
+                    .find(f => f.label === 'Product Name' || f.api_name === 'cf_product_name')?.value
+                    || item.cf_product_name_unformatted || item.cf_product_name || null;
                 const cfDpl = (item.custom_fields || []).find(f => f.label === 'DPL' || f.api_name === 'cf_dpl');
 
                 await pool.query(`
@@ -1478,7 +1485,7 @@ async function syncItems(triggeredBy = null) {
                     item.reorder_level || null, item.stock_on_hand || null,
                     item.category_name || null, item.upc || null, item.ean || null,
                     item.isbn || null, item.part_number || null,
-                    cfProductName?.value || null, cfDpl?.value || null
+                    cfProductNameValue, cfDpl?.value || null
                 ]);
                 totalSynced++;
             }

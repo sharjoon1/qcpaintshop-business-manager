@@ -211,8 +211,10 @@ router.get('/items', requireAuth, validateQuery(itemsQuerySchema), async (req, r
             params.push(category);
         }
         if (search) {
-            where.push('(zoho_item_name LIKE ? OR zoho_sku LIKE ? OR zoho_description LIKE ?)');
-            params.push(`%${search}%`, `%${search}%`, `%${search}%`);
+            // zoho_cf_product_name is the friendly Zoho "Product Name" custom field —
+            // staff search by that, not by the terse "IE01 RD1 ..." item name.
+            where.push('(zoho_item_name LIKE ? OR zoho_sku LIKE ? OR zoho_description LIKE ? OR zoho_cf_product_name LIKE ?)');
+            params.push(`%${search}%`, `%${search}%`, `%${search}%`, `%${search}%`);
         }
         if (status === 'missing_dpl') {
             where.push('(zoho_cf_dpl IS NULL OR zoho_cf_dpl = 0)');

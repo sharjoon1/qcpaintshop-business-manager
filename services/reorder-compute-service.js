@@ -123,12 +123,18 @@ async function computeAll({ windowDays = 60, minSales = 1 } = {}) {
 }
 
 async function refreshAlerts() {
+    // item_name / location_name are sourced exactly like zoho-api.js::checkReorderAlerts
+    // (the other writer to zoho_reorder_alerts): the stock row carries the item name and
+    // zoho_locations_map carries the branch name. Without them the alert rows landed with
+    // NULL names and the dashboard could not say which item at which branch was low.
     const [rows] = await pool.query(`
         SELECT rc.zoho_item_id, rc.zoho_location_id, rc.reorder_level,
-               COALESCE(ls.stock_on_hand, 0) AS stock
+               COALESCE(ls.stock_on_hand, 0) AS stock,
+               ls.item_name, lm.zoho_location_name AS location_name
         FROM zoho_reorder_config rc
         LEFT JOIN zoho_location_stock ls
             ON ls.zoho_item_id = rc.zoho_item_id AND ls.zoho_location_id = rc.zoho_location_id
+        LEFT JOIN zoho_locations_map lm ON lm.zoho_location_id = rc.zoho_location_id
         WHERE rc.is_active = 1
     `);
 
@@ -139,17 +145,24 @@ async function refreshAlerts() {
             // zoho_reorder_alerts columns verified: no triggered_at; created_at auto-set.
             // current_stock has DEFAULT 0.00; reorder_level has DEFAULT 0.00 — both nullable/defaulted.
             // uq_item_loc unique key added via migration to enable ON DUPLICATE KEY UPDATE.
+            // Names are COALESCEd on update so a row that already has good names (e.g.
+            // written by checkReorderAlerts) is never blanked when the stock row is missing.
             await pool.query(`
                 INSERT INTO zoho_reorder_alerts
-                    (zoho_item_id, zoho_location_id, severity, status, current_stock, reorder_level)
-                VALUES (?, ?, ?, 'active', ?, ?)
+                    (zoho_item_id, zoho_location_id, severity, status,
+                     item_name, location_name, current_stock, reorder_level)
+                VALUES (?, ?, ?, 'active', ?, ?, ?, ?)
                 ON DUPLICATE KEY UPDATE
                     severity = VALUES(severity),
                     status = 'active',
+                    item_name = COALESCE(VALUES(item_name), item_name),
+                    location_name = COALESCE(VALUES(location_name), location_name),
                     current_stock = VALUES(current_stock),
                     reorder_level = VALUES(reorder_level),
                     updated_at = NOW()
-            `, [r.zoho_item_id, r.zoho_location_id, severity, Number(r.stock), Number(r.reorder_level)]);
+            `, [r.zoho_item_id, r.zoho_location_id, severity,
+                r.item_name ?? null, r.location_name ?? null,
+                Number(r.stock), Number(r.reorder_level)]);
             active++;
         } else {
             const [upd] = await pool.query(`

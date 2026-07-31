@@ -207,8 +207,10 @@ async function executeStockSync() {
                 console.error('[Scheduler] Locations sync failed:', e.message);
             }
 
-            // Re-check quota after items/locations sync
-            const postQuotaCheck = rateLimiter.canStartHeavyOperation(200);
+            // Re-check quota after items/locations sync. Pass our own lock name so the
+            // check only weighs quota — we already hold 'stockSync' ourselves, and
+            // without the exemption this refused every run (stock never synced).
+            const postQuotaCheck = rateLimiter.canStartHeavyOperation(200, 'stockSync');
             if (!postQuotaCheck.safe) {
                 console.log(`[Scheduler] Skipping location stock sync: ${postQuotaCheck.reason}`);
             } else {
@@ -682,6 +684,7 @@ module.exports = {
     restart,
     getStatus,
     executeSyncCycle,
+    executeStockSync,
     loadConfig,
     localDateStr
 };
