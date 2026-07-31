@@ -143,12 +143,15 @@
                     <span id="lastSyncTime" class="ml-2 text-xs text-gray-400"></span>
                 </p>
             </div>
-            <button onclick="syncStock()" id="syncBtn" class="flex items-center gap-2 px-4 py-2 text-white text-sm font-semibold rounded-lg transition shadow-sm whitespace-nowrap" style="background: #667eea;" onmouseover="this.style.background='#5a6fd6'" onmouseout="this.style.background='#667eea'">
-                <svg id="syncIcon" class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
-                </svg>
-                <span id="syncBtnText">Sync Stock</span>
-            </button>
+            <div class="flex items-center gap-2 flex-wrap">
+                <a href="/admin-zoho-stock-adjust.html" class="px-3 py-1.5 rounded-lg border border-gray-300 bg-white hover:bg-gray-50 text-xs font-medium text-gray-700 transition whitespace-nowrap">Adjust Stock &rarr;</a>
+                <button onclick="syncStock()" id="syncBtn" class="flex items-center gap-2 px-4 py-2 text-white text-sm font-semibold rounded-lg transition shadow-sm whitespace-nowrap" style="background: #667eea;" onmouseover="this.style.background='#5a6fd6'" onmouseout="this.style.background='#667eea'">
+                    <svg id="syncIcon" class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
+                    </svg>
+                    <span id="syncBtnText">Sync Stock</span>
+                </button>
+            </div>
         </div>
 
         <!-- Summary Cards -->
