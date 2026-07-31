@@ -14,6 +14,12 @@
  *
  * Pure node test: the raw `https` transport the module uses is mocked
  * (NO real network), as are zoho-oauth and the rate limiter.
+ *
+ * Also covers the sibling item-lifecycle calls that live next to
+ * createItem/updateItem in the same module — markItemActive / markItemInactive
+ * (POST /items/{id}/active|inactive with an EMPTY body). These are money/
+ * inventory-adjacent (deactivating an item that still holds stock), so their
+ * exact URL + empty-body contract is locked here.
  */
 
 jest.mock('https');
@@ -154,5 +160,59 @@ describe('createItem cf_* wrapping (sibling of updateItem — same rule)', () =>
         const body = lastBody();
         expect(Object.prototype.hasOwnProperty.call(body, 'custom_fields')).toBe(false);
         expect(body).toEqual({ name: 'PLAIN ITEM', rate: 20 });
+    });
+});
+
+describe('markItemActive / markItemInactive (item lifecycle)', () => {
+    it('markItemInactive POSTs to /items/{id}/inactive with an EMPTY body', async () => {
+        await zohoAPI.markItemInactive('2032688000000687828');
+
+        expect(lastRequest().options.method).toBe('POST');
+        expect(lastRequest().options.path).toBe(
+            `/books/v3/items/2032688000000687828/inactive?organization_id=${ORG_ID}`
+        );
+        // Empty body — Zoho's mark-inactive endpoint takes no payload.
+        expect(lastBody()).toEqual({});
+        expect(lastRequest().body).toBe('{}');
+    });
+
+    it('markItemActive POSTs to /items/{id}/active with an EMPTY body', async () => {
+        await zohoAPI.markItemActive('2032688000000687828');
+
+        expect(lastRequest().options.method).toBe('POST');
+        expect(lastRequest().options.path).toBe(
+            `/books/v3/items/2032688000000687828/active?organization_id=${ORG_ID}`
+        );
+        expect(lastBody()).toEqual({});
+        expect(lastRequest().body).toBe('{}');
+    });
+
+    it('each call makes exactly one HTTP request and returns the parsed Zoho response', async () => {
+        const res = await zohoAPI.markItemInactive('9000009');
+        expect(requests).toHaveLength(1);
+        expect(res).toEqual({ code: 0, message: 'success' });
+    });
+
+    it('propagates a Zoho error response as a rejected promise (apiPost contract)', async () => {
+        // Zoho returns a non-zero code -> apiPost rejects; markItem* must not swallow it.
+        https.request.mockImplementation((options, onResponse) => {
+            const call = { options, body: '' };
+            requests.push(call);
+            return {
+                on: jest.fn(),
+                setTimeout: jest.fn(),
+                destroy: jest.fn(),
+                write: jest.fn((chunk) => { call.body += chunk; }),
+                end: jest.fn(() => {
+                    const handlers = {};
+                    onResponse({ on: (event, fn) => { handlers[event] = fn; } });
+                    handlers.data(JSON.stringify({ code: 1001, message: 'Item cannot be marked inactive' }));
+                    handlers.end();
+                })
+            };
+        });
+
+        await expect(zohoAPI.markItemInactive('9000010'))
+            .rejects.toThrow('Zoho API error 1001: Item cannot be marked inactive');
     });
 });

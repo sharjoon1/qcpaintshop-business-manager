@@ -1791,6 +1791,30 @@ async function updateItem(itemId, data) {
 }
 
 /**
+ * Mark an item ACTIVE in Zoho Books
+ * Zoho API: POST /items/{item_id}/active — no payload.
+ */
+async function markItemActive(itemId) {
+    const orgId = process.env.ZOHO_ORGANIZATION_ID;
+    // Rate limiting handled centrally in apiPost
+    return await apiPost(`/items/${itemId}/active?organization_id=${orgId}`, {});
+}
+
+/**
+ * Mark an item INACTIVE in Zoho Books
+ * Zoho API: POST /items/{item_id}/inactive — no payload.
+ *
+ * NOTE: an inactive item can still hold stock in Zoho. Callers that are
+ * retiring an item must move its stock out FIRST (inventory adjustment) and
+ * only then deactivate.
+ */
+async function markItemInactive(itemId) {
+    const orgId = process.env.ZOHO_ORGANIZATION_ID;
+    // Rate limiting handled centrally in apiPost
+    return await apiPost(`/items/${itemId}/inactive?organization_id=${orgId}`, {});
+}
+
+/**
  * Create a bulk update job
  */
 async function createBulkUpdateJob(filter, updateFields, userId) {
@@ -2703,6 +2727,8 @@ module.exports = {
     getItem,
     createItem,
     updateItem,
+    markItemActive,
+    markItemInactive,
     // Reports
     getProfitAndLoss,
     getBalanceSheet,
