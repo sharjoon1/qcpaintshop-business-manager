@@ -23,7 +23,8 @@
 const script = require('../../scripts/consolidate-asian-items');
 
 const {
-    ITEMS, newSkuFor, newNameFor, buildNewItemPayload, buildAdjustmentPair,
+    ITEMS, DESCRIPTION_MAX, newSkuFor, newNameFor, buildNewItemPayload,
+    buildConsolidationDescription, buildAdjustmentPair,
     parseArgs, selectItems, consolidateItem, run
 } = script;
 
@@ -232,7 +233,7 @@ describe('buildAdjustmentPair — stock-migration.js proven shape', () => {
         expect(pair.increase).toEqual({
             date: '2026-07-31',
             reason: `Consolidation IN: ${OLD_SKU}`,
-            description: `Asian Paints vendor-item consolidation ${OLD_ID} -> ${NEW_ID}`,
+            description: `AP consol ${OLD_ID}:${NEW_ID}`,
             adjustment_type: 'quantity',
             location_id: 'LOC1',
             line_items: [{ item_id: NEW_ID, location_id: 'LOC1', quantity_adjusted: 12 }]
@@ -266,6 +267,96 @@ describe('buildAdjustmentPair — stock-migration.js proven shape', () => {
         });
         expect(p.increase.reason.length).toBeLessThanOrEqual(50);
         expect(p.decrease.reason.length).toBeLessThanOrEqual(50);
+    });
+});
+
+// ── description length cap (live-pilot regression) ───────────────────────────
+
+describe('adjustment description is length-capped AND still traces both items', () => {
+    // Live pilot 2026-07-31 against production Zoho, attempt 2, failed with:
+    //   Zoho API error 2: Invalid value passed for Description
+    // First fix (attempt 2->3) capped length at 50 with a '>' separator and
+    // was itself judge-rejected before any 3rd live attempt: routes/stock-check.js
+    // and routes/stock-migration.js already post LONGER untruncated descriptions
+    // to this same /inventoryadjustments endpoint successfully (76 and 57-66
+    // chars respectively) — so length was never the real cause. The actual
+    // trigger is the '<'/'>' angle-bracket XSS guard Zoho applies to text fields
+    // (same error family documented in routes/vendors.js for other endpoints).
+    // Separator is now ':' — never reintroduce '<' or '>' into this string.
+    const REAL_OLD = '2032688000000664241';   // pilot item that failed
+    const REAL_NEW = '2032688000028095042';   // replacement Zoho created
+
+    it('the exact string that broke the live pilot is now under the cap and angle-bracket-free', () => {
+        const desc = buildConsolidationDescription(REAL_OLD, REAL_NEW);
+        expect(desc).toBe('AP consol 2032688000000664241:2032688000028095042');
+        expect(desc.length).toBe(49);
+        expect(desc.length).toBeLessThanOrEqual(DESCRIPTION_MAX);
+        expect(DESCRIPTION_MAX).toBeLessThanOrEqual(50);
+        // regression guard: neither the old rejected template nor angle brackets return
+        expect(desc).not.toContain('Asian Paints vendor-item consolidation');
+        expect(desc).not.toMatch(/[<>]/);
+    });
+
+    it('keeps BOTH 19-digit ids in FULL — traceability is not sacrificed', () => {
+        const desc = buildConsolidationDescription(REAL_OLD, REAL_NEW);
+        expect(desc).toContain(REAL_OLD);
+        expect(desc).toContain(REAL_NEW);
+        // and the direction (old -> new) is still readable
+        expect(desc.indexOf(REAL_OLD)).toBeLessThan(desc.indexOf(REAL_NEW));
+    });
+
+    it('both sides of the pair carry the capped description', () => {
+        const p = buildAdjustmentPair({
+            newItemId: REAL_NEW, oldItemId: REAL_OLD, locationId: 'LOC1',
+            quantity: 7, oldSku: '00129189214', date: '2026-07-31'
+        });
+        for (const side of [p.increase, p.decrease]) {
+            expect(side.description.length).toBeLessThanOrEqual(DESCRIPTION_MAX);
+            expect(side.description).toContain(REAL_OLD);
+            expect(side.description).toContain(REAL_NEW);
+        }
+        expect(p.increase.description).toBe(p.decrease.description);
+    });
+
+    it('holds for ALL 46 items against a realistic 19-digit new id', () => {
+        for (const entry of ITEMS) {
+            const p = buildAdjustmentPair({
+                newItemId: REAL_NEW, oldItemId: entry.old_item_id, locationId: 'L',
+                quantity: 1, oldSku: entry.old_sku, date: '2026-07-31'
+            });
+            expect(p.increase.description.length).toBeLessThanOrEqual(DESCRIPTION_MAX);
+            expect(p.decrease.description.length).toBeLessThanOrEqual(DESCRIPTION_MAX);
+            expect(p.increase.description).toContain(entry.old_item_id);
+            expect(p.increase.description).toContain(REAL_NEW);
+        }
+    });
+
+    it('over-long ids fall back to id TAILS — never drops the new id entirely', () => {
+        // A blind .substring(0, 50) on the old template chopped ${newItemId}
+        // (which came last) clean off. The fallback must keep a trace of both.
+        const longOld = '2'.repeat(30);
+        const longNew = '1'.repeat(30);
+        const desc = buildConsolidationDescription(longOld, longNew);
+
+        expect(desc.length).toBeLessThanOrEqual(DESCRIPTION_MAX);
+        expect(desc).not.toMatch(/[<>]/);
+        expect(desc).toContain(':');
+        const [oldPart, newPart] = desc.split(':');
+        expect(newPart.length).toBeGreaterThan(0);
+        expect(longOld.endsWith(oldPart.replace('AP consol ', ''))).toBe(true);
+        expect(longNew.endsWith(newPart)).toBe(true);
+    });
+
+    it('is safe with missing/null ids', () => {
+        expect(buildConsolidationDescription(null, null).length).toBeLessThanOrEqual(DESCRIPTION_MAX);
+        expect(buildConsolidationDescription(undefined, NEW_ID)).toContain(NEW_ID);
+    });
+
+    it('never contains angle brackets for any of the 46 real items (Zoho XSS-guard regression)', () => {
+        for (const entry of ITEMS) {
+            const desc = buildConsolidationDescription(entry.old_item_id, REAL_NEW);
+            expect(desc).not.toMatch(/[<>]/);
+        }
     });
 });
 

@@ -46,6 +46,24 @@ const SKU_SUFFIX = '-OWN';
 // (pilot 2026-07-31 failed with: Zoho API error 1001: Item "..." already exists).
 const NAME_SUFFIX = ' -OWN';
 
+// Live pilot 2026-07-31, 2nd attempt, failed on the increase-adjustment call
+// with "Zoho API error 2: Invalid value passed for Description" (confirmed via
+// live get_item that item creation itself had already succeeded cleanly with
+// its own description field intact, and that no stock had moved — the
+// adjustment description was the only untested string in that call). The old
+// template "Asian Paints vendor-item consolidation <id> -> <id>" was ~82
+// chars AND contained '>'. routes/stock-check.js and routes/stock-migration.js
+// post longer (57-76 char) descriptions to this same endpoint successfully,
+// so a plain length cap alone is not proven sufficient — the separator is also
+// no longer '<'/'>' (see buildConsolidationDescription). 50 is a conservative
+// cap kept for margin, not because it's the proven exact limit.
+const DESCRIPTION_MAX = 50;
+// Deliberately terse prose: 50 - 38 (two 19-digit ids) - 1 (separator) leaves
+// only 11 chars, and keeping BOTH ids in full is worth more for traceability
+// than long prose. The human-readable context lives in `reason`
+// ("Consolidation IN/OUT: <sku>") and in zoho_item_consolidation_log.
+const DESCRIPTION_PREFIX = 'AP consol ';
+
 /**
  * The 46 stock-holding vendor items to consolidate.
  * category_assigned values come from the owner-accepted category table and
@@ -141,6 +159,35 @@ function buildNewItemPayload(oldItem, entry) {
 }
 
 /**
+ * Length-capped adjustment description that still traces BOTH item ids.
+ *
+ * A blind `.substring(0, 50)` on the old template would have chopped the NEW
+ * item id off entirely (it comes last), which defeats the whole point of the
+ * field. Instead the prose is short enough that two full 19-digit ids fit; only
+ * if the ids are longer than that do we fall back to keeping the TAIL of each
+ * id (Zoho ids share a long org-level prefix, so the tail is the distinguishing
+ * part) so the description still points at both items.
+ *
+ * Separator is ':' not '>' — a live pilot proved length wasn't the real
+ * rejection cause (routes/stock-check.js and routes/stock-migration.js post
+ * longer untruncated descriptions to this same endpoint successfully); '>'
+ * (and '<') are what Zoho's field-level XSS guard actually rejects with this
+ * exact "Invalid value passed for Description" error (see routes/vendors.js
+ * for the same error family on angle brackets). Never use '<' or '>' here.
+ */
+function buildConsolidationDescription(oldItemId, newItemId, max = DESCRIPTION_MAX) {
+    const oldId = String(oldItemId == null ? '' : oldItemId);
+    const newId = String(newItemId == null ? '' : newItemId);
+    const full = `${DESCRIPTION_PREFIX}${oldId}:${newId}`;
+    if (full.length <= max) return full;
+
+    const budget = max - DESCRIPTION_PREFIX.length - 1; // 1 = the ':' separator
+    const perId = Math.floor(budget / 2);
+    if (perId <= 0) return full.substring(0, max);
+    return `${DESCRIPTION_PREFIX}${oldId.slice(-perId)}:${newId.slice(-perId)}`.substring(0, max);
+}
+
+/**
  * Paired quantity adjustments for ONE location — the exact shape proven in
  * routes/stock-migration.js:112-148, except the two calls differ by item_id
  * (new vs old) instead of by location_id: both sides act on the SAME location.
@@ -149,7 +196,7 @@ function buildAdjustmentPair({ newItemId, oldItemId, locationId, quantity, oldSk
     const qty = Math.abs(parseFloat(quantity));
     const when = date || today();
     const label = String(oldSku || '').substring(0, 30);
-    const description = `Asian Paints vendor-item consolidation ${oldItemId} -> ${newItemId}`;
+    const description = buildConsolidationDescription(oldItemId, newItemId);
 
     return {
         increase: {
@@ -472,9 +519,12 @@ module.exports = {
     BRAND,
     SKU_SUFFIX,
     NAME_SUFFIX,
+    DESCRIPTION_MAX,
+    DESCRIPTION_PREFIX,
     newSkuFor,
     newNameFor,
     buildNewItemPayload,
+    buildConsolidationDescription,
     buildAdjustmentPair,
     parseArgs,
     selectItems,
