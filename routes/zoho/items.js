@@ -2651,7 +2651,14 @@ router.post('/items/normalize/remember', requirePermission('zoho', 'manage'), as
 /**
  * POST /api/zoho/items/normalize-apply
  * Body: { items: [{ zoho_item_id, new_name, new_sku? }, ...] }
- * Updates DB and pushes to Zoho.
+ * Queues the renames as a bulk edit job; the worker pushes them to Zoho.
+ *
+ * Thin adapter over createBulkEditJob() — it owns the SKU-uniqueness guards
+ * (in-batch duplicates + SKUs already held by another active item) and the
+ * deferred local SKU mirror write (name lands now, SKU only after Zoho
+ * confirms). This endpoint used to hand-roll the job INSERTs and optimistically
+ * write zoho_sku locally, which is exactly the corruption
+ * migrations/resync-corrupted-skus.js exists to repair.
  */
 router.post('/items/normalize/apply', requirePermission('zoho', 'manage'), async (req, res) => {
     try {
@@ -2666,52 +2673,22 @@ router.post('/items/normalize/apply', requirePermission('zoho', 'manage'), async
             }
         }
 
-        // Create bulk job so user can track at /admin-zoho-bulk-jobs.html
-        const [jobResult] = await pool.query(`
-            INSERT INTO zoho_bulk_jobs (job_type, filter_criteria, update_fields, total_items, created_by)
-            VALUES ('item_update', ?, ?, ?, ?)
-        `, [
-            JSON.stringify({ mode: 'normalize_names', item_count: items.length }),
-            JSON.stringify({ mode: 'per_item', source: 'normalize' }),
-            items.length,
-            req.user.id
-        ]);
-        const jobId = jobResult.insertId;
-
-        // Queue per-item payloads
-        for (const it of items) {
-            const payload = { name: it.new_name };
-            if (it.new_sku) payload.sku = it.new_sku;
-            await pool.query(`
-                INSERT INTO zoho_bulk_job_items (job_id, zoho_item_id, item_name, payload)
-                VALUES (?, ?, ?, ?)
-            `, [jobId, it.zoho_item_id, it.new_name, JSON.stringify(payload)]);
-        }
-
-        // Update local zoho_items_map immediately so the UI reflects changes
-        // while the background worker pushes to Zoho.
-        for (const it of items) {
-            if (it.new_sku) {
-                await pool.query(
-                    `UPDATE zoho_items_map SET zoho_item_name = ?, zoho_sku = ? WHERE zoho_item_id = ?`,
-                    [it.new_name, it.new_sku, it.zoho_item_id]
-                );
-            } else {
-                await pool.query(
-                    `UPDATE zoho_items_map SET zoho_item_name = ? WHERE zoho_item_id = ?`,
-                    [it.new_name, it.zoho_item_id]
-                );
-            }
-        }
+        const jobItems = items.map(it => ({
+            zoho_item_id: it.zoho_item_id,
+            item_name: it.new_name,
+            changes: it.new_sku ? { name: it.new_name, sku: it.new_sku } : { name: it.new_name }
+        }));
+        const result = await createBulkEditJob(jobItems, req.user);
 
         res.json({
             success: true,
-            data: { job_id: jobId, total_items: items.length },
-            message: `Bulk rename job #${jobId} created with ${items.length} items — track progress on the Bulk Jobs page`
+            data: { job_id: result.job_id, total_items: result.total_items },
+            message: `Bulk rename job #${result.job_id} created with ${result.total_items} items — track progress on the Bulk Jobs page`
         });
     } catch (error) {
         console.error('Normalize apply error:', error);
-        res.status(500).json({ success: false, message: error.message });
+        const status = error.httpStatus || 500;
+        res.status(status).json(Object.assign({ success: false, message: error.message }, error.code ? { code: error.code } : {}, error.payload || {}));
     }
 });
 
