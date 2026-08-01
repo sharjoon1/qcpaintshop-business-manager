@@ -70,7 +70,8 @@ const OWN_SUFFIX = '-OWN';
 const CANDIDATE_SQL = `
   SELECT zoho_item_id, zoho_item_name, zoho_sku
   FROM zoho_items_map
-  WHERE zoho_status='active' AND zoho_brand='ASIAN PAINTS' AND zoho_sku NOT LIKE '%-OWN'
+  WHERE zoho_status='active' AND zoho_brand='ASIAN PAINTS'
+    AND (zoho_sku IS NULL OR zoho_sku NOT LIKE '%-OWN')
 `;
 
 /** Decimal(12,2) sums come back as strings; compare with a tolerance, not ===. */

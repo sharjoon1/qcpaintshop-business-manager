@@ -83,7 +83,8 @@ describe('CANDIDATE_SQL — live list, and the -OWN exclusion that protects the 
         expect(flat).toBe(
             "SELECT zoho_item_id, zoho_item_name, zoho_sku " +
             "FROM zoho_items_map " +
-            "WHERE zoho_status='active' AND zoho_brand='ASIAN PAINTS' AND zoho_sku NOT LIKE '%-OWN'"
+            "WHERE zoho_status='active' AND zoho_brand='ASIAN PAINTS' " +
+            "AND (zoho_sku IS NULL OR zoho_sku NOT LIKE '%-OWN')"
         );
         expect(BRAND).toBe('ASIAN PAINTS');
         expect(OWN_SUFFIX).toBe('-OWN');
@@ -94,6 +95,14 @@ describe('CANDIDATE_SQL — live list, and the -OWN exclusion that protects the 
         // are the owner's good items holding the migrated stock. Losing this
         // clause would deactivate them.
         expect(flat).toContain("zoho_sku NOT LIKE '%-OWN'");
+    });
+
+    it("does NOT silently drop candidates whose sku is NULL (SQL 3-valued-logic regression)", () => {
+        // `zoho_sku NOT LIKE '%-OWN'` alone evaluates to NULL (not TRUE) when
+        // zoho_sku IS NULL, which drops the row from the WHERE clause entirely.
+        // Several genuine vendor items (sku never populated) were silently
+        // excluded by the old query — this asserts the IS NULL escape hatch.
+        expect(flat).toContain('zoho_sku IS NULL');
     });
 
     it('is read-only — no INSERT/UPDATE/DELETE/DROP anywhere in the candidate query', () => {
