@@ -85,6 +85,75 @@ async function validateSendFrom(value) {
     return rows.length > 0;
 }
 
+// ========================================
+// SCHEDULE PICKER (CM5)
+// ========================================
+
+// IST = UTC + 5:30. The datetime-local wizard input is an IST wall-clock time,
+// but the DB session TZ is forced to +00:00 (config/database.js), so the engine
+// activates on `scheduled_at <= NOW()` in UTC. Storing the raw IST string would
+// fire the campaign 5.5h late — every scheduled value must be shifted to UTC.
+const IST_OFFSET_MS = 5.5 * 60 * 60 * 1000;
+const SCHEDULE_GRACE_MS = 2 * 60 * 1000;            // allow up to 2 min in the past
+const SCHEDULE_MAX_MS = 30 * 24 * 60 * 60 * 1000;   // reject > 30 days out
+const DATETIME_LOCAL_RE = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})$/;
+
+/**
+ * Parse a datetime-local value (`YYYY-MM-DDTHH:mm`, interpreted as IST wall
+ * clock) into the actual UTC epoch (ms) it represents, or null when the input
+ * is empty / malformed / out of calendar range. Pure + sync.
+ */
+function parseIstLocalToEpoch(input) {
+    if (typeof input !== 'string') return null;
+    const m = DATETIME_LOCAL_RE.exec(input.trim());
+    if (!m) return null;
+    const y = +m[1], mo = +m[2], d = +m[3], h = +m[4], mi = +m[5];
+    if (mo < 1 || mo > 12 || d < 1 || d > 31 || h > 23 || mi > 59) return null;
+    return Date.UTC(y, mo - 1, d, h, mi, 0) - IST_OFFSET_MS;
+}
+
+/** Format an epoch (ms) as a UTC `YYYY-MM-DD HH:mm:ss` string for MySQL DATETIME. */
+function formatUtcSql(epochMs) {
+    const dt = new Date(epochMs);
+    const pad = (n) => String(n).padStart(2, '0');
+    return `${dt.getUTCFullYear()}-${pad(dt.getUTCMonth() + 1)}-${pad(dt.getUTCDate())} ` +
+        `${pad(dt.getUTCHours())}:${pad(dt.getUTCMinutes())}:${pad(dt.getUTCSeconds())}`;
+}
+
+/**
+ * Convert a datetime-local input (IST wall clock) to a UTC
+ * `YYYY-MM-DD HH:mm:ss` string suitable for storing in wa_campaigns.scheduled_at.
+ * Returns null for empty/malformed input. Pure + sync (unit-testable).
+ *   e.g. '2026-07-15T15:00' → '2026-07-15 09:30:00'
+ *        '2026-07-15T02:00' → '2026-07-14 20:30:00' (midnight rollover)
+ */
+function istLocalToUtcSql(input) {
+    const epochMs = parseIstLocalToEpoch(input);
+    return epochMs === null ? null : formatUtcSql(epochMs);
+}
+
+/**
+ * Validate + convert a scheduled_at input for the start route.
+ * Returns { ok:true, utc } or { ok:false, error } (→ HTTP 400).
+ *   - malformed / empty        → error
+ *   - > 2 min in the past      → error (small grace for click latency)
+ *   - > 30 days in the future  → error
+ * `now` is injectable for deterministic tests (defaults to Date.now()).
+ */
+function validateScheduledAt(input, now = Date.now()) {
+    const epochMs = parseIstLocalToEpoch(input);
+    if (epochMs === null) {
+        return { ok: false, error: 'Invalid schedule time — expected YYYY-MM-DDTHH:mm' };
+    }
+    if (epochMs < now - SCHEDULE_GRACE_MS) {
+        return { ok: false, error: 'Scheduled time is in the past' };
+    }
+    if (epochMs > now + SCHEDULE_MAX_MS) {
+        return { ok: false, error: 'Scheduled time is more than 30 days away' };
+    }
+    return { ok: true, utc: formatUtcSql(epochMs) };
+}
+
 // Upload config
 const storage = multer.diskStorage({
     destination: (req, file, cb) => cb(null, 'uploads/wa-marketing'),
@@ -388,13 +457,19 @@ router.post('/campaigns/:id/start', managePerm, async (req, res) => {
             return res.status(400).json({ error: 'Campaign has no audience — populate leads first' });
         }
 
+        // Schedule (CM5): datetime-local input is IST wall-clock; the engine
+        // activates on `scheduled_at <= NOW()` with the DB session in UTC
+        // (+00:00, config/database.js) — store the CONVERTED UTC value, never
+        // the raw IST string (raw fires the campaign 5.5h late).
         const { scheduled_at } = req.body;
         if (scheduled_at) {
+            const validated = validateScheduledAt(scheduled_at);
+            if (!validated.ok) return res.status(400).json({ error: validated.error });
             await pool.query(
                 "UPDATE wa_campaigns SET status = 'scheduled', scheduled_at = ? WHERE id = ?",
-                [scheduled_at, req.params.id]
+                [validated.utc, req.params.id]
             );
-            res.json({ success: true, status: 'scheduled', scheduled_at });
+            res.json({ success: true, status: 'scheduled', scheduled_at: validated.utc });
         } else {
             await pool.query(
                 "UPDATE wa_campaigns SET status = 'running', sending_started_at = COALESCE(sending_started_at, NOW()) WHERE id = ?",
@@ -1188,5 +1263,10 @@ module.exports = {
     buildLeadFilterQuery,
     // Exported for tests (CM4)
     parseSendFrom,
-    validateSendFrom
+    validateSendFrom,
+    // Exported for tests (CM5)
+    parseIstLocalToEpoch,
+    formatUtcSql,
+    istLocalToUtcSql,
+    validateScheduledAt
 };

@@ -624,6 +624,11 @@
                 <!-- Step 5: Review -->
                 <div class="wizard-step" id="wizStep5">
                     <div class="space-y-3" id="reviewSummary"></div>
+                    <div class="form-group mt-3">
+                        <label>Schedule Start (optional)</label>
+                        <input type="datetime-local" id="wizScheduledAt" class="w-full border rounded-lg px-3 py-1.5 text-sm">
+                        <p class="text-xs text-gray-400 mt-1">Leave empty to start immediately. If set, the campaign starts within ~1 minute of the scheduled time.</p>
+                    </div>
                 </div>
             </div>
             <div class="modal-footer">
@@ -1158,6 +1163,13 @@ function openCampaignWizard() {
     document.getElementById('wizHourlyLimit').value = 30;
     document.getElementById('wizDailyLimit').value = 200;
     document.getElementById('wizWarmUp').checked = false;
+    // Schedule (CM5): reset the picker and floor it at now (browser-local
+    // wall-clock; the backend re-validates in IST and converts to UTC).
+    const schedInput = document.getElementById('wizScheduledAt');
+    schedInput.value = '';
+    const nowLocal = new Date();
+    const pad2 = n => String(n).padStart(2, '0');
+    schedInput.min = `${nowLocal.getFullYear()}-${pad2(nowLocal.getMonth() + 1)}-${pad2(nowLocal.getDate())}T${pad2(nowLocal.getHours())}:${pad2(nowLocal.getMinutes())}`;
     document.getElementById('wizFilterStatus').value = '';
     document.getElementById('wizFilterSource').value = '';
     document.getElementById('wizFilterPriority').value = '';
@@ -1410,6 +1422,9 @@ function buildReviewSummary() {
     const msgBody = document.getElementById('wizMsgBody').value;
     const warmUp = document.getElementById('wizWarmUp').checked;
     const selCount = selectedLeadIds.size;
+    // Schedule (CM5): show the raw IST wall-clock choice as the user typed it.
+    const schedVal = document.getElementById('wizScheduledAt').value;
+    const scheduleLabel = schedVal ? `Scheduled ${schedVal} (IST)` : 'Immediately';
 
     document.getElementById('reviewSummary').innerHTML = `
         <div class="stat-card">
@@ -1419,6 +1434,7 @@ function buildReviewSummary() {
             <p class="text-sm"><strong>Send from:</strong> ${esc(sendFromName)}</p>
             <p class="text-sm"><strong>Type:</strong> ${msgType}</p>
             ${warmUp ? '<p class="text-sm text-amber-600"><strong>Warm-Up:</strong> Enabled</p>' : ''}
+            <p class="text-sm"><strong>Start:</strong> ${scheduleLabel}</p>
         </div>
         <div class="stat-card">
             <h4 class="font-semibold text-sm text-gray-700 mb-2">Message</h4>
@@ -1472,11 +1488,15 @@ async function createAndStartCampaign() {
         const popData = await popRes.json();
         if (!popRes.ok) { showToast(popData.error, 'error'); return; }
 
-        // Start
-        const startRes = await fetch(`${API}/campaigns/${campaignId}/start`, { method: 'POST', headers: getAuthHeaders(), body: JSON.stringify({}) });
+        // Start — thread the RAW datetime-local string (IST wall-clock, no
+        // toISOString conversion); the backend converts it to UTC (CM5).
+        const startBody = {};
+        const sched = document.getElementById('wizScheduledAt').value;
+        if (sched) startBody.scheduled_at = sched;
+        const startRes = await fetch(`${API}/campaigns/${campaignId}/start`, { method: 'POST', headers: getAuthHeaders(), body: JSON.stringify(startBody) });
         if (!startRes.ok) { const d = await startRes.json(); showToast(d.error, 'error'); return; }
 
-        showToast(`Campaign started with ${popData.total_leads} contacts!`, 'success');
+        showToast(sched ? `Campaign scheduled for ${sched}!` : `Campaign started with ${popData.total_leads} contacts!`, 'success');
         closeModal('campaignWizardModal');
         switchTab('campaigns');
         loadCampaigns();
