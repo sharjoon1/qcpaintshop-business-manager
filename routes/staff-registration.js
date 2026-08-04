@@ -256,8 +256,11 @@ router.get('/registrations', requireAuth, requirePermission('staff_registrations
             params.push(s, s, s, s);
         }
 
-        // Get total count
-        const countQuery = query.replace(/SELECT sr\.\*[\s\S]*?FROM/, 'SELECT COUNT(*) as total FROM');
+        // Build COUNT query explicitly (not via fragile regex replacement)
+        const countQuery = query.replace(
+            /SELECT sr\.\*,\s*u_approved\.full_name[\s\S]*?FROM/,
+            'SELECT COUNT(*) as total FROM'
+        );
         const [countResult] = await pool.query(countQuery, params);
         const total = countResult[0].total;
 
@@ -417,7 +420,8 @@ router.post('/registrations/:id/approve', requireAuth, requirePermission('staff_
         } catch (notifErr) { console.error('Approval notification error:', notifErr.message); }
 
         // Send approval email (outside transaction)
-        const totalSalary = parseFloat(monthly_salary) + parseFloat(transport_allowance) + parseFloat(food_allowance) + parseFloat(other_allowance);
+        const totalSalary = (parseFloat(monthly_salary) || 0) + (parseFloat(transport_allowance) || 0) + (parseFloat(food_allowance) || 0) + (parseFloat(other_allowance) || 0);
+        const salaryDisplay = isNaN(totalSalary) ? '0' : totalSalary.toLocaleString('en-IN');
         await sendEmail(reg.email, 'Congratulations! Your Registration is Approved - Quality Colours', `
             <h2 style="color: #333;">Dear ${reg.full_name},</h2>
             <p>We are delighted to inform you that your staff registration has been <strong style="color: #059669;">approved</strong>!</p>
@@ -426,7 +430,7 @@ router.post('/registrations/:id/approve', requireAuth, requirePermission('staff_
                 <table style="width: 100%; border-collapse: collapse;">
                     <tr><td style="padding: 8px 0; color: #6b7280;">Position:</td><td style="padding: 8px 0; font-weight: 600;">${assigned_role}</td></tr>
                     <tr><td style="padding: 8px 0; color: #6b7280;">Joining Date:</td><td style="padding: 8px 0; font-weight: 600;">${joining_date}</td></tr>
-                    <tr><td style="padding: 8px 0; color: #6b7280;">Monthly CTC:</td><td style="padding: 8px 0; font-weight: 600;">₹${totalSalary.toLocaleString('en-IN')}</td></tr>
+                    <tr><td style="padding: 8px 0; color: #6b7280;">Monthly CTC:</td><td style="padding: 8px 0; font-weight: 600;">₹${salaryDisplay}</td></tr>
                 </table>
             </div>
             <p>You can now log in to the staff portal using your registered phone number and password.</p>
@@ -483,13 +487,14 @@ router.post('/registrations/:id/reject', requireAuth, requirePermission('staff_r
             WHERE id = ?
         `, [req.user.id, reason, req.params.id]);
 
-        // Send rejection email
+        // Send rejection email (escape HTML to prevent injection)
+        const escapedReason = reason.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#039;');
         await sendEmail(reg.email, 'Registration Update - Quality Colours', `
             <h2 style="color: #333;">Dear ${reg.full_name},</h2>
             <p>Thank you for your interest in joining Quality Colours.</p>
             <p>After careful review, we regret to inform you that your staff registration (REG-${reg.id}) could not be approved at this time.</p>
             <div style="background: #fef2f2; border-left: 4px solid #ef4444; padding: 15px; margin: 20px 0; border-radius: 4px;">
-                <p style="margin: 0; color: #991b1b;"><strong>Reason:</strong> ${reason}</p>
+                <p style="margin: 0; color: #991b1b;"><strong>Reason:</strong> ${escapedReason}</p>
             </div>
             <p>If you have any questions, please contact our office.</p>
         `);
@@ -1127,6 +1132,11 @@ router.post('/bank-details', requireAuth, async (req, res) => {
             return res.status(400).json({ success: false, message: 'Invalid IFSC code format' });
         }
 
+        // Validate bank account number (9-18 digits)
+        if (!/^\d{9,18}$/.test(bank_account_number)) {
+            return res.status(400).json({ success: false, message: 'Bank account number must be 9-18 digits' });
+        }
+
         await pool.query(
             `UPDATE users SET bank_account_name = ?, bank_name = ?, bank_account_number = ?, bank_ifsc_code = ?, upi_id = ? WHERE id = ?`,
             [bank_account_name, bank_name, bank_account_number, bank_ifsc_code, upi_id || null, req.user.id]
@@ -1169,6 +1179,11 @@ router.post('/bank-details/:userId', requireAuth, requirePermission('staff_regis
 
         if (!/^[A-Z]{4}0[A-Z0-9]{6}$/i.test(bank_ifsc_code)) {
             return res.status(400).json({ success: false, message: 'Invalid IFSC code format' });
+        }
+
+        // Validate bank account number (9-18 digits)
+        if (!/^\d{9,18}$/.test(bank_account_number)) {
+            return res.status(400).json({ success: false, message: 'Bank account number must be 9-18 digits' });
         }
 
         const [user] = await pool.query('SELECT id FROM users WHERE id = ?', [req.params.userId]);
@@ -1265,7 +1280,9 @@ router.get('/registrations/:id/offer-letter-data', requireAuth, requirePermissio
             position: position,
             branch_name: branchName,
             ref_number: `QC/OL/${new Date().getFullYear()}/${String(reg.id).padStart(4, '0')}`,
-            letter_date: new Date(reg.approved_at || Date.now()).toLocaleDateString('en-IN', { day: '2-digit', month: 'long', year: 'numeric' }),
+            letter_date: reg.approved_at
+                ? new Date(reg.approved_at).toLocaleDateString('en-IN', { day: '2-digit', month: 'long', year: 'numeric' })
+                : new Date().toLocaleDateString('en-IN', { day: '2-digit', month: 'long', year: 'numeric' }),
             joining_date: reg.joining_date ? new Date(reg.joining_date).toLocaleDateString('en-IN', { day: '2-digit', month: 'long', year: 'numeric' }) : '',
             monthly_salary: parseFloat(reg.monthly_salary || 0),
             transport_allowance: parseFloat(reg.transport_allowance || 0),
