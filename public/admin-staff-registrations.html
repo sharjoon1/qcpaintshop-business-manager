@@ -248,14 +248,21 @@
                             Edit Staff Details
                         </button>
                     </div>
-                    <div class="flex gap-3">
-                        <button onclick="openOfferLetterEditor()" class="flex-1 bg-purple-600 text-white py-2.5 rounded-lg hover:bg-purple-700 transition text-sm font-semibold">
-                            Preview & Edit Offer Letter
-                        </button>
-                        <button onclick="sendOfferLetter()" id="btnSendOffer"
-                                class="flex-1 bg-blue-600 text-white py-2.5 rounded-lg hover:bg-blue-700 transition text-sm font-semibold">
-                            Email Offer Letter
-                        </button>
+                    <button id="toggleOfferActions" onclick="toggleOfferActions()"
+                            class="w-full text-sm text-gray-500 hover:text-purple-600 py-2 border border-dashed border-gray-300 rounded-lg hover:border-purple-400 transition flex items-center justify-center gap-1.5">
+                        <svg id="toggleOfferIcon" class="w-4 h-4 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
+                        <span id="toggleOfferLabel">Offer Letter Actions</span>
+                    </button>
+                    <div id="offerActionsPanel" class="hidden mt-3 space-y-2">
+                        <div class="flex gap-3">
+                            <button onclick="openOfferLetterEditor()" class="flex-1 bg-purple-600 text-white py-2.5 rounded-lg hover:bg-purple-700 transition text-sm font-semibold">
+                                Preview & Edit Offer Letter
+                            </button>
+                            <button onclick="sendOfferLetter()" id="btnSendOffer"
+                                    class="flex-1 bg-blue-600 text-white py-2.5 rounded-lg hover:bg-blue-700 transition text-sm font-semibold">
+                                Email Offer Letter
+                            </button>
+                        </div>
                     </div>
                     <div id="offerSentInfo" class="hidden mt-2 text-xs text-green-600 text-center"></div>
                 </div>
@@ -787,6 +794,10 @@
                 let details = '';
                 if (r.status === 'approved') {
                     approvedSection.classList.remove('hidden');
+                    // Reset offer actions panel to collapsed
+                    document.getElementById('offerActionsPanel').classList.add('hidden');
+                    document.getElementById('toggleOfferIcon').style.transform = '';
+                    document.getElementById('toggleOfferLabel').textContent = 'Offer Letter Actions';
                     details = `
                         <div class="bg-green-50 rounded-lg p-3">
                             <p class="text-green-700 font-medium mb-2">Approved</p>
@@ -987,6 +998,21 @@
                 }
             }
         });
+
+        function toggleOfferActions() {
+            var panel = document.getElementById('offerActionsPanel');
+            var icon = document.getElementById('toggleOfferIcon');
+            var label = document.getElementById('toggleOfferLabel');
+            if (panel.classList.contains('hidden')) {
+                panel.classList.remove('hidden');
+                icon.style.transform = 'rotate(180deg)';
+                label.textContent = 'Hide Offer Letter Actions';
+            } else {
+                panel.classList.add('hidden');
+                icon.style.transform = '';
+                label.textContent = 'Offer Letter Actions';
+            }
+        }
 
         function escapeHtml(str) {
             if (!str) return '';
