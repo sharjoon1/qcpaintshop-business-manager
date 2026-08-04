@@ -9,7 +9,7 @@
     <link rel="manifest" href="/manifest.json">
     <link rel="icon" type="image/png" sizes="192x192" href="/icons/icon-192x192.png">
     <link rel="apple-touch-icon" href="/icons/icon-192x192.png">
-    <title>Staff Registrations - Quality Colours</title>
+    <title>Staff Registrations - Quality Colours</title><!-- v2 modal-fix -->
     <script src="/js/auth-helper.js?v=7101c516"></script>
     <script>requireAdminOrRedirect();</script>
     <link rel="stylesheet" href="/css/tailwind.css?v=849f1b5c">
@@ -964,12 +964,33 @@
 
         // ── Helpers ──
         function closeModal(id) {
-            document.getElementById(id).classList.add('hidden');
+            const el = document.getElementById(id);
+            if (el) { el.classList.add('hidden'); el.style.setProperty('display','none','important'); }
         }
+        // Close ALL modals (force-hide via both CSS class + inline style)
+        function closeAllModals() {
+            ['reviewModal','rejectModal','editStaffModal','offerLetterModal'].forEach(function(id){
+                var el = document.getElementById(id);
+                if (el) { el.classList.add('hidden'); el.style.setProperty('display','none','important'); }
+            });
+        }
+        // Global Escape handler — closes topmost visible modal
+        document.addEventListener('keydown', function(e){
+            if (e.key !== 'Escape') return;
+            var modals = ['editStaffModal','offerLetterModal','rejectModal','reviewModal'];
+            for (var i=0; i<modals.length; i++) {
+                var el = document.getElementById(modals[i]);
+                if (el && !el.classList.contains('hidden')) {
+                    closeModal(modals[i]);
+                    e.preventDefault();
+                    break;
+                }
+            }
+        });
 
         function escapeHtml(str) {
             if (!str) return '';
-            const div = document.createElement('div');
+            var div = document.createElement('div');
             div.textContent = str;
             return div.innerHTML;
         }
