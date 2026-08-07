@@ -81,6 +81,7 @@ body{ background:#f8fafb; font-family:Inter, -apple-system, BlinkMacSystemFont, 
     <button class="hub-tab" data-tab="reorder" onclick="switchTab('reorder')">Reorder <span id="tabReorderBadge" class="ml-1 hidden bg-red-500 text-white text-[10px] px-1.5 py-0.5 rounded-full"></span></button>
     <button class="hub-tab" data-tab="checks" onclick="switchTab('checks')">Stock Checks</button>
     <button class="hub-tab" data-tab="migrate" onclick="switchTab('migrate')">Migrate</button>
+    <button class="hub-tab" data-tab="dead" onclick="switchTab('dead')">Dead Stock <span id="tabDeadBadge" class="ml-1 hidden bg-gray-500 text-white text-[10px] px-1.5 py-0.5 rounded-full"></span></button>
   </div>
 
   <div class="bg-white rounded-b-lg shadow-sm border border-t-0 border-gray-200 p-3 md:p-5 min-h-[420px]">
@@ -113,6 +114,11 @@ body{ background:#f8fafb; font-family:Inter, -apple-system, BlinkMacSystemFont, 
       <div class="flex items-center justify-between mb-2"><h3 class="text-sm font-semibold text-gray-800">Recent checks</h3><button onclick="switchTab('checks')" class="text-xs text-[#667eea] font-medium">View all →</button></div>
       <div id="overviewChecks" class="overflow-x-auto"><div class="text-sm text-gray-400 py-4">Loading…</div></div>
     </div>
+    <div class="mt-4">
+      <div class="flex items-center justify-between mb-2"><h3 class="text-sm font-semibold text-gray-800">Stock Value — Branch wise</h3><button onclick="loadValuation()" class="text-xs text-[#667eea] font-medium">Refresh</button></div>
+      <div id="valuationCards" class="grid md:grid-cols-3 gap-3"></div>
+      <div id="valuationTotal" class="mt-2 text-sm font-semibold text-gray-800"></div>
+    </div>
   </div>
 
   <!-- STOCK PANE -->
@@ -123,6 +129,8 @@ body{ background:#f8fafb; font-family:Inter, -apple-system, BlinkMacSystemFont, 
       <select id="stockSort" onchange="loadStock()" class="px-3 py-2 border border-gray-300 rounded-lg text-sm bg-white">
         <option value="name_asc">Name A→Z</option><option value="name_desc">Name Z→A</option><option value="stock_asc">Stock low→high</option><option value="stock_desc">Stock high→low</option><option value="updated_desc">Recently updated</option>
       </select>
+      <select id="stockBrand" onchange="loadStock()" class="px-3 py-2 border border-gray-300 rounded-lg text-sm bg-white"><option value="">All Brands</option></select>
+      <select id="stockCategory" onchange="loadStock()" class="px-3 py-2 border border-gray-300 rounded-lg text-sm bg-white"><option value="">All Categories</option></select>
       <label class="flex items-center gap-2 text-sm px-2"><input type="checkbox" id="stockLowOnly" onchange="loadStock()"> Low only</label>
       <button onclick="stockFilterMgr && stockFilterMgr.togglePanel()" class="px-3 py-2 border border-gray-300 rounded-lg text-sm bg-white">Filters <span id="stockFilterBadge" class="ml-1 text-xs bg-gray-100 px-1.5 py-0.5 rounded-full">0</span></button>
     </div>
@@ -148,17 +156,20 @@ body{ background:#f8fafb; font-family:Inter, -apple-system, BlinkMacSystemFont, 
       <div class="flex gap-2 text-xs">
         <span class="badge badge-critical" id="rCritical">0 critical</span><span class="badge badge-high" id="rHigh">0 high</span><span class="badge badge-medium" id="rMed">0 medium</span><span class="badge badge-low" id="rLow">0 low</span>
       </div>
-      <div class="flex gap-2">
+      <div class="flex gap-2 flex-wrap">
+        <select id="reorderBrand" onchange="loadReorder()" class="px-2 py-1.5 border border-gray-300 rounded-lg text-xs bg-white"><option value="">All Brands</option></select>
+        <select id="reorderCategory" onchange="loadReorder()" class="px-2 py-1.5 border border-gray-300 rounded-lg text-xs bg-white"><option value="">All Categories</option></select>
         <select id="reorderStatus" onchange="loadReorder()" class="px-2 py-1.5 border border-gray-300 rounded-lg text-xs bg-white"><option value="">All status</option><option value="active">Active</option><option value="acknowledged">Acknowledged</option><option value="resolved">Resolved</option></select>
         <select id="reorderSeverity" onchange="loadReorder()" class="px-2 py-1.5 border border-gray-300 rounded-lg text-xs bg-white"><option value="">All severity</option><option value="critical">Critical</option><option value="high">High</option><option value="medium">Medium</option><option value="low">Low</option></select>
       </div>
     </div>
     <div id="reorderSelectionBar" class="hidden items-center justify-between bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 mb-3">
       <span class="text-sm font-medium text-amber-800"><span id="reorderSelCount">0</span> selected</span>
-      <div class="flex gap-2">
+      <div class="flex gap-2 flex-wrap">
         <button onclick="clearReorderSelection()" class="px-3 py-1.5 bg-white border border-gray-300 rounded-lg text-xs">Clear</button>
         <button onclick="createCheckFromReorder()" class="px-3 py-1.5 bg-gray-900 text-white rounded-lg text-xs font-medium">Create Stock Check</button>
         <button onclick="bulkAcknowledge()" class="px-3 py-1.5 bg-white border border-gray-300 rounded-lg text-xs">Acknowledge</button>
+        <button onclick="smartCheckAutoQueue()" class="px-3 py-1.5 bg-[#667eea] text-white rounded-lg text-xs font-medium">Smart Check: Auto-queue</button>
       </div>
     </div>
     <div id="reorderLoading" class="text-center py-8 text-gray-400 text-sm">Loading reorder alerts…</div>
@@ -208,6 +219,29 @@ body{ background:#f8fafb; font-family:Inter, -apple-system, BlinkMacSystemFont, 
   </div>
 
   <!-- MIGRATE PANE -->
+  <div id="pane-dead" class="hub-pane">
+    <div class="flex flex-wrap gap-2 mb-3 items-end">
+      <select id="deadDays" onchange="loadDead()" class="px-3 py-2 border border-gray-300 rounded-lg text-sm bg-white"><option value="30">30 days</option><option value="60" selected>60 days</option><option value="90">90 days</option></select>
+      <select id="deadBrand" onchange="loadDead()" class="px-3 py-2 border border-gray-300 rounded-lg text-sm bg-white"><option value="">All Brands</option></select>
+      <select id="deadCategory" onchange="loadDead()" class="px-3 py-2 border border-gray-300 rounded-lg text-sm bg-white"><option value="">All Categories</option></select>
+      <input id="deadSearch" type="text" placeholder="Search name or SKU..." class="flex-1 min-w-[150px] px-3 py-2 border border-gray-300 rounded-lg text-sm" oninput="debounceDeadSearch()">
+      <button onclick="loadDead()" class="px-3 py-2 bg-white border border-gray-300 rounded-lg text-sm">Refresh</button>
+      <button onclick="smartCheckAutoQueue()" class="ml-auto px-3 py-2 bg-[#667eea] text-white rounded-lg text-sm font-medium">Smart Check: Auto-queue</button>
+    </div>
+    <div id="deadSelectionBar" class="hidden items-center justify-between bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 mb-3">
+      <span class="text-sm font-medium text-gray-700"><span id="deadSelCount">0</span> selected</span>
+      <div class="flex gap-2">
+        <button onclick="clearDeadSelection()" class="px-3 py-1.5 bg-white border border-gray-300 rounded-lg text-xs">Clear</button>
+        <button onclick="addDeadToCheck()" class="px-3 py-1.5 bg-[#667eea] text-white rounded-lg text-xs font-medium">Add to Stock Check</button>
+      </div>
+    </div>
+    <div id="deadLoading" class="text-center py-8 text-gray-400 text-sm">Select filters to view dead stock</div>
+    <div id="deadTableWrap" class="hidden overflow-x-auto border border-gray-200 rounded-lg">
+      <table class="qc-table"><thead><tr><th style="width:28px"><input type="checkbox" id="deadSelectAll" onchange="toggleDeadSelectAll(this)"></th><th>Item</th><th>Branch</th><th class="text-right">Stock</th><th class="text-right">Value</th><th>Last sale</th><th class="text-right">Days ago</th></tr></thead><tbody id="deadBody"></tbody></table>
+    </div>
+    <div id="deadPagination" class="flex items-center justify-between mt-3 text-sm hidden"><span id="deadPageInfo" class="text-gray-500"></span><div id="deadPageBtns" class="flex gap-1"></div></div>
+  </div>
+
   <div id="pane-migrate" class="hub-pane">
     <div class="flex items-center justify-between mb-3">
       <p class="text-sm text-gray-500">Move all warehouse stock to business locations. Paired Zoho adjustments run automatically.</p>
@@ -234,6 +268,7 @@ let locations=[], branches=[], reorderCache=[], stockCache=[], pendingCheckItems
 let selectedStock=new Set(), selectedReorder=new Set();
 let currentLocationId=null, stockPage=1, stockTotal=0, reorderPage=1, reorderTotal=0, checksPage=1, checksTotal=0;
 let stockFilterMgr=null;
+let deadCache=[], selectedDead=new Set(), deadPage=1, deadTotal=0;
 
 function toast(msg, err=false){ const t=document.getElementById('toast'); t.textContent=msg; t.className='toast show '+(err?'bg-red-600':''); setTimeout(()=>t.className='toast',3000); }
 function esc(s){ return (s==null?'':String(s)).replace(/[&<>"']/g,c=>({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
@@ -246,10 +281,120 @@ function switchTab(name){
   if(name==='reorder') loadReorder();
   if(name==='checks') loadChecks();
   if(name==='migrate') loadMigrate();
+  if(name==='dead') loadDead();
   history.replaceState(null,'','#'+name);
 }
 
 // ---------- OVERVIEW ----------
+
+function populateBrandCategory(brands, categories){
+  const fill = (id, list) => {
+    const el=document.getElementById(id);
+    if(!el) return;
+    const cur=el.value;
+    el.innerHTML='<option value="">All '+(id.includes('Brand')?'Brands':'Categories')+'</option>'+list.map(v=>`<option value="${esc(v)}">${esc(v)}</option>`).join('');
+    if(cur) el.value=cur;
+  };
+  if(brands){ ['stockBrand','reorderBrand','deadBrand'].forEach(id=> fill(id, brands)); }
+  if(categories){ ['stockCategory','reorderCategory','deadCategory'].forEach(id=> fill(id, categories)); }
+}
+async function loadValuation(){
+  try{
+    const res=await apiFetch(API_Z+'/stock/valuation');
+    const cards=document.getElementById('valuationCards');
+    const totalEl=document.getElementById('valuationTotal');
+    if(!res.perBranch || !res.perBranch.length){ cards.innerHTML='<div class="text-sm text-gray-400">No valuation data</div>'; totalEl.textContent=''; return; }
+    cards.innerHTML=res.perBranch.map(b=>`<div class="stat-card"><div class="label">${esc(b.branch_name||b.zoho_location_name)}</div><div class="value" style="font-size:1.1rem">₹${Number(b.total_value).toLocaleString('en-IN')}</div><div class="hint">${b.sku_count} SKUs · ${Number(b.total_qty).toLocaleString()} qty</div></div>`).join('');
+    totalEl.textContent=`Total: ₹${Number(res.total.total_value).toLocaleString('en-IN')} · ${res.total.sku_count} SKUs · ${Number(res.total.total_qty).toLocaleString()} qty`;
+  }catch(e){ const c=document.getElementById('valuationCards'); if(c) c.innerHTML=`<div class="text-sm text-red-500">${esc(e.message)}</div>`; }
+}
+let deadDebounce=null;
+function debounceDeadSearch(){ clearTimeout(deadDebounce); deadDebounce=setTimeout(()=>{ deadPage=1; loadDead(); },400); }
+async function loadDead(){
+  const days=document.getElementById('deadDays')?.value||60;
+  const brand=document.getElementById('deadBrand')?.value||'';
+  const category=document.getElementById('deadCategory')?.value||'';
+  const search=document.getElementById('deadSearch')?.value.trim()||'';
+  const q=new URLSearchParams({ days, page: deadPage, limit: 25 });
+  if(brand) q.set('brand', brand);
+  if(category) q.set('category', category);
+  if(search) q.set('search', search);
+  if(currentLocationId) q.set('location_id', currentLocationId);
+  document.getElementById('deadLoading').textContent='Loading…';
+  document.getElementById('deadLoading').classList.remove('hidden');
+  try{
+    const res=await apiFetch(API_Z+'/stock/dead?'+q.toString());
+    deadCache=res.data||[];
+    deadTotal=res.pagination?res.pagination.total:deadCache.length;
+    renderDead(deadCache);
+    renderDeadPagination(res.pagination);
+    document.getElementById('deadLoading').classList.add('hidden');
+    document.getElementById('deadTableWrap').classList.remove('hidden');
+    const badge=document.getElementById('tabDeadBadge');
+    if(res.pagination && res.pagination.total>0){ badge.textContent=res.pagination.total; badge.classList.remove('hidden'); } else badge.classList.add('hidden');
+  }catch(e){ document.getElementById('deadLoading').innerHTML='<div class="text-sm text-gray-500 py-2">No data — Sync Stock try pannunga / Filters maathunga</div><div class="text-xs text-gray-400">'+esc(e.message)+'</div>'; }
+}
+function renderDead(rows){
+  const tb=document.getElementById('deadBody');
+  if(!rows.length){ tb.innerHTML='<tr><td colspan="7" class="text-center py-6 text-gray-400">No dead stock</td></tr>'; return; }
+  tb.innerHTML=rows.map(r=>{
+    const checked=selectedDead.has(String(r.zoho_item_id+'|'+r.zoho_location_id));
+    const last = r.last_sale_date ? new Date(r.last_sale_date).toLocaleDateString() : 'Never';
+    const days = r.days_since_sale != null ? r.days_since_sale : '—';
+    return `<tr class="${checked?'selected-row':''}"><td><input type="checkbox" ${checked?'checked':''} onchange="toggleDeadRow('${esc(r.zoho_item_id)}|${esc(r.zoho_location_id)}', this)"></td><td><div class="font-medium">${esc(r.item_name||r.zoho_item_name)}</div><div class="text-xs text-gray-400">${esc(r.sku||'')} · ${esc(r.brand||'')} / ${esc(r.category||'')}</div></td><td class="text-xs">${esc(r.branch_name||r.zoho_location_name)}</td><td class="text-right">${esc(r.stock_on_hand)}</td><td class="text-right">₹${Number(r.stock_value||0).toLocaleString('en-IN')}</td><td class="text-xs">${esc(last)}</td><td class="text-right">${esc(days)}</td></tr>`;
+  }).join('');
+}
+function renderDeadPagination(p){
+  const w=document.getElementById('deadPagination');
+  if(!p){ w.classList.add('hidden'); return; }
+  w.classList.remove('hidden');
+  document.getElementById('deadPageInfo').textContent=`Page ${p.page} of ${p.pages} · ${p.total}`;
+  document.getElementById('deadPageBtns').innerHTML=`<button ${p.page<=1?'disabled':''} onclick="deadPage--;loadDead()" class="px-2 py-1 border rounded text-xs">Prev</button><button ${p.page>=p.pages?'disabled':''} onclick="deadPage++;loadDead()" class="px-2 py-1 border rounded text-xs">Next</button>`;
+}
+function toggleDeadRow(key, el){ if(el.checked) selectedDead.add(String(key)); else selectedDead.delete(String(key)); updateDeadBar(); }
+function toggleDeadSelectAll(el){ if(el.checked) deadCache.forEach(r=> selectedDead.add(String(r.zoho_item_id+'|'+r.zoho_location_id))); else deadCache.forEach(r=> selectedDead.delete(String(r.zoho_item_id+'|'+r.zoho_location_id))); renderDead(deadCache); updateDeadBar(); }
+function updateDeadBar(){ const bar=document.getElementById('deadSelectionBar'); document.getElementById('deadSelCount').textContent=selectedDead.size; bar.style.display=selectedDead.size?'flex':'none'; bar.classList.toggle('hidden', !selectedDead.size); }
+function clearDeadSelection(){ selectedDead.clear(); renderDead(deadCache); updateDeadBar(); document.getElementById('deadSelectAll').checked=false; }
+function addDeadToCheck(){
+  if(!selectedDead.size) return toast('Select dead stock first', true);
+  const items=deadCache.filter(r=> selectedDead.has(String(r.zoho_item_id+'|'+r.zoho_location_id))).map(r=> ({zoho_item_id:r.zoho_item_id, item_name:r.item_name, sku:r.sku}));
+  pendingCheckItems = [...pendingCheckItems, ...items.filter(n=> !pendingCheckItems.find(o=> String(o.zoho_item_id)===String(n.zoho_item_id)))];
+  window._pendingHubLocation = deadCache.find(r=> selectedDead.has(String(r.zoho_item_id+'|'+r.zoho_location_id)))?.zoho_location_id || window._pendingHubLocation;
+  openCreateCheck(); toast(items.length+' dead items queued'); clearDeadSelection();
+}
+async function smartCheckAutoQueue(){
+  // Collect from reorder (critical/high), dead (first page), and low stock
+  try{
+    toast('Building Smart Check…');
+    const promises=[];
+    // reorder critical/high
+    promises.push(apiFetch(API_Z+'/reorder/alerts?limit=50&severity=critical').catch(()=>({data:[]})));
+    promises.push(apiFetch(API_Z+'/reorder/alerts?limit=50&severity=high').catch(()=>({data:[]})));
+    // dead 60d first page
+    promises.push(apiFetch(API_Z+'/stock/dead?days=60&limit=25').catch(()=>({data:[]})));
+    // low stock (stock by location if location selected)
+    if(currentLocationId) promises.push(apiFetch(API_Z+'/stock/by-location?location_id='+currentLocationId+'&stock_status=low_stock&limit=25').catch(()=>({data:[]})));
+    const results=await Promise.all(promises);
+    const seen=new Set(pendingCheckItems.map(x=> String(x.zoho_item_id)));
+    let added=0;
+    let loc=window._pendingHubLocation;
+    for(const r of results){
+      const arr=r.data||r.alerts||r.rows||[];
+      for(const it of arr){
+        const id=String(it.zoho_item_id||it.item_id||it.zoho_item_id);
+        if(!id || seen.has(id)) continue;
+        seen.add(id);
+        pendingCheckItems.push({zoho_item_id:id, item_name: it.item_name||it.zoho_item_name||it.name||'Item '+id, sku: it.sku||it.zoho_sku||''});
+        loc=loc||it.zoho_location_id||it.location_id;
+        added++;
+      }
+    }
+    if(!added) return toast('No items to queue', true);
+    window._pendingHubLocation=loc;
+    openCreateCheck();
+    toast(added+' items auto-queued for Smart Check');
+  }catch(e){ toast(e.message,true); }
+}
 async function loadOverview(){
   try{
     const [stockDash, reorderSum, checks] = await Promise.all([
@@ -276,6 +421,8 @@ async function loadOverview(){
       const oc=document.getElementById('overviewChecks');
       if(checks.data.length){ oc.innerHTML='<table class="qc-table"><thead><tr><th>Date</th><th>Branch</th><th>Staff</th><th>Status</th><th></th></tr></thead><tbody>'+checks.data.slice(0,5).map(a=>'<tr><td>'+esc(a.check_date)+'</td><td>'+esc(a.branch_name)+'</td><td>'+esc(a.staff_name)+'</td><td><span class="badge" style="background:#fef3c7">'+esc(a.status)+'</span></td><td><button onclick="openReview('+a.id+')" class="text-xs text-[#667eea]">Review</button></td></tr>').join('')+'</tbody></table>'; } else oc.innerHTML='<div class="text-sm text-gray-400">No checks yet</div>';
     }
+    // valuation
+    loadValuation().catch(()=>{});
     // top reorder items preview
     try{
       const ro=await apiFetch(API_Z+'/reorder/alerts?limit=5&status=active').catch(()=>null);
@@ -312,6 +459,7 @@ async function initStock(){
       const brands=fOpts.brands||[], cats=fOpts.categories||[], map=fOpts.brandCategories||{};
       stockFilterMgr=new StockFilters({ brands, categories:cats, brandCategories:map, panelId:'stockFilterPanel', chipsId:'stockFilterChips', badgeId:'stockFilterBadge', onApply: loadStock });
     }
+    if(fOpts){ populateBrandCategory(fOpts.brands||[], fOpts.categories||[]); }
   }catch(e){ console.error('initStock',e); }
 }
 function fillLocationChips(){
@@ -326,7 +474,11 @@ async function loadStock(){
   if(!currentLocationId){ document.getElementById('stockLoading').textContent='No location available'; return; }
   document.getElementById('stockLoading').textContent='Loading…'; document.getElementById('stockLoading').classList.remove('hidden');
   try{
+    const brand=document.getElementById('stockBrand')?.value||'';
+    const category=document.getElementById('stockCategory')?.value||'';
     const q=new URLSearchParams({ location_id: currentLocationId, page: stockPage, limit: 25, sort: document.getElementById('stockSort').value, search: document.getElementById('stockSearch').value.trim() });
+    if(brand) q.set('brands', brand);
+    if(category) q.set('categories', category);
     if(document.getElementById('stockLowOnly').checked) q.set('stock_status','low_stock');
     if(stockFilterMgr){ const f=stockFilterMgr.getSelected(); if(f.brands.length) q.set('brands', f.brands.join(',')); if(f.categories.length) q.set('categories', f.categories.join(',')); }
     const res=await apiFetch(API_Z+'/stock/by-location?'+q.toString());
@@ -340,7 +492,7 @@ async function loadStock(){
     document.getElementById('kpiTotal').textContent = res.pagination?res.pagination.total:rows.length;
     // low count quick
     try{ const low=rows.filter(r=> (r.stock_on_hand||0) <=5 ).length; }catch{}
-  }catch(e){ document.getElementById('stockLoading').textContent='Failed: '+e.message; }
+  }catch(e){ document.getElementById('stockLoading').innerHTML='<div class="text-sm text-gray-500">No data — location select pannunga / Sync Stock</div><div class="text-xs text-gray-400">'+esc(e.message)+'</div>'; }
 }
 function renderStock(rows){
   const tb=document.getElementById('stockBody');
@@ -375,12 +527,14 @@ async function loadReorder(){
     const q=new URLSearchParams({ page: reorderPage, limit: 25 });
     const st=document.getElementById('reorderStatus').value; if(st) q.set('status', st);
     const se=document.getElementById('reorderSeverity').value; if(se) q.set('severity', se);
+    const rb=document.getElementById('reorderBrand')?.value; if(rb) q.set('brand', rb);
+    const rc=document.getElementById('reorderCategory')?.value; if(rc) q.set('category', rc);
     const res=await apiFetch(API_Z+'/reorder/alerts?'+q.toString());
     const rows=res.data||res.alerts||res.rows||res.items||[];
     reorderCache=rows; reorderTotal=res.pagination?res.pagination.total:rows.length;
     renderReorder(rows); renderReorderPagination(res.pagination);
     document.getElementById('reorderLoading').classList.add('hidden'); document.getElementById('reorderTableWrap').classList.remove('hidden');
-  }catch(e){ document.getElementById('reorderLoading').textContent='Failed: '+e.message; }
+  }catch(e){ document.getElementById('reorderLoading').innerHTML='<div class="text-sm text-gray-500 py-2">No reorder data — Check Reorder click pannunga</div><div class="text-xs text-gray-400">'+esc(e.message)+'</div>'; }
 }
 function renderReorder(rows){
   const tb=document.getElementById('reorderBody');

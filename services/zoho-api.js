@@ -2296,6 +2296,24 @@ async function getReorderDashboard(filters = {}) {
         where += ' AND ra.zoho_location_id = ?';
         params.push(filters.location_id);
     }
+    if (filters.branch_id) {
+        where += ' AND lm.local_branch_id = ?';
+        params.push(filters.branch_id);
+    }
+    if (filters.brand) {
+        const bl = String(filters.brand).split(',').map(s=>s.trim()).filter(Boolean);
+        if (bl.length === 1) { where += ' AND zim.zoho_brand = ?'; params.push(bl[0]); }
+        else if (bl.length > 1) { where += ` AND zim.zoho_brand IN (${bl.map(()=>'?').join(',')})`; params.push(...bl); }
+    }
+    if (filters.category) {
+        const cl = String(filters.category).split(',').map(s=>s.trim()).filter(Boolean);
+        if (cl.length === 1) { where += ' AND zim.zoho_category_name = ?'; params.push(cl[0]); }
+        else if (cl.length > 1) { where += ` AND zim.zoho_category_name IN (${cl.map(()=>'?').join(',')})`; params.push(...cl); }
+    }
+    if (filters.search) {
+        where += ' AND (zim.zoho_item_name LIKE ? OR zim.zoho_sku LIKE ?)';
+        params.push(`%${filters.search}%`, `%${filters.search}%`);
+    }
     if (filters.severity) {
         where += ' AND ra.severity = ?';
         params.push(filters.severity);
@@ -2319,6 +2337,7 @@ async function getReorderDashboard(filters = {}) {
 
     const [[{ total }]] = await pool.query(`
         SELECT COUNT(*) as total FROM zoho_reorder_alerts ra
+        LEFT JOIN zoho_items_map zim ON zim.zoho_item_id = ra.zoho_item_id
         LEFT JOIN zoho_locations_map lm ON ra.zoho_location_id = lm.zoho_location_id
         LEFT JOIN reorder_snoozes snz ON snz.zoho_item_id = ra.zoho_item_id AND snz.zoho_location_id = ra.zoho_location_id
         ${where} AND (lm.is_active = 1 OR lm.is_active IS NULL) ${snoozeFilter}`, params);

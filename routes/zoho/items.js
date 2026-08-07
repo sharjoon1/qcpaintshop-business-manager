@@ -729,6 +729,101 @@ router.get('/stock/history', requirePermission('zoho', 'view'), async (req, res)
 });
 
 /**
+ * GET /api/zoho/stock/valuation - Stock value per branch/location + total
+ * Query: location_id, branch_id, brand, category, group=branch|total
+ */
+router.get('/stock/valuation', requirePermission('zoho', 'view'), async (req, res) => {
+    try {
+        const { location_id, branch_id, brand, category } = req.query;
+        const cacheKey = `stock_val_${location_id||''}_${branch_id||''}_${brand||''}_${category||''}`;
+        const cached = getCached(cacheKey);
+        if (cached) return res.json({ success: true, ...cached, cached: true });
+        let where = "WHERE (lm.is_active = 1 OR lm.is_active IS NULL) AND ls.stock_on_hand > 0";
+        const params = [];
+        if (location_id) { where += " AND ls.zoho_location_id = ?"; params.push(location_id); }
+        if (branch_id) { where += " AND lm.local_branch_id = ?"; params.push(branch_id); }
+        if (brand) { const bl = brand.split(',').map(s=>s.trim()).filter(Boolean); if (bl.length) { where += ` AND zim.zoho_brand IN (${bl.map(()=> '?').join(',')})`; params.push(...bl); } }
+        if (category) { const cl = category.split(',').map(s=>s.trim()).filter(Boolean); if (cl.length) { where += ` AND zim.zoho_category_name IN (${cl.map(()=> '?').join(',')})`; params.push(...cl); } }
+        const [perBranch] = await pool.query(`
+            SELECT lm.zoho_location_id, lm.zoho_location_name, lm.local_branch_id,
+                   b.name as branch_name,
+                   COUNT(*) as sku_count,
+                   SUM(ls.stock_on_hand) as total_qty,
+                   SUM(ls.stock_on_hand * COALESCE(zim.zoho_rate,0)) as total_value
+            FROM zoho_location_stock ls
+            LEFT JOIN zoho_locations_map lm ON ls.zoho_location_id = lm.zoho_location_id
+            LEFT JOIN zoho_items_map zim ON ls.zoho_item_id = zim.zoho_item_id
+            LEFT JOIN branches b ON lm.local_branch_id = b.id
+            ${where}
+            GROUP BY lm.zoho_location_id, lm.zoho_location_name, lm.local_branch_id, b.name
+            ORDER BY total_value DESC
+        `, params);
+        const totalValue = perBranch.reduce((s,r)=> s + Number(r.total_value||0), 0);
+        const totalQty = perBranch.reduce((s,r)=> s + Number(r.total_qty||0), 0);
+        const totalSkus = perBranch.reduce((s,r)=> s + Number(r.sku_count||0), 0);
+        const result = { perBranch, total: { total_value: totalValue, total_qty: totalQty, sku_count: totalSkus } };
+        setCache(cacheKey, result, 60 * 1000);
+        res.json({ success: true, ...result });
+    } catch (error) { res.status(500).json({ success: false, message: error.message }); }
+});
+
+/**
+ * GET /api/zoho/stock/dead - Dead/slow-moving stock (no sales in N days)
+ * Query: days=60, location_id, branch_id, brand, category, search, page, limit, sort
+ */
+router.get('/stock/dead', requirePermission('zoho', 'view'), async (req, res) => {
+    try {
+        const { location_id, branch_id, brand, category, search, page = 1, limit = 50, days = 60, sort = 'days_desc' } = req.query;
+        const safeLimit = Math.min(parseInt(limit) || 50, 500);
+        const safeDays = Math.min(Math.max(parseInt(days) || 60, 7), 365);
+        const offset = (Math.max(1, parseInt(page)) - 1) * safeLimit;
+        let where = "WHERE ls.stock_on_hand > 0 AND (lm.is_active = 1 OR lm.is_active IS NULL)";
+        const params = [];
+        if (location_id) { where += " AND ls.zoho_location_id = ?"; params.push(location_id); }
+        if (branch_id) { where += " AND lm.local_branch_id = ?"; params.push(branch_id); }
+        if (brand) { const bl = brand.split(',').map(s=>s.trim()).filter(Boolean); if (bl.length) { where += ` AND zim.zoho_brand IN (${bl.map(()=> '?').join(',')})`; params.push(...bl); } }
+        if (category) { const cl = category.split(',').map(s=>s.trim()).filter(Boolean); if (cl.length) { where += ` AND zim.zoho_category_name IN (${cl.map(()=> '?').join(',')})`; params.push(...cl); } }
+        if (search) { where += " AND (ls.item_name LIKE ? OR ls.sku LIKE ?)"; params.push(`%${search}%`, `%${search}%`); }
+        const having = `HAVING (last_sale_date IS NULL OR last_sale_date < DATE_SUB(CURDATE(), INTERVAL ${safeDays} DAY))`;
+        const sortMap = { days_desc: "days_since_sale DESC", days_asc: "days_since_sale ASC", stock_desc: "ls.stock_on_hand DESC", stock_asc: "ls.stock_on_hand ASC", name_asc: "ls.item_name ASC", name_desc: "ls.item_name DESC" };
+        const orderBy = sortMap[sort] || sortMap.days_desc;
+        const countSql = `
+            SELECT COUNT(*) as total FROM (
+                SELECT ls.zoho_item_id, ls.zoho_location_id
+                FROM zoho_location_stock ls
+                LEFT JOIN zoho_locations_map lm ON ls.zoho_location_id = lm.zoho_location_id
+                LEFT JOIN zoho_items_map zim ON ls.zoho_item_id = zim.zoho_item_id
+                LEFT JOIN ( SELECT zoho_item_id, local_branch_id, MAX(sale_date) as last_sale_date FROM branch_item_sales GROUP BY zoho_item_id, local_branch_id ) bis ON bis.zoho_item_id = ls.zoho_item_id AND bis.local_branch_id = lm.local_branch_id
+                ${where}
+                GROUP BY ls.zoho_item_id, ls.zoho_location_id, bis.last_sale_date
+                ${having}
+            ) t
+        `;
+        const [[{ total }]] = await pool.query(countSql, params);
+        const dataSql = `
+            SELECT ls.zoho_item_id, ls.item_name, ls.sku, ls.stock_on_hand, ls.zoho_location_id,
+                   lm.zoho_location_name, lm.local_branch_id, b.name as branch_name,
+                   zim.zoho_brand as brand, zim.zoho_category_name as category, zim.zoho_rate as rate,
+                   bis.last_sale_date,
+                   DATEDIFF(CURDATE(), bis.last_sale_date) as days_since_sale,
+                   (ls.stock_on_hand * COALESCE(zim.zoho_rate,0)) as stock_value
+            FROM zoho_location_stock ls
+            LEFT JOIN zoho_locations_map lm ON ls.zoho_location_id = lm.zoho_location_id
+            LEFT JOIN zoho_items_map zim ON ls.zoho_item_id = zim.zoho_item_id
+            LEFT JOIN branches b ON lm.local_branch_id = b.id
+            LEFT JOIN ( SELECT zoho_item_id, local_branch_id, MAX(sale_date) as last_sale_date FROM branch_item_sales GROUP BY zoho_item_id, local_branch_id ) bis ON bis.zoho_item_id = ls.zoho_item_id AND bis.local_branch_id = lm.local_branch_id
+            ${where}
+            GROUP BY ls.zoho_item_id, ls.zoho_location_id, lm.zoho_location_name, lm.local_branch_id, b.name, ls.item_name, ls.sku, ls.stock_on_hand, zim.zoho_brand, zim.zoho_category_name, zim.zoho_rate, bis.last_sale_date
+            ${having}
+            ORDER BY ${orderBy}
+            LIMIT ? OFFSET ?
+        `;
+        const [rows] = await pool.query(dataSql, [...params, safeLimit, offset]);
+        res.json({ success: true, data: rows, pagination: { total, page: parseInt(page), limit: safeLimit, pages: Math.ceil(total / safeLimit), totalPages: Math.ceil(total / safeLimit) }, meta: { days: safeDays } });
+    } catch (error) { res.status(500).json({ success: false, message: error.message }); }
+});
+
+/**
  * GET /api/zoho/stock/:itemId - Single item stock across all locations
  */
 router.get('/stock/:itemId', requirePermission('zoho', 'view'), async (req, res) => {
