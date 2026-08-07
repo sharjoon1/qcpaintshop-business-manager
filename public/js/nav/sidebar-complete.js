@@ -26,6 +26,7 @@
 let sidebarPinned  = false;   // true = click-locked open
 let hoverActive    = false;   // true = expanded via hover
 let hoverLeaveTimer = null;
+let hoverEnabled   = false;   // guard: block hover until page settles (fix auto open/close on load)
 const HOVER_DELAY  = 200;     // ms debounce before collapsing
 
 // ── helpers ──
@@ -118,7 +119,7 @@ function handleClickOutside(e) {
 // ── hover on the sidebar rail (desktop) ──
 
 function onSidebarMouseEnter() {
-    if (window.innerWidth < 768 || sidebarPinned) return;
+    if (!hoverEnabled || window.innerWidth < 768 || sidebarPinned) return;
     clearTimeout(hoverLeaveTimer);
     hoverActive = true;
     expandSidebar();
@@ -298,6 +299,11 @@ function initSidebar() {
     highlightActiveSidebarPage();
     highlightQuickbar();
     attachSidebarListeners();
+    // Enable hover only after page settles + first mousemove (prevents auto open/close on load)
+    let _hoverArmed = false;
+    function armHover() { if (_hoverArmed) return; _hoverArmed = true; setTimeout(() => { hoverEnabled = true; }, 400); window.removeEventListener('mousemove', armHover); }
+    window.addEventListener('mousemove', armHover, { once: true });
+    setTimeout(() => { if (!_hoverArmed) hoverEnabled = true; }, 1200);
 }
 
 if (document.readyState === 'loading') {

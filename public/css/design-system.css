@@ -27,19 +27,19 @@
      BRAND COLORS
      ================== */
 
-  /* Primary — Admin: #667eea per CLAUDE.md (was #6366f1 indigo drift). Staff override via [data-theme="staff"] */
-  --color-primary: #667eea;
-  --color-primary-dark: #5a67d8;
-  --color-primary-darker: #4c51bf;
-  --color-primary-light: #7f9cf5;
-  --color-primary-lighter: #a3bffa;
-  --color-primary-50: #eef2ff;
-  --color-primary-100: #e0e7ff;
+  /* Primary — Admin: #0F3A5F per CLAUDE.md (was #6366f1 indigo drift). Staff override via [data-theme="staff"] */
+  --color-primary: #0F3A5F;
+  --color-primary-dark: #0C2E4D;
+  --color-primary-darker: #08233C;
+  --color-primary-light: #1A4A6E;
+  --color-primary-lighter: #2E5F85;
+  --color-primary-50: #EBF2F8;
+  --color-primary-100: #D6E5F0;
 
-  /* Secondary - Purple */
-  --color-secondary: #8b5cf6;
-  --color-secondary-dark: #7c3aed;
-  --color-secondary-light: #a78bfa;
+  /* Secondary - Terracotta */
+  --color-secondary: #C07848;
+  --color-secondary-dark: #A85E32;
+  --color-secondary-light: #D89A6B;
   --color-secondary-50: #faf5ff;
   --color-secondary-100: #f3e8ff;
 
@@ -87,8 +87,8 @@
   /* ==================
      GRADIENTS
      ================== */
-  --gradient-primary: linear-gradient(135deg, #667eea 0%, #764ba2 100%); // admin brand
-  --gradient-secondary: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  --gradient-primary: linear-gradient(135deg, #0F3A5F 0%, #1A4A6E 100%); /* QC navy */
+  --gradient-secondary: linear-gradient(135deg, #0F3A5F 0%, #1A4A6E 100%);
   --gradient-success: linear-gradient(135deg, #10b981 0%, #059669 100%);
   --gradient-warning: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
   --gradient-danger: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);

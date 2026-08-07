@@ -1235,6 +1235,10 @@
             renderUnitChips();
             toggleAreaCoverage(); // Initialize field visibility
             document.getElementById('productModal').classList.remove('hidden');
+            // lock background scroll (reserve scrollbar width to avoid jump)
+            const _sbw = window.innerWidth - document.documentElement.clientWidth;
+            document.body.style.overflow = 'hidden';
+            if (_sbw > 0) document.body.style.paddingRight = _sbw + 'px';
         }
 
         // Edit product
@@ -1296,14 +1300,44 @@
             renderPackSizes();
             renderUnitChips();
             document.getElementById('productModal').classList.remove('hidden');
+            // lock background scroll (reserve scrollbar width to avoid jump)
+            const _sbw = window.innerWidth - document.documentElement.clientWidth;
+            document.body.style.overflow = 'hidden';
+            if (_sbw > 0) document.body.style.paddingRight = _sbw + 'px';
         }
 
-        // Close modal
+        // Close modal — also unlock scroll & clear ESC handler
         function closeModal() {
             document.getElementById('productModal').classList.add('hidden');
-            document.getElementById('productForm').reset();
+            const f = document.getElementById('productForm');
+            if (f) f.reset();
             editingProductId = null;
+            document.body.style.overflow = '';
+            document.body.style.paddingRight = '';
         }
+        // Overlay click: only close when clicking the backdrop itself
+        document.addEventListener('click', function(e){
+            const pm = document.getElementById('productModal');
+            if (pm && !pm.classList.contains('hidden') && e.target === pm) closeModal();
+            const um = document.getElementById('unitsManagerSheet');
+            if (um && !um.classList.contains('hidden') && e.target === um) closeUnitsManager();
+            const ir = document.getElementById('importReviewModal');
+            if (ir && !ir.classList.contains('hidden') && e.target === ir) ir.classList.add('hidden');
+            const er = document.getElementById('editReviewModal');
+            if (er && !er.classList.contains('hidden') && e.target === er) er.classList.add('hidden');
+        });
+        // ESC closes top open modal
+        document.addEventListener('keydown', function(e){
+            if (e.key !== 'Escape') return;
+            const um = document.getElementById('unitsManagerSheet');
+            if (um && !um.classList.contains('hidden')) return closeUnitsManager();
+            const pm = document.getElementById('productModal');
+            if (pm && !pm.classList.contains('hidden')) return closeModal();
+            const ir = document.getElementById('importReviewModal');
+            if (ir && !ir.classList.contains('hidden')) { ir.classList.add('hidden'); return; }
+            const er = document.getElementById('editReviewModal');
+            if (er && !er.classList.contains('hidden')) { er.classList.add('hidden'); return; }
+        });
 
         // Save product
         async function saveProduct(event) {
