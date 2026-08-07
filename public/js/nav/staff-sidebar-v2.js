@@ -1,0 +1,4 @@
+// staff-sidebar-v2 externalized (NAV-2)
+(function(){ var dp=document.body.getAttribute('data-page')||document.documentElement.getAttribute('data-page')||''; document.querySelectorAll('#mainSidebar .qc-nav-item').forEach(function(a){ var pages=(a.getAttribute('data-pages')||'').split(',').map(function(s){return s.trim()}); if(pages.includes(dp)||a.getAttribute('data-page')===dp) a.classList.add('active'); });   try{ if(localStorage.getItem('sidebarCollapsed')==='1'){ document.body.classList.add('sidebar-collapsed'); var sb=document.getElementById('mainSidebar'); if(sb) sb.classList.add('collapsed'); } }catch(e){}
+  var tog2=document.getElementById('sidebarToggleBtn'); if(tog2){ tog2.addEventListener('click', function(){ var sb=document.getElementById('mainSidebar'); if(!sb) return; var c=sb.classList.toggle('collapsed'); document.body.classList.toggle('sidebar-collapsed', c); try{ localStorage.setItem('sidebarCollapsed', c?'1':'0'); }catch(e){} }); }
+})();

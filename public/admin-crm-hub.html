@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CRM Hub — Quality Colours Manager</title>
+<link rel="stylesheet" href="/css/tailwind.css?v=849f1b5c">
+<link rel="stylesheet" href="/css/design-system.css">
+<link rel="stylesheet" href="/css/qc-ui.css">
+<style>
+:root{--hub-accent:#667eea}
+.qc-hub-tabs{display:flex;gap:.25rem;overflow-x:auto;padding:.5rem 0;border-bottom:1px solid #e5e7eb}
+.qc-hub-tab{white-space:nowrap;padding:.6rem 1rem;border-radius:8px 8px 0 0;font-weight:600;font-size:.85rem;color:#64748b;border:1px solid transparent;border-bottom:none;cursor:pointer;background:#f8fafc}
+.qc-hub-tab.active{background:#fff;color:var(--hub-accent);border-color:#e5e7eb;box-shadow:0 -2px 8px rgba(0,0,0,.04)}
+.qc-hub-panel{display:none}.qc-hub-panel.active{display:block}
+.qc-card{background:#fff;border:1px solid #e5e7eb;border-radius:10px;padding:1rem}
+@media (prefers-reduced-motion: reduce){*{transition:none!important;animation:none!important}}
+</style>
+</head>
+<body data-page="leads" class="bg-gray-50">
+<div id="universal-nav-placeholder"></div>
+<div id="subnav-placeholder"></div>
+<main class="max-w-7xl mx-auto px-4 py-6">
+  <header class="flex flex-wrap items-center justify-between gap-3 mb-4">
+    <div>
+      <h1 class="text-xl font-bold text-slate-900">CRM Hub</h1>
+      <p class="text-sm text-slate-500">Leads · Customers · Credit limits · Design requests — ore idam</p>
+    </div>
+    <div class="flex gap-2">
+      <button id="btn-refresh" class="px-3 py-2 rounded-lg border bg-white text-sm">Refresh</button>
+      <a href="/admin-leads.html" class="px-3 py-2 rounded-lg text-white text-sm" style="background:var(--gradient-primary)">Leads</a>
+      <a href="/admin-customers.html" class="px-3 py-2 rounded-lg border bg-white text-sm">Customers</a>
+    </div>
+  </header>
+  <div class="qc-hub-tabs" role="tablist">
+    <button class="qc-hub-tab active" data-tab="leads" role="tab" aria-selected="true">Leads</button>
+    <button class="qc-hub-tab" data-tab="customers" role="tab">Customers</button>
+    <button class="qc-hub-tab" data-tab="credit" role="tab">Credit</button>
+    <button class="qc-hub-tab" data-tab="design" role="tab">Design Requests</button>
+  </div>
+
+  <section id="panel-leads" class="qc-hub-panel active">
+    <div class="qc-card mt-4">
+      <div class="flex flex-wrap gap-2 mb-3">
+        <input id="leads-q" placeholder="Search leads…" class="border rounded-lg px-3 py-2 text-sm w-64">
+        <select id="leads-status" class="border rounded-lg px-3 py-2 text-sm"><option value="">All status</option><option>new</option><option>contacted</option><option>qualified</option><option>won</option><option>lost</option></select>
+        <button id="btn-leads" class="px-3 py-2 rounded-lg text-white text-sm" style="background:#667eea">Search</button>
+        <span id="leads-status-txt" class="text-sm text-slate-500 self-center"></span>
+      </div>
+      <div id="leads-empty" class="hidden text-sm text-slate-500 py-8 text-center">No leads.</div>
+      <table class="w-full text-sm"><thead class="text-slate-500"><tr><th class="text-left p-2">Name</th><th class="text-left p-2">Phone</th><th class="text-left p-2">Status</th><th class="p-2"></th></tr></thead><tbody id="leads-body"></tbody></table>
+    </div>
+  </section>
+
+  <section id="panel-customers" class="qc-hub-panel">
+    <div class="qc-card mt-4">
+      <div class="flex gap-2 mb-3"><input id="cust-q" placeholder="Search customers…" class="border rounded-lg px-3 py-2 text-sm w-64"><button id="btn-cust" class="px-3 py-2 rounded-lg text-white text-sm" style="background:#667eea">Search</button><span id="cust-status" class="text-sm text-slate-500 self-center"></span></div>
+      <div id="cust-empty" class="hidden text-sm text-slate-500 py-8 text-center">No customers.</div>
+      <table class="w-full text-sm"><thead class="text-slate-500"><tr><th class="text-left p-2">Name</th><th class="text-left p-2">Phone</th><th class="text-left p-2">Type</th></tr></thead><tbody id="cust-body"></tbody></table>
+    </div>
+  </section>
+
+  <section id="panel-credit" class="qc-hub-panel">
+    <div class="qc-card mt-4">
+      <div class="flex gap-2 mb-3"><button id="btn-credit" class="px-3 py-2 rounded-lg text-white text-sm" style="background:#667eea">Load credit limits</button><span id="credit-status" class="text-sm text-slate-500 self-center"></span></div>
+      <div id="credit-empty" class="hidden text-sm text-slate-500 py-8 text-center">No credit data.</div>
+      <table class="w-full text-sm"><thead class="text-slate-500"><tr><th class="text-left p-2">Customer</th><th class="text-right p-2">Limit</th><th class="text-right p-2">Used</th></tr></thead><tbody id="credit-body"></tbody></table>
+    </div>
+  </section>
+
+  <section id="panel-design" class="qc-hub-panel">
+    <div class="qc-card mt-4">
+      <div class="flex gap-2 mb-3"><button id="btn-design" class="px-3 py-2 rounded-lg text-white text-sm" style="background:#667eea">Load design requests</button><span id="design-status" class="text-sm text-slate-500 self-center"></span></div>
+      <div id="design-empty" class="hidden text-sm text-slate-500 py-8 text-center">No design requests.</div>
+      <table class="w-full text-sm"><thead class="text-slate-500"><tr><th class="text-left p-2">Customer</th><th class="text-left p-2">Status</th><th class="text-left p-2">Date</th></tr></thead><tbody id="design-body"></tbody></table>
+    </div>
+  </section>
+</main>
+<script src="/universal-nav-loader.js?v=6b4a6dbe"></script>
+<script>
+const $=s=>document.querySelector(s);
+function getAuthHeaders(){const t=localStorage.getItem('auth_token')||localStorage.getItem('token')||'';return t?{Authorization:'Bearer '+t}:{}}
+async function apiFetch(url,opts={}){const h={...getAuthHeaders(), ...(opts.headers||{})}; if(opts.body && !(opts.body instanceof FormData) && !h['Content-Type']) h['Content-Type']='application/json'; const r=await fetch(url,{...opts,headers:h}); if(r.status===401){location.href='/login.html'; throw new Error('Auth');} if(!r.ok) throw new Error((await r.text()).slice(0,300)); return r.json();}
+function esc(s){const d=document.createElement('div'); d.textContent=s??''; return d.innerHTML;}
+function setTab(n){document.querySelectorAll('.qc-hub-tab').forEach(b=>{const on=b.dataset.tab===n; b.classList.toggle('active',on); b.setAttribute('aria-selected',String(on));}); document.querySelectorAll('.qc-hub-panel').forEach(p=> p.classList.toggle('active', p.id==='panel-'+n)); history.replaceState(null,'','#'+n);}
+document.querySelectorAll('.qc-hub-tab').forEach(b=> b.addEventListener('click',()=> setTab(b.dataset.tab)));
+if(location.hash) setTab(location.hash.slice(1));
+async function loadLeads(){
+  const q=$('#leads-q').value.trim(); const st=$('#leads-status').value;
+  $('#leads-status-txt').textContent='Loading…';
+  try{const qs=new URLSearchParams(); if(q) qs.set('q',q); if(st) qs.set('status',st); qs.set('limit','20'); const j=await apiFetch('/api/leads?'+qs.toString()); const rows=j.data||j.leads||j.rows||[]; const tb=$('#leads-body'); tb.innerHTML=''; if(!rows.length) $('#leads-empty').classList.remove('hidden'); else $('#leads-empty').classList.add('hidden'); rows.forEach(r=>{const tr=document.createElement('tr'); tr.className='border-t'; tr.innerHTML=`<td class="p-2">${esc(r.name||r.customer_name||'')}</td><td class="p-2">${esc(r.phone||'')}</td><td class="p-2">${esc(r.status||'')}</td><td class="p-2"><a href="/admin-leads.html" class="text-xs text-blue-600">Open</a></td>`; tb.appendChild(tr);}); $('#leads-status-txt').textContent=rows.length+' rows';}catch(e){$('#leads-status-txt').textContent=e.message;}
+}
+async function loadCust(){
+  const q=$('#cust-q').value.trim(); $('#cust-status').textContent='Loading…';
+  try{const qs=new URLSearchParams(); if(q) qs.set('q',q); qs.set('limit','20'); const j=await apiFetch('/api/customers?'+qs.toString()); const rows=j.data||j.customers||j.rows||[]; const tb=$('#cust-body'); tb.innerHTML=''; if(!rows.length) $('#cust-empty').classList.remove('hidden'); else $('#cust-empty').classList.add('hidden'); rows.forEach(r=>{const tr=document.createElement('tr'); tr.className='border-t'; tr.innerHTML=`<td class="p-2">${esc(r.name||'')}</td><td class="p-2">${esc(r.phone||'')}</td><td class="p-2">${esc(r.customer_type||r.type||'')}</td>`; tb.appendChild(tr);}); $('#cust-status').textContent=rows.length+' rows';}catch(e){$('#cust-status').textContent=e.message;}
+}
+async function loadCredit(){
+  $('#credit-status').textContent='Loading…';
+  try{const j=await apiFetch('/api/credit-limits'); const rows=j.data||j.rows||[]; const tb=$('#credit-body'); tb.innerHTML=''; if(!rows.length) $('#credit-empty').classList.remove('hidden'); else $('#credit-empty').classList.add('hidden'); rows.forEach(r=>{const tr=document.createElement('tr'); tr.className='border-t'; tr.innerHTML=`<td class="p-2">${esc(r.customer_name||r.name||'')}</td><td class="p-2 text-right">₹${Number(r.credit_limit||0).toLocaleString('en-IN')}</td><td class="p-2 text-right">₹${Number(r.used||r.outstanding||0).toLocaleString('en-IN')}</td>`; tb.appendChild(tr);}); $('#credit-status').textContent=rows.length+' rows';}catch(e){$('#credit-status').textContent=e.message;}
+}
+async function loadDesign(){
+  $('#design-status').textContent='Loading…';
+  try{const j=await apiFetch('/api/design-requests'); const rows=j.data||j.rows||[]; const tb=$('#design-body'); tb.innerHTML=''; if(!rows.length) $('#design-empty').classList.remove('hidden'); else $('#design-empty').classList.add('hidden'); rows.forEach(r=>{const tr=document.createElement('tr'); tr.className='border-t'; tr.innerHTML=`<td class="p-2">${esc(r.customer_name||r.name||'')}</td><td class="p-2">${esc(r.status||'')}</td><td class="p-2">${esc((r.created_at||'').slice(0,10))}</td>`; tb.appendChild(tr);}); $('#design-status').textContent=rows.length+' rows';}catch(e){$('#design-status').textContent=e.message;}
+}
+$('#btn-leads').addEventListener('click', loadLeads);
+$('#btn-cust').addEventListener('click', loadCust);
+$('#btn-credit').addEventListener('click', loadCredit);
+$('#btn-design').addEventListener('click', loadDesign);
+$('#btn-refresh').addEventListener('click', ()=>{const t=document.querySelector('.qc-hub-tab.active').dataset.tab; if(t==='leads') loadLeads(); if(t==='customers') loadCust(); if(t==='credit') loadCredit(); if(t==='design') loadDesign();});
+loadLeads();
+</script>
+</body>
+</html>

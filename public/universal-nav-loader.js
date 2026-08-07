@@ -10,13 +10,20 @@
     // Admin-level roles (admin / administrator / super_admin / manager /
     // branch_manager) get the full admin sidebar; everyone else gets the
     // staff sidebar.
-    let sidebarPath = '/components/sidebar-complete.html';
+    // Feature flag: ?nav=v2 or localStorage.nav2=1 enables new 8-hub sidebar (NAV-2)
+    let _nav2 = false;
+    try {
+        _nav2 = (new URLSearchParams(location.search).get('nav') === 'v2') || localStorage.getItem('nav2') === '1';
+        if (new URLSearchParams(location.search).get('nav') === 'v1') _nav2 = false;
+        if (_nav2) document.documentElement.setAttribute('data-nav', 'v2');
+    } catch(e) {}
+    let sidebarPath = _nav2 ? '/components/sidebar-v2.html' : '/components/sidebar-complete.html';
     const ADMIN_LEVEL_ROLES = ['admin', 'administrator', 'super_admin', 'manager', 'branch_manager'];
     try {
         const u = JSON.parse(localStorage.getItem('user') || '{}');
         const role = u.role ? String(u.role).toLowerCase() : '';
         if (role && !ADMIN_LEVEL_ROLES.includes(role)) {
-            sidebarPath = '/components/staff-sidebar.html';
+            sidebarPath = _nav2 ? '/components/staff-sidebar-v2.html' : '/components/staff-sidebar.html';
         }
     } catch(e) {}
 
@@ -65,7 +72,9 @@
         // their JS as external <script src> — strict-CSP-legal end to end.
         '/components/header-v2.html':        '/js/nav/header-v2.js',
         '/components/sidebar-complete.html': '/js/nav/sidebar-complete.js',
+        '/components/sidebar-v2.html':       '/js/nav/sidebar-v2.js',
         '/components/staff-sidebar.html':    '/js/nav/staff-sidebar.js',
+        '/components/staff-sidebar-v2.html': '/js/nav/staff-sidebar-v2.js',
     };
 
     // Map data-page values to subnav component paths

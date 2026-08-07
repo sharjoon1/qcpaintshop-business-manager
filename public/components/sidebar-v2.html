@@ -1,0 +1,681 @@
+<!-- Premium Sidebar Navigation v3 - Clean Light Design with Icon Rail -->
+<style>
+    /* ═══════════════════════════════════════════════
+       PREMIUM SIDEBAR - Light/White with Icon Rail
+       ═══════════════════════════════════════════════ */
+
+    /* Custom scrollbar */
+    .qc-sidebar::-webkit-scrollbar { width: 3px; }
+    .qc-sidebar::-webkit-scrollbar-track { background: transparent; }
+    .qc-sidebar::-webkit-scrollbar-thumb { background: rgba(0,0,0,0.08); border-radius: 3px; }
+    .qc-sidebar::-webkit-scrollbar-thumb:hover { background: rgba(0,0,0,0.14); }
+
+    /* Sidebar Base */
+    .qc-sidebar {
+        position: fixed;
+        top: 0;
+        left: -320px;
+        width: 320px;
+        height: 100vh;
+        background: #ffffff;
+        border-right: 1px solid #e8ecf1;
+        transition: left 0.35s cubic-bezier(0.4, 0, 0.2, 1),
+                    width 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+        z-index: 1002;
+        overflow-y: auto;
+        overflow-x: hidden;
+        display: flex;
+        flex-direction: column;
+        font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    }
+    .qc-sidebar.open { left: 0; }
+
+    /* Sidebar Header / Brand */
+    .qc-sidebar-header {
+        padding: 1rem 1.25rem;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        flex-shrink: 0;
+        border-bottom: 1px solid #f1f5f9;
+        min-height: 56px;
+    }
+    .qc-sidebar-brand {
+        color: #1e293b;
+        font-size: 0.9375rem;
+        font-weight: 700;
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+        letter-spacing: -0.02em;
+        white-space: nowrap;
+        overflow: hidden;
+    }
+    .qc-sidebar-brand-icon {
+        width: 32px;
+        height: 32px;
+        min-width: 32px;
+        background: var(--gradient-primary);
+        border-radius: 8px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 1rem;
+    }
+    .qc-sidebar-brand-text {
+        transition: opacity 0.25s ease, width 0.25s ease;
+    }
+    .qc-sidebar-close {
+        background: transparent;
+        border: 1px solid #e2e8f0;
+        color: #94a3b8;
+        width: 28px;
+        height: 28px;
+        min-width: 28px;
+        border-radius: 6px;
+        font-size: 1.125rem;
+        cursor: pointer;
+        transition: all 0.2s;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        line-height: 1;
+    }
+    .qc-sidebar-close:hover {
+        background: #f8fafc;
+        color: #64748b;
+        border-color: #cbd5e1;
+    }
+
+    /* Sidebar hamburger toggle (desktop only — sits inside sidebar header) */
+    .qc-sidebar-toggle {
+        display: none;             /* hidden on mobile */
+        flex-direction: column;
+        gap: 4px;
+        background: transparent;
+        border: 1px solid #e2e8f0;
+        padding: 7px;
+        border-radius: 7px;
+        cursor: pointer;
+        width: 32px;
+        height: 32px;
+        min-width: 32px;
+        justify-content: center;
+        align-items: center;
+        transition: all 0.25s ease;
+    }
+    .qc-sidebar-toggle:hover {
+        background: #f0f4ff;
+        border-color: #a3bffa;
+    }
+    .qc-sidebar-toggle span {
+        width: 16px;
+        height: 2px;
+        background: #64748b;
+        border-radius: 1px;
+        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+    .qc-sidebar-toggle:hover span { background: #667eea; }
+
+    /* Navigation Container */
+    .qc-sidebar-nav {
+        padding: 0.5rem 0;
+        flex: 1;
+    }
+
+    /* Section Titles */
+    .qc-nav-section { margin-bottom: 0.125rem; }
+    .qc-nav-section-title {
+        padding: 0.75rem 1.25rem 0.3rem;
+        color: #94a3b8;
+        font-size: 0.625rem;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.1em;
+        white-space: nowrap;
+        overflow: hidden;
+        transition: opacity 0.25s ease;
+    }
+
+    /* Navigation Items */
+    .qc-nav-item {
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+        padding: 0.5rem 1rem;
+        margin: 1px 0.5rem;
+        color: #64748b;
+        text-decoration: none;
+        font-weight: 500;
+        font-size: 0.8125rem;
+        border-radius: 8px;
+        transition: all 0.18s ease;
+        position: relative;
+        white-space: nowrap;
+        overflow: hidden;
+    }
+    .qc-nav-item:hover {
+        background: #f8fafc;
+        color: #334155;
+    }
+    .qc-nav-item.active {
+        background: rgba(102,126,234,0.10);
+        color: #667eea;
+        font-weight: 600;
+    }
+    .qc-nav-item.active::before {
+        content: '';
+        position: absolute;
+        left: 0;
+        top: 50%;
+        transform: translateY(-50%);
+        width: 3px;
+        height: 18px;
+        background: #3b82f6;
+        border-radius: 0 3px 3px 0;
+    }
+
+    /* Nav Item Icons */
+    .qc-nav-item-icon {
+        font-size: 1rem;
+        width: 20px;
+        min-width: 20px;
+        text-align: center;
+        flex-shrink: 0;
+        line-height: 1;
+    }
+    .qc-nav-item-icon svg {
+        width: 17px;
+        height: 17px;
+        stroke: currentColor;
+        fill: none;
+        stroke-width: 1.75;
+        stroke-linecap: round;
+        stroke-linejoin: round;
+    }
+
+    /* Nav item text */
+    .qc-nav-item-text {
+        transition: opacity 0.25s ease;
+    }
+
+    /* Submenu */
+    /* Collapsible section toggle button */
+    .qc-nav-section-toggle {
+        width: 100%;
+        background: transparent;
+        border: 0;
+        cursor: pointer;
+        padding: 0.75rem 1.25rem 0.375rem;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        color: #94a3b8;
+        font-family: inherit;
+        font-size: 0.625rem;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+        transition: color 0.15s ease, background 0.15s ease;
+    }
+    .qc-nav-section-toggle:hover { color: #475569; background: #f8fafc; }
+    .qc-nav-section-toggle:focus { outline: none; color: #475569; }
+    .qc-nav-section-label { flex: 1; text-align: left; }
+    .qc-nav-chevron {
+        width: 14px;
+        height: 14px;
+        flex-shrink: 0;
+        transition: transform 0.2s ease;
+        color: #94a3b8;
+    }
+    .qc-nav-section-toggle[aria-expanded="true"] .qc-nav-chevron {
+        transform: rotate(90deg);
+    }
+    .qc-nav-section-toggle[aria-expanded="true"] { color: #1e293b; }
+    /* Hide section toggles when sidebar is collapsed */
+    .qc-sidebar.collapsed .qc-nav-section-toggle { display: none; }
+    /* Submenu wraps .qc-nav-item rows — let items render normally inside */
+    .qc-nav-submenu {
+        max-height: 0;
+        overflow: hidden;
+        transition: max-height 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+    .qc-nav-submenu.open { max-height: 2000px; }
+    .qc-nav-submenu-item {
+        padding: 0.5rem 1rem 0.5rem 3rem;
+        color: #94a3b8;
+        text-decoration: none;
+        display: block;
+        font-size: 0.775rem;
+        transition: all 0.15s;
+        font-weight: 500;
+    }
+    .qc-nav-submenu-item:hover { color: #334155; background: #f1f5f9; }
+    .qc-nav-submenu-item.active { color: #2563eb; font-weight: 600; }
+
+    /* Section Divider */
+    .qc-nav-divider {
+        height: 1px;
+        background: #f1f5f9;
+        margin: 0.375rem 1rem;
+    }
+
+    /* Footer */
+    .qc-sidebar-footer {
+        padding: 0.625rem 0.75rem;
+        border-top: 1px solid #f1f5f9;
+        flex-shrink: 0;
+    }
+    .qc-sidebar-logout {
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+        padding: 0.5rem 0.75rem;
+        background: #fef2f2;
+        border: 1px solid #fecaca;
+        color: #dc2626;
+        border-radius: 8px;
+        cursor: pointer;
+        width: 100%;
+        font-weight: 600;
+        font-size: 0.8rem;
+        transition: all 0.2s;
+        font-family: inherit;
+        white-space: nowrap;
+        overflow: hidden;
+    }
+    .qc-sidebar-logout:hover {
+        background: #fee2e2;
+        border-color: #fca5a5;
+    }
+    .qc-sidebar-logout svg {
+        width: 17px;
+        height: 17px;
+        min-width: 17px;
+        stroke: currentColor;
+        fill: none;
+        stroke-width: 1.75;
+    }
+    .qc-sidebar-logout-text {
+        transition: opacity 0.25s ease;
+    }
+
+    /* Overlay */
+    .qc-sidebar-overlay {
+        display: none;
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100vh;
+        background: rgba(0,0,0,0.3);
+        backdrop-filter: blur(4px);
+        -webkit-backdrop-filter: blur(4px);
+        z-index: 1001;
+        transition: opacity 0.3s;
+    }
+    .qc-sidebar-overlay.show { display: block; }
+
+    /* App Version */
+    .qc-sidebar-version {
+        padding: 0.375rem 1rem 0.5rem;
+        text-align: center;
+        font-size: 0.5625rem;
+        color: #cbd5e1;
+        letter-spacing: 0.05em;
+        white-space: nowrap;
+        overflow: hidden;
+    }
+
+    /* Tooltip for collapsed icon rail */
+    .qc-nav-tooltip {
+        display: none;
+    }
+
+    /* ─── MOBILE QUICK-ACCESS BOTTOM BAR ─── */
+    .qc-mobile-quickbar {
+        display: none;
+        position: fixed;
+        bottom: 0;
+        left: 0;
+        right: 0;
+        background: #ffffff;
+        border-top: 1px solid #e8ecf1;
+        z-index: 1000;
+        padding: 6px 0 calc(6px + env(safe-area-inset-bottom, 0px));
+        box-shadow: 0 -2px 12px rgba(0,0,0,0.08);
+    }
+    .qc-mobile-quickbar-inner {
+        display: flex;
+        justify-content: space-around;
+        align-items: center;
+        max-width: 500px;
+        margin: 0 auto;
+    }
+    .qc-quickbar-item {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 2px;
+        padding: 6px 8px;
+        text-decoration: none;
+        color: #64748b;
+        font-size: 10px;
+        font-weight: 600;
+        border-radius: 8px;
+        transition: color 0.2s;
+        background: none;
+        border: none;
+        cursor: pointer;
+        font-family: inherit;
+        -webkit-tap-highlight-color: transparent;
+    }
+    .qc-quickbar-item:active { transform: scale(0.92); }
+    .qc-quickbar-item.active { color: #2563eb; }
+    .qc-quickbar-item svg {
+        width: 22px; height: 22px;
+        stroke: currentColor; fill: none;
+        stroke-width: 1.75; stroke-linecap: round; stroke-linejoin: round;
+    }
+    .qc-quickbar-menu-icon {
+        display: flex; flex-direction: column; gap: 3px;
+        width: 22px; height: 22px;
+        align-items: center; justify-content: center;
+    }
+    .qc-quickbar-menu-icon span {
+        width: 18px; height: 2px;
+        background: currentColor; border-radius: 1px;
+    }
+
+    /* ─── MOBILE ─── */
+    @media (max-width: 767px) {
+        .qc-sidebar { width: 85%; max-width: 320px; }
+        .qc-mobile-quickbar { display: block; }
+        body { padding-bottom: 64px !important; }
+    }
+
+    /* ─── DESKTOP ≥ 768px: Sidebar with icon-rail collapsed state ─── */
+    @media (min-width: 768px) {
+        .qc-sidebar {
+            left: 0;
+            width: 256px;
+            box-shadow: none;
+            transition: width 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        /* COLLAPSED = icon rail (not hidden) */
+        .qc-sidebar.collapsed {
+            width: 60px;
+            left: 0;
+        }
+
+        /* Show the sidebar toggle on desktop */
+        .qc-sidebar-toggle { display: flex; }
+
+        /* Hide text elements when collapsed */
+        .qc-sidebar.collapsed .qc-sidebar-brand-text,
+        .qc-sidebar.collapsed .qc-nav-section-title,
+        .qc-sidebar.collapsed .qc-nav-item-text,
+        .qc-sidebar.collapsed .qc-sidebar-logout-text,
+        .qc-sidebar.collapsed .qc-sidebar-version,
+        .qc-sidebar.collapsed .qc-sidebar-close {
+            opacity: 0;
+            width: 0;
+            overflow: hidden;
+            pointer-events: none;
+        }
+
+        /* Adjust spacing for collapsed */
+        .qc-sidebar.collapsed .qc-sidebar-header {
+            padding: 0.75rem 0;
+            justify-content: center;
+            border-bottom-color: transparent;
+        }
+        .qc-sidebar.collapsed .qc-sidebar-brand {
+            display: none;
+        }
+        /* When collapsed, center the toggle in the header */
+        .qc-sidebar.collapsed .qc-sidebar-toggle {
+            margin: 0 auto;
+        }
+        .qc-sidebar.collapsed .qc-nav-item {
+            padding: 0.5rem;
+            margin: 2px 0.375rem;
+            justify-content: center;
+            gap: 0;
+            border-radius: 8px;
+        }
+        .qc-sidebar.collapsed .qc-nav-item-icon {
+            width: 22px;
+        }
+        .qc-sidebar.collapsed .qc-nav-item.active::before {
+            height: 14px;
+            width: 2px;
+        }
+        .qc-sidebar.collapsed .qc-sidebar-footer {
+            padding: 0.5rem 0.375rem;
+        }
+        .qc-sidebar.collapsed .qc-sidebar-logout {
+            padding: 0.5rem;
+            justify-content: center;
+            gap: 0;
+        }
+        .qc-sidebar.collapsed .qc-nav-divider {
+            margin: 0.25rem 0.5rem;
+        }
+        .qc-sidebar.collapsed .qc-nav-section {
+            margin-bottom: 0;
+        }
+
+        /* Tooltip on hover for collapsed items */
+        .qc-sidebar.collapsed .qc-nav-item {
+            position: relative;
+        }
+        .qc-sidebar.collapsed .qc-nav-tooltip {
+            display: none;
+            position: absolute;
+            left: calc(100% + 8px);
+            top: 50%;
+            transform: translateY(-50%);
+            background: #1e293b;
+            color: #f1f5f9;
+            padding: 0.375rem 0.625rem;
+            border-radius: 6px;
+            font-size: 0.725rem;
+            font-weight: 500;
+            white-space: nowrap;
+            z-index: 1100;
+            pointer-events: none;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+        }
+        .qc-sidebar.collapsed .qc-nav-item:hover .qc-nav-tooltip {
+            display: block;
+        }
+
+        /* Hide the × close on desktop (toggle replaces it) */
+        .qc-sidebar-close { display: none; }
+
+        /* Overlay hidden on desktop */
+        .qc-sidebar-overlay { display: none !important; }
+
+        /* Push page content */
+        body {
+            margin-left: 256px;
+            transition: margin-left 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        body.sidebar-collapsed {
+            margin-left: 60px;
+        }
+
+        /* Header adjustments */
+        .qc-unified-header {
+            margin-left: -256px;
+            padding-left: calc(256px);
+            transition: margin-left 0.35s cubic-bezier(0.4, 0, 0.2, 1),
+                        padding-left 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        body.sidebar-collapsed .qc-unified-header {
+            margin-left: -60px;
+            padding-left: 60px;
+        }
+
+        /* Compact desktop sizing */
+        .qc-sidebar-header { padding: 0.875rem 1rem; }
+        .qc-sidebar-brand { font-size: 0.875rem; }
+        .qc-sidebar-brand-icon { width: 30px; height: 30px; min-width: 30px; font-size: 0.875rem; border-radius: 7px; }
+        .qc-nav-item { padding: 0.45rem 0.875rem; margin: 1px 0.375rem; font-size: 0.775rem; gap: 0.625rem; border-radius: 7px; }
+        .qc-nav-item-icon { font-size: 0.9rem; width: 20px; min-width: 20px; }
+        .qc-nav-item-icon svg { width: 16px; height: 16px; }
+        .qc-nav-section-title { padding: 0.625rem 1rem 0.25rem; font-size: 0.575rem; }
+        .qc-sidebar-footer { padding: 0.5rem 0.75rem; }
+        .qc-sidebar-logout { padding: 0.45rem 0.625rem; font-size: 0.775rem; border-radius: 7px; }
+        .qc-sidebar-logout svg { width: 16px; height: 16px; min-width: 16px; }
+    }
+
+    /* ─── LARGE DESKTOP ≥ 1280px ─── */
+    @media (min-width: 1280px) {
+        .qc-sidebar { width: 268px; }
+        .qc-sidebar.collapsed { width: 64px; }
+        body { margin-left: 268px; }
+        body.sidebar-collapsed { margin-left: 64px; }
+        .qc-unified-header {
+            margin-left: -268px;
+            padding-left: 268px;
+        }
+        body.sidebar-collapsed .qc-unified-header {
+            margin-left: -64px;
+            padding-left: 64px;
+        }
+    }
+</style>
+<!-- Overlay -->
+<div class="qc-sidebar-overlay" id="sidebarOverlay"></div>
+
+<!-- Sidebar v2 — 8 Hubs (NAV-2) -->
+<aside class="qc-sidebar" id="mainSidebar">
+    <div class="qc-sidebar-header">
+        <div class="qc-sidebar-brand">
+            <div class="qc-sidebar-brand-icon">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+            </div>
+            <span class="qc-sidebar-brand-text">Quality Colours</span>
+        </div>
+        <button class="qc-sidebar-toggle" id="sidebarToggleBtn" title="Toggle menu"><span></span><span></span><span></span></button>
+        <button class="qc-sidebar-close" id="sidebarCloseBtn" title="Close">&times;</button>
+    </div>
+
+    <nav class="qc-sidebar-nav" id="sidebarNav">
+
+        <!-- 1 Overview -->
+        <div class="qc-nav-section" data-hub="overview">
+            <button type="button" class="qc-nav-section-toggle" data-section="overview" aria-expanded="true">
+                <span class="qc-nav-section-label">Overview</span>
+                <svg class="qc-nav-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 18l6-6-6-6"/></svg>
+            </button>
+            <div class="qc-nav-submenu open" data-submenu="overview">
+                <a href="/admin-dashboard.html" class="qc-nav-item" data-pages="dashboard,admin-dashboard,live-dashboard"><span class="qc-nav-item-icon"><svg viewBox="0 0 24 24"><path d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-4 0h4"/></svg></span><span class="qc-nav-item-text">Dashboard</span></a>
+                <a href="/admin-live-dashboard.html" class="qc-nav-item" data-pages="live-dashboard"><span class="qc-nav-item-icon"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M2 12h2M20 12h2"/></svg></span><span class="qc-nav-item-text">Live Monitor</span></a>
+                <a href="/chat.html" class="qc-nav-item" data-pages="chat"><span class="qc-nav-item-icon"><svg viewBox="0 0 24 24"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg></span><span class="qc-nav-item-text">Chat</span></a>
+            </div>
+        </div>
+
+        <!-- 2 Sales & Estimates -->
+        <div class="qc-nav-section" data-hub="sales">
+            <button type="button" class="qc-nav-section-toggle" data-section="sales" aria-expanded="false">
+                <span class="qc-nav-section-label">Sales &amp; Estimates</span>
+                <svg class="qc-nav-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 18l6-6-6-6"/></svg>
+            </button>
+            <div class="qc-nav-submenu" data-submenu="sales">
+                <a href="/estimates.html" class="qc-nav-item" data-pages="estimates"><span class="qc-nav-item-icon"><svg viewBox="0 0 24 24"><path d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg></span><span class="qc-nav-item-text">Estimates</span></a>
+                <a href="/estimate-create-new.html" class="qc-nav-item" data-pages="estimate-create"><span class="qc-nav-item-icon"><svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg></span><span class="qc-nav-item-text">New Estimate</span></a>
+                <a href="/admin-estimate-requests.html" class="qc-nav-item" data-pages="estimate-requests" data-roles="admin,manager"><span class="qc-nav-item-icon"><svg viewBox="0 0 24 24"><path d="M22 11.08V12a10 10 0 11-5.93-9.14"/><path d="M22 4L12 14.01l-3-3"/></svg></span><span class="qc-nav-item-text">Requests</span></a>
+            </div>
+        </div>
+
+        <!-- 3 Catalog -->
+        <div class="qc-nav-section" data-hub="catalog">
+            <button type="button" class="qc-nav-section-toggle" data-section="catalog" aria-expanded="false">
+                <span class="qc-nav-section-label">Catalog</span>
+                <svg class="qc-nav-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 18l6-6-6-6"/></svg>
+            </button>
+            <div class="qc-nav-submenu" data-submenu="catalog">
+                <a href="/admin-catalog-hub.html" class="qc-nav-item" data-pages="products,brands,categories,item-master"><span class="qc-nav-item-icon"><svg viewBox="0 0 24 24"><path d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/></svg></span><span class="qc-nav-item-text">Products</span></a>
+                <a href="/admin-catalog-hub.html#brands" class="qc-nav-item" data-pages="brands" data-roles="admin,manager"><span class="qc-nav-item-icon"><svg viewBox="0 0 24 24"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg></span><span class="qc-nav-item-text">Brands</span></a>
+                <a href="/admin-catalog-hub.html#categories" class="qc-nav-item" data-pages="categories" data-roles="admin,manager"><span class="qc-nav-item-icon"><svg viewBox="0 0 24 24"><path d="M22 19a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2h5l2 2h9a2 2 0 012 2z"/></svg></span><span class="qc-nav-item-text">Categories</span></a>
+                <a href="/admin-catalog-hub.html#master" class="qc-nav-item" data-pages="item-master"><span class="qc-nav-item-icon"><svg viewBox="0 0 24 24"><path d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"/></svg></span><span class="qc-nav-item-text">Item Master</span></a>
+            </div>
+        </div>
+
+        <!-- 4 CRM -->
+        <div class="qc-nav-section" data-hub="crm">
+            <button type="button" class="qc-nav-section-toggle" data-section="crm" aria-expanded="false">
+                <span class="qc-nav-section-label">CRM</span>
+                <svg class="qc-nav-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 18l6-6-6-6"/></svg>
+            </button>
+            <div class="qc-nav-submenu" data-submenu="crm">
+                <a href="/admin-crm-hub.html" class="qc-nav-item" data-pages="leads,lead-scoring,customers,customer-types,credit-limits,design-requests"><span class="qc-nav-item-icon"><svg viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87"/><path d="M16 3.13a4 4 0 010 7.75"/></svg></span><span class="qc-nav-item-text">Leads</span></a>
+                <a href="/admin-crm-hub.html#customers" class="qc-nav-item" data-pages="customers,customer-types,credit-limits"><span class="qc-nav-item-icon"><svg viewBox="0 0 24 24"><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/></svg></span><span class="qc-nav-item-text">Customers</span></a>
+                <a href="/admin-design-requests.html" class="qc-nav-item" data-pages="design-requests" data-roles="admin,manager"><span class="qc-nav-item-icon"><svg viewBox="0 0 24 24"><path d="M12 19l7-7a2 2 0 000-2.828L15.172 5.343a2 2 0 00-2.828 0L5 12.343"/><path d="M7 12l10-10"/></svg></span><span class="qc-nav-item-text">Design Requests</span></a>
+            </div>
+        </div>
+
+        <!-- 5 Stock & Operations (canonical Stock Hub) -->
+        <div class="qc-nav-section" data-hub="stock">
+            <button type="button" class="qc-nav-section-toggle" data-section="stock" aria-expanded="false">
+                <span class="qc-nav-section-label">Stock &amp; Ops</span>
+                <svg class="qc-nav-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 18l6-6-6-6"/></svg>
+            </button>
+            <div class="qc-nav-submenu" data-submenu="stock">
+                <a href="/admin-stock-hub.html" class="qc-nav-item" data-pages="zoho-stock-hub,zoho-stock,zoho-stock-adjust,zoho-stock-check,zoho-stock-migrate,zoho-items,zoho-items-edit,zoho-dpl,zoho-reorder,zoho-purchase-suggestions,zoho-locations,item-master"><span class="qc-nav-item-icon"><svg viewBox="0 0 24 24"><path d="M4 7v10c0 2 1 3 3 3h10c2 0 3-1 3-3V7c0-2-1-3-3-3H7c-2 0-3 1-3 3z"/><path d="M16 2v4M8 2v4M4 10h16"/><path d="M9 14l2 2 4-4"/></svg></span><span class="qc-nav-item-text">Stock Hub</span></a>
+                <a href="/admin-zoho-dashboard.html" class="qc-nav-item" data-pages="zoho-dashboard,zoho-invoices,zoho-transactions,zoho-collections,zoho-reports,gst-reports"><span class="qc-nav-item-icon"><svg viewBox="0 0 24 24"><path d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/></svg></span><span class="qc-nav-item-text">Zoho Books</span></a>
+            </div>
+        </div>
+
+        <!-- 6 Work & HR -->
+        <div class="qc-nav-section" data-hub="work">
+            <button type="button" class="qc-nav-section-toggle" data-section="work" aria-expanded="false">
+                <span class="qc-nav-section-label">Work &amp; HR</span>
+                <svg class="qc-nav-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 18l6-6-6-6"/></svg>
+            </button>
+            <div class="qc-nav-submenu" data-submenu="work">
+                <a href="/admin-work-hub.html" class="qc-nav-item" data-pages="attendance-admin,attendance-activities,attendance-clock-in,attendance-clock-out,attendance-permission,attendance-tasks,admin-attendance,admin-tasks,admin-daily-tasks,geofence-logs,activity-monitor" data-roles="admin,manager"><span class="qc-nav-item-icon"><svg viewBox="0 0 24 24"><path d="M12 22a10 10 0 100-20 10 10 0 000 20z"/><path d="M12 6v6l4 2"/></svg></span><span class="qc-nav-item-text">Attendance</span></a>
+                <a href="/admin-work-hub.html#tasks" class="qc-nav-item" data-pages="admin-tasks,admin-daily-tasks,activities,daily-tasks,my-tasks"><span class="qc-nav-item-icon"><svg viewBox="0 0 24 24"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/></svg></span><span class="qc-nav-item-text">Tasks</span></a>
+                <a href="/admin-salary-hub.html" class="qc-nav-item" data-pages="salary-config,salary-monthly,salary-payments,salary-advances,salary-reports,salary-incentives,my-salary,advance-request" data-roles="admin,manager,accountant,staff"><span class="qc-nav-item-icon"><svg viewBox="0 0 24 24"><path d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg></span><span class="qc-nav-item-text">Salary</span></a>
+                <a href="/admin-branches.html" class="qc-nav-item" data-pages="branches,staff,staff-registrations,roles,permissions,admin-agreements" data-roles="admin"><span class="qc-nav-item-icon"><svg viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87"/><path d="M16 3.13a4 4 0 010 7.75"/></svg></span><span class="qc-nav-item-text">Branches &amp; Staff</span></a>
+            </div>
+        </div>
+
+        <!-- 7 Growth -->
+        <div class="qc-nav-section" data-hub="growth">
+            <button type="button" class="qc-nav-section-toggle" data-section="growth" aria-expanded="false">
+                <span class="qc-nav-section-label">Growth</span>
+                <svg class="qc-nav-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 18l6-6-6-6"/></svg>
+            </button>
+            <div class="qc-nav-submenu" data-submenu="growth">
+                <a href="/admin-wa-dashboard.html" class="qc-nav-item" data-pages="wa-dashboard,whatsapp-chat,wa-contacts,wa-marketing,wa-templates,whatsapp-sessions,wa-admin-login,wa-settings"><span class="qc-nav-item-icon"><svg viewBox="0 0 24 24"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg></span><span class="qc-nav-item-text">WhatsApp</span></a>
+                <a href="/admin-painters.html" class="qc-nav-item" data-pages="painters,painter-leads,painter-points,painter-catalog,painter-rates,painter-withdrawals,painter-reports"><span class="qc-nav-item-icon"><svg viewBox="0 0 24 24"><path d="M12 19l7-7a2 2 0 000-2.828L15.172 5.343a2 2 0 00-2.828 0L5 12.343"/><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></svg></span><span class="qc-nav-item-text">Painters</span></a>
+                <a href="/admin-engineers.html" class="qc-nav-item" data-pages="engineers,engineers-pending,engineer-catalog"><span class="qc-nav-item-icon"><svg viewBox="0 0 24 24"><path d="M14.7 6.3a1 1 0 000 1.4l1.6 1.6a1 1 0 001.4 0l3.77-3.77a6 6 0 01-7.94 7.94l-6.91 6.91a2.12 2.12 0 01-3-3l6.91-6.91a6 6 0 017.94-7.94l-3.76 3.76z"/></svg></span><span class="qc-nav-item-text">Engineers</span></a>
+            </div>
+        </div>
+
+        <!-- 8 System -->
+        <div class="qc-nav-section" data-hub="system">
+            <button type="button" class="qc-nav-section-toggle" data-section="system" aria-expanded="false">
+                <span class="qc-nav-section-label">System</span>
+                <svg class="qc-nav-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 18l6-6-6-6"/></svg>
+            </button>
+            <div class="qc-nav-submenu" data-submenu="system">
+                <a href="/admin-system-hub.html" class="qc-nav-item" data-pages="settings,system-health,bug-reports,anomalies,monitoring,reports,guides,ai,photos" data-roles="admin"><span class="qc-nav-item-icon"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-2 2 2 2 0 01-2-2v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83 0 2 2 0 010-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 01-2-2 2 2 0 012-2h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 010-2.83 2 2 0 012.83 0l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 012-2 2 2 0 012 2v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 0 2 2 0 010 2.83l-.06.06a1.65 1.65 0 00-.33 1.82V9a1.65 1.65 0 001.51 1H21a2 2 0 012 2 2 2 0 01-2 2h-.09a1.65 1.65 0 00-1.51 1z"/></svg></span><span class="qc-nav-item-text">Settings</span></a>
+                <a href="/admin-system-health.html" class="qc-nav-item" data-pages="system-health,bug-reports,anomalies,monitoring"><span class="qc-nav-item-icon"><svg viewBox="0 0 24 24"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg></span><span class="qc-nav-item-text">Health</span></a>
+                <a href="/admin-reports.html" class="qc-nav-item" data-pages="reports"><span class="qc-nav-item-icon"><svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg></span><span class="qc-nav-item-text">Reports</span></a>
+                <a href="/admin-guides.html" class="qc-nav-item" data-pages="guides,ai,photos"><span class="qc-nav-item-icon"><svg viewBox="0 0 24 24"><path d="M4 19.5A2.5 2.5 0 016.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 014 19.5v-15A2.5 2.5 0 016.5 2z"/></svg></span><span class="qc-nav-item-text">Guides &amp; AI</span></a>
+            </div>
+        </div>
+
+    </nav>
+
+    <div class="qc-sidebar-footer">
+        <button class="qc-sidebar-logout" onclick="logout()"><svg viewBox="0 0 24 24"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg><span class="qc-sidebar-logout-text">Logout</span></button>
+    </div>
+</aside>
+

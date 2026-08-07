@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>System Hub — Quality Colours Manager</title>
+<link rel="stylesheet" href="/css/tailwind.css?v=849f1b5c">
+<link rel="stylesheet" href="/css/design-system.css">
+<link rel="stylesheet" href="/css/qc-ui.css">
+<style>
+:root{--hub-accent:#667eea}
+.qc-hub-tabs{display:flex;gap:.25rem;overflow-x:auto;padding:.5rem 0;border-bottom:1px solid #e5e7eb}
+.qc-hub-tab{white-space:nowrap;padding:.6rem 1rem;border-radius:8px 8px 0 0;font-weight:600;font-size:.85rem;color:#64748b;border:1px solid transparent;border-bottom:none;cursor:pointer;background:#f8fafc}
+.qc-hub-tab.active{background:#fff;color:var(--hub-accent);border-color:#e5e7eb}
+.qc-hub-panel{display:none}.qc-hub-panel.active{display:block}
+.qc-card{background:#fff;border:1px solid #e5e7eb;border-radius:10px;padding:1rem}
+@media (prefers-reduced-motion: reduce){*{transition:none!important;animation:none!important}}
+</style>
+</head>
+<body data-page="settings" class="bg-gray-50">
+<div id="universal-nav-placeholder"></div>
+<div id="subnav-placeholder"></div>
+<main class="max-w-7xl mx-auto px-4 py-6">
+  <header class="flex flex-wrap items-center justify-between gap-3 mb-4">
+    <div><h1 class="text-xl font-bold text-slate-900">System Hub</h1><p class="text-sm text-slate-500">Settings · Health · Monitoring · Guides</p></div>
+    <div class="flex gap-2"><button id="btn-refresh" class="px-3 py-2 rounded-lg border bg-white text-sm">Refresh</button><a href="/admin-settings.html" class="px-3 py-2 rounded-lg text-white text-sm" style="background:var(--gradient-primary)">Settings</a></div>
+  </header>
+  <div class="qc-hub-tabs" role="tablist">
+    <button class="qc-hub-tab active" data-tab="settings" role="tab" aria-selected="true">Settings</button>
+    <button class="qc-hub-tab" data-tab="health" role="tab">Health</button>
+    <button class="qc-hub-tab" data-tab="monitor" role="tab">Monitor</button>
+    <button class="qc-hub-tab" data-tab="guides" role="tab">Guides</button>
+  </div>
+
+  <section id="panel-settings" class="qc-hub-panel active">
+    <div class="qc-card mt-4"><p class="text-sm text-slate-600">System settings canonical page-la irukku.</p><a href="/admin-settings.html" class="inline-block mt-2 px-4 py-2 rounded-lg text-white text-sm" style="background:var(--gradient-primary)">Open Settings →</a><div id="cfg" class="mt-3 text-sm text-slate-700"></div></div>
+  </section>
+  <section id="panel-health" class="qc-hub-panel">
+    <div class="qc-card mt-4">
+      <div class="flex gap-2 mb-3"><button id="btn-health" class="px-3 py-2 rounded-lg text-white text-sm" style="background:#667eea">Check health</button><span id="health-status" class="text-sm text-slate-500 self-center"></span></div>
+      <div id="health-empty" class="hidden text-sm text-slate-500 py-8 text-center">No health data.</div>
+      <pre id="health-pre" class="text-xs bg-slate-950 text-slate-200 rounded-lg p-3 overflow-auto max-h-96"></pre>
+      <div class="flex gap-2 mt-3"><a href="/admin-system-health.html" class="px-3 py-2 rounded-lg border bg-white text-sm">System Health</a><a href="/admin-bug-reports.html" class="px-3 py-2 rounded-lg border bg-white text-sm">Bug Reports</a></div>
+    </div>
+  </section>
+  <section id="panel-monitor" class="qc-hub-panel">
+    <div class="qc-card mt-4">
+      <div class="flex gap-2 mb-3"><button id="btn-mon" class="px-3 py-2 rounded-lg text-white text-sm" style="background:#667eea">Load monitor</button><span id="mon-status" class="text-sm text-slate-500 self-center"></span></div>
+      <div id="mon-empty" class="hidden text-sm text-slate-500 py-8 text-center">No monitor data.</div>
+      <pre id="mon-pre" class="text-xs bg-slate-950 text-slate-200 rounded-lg p-3 overflow-auto max-h-96"></pre>
+      <div class="flex gap-2 mt-3"><a href="/admin-monitoring.html" class="px-3 py-2 rounded-lg border bg-white text-sm">Monitoring</a><a href="/admin-anomalies.html" class="px-3 py-2 rounded-lg border bg-white text-sm">Anomalies</a></div>
+    </div>
+  </section>
+  <section id="panel-guides" class="qc-hub-panel">
+    <div class="qc-card mt-4">
+      <div class="flex gap-2 mb-3"><button id="btn-guides" class="px-3 py-2 rounded-lg text-white text-sm" style="background:#667eea">Load guides</button><span id="guides-status" class="text-sm text-slate-500 self-center"></span></div>
+      <div id="guides-empty" class="hidden text-sm text-slate-500 py-8 text-center">No guides.</div>
+      <table class="w-full text-sm"><thead class="text-slate-500"><tr><th class="text-left p-2">Title</th><th class="text-left p-2">Updated</th></tr></thead><tbody id="guides-body"></tbody></table>
+      <a href="/admin-guides.html" class="inline-block mt-3 text-sm text-blue-600">Open Guides →</a>
+    </div>
+  </section>
+</main>
+<script src="/universal-nav-loader.js?v=6b4a6dbe"></script>
+<script>
+const $=s=>document.querySelector(s);
+function getAuthHeaders(){const t=localStorage.getItem('auth_token')||localStorage.getItem('token')||'';return t?{Authorization:'Bearer '+t}:{}}
+async function apiFetch(url,opts={}){const h={...getAuthHeaders(), ...(opts.headers||{})}; if(opts.body && !(opts.body instanceof FormData) && !h['Content-Type']) h['Content-Type']='application/json'; const r=await fetch(url,{...opts,headers:h}); if(r.status===401){location.href='/login.html'; throw new Error('Auth');} if(!r.ok) throw new Error((await r.text()).slice(0,300)); return r.json();}
+function esc(s){const d=document.createElement('div'); d.textContent=s??''; return d.innerHTML;}
+function setTab(n){document.querySelectorAll('.qc-hub-tab').forEach(b=>{const on=b.dataset.tab===n; b.classList.toggle('active',on); b.setAttribute('aria-selected',String(on));}); document.querySelectorAll('.qc-hub-panel').forEach(p=> p.classList.toggle('active', p.id==='panel-'+n)); history.replaceState(null,'','#'+n);}
+document.querySelectorAll('.qc-hub-tab').forEach(b=> b.addEventListener('click',()=> setTab(b.dataset.tab)));
+if(location.hash) setTab(location.hash.slice(1));
+async function loadHealth(){
+  $('#health-status').textContent='Loading…';
+  try{const j=await apiFetch('/api/system/health'); $('#health-pre').textContent=JSON.stringify(j,null,2).slice(0,8000); $('#health-status').textContent='Loaded'; $('#health-empty').classList.add('hidden');}catch(e){$('#health-status').textContent=e.message; $('#health-pre').textContent=e.message;}
+}
+async function loadMon(){
+  $('#mon-status').textContent='Loading…';
+  try{const j=await apiFetch('/api/monitoring/summary'); $('#mon-pre').textContent=JSON.stringify(j,null,2).slice(0,8000); $('#mon-status').textContent='Loaded'; $('#mon-empty').classList.add('hidden');}catch(e){$('#mon-status').textContent=e.message; $('#mon-pre').textContent=e.message;}
+}
+async function loadGuides(){
+  $('#guides-status').textContent='Loading…';
+  try{const j=await apiFetch('/api/guides'); const rows=j.data||j.guides||j.rows||[]; const tb=$('#guides-body'); tb.innerHTML=''; if(!rows.length) $('#guides-empty').classList.remove('hidden'); else $('#guides-empty').classList.add('hidden'); rows.forEach(r=>{const tr=document.createElement('tr'); tr.className='border-t'; tr.innerHTML=`<td class="p-2">${esc(r.title||'')}</td><td class="p-2">${esc((r.updated_at||'').slice(0,10))}</td>`; tb.appendChild(tr);}); $('#guides-status').textContent=rows.length+' rows';}catch(e){$('#guides-status').textContent=e.message;}
+}
+$('#btn-health').addEventListener('click', loadHealth);
+$('#btn-mon').addEventListener('click', loadMon);
+$('#btn-guides').addEventListener('click', loadGuides);
+$('#btn-refresh').addEventListener('click', ()=>{const t=document.querySelector('.qc-hub-tab.active').dataset.tab; if(t==='health') loadHealth(); if(t==='monitor') loadMon(); if(t==='guides') loadGuides();});
+loadHealth();
+</script>
+</body>
+</html>

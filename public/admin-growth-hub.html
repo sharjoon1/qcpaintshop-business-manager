@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Growth Hub — Quality Colours Manager</title>
+<link rel="stylesheet" href="/css/tailwind.css?v=849f1b5c">
+<link rel="stylesheet" href="/css/design-system.css">
+<link rel="stylesheet" href="/css/qc-ui.css">
+<style>
+:root{--hub-accent:#667eea}
+.qc-hub-tabs{display:flex;gap:.25rem;overflow-x:auto;padding:.5rem 0;border-bottom:1px solid #e5e7eb}
+.qc-hub-tab{white-space:nowrap;padding:.6rem 1rem;border-radius:8px 8px 0 0;font-weight:600;font-size:.85rem;color:#64748b;border:1px solid transparent;border-bottom:none;cursor:pointer;background:#f8fafc}
+.qc-hub-tab.active{background:#fff;color:var(--hub-accent);border-color:#e5e7eb}
+.qc-hub-panel{display:none}.qc-hub-panel.active{display:block}
+.qc-card{background:#fff;border:1px solid #e5e7eb;border-radius:10px;padding:1rem}
+@media (prefers-reduced-motion: reduce){*{transition:none!important;animation:none!important}}
+</style>
+</head>
+<body data-page="wa-dashboard" class="bg-gray-50">
+<div id="universal-nav-placeholder"></div>
+<div id="subnav-placeholder"></div>
+<main class="max-w-7xl mx-auto px-4 py-6">
+  <header class="flex flex-wrap items-center justify-between gap-3 mb-4">
+    <div><h1 class="text-xl font-bold text-slate-900">Growth Hub</h1><p class="text-sm text-slate-500">WhatsApp · Painters · Engineers — ore hub</p></div>
+    <div class="flex gap-2"><button id="btn-refresh" class="px-3 py-2 rounded-lg border bg-white text-sm">Refresh</button><a href="/admin-wa-dashboard.html" class="px-3 py-2 rounded-lg text-white text-sm" style="background:var(--gradient-primary)">WhatsApp</a></div>
+  </header>
+  <div class="qc-hub-tabs" role="tablist">
+    <button class="qc-hub-tab active" data-tab="whatsapp" role="tab" aria-selected="true">WhatsApp</button>
+    <button class="qc-hub-tab" data-tab="painters" role="tab">Painters</button>
+    <button class="qc-hub-tab" data-tab="engineers" role="tab">Engineers</button>
+  </div>
+
+  <section id="panel-whatsapp" class="qc-hub-panel active">
+    <div class="qc-card mt-4">
+      <div class="flex gap-2 mb-3"><button id="btn-wa" class="px-3 py-2 rounded-lg text-white text-sm" style="background:#667eea">Load WhatsApp status</button><span id="wa-status" class="text-sm text-slate-500 self-center"></span></div>
+      <div id="wa-empty" class="hidden text-sm text-slate-500 py-8 text-center">No WhatsApp data.</div>
+      <div id="wa-info" class="text-sm"></div>
+      <div class="flex gap-2 mt-3">
+        <a href="/admin-whatsapp-chat.html" class="px-3 py-2 rounded-lg border bg-white text-sm">Chat</a>
+        <a href="/admin-wa-contacts.html" class="px-3 py-2 rounded-lg border bg-white text-sm">Contacts</a>
+        <a href="/admin-wa-marketing.html" class="px-3 py-2 rounded-lg border bg-white text-sm">Marketing</a>
+        <a href="/admin-wa-templates.html" class="px-3 py-2 rounded-lg border bg-white text-sm">Templates</a>
+      </div>
+    </div>
+  </section>
+  <section id="panel-painters" class="qc-hub-panel">
+    <div class="qc-card mt-4">
+      <div class="flex gap-2 mb-3"><input id="painter-q" placeholder="Search painters…" class="border rounded-lg px-3 py-2 text-sm w-64"><button id="btn-painters" class="px-3 py-2 rounded-lg text-white text-sm" style="background:#667eea">Search</button><span id="painters-status" class="text-sm text-slate-500 self-center"></span></div>
+      <div id="painters-empty" class="hidden text-sm text-slate-500 py-8 text-center">No painters.</div>
+      <table class="w-full text-sm"><thead class="text-slate-500"><tr><th class="text-left p-2">Name</th><th class="text-left p-2">Phone</th><th class="text-left p-2">Tier</th></tr></thead><tbody id="painters-body"></tbody></table>
+      <a href="/admin-painters.html" class="inline-block mt-3 text-sm text-blue-600">Open Painters →</a>
+    </div>
+  </section>
+  <section id="panel-engineers" class="qc-hub-panel">
+    <div class="qc-card mt-4">
+      <div class="flex gap-2 mb-3"><input id="eng-q" placeholder="Search engineers…" class="border rounded-lg px-3 py-2 text-sm w-64"><button id="btn-engineers" class="px-3 py-2 rounded-lg text-white text-sm" style="background:#667eea">Search</button><span id="eng-status" class="text-sm text-slate-500 self-center"></span></div>
+      <div id="eng-empty" class="hidden text-sm text-slate-500 py-8 text-center">No engineers.</div>
+      <table class="w-full text-sm"><thead class="text-slate-500"><tr><th class="text-left p-2">Name</th><th class="text-left p-2">Phone</th><th class="text-left p-2">Status</th></tr></thead><tbody id="eng-body"></tbody></table>
+      <a href="/admin-engineers.html" class="inline-block mt-3 text-sm text-blue-600">Open Engineers →</a>
+    </div>
+  </section>
+</main>
+<script src="/universal-nav-loader.js?v=6b4a6dbe"></script>
+<script>
+const $=s=>document.querySelector(s);
+function getAuthHeaders(){const t=localStorage.getItem('auth_token')||localStorage.getItem('token')||'';return t?{Authorization:'Bearer '+t}:{}}
+async function apiFetch(url,opts={}){const h={...getAuthHeaders(), ...(opts.headers||{})}; if(opts.body && !(opts.body instanceof FormData) && !h['Content-Type']) h['Content-Type']='application/json'; const r=await fetch(url,{...opts,headers:h}); if(r.status===401){location.href='/login.html'; throw new Error('Auth');} if(!r.ok) throw new Error((await r.text()).slice(0,300)); return r.json();}
+function esc(s){const d=document.createElement('div'); d.textContent=s??''; return d.innerHTML;}
+function setTab(n){document.querySelectorAll('.qc-hub-tab').forEach(b=>{const on=b.dataset.tab===n; b.classList.toggle('active',on); b.setAttribute('aria-selected',String(on));}); document.querySelectorAll('.qc-hub-panel').forEach(p=> p.classList.toggle('active', p.id==='panel-'+n)); history.replaceState(null,'','#'+n);}
+document.querySelectorAll('.qc-hub-tab').forEach(b=> b.addEventListener('click',()=> setTab(b.dataset.tab)));
+if(location.hash) setTab(location.hash.slice(1));
+async function loadWA(){
+  $('#wa-status').textContent='Loading…';
+  try{const j=await apiFetch('/api/whatsapp/status'); const info=j.data||j||{}; const el=$('#wa-info'); el.innerHTML='<div class="text-slate-700">Status: '+esc(String(info.status||info.connected||'unknown'))+'</div>'+ (info.phone?'<div>Phone: '+esc(info.phone)+'</div>':''); $('#wa-status').textContent='Loaded'; if(!Object.keys(info).length) $('#wa-empty').classList.remove('hidden'); else $('#wa-empty').classList.add('hidden'); }catch(e){$('#wa-status').textContent=e.message; try{const j2=await apiFetch('/api/wa/status'); $('#wa-info').textContent=JSON.stringify(j2).slice(0,800);}catch(_){}}
+}
+async function loadPainters(){
+  const q=$('#painter-q').value.trim(); $('#painters-status').textContent='Loading…';
+  try{const qs=new URLSearchParams(); if(q) qs.set('q',q); qs.set('limit','20'); const j=await apiFetch('/api/painters?'+qs.toString()); const rows=j.data||j.painters||j.rows||[]; const tb=$('#painters-body'); tb.innerHTML=''; if(!rows.length) $('#painters-empty').classList.remove('hidden'); else $('#painters-empty').classList.add('hidden'); rows.forEach(r=>{const tr=document.createElement('tr'); tr.className='border-t'; tr.innerHTML=`<td class="p-2">${esc(r.name||'')}</td><td class="p-2">${esc(r.phone||'')}</td><td class="p-2">${esc(r.tier||r.level||'')}</td>`; tb.appendChild(tr);}); $('#painters-status').textContent=rows.length+' rows';}catch(e){$('#painters-status').textContent=e.message;}
+}
+async function loadEng(){
+  const q=$('#eng-q').value.trim(); $('#eng-status').textContent='Loading…';
+  try{const qs=new URLSearchParams(); if(q) qs.set('q',q); qs.set('limit','20'); const j=await apiFetch('/api/engineers?'+qs.toString()); const rows=j.data||j.engineers||j.rows||[]; const tb=$('#eng-body'); tb.innerHTML=''; if(!rows.length) $('#eng-empty').classList.remove('hidden'); else $('#eng-empty').classList.add('hidden'); rows.forEach(r=>{const tr=document.createElement('tr'); tr.className='border-t'; tr.innerHTML=`<td class="p-2">${esc(r.name||'')}</td><td class="p-2">${esc(r.phone||'')}</td><td class="p-2">${esc(r.status||'')}</td>`; tb.appendChild(tr);}); $('#eng-status').textContent=rows.length+' rows';}catch(e){$('#eng-status').textContent=e.message;}
+}
+$('#btn-wa').addEventListener('click', loadWA);
+$('#btn-painters').addEventListener('click', loadPainters);
+$('#btn-engineers').addEventListener('click', loadEng);
+$('#btn-refresh').addEventListener('click', ()=>{const t=document.querySelector('.qc-hub-tab.active').dataset.tab; if(t==='whatsapp') loadWA(); if(t==='painters') loadPainters(); if(t==='engineers') loadEng();});
+loadWA();
+</script>
+</body>
+</html>

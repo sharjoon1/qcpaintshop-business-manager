@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Work & HR Hub — Quality Colours Manager</title>
+<link rel="stylesheet" href="/css/tailwind.css?v=849f1b5c">
+<link rel="stylesheet" href="/css/design-system.css">
+<link rel="stylesheet" href="/css/qc-ui.css">
+<style>
+:root{--hub-accent:#667eea}
+.qc-hub-tabs{display:flex;gap:.25rem;overflow-x:auto;padding:.5rem 0;border-bottom:1px solid #e5e7eb}
+.qc-hub-tab{white-space:nowrap;padding:.6rem 1rem;border-radius:8px 8px 0 0;font-weight:600;font-size:.85rem;color:#64748b;border:1px solid transparent;border-bottom:none;cursor:pointer;background:#f8fafc}
+.qc-hub-tab.active{background:#fff;color:var(--hub-accent);border-color:#e5e7eb}
+.qc-hub-panel{display:none}.qc-hub-panel.active{display:block}
+.qc-card{background:#fff;border:1px solid #e5e7eb;border-radius:10px;padding:1rem}
+@media (prefers-reduced-motion: reduce){*{transition:none!important;animation:none!important}}
+</style>
+</head>
+<body data-page="admin-tasks" class="bg-gray-50">
+<div id="universal-nav-placeholder"></div>
+<div id="subnav-placeholder"></div>
+<main class="max-w-7xl mx-auto px-4 py-6">
+  <header class="flex flex-wrap items-center justify-between gap-3 mb-4">
+    <div><h1 class="text-xl font-bold text-slate-900">Work & HR Hub</h1><p class="text-sm text-slate-500">Attendance · Tasks · Salary shortcut — ore screen</p></div>
+    <div class="flex gap-2"><button id="btn-refresh" class="px-3 py-2 rounded-lg border bg-white text-sm">Refresh</button><a href="/admin-attendance.html" class="px-3 py-2 rounded-lg text-white text-sm" style="background:var(--gradient-primary)">Attendance</a></div>
+  </header>
+  <div class="qc-hub-tabs" role="tablist">
+    <button class="qc-hub-tab active" data-tab="attendance" role="tab" aria-selected="true">Attendance</button>
+    <button class="qc-hub-tab" data-tab="tasks" role="tab">Tasks</button>
+    <button class="qc-hub-tab" data-tab="daily" role="tab">Daily Tasks</button>
+    <button class="qc-hub-tab" data-tab="salary" role="tab">Salary</button>
+  </div>
+
+  <section id="panel-attendance" class="qc-hub-panel active">
+    <div class="qc-card mt-4">
+      <div class="flex gap-2 mb-3"><input id="att-date" type="date" class="border rounded-lg px-3 py-2 text-sm"><button id="btn-att" class="px-3 py-2 rounded-lg text-white text-sm" style="background:#667eea">Load attendance</button><span id="att-status" class="text-sm text-slate-500 self-center"></span></div>
+      <div id="att-empty" class="hidden text-sm text-slate-500 py-8 text-center">No attendance records.</div>
+      <table class="w-full text-sm"><thead class="text-slate-500"><tr><th class="text-left p-2">Staff</th><th class="text-left p-2">Check-in</th><th class="text-left p-2">Status</th></tr></thead><tbody id="att-body"></tbody></table>
+      <a href="/admin-attendance.html" class="inline-block mt-3 text-sm text-blue-600">Open Attendance →</a>
+    </div>
+  </section>
+  <section id="panel-tasks" class="qc-hub-panel">
+    <div class="qc-card mt-4">
+      <div class="flex gap-2 mb-3"><button id="btn-tasks" class="px-3 py-2 rounded-lg text-white text-sm" style="background:#667eea">Load tasks</button><span id="tasks-status" class="text-sm text-slate-500 self-center"></span></div>
+      <div id="tasks-empty" class="hidden text-sm text-slate-500 py-8 text-center">No tasks.</div>
+      <table class="w-full text-sm"><thead class="text-slate-500"><tr><th class="text-left p-2">Title</th><th class="text-left p-2">Assignee</th><th class="text-left p-2">Status</th></tr></thead><tbody id="tasks-body"></tbody></table>
+    </div>
+  </section>
+  <section id="panel-daily" class="qc-hub-panel">
+    <div class="qc-card mt-4">
+      <div class="flex gap-2 mb-3"><button id="btn-daily" class="px-3 py-2 rounded-lg text-white text-sm" style="background:#667eea">Load daily tasks</button><span id="daily-status" class="text-sm text-slate-500 self-center"></span></div>
+      <div id="daily-empty" class="hidden text-sm text-slate-500 py-8 text-center">No daily tasks.</div>
+      <table class="w-full text-sm"><thead class="text-slate-500"><tr><th class="text-left p-2">Task</th><th class="text-left p-2">Date</th><th class="text-left p-2">Status</th></tr></thead><tbody id="daily-body"></tbody></table>
+    </div>
+  </section>
+  <section id="panel-salary" class="qc-hub-panel">
+    <div class="qc-card mt-4"><p class="text-sm text-slate-600">Salary is full hub — quick jump.</p><a href="/admin-salary-hub.html" class="inline-block mt-2 px-4 py-2 rounded-lg text-white text-sm" style="background:var(--gradient-primary)">Open Salary Hub →</a></div>
+  </section>
+</main>
+<script src="/universal-nav-loader.js?v=6b4a6dbe"></script>
+<script>
+const $=s=>document.querySelector(s);
+function getAuthHeaders(){const t=localStorage.getItem('auth_token')||localStorage.getItem('token')||'';return t?{Authorization:'Bearer '+t}:{}}
+async function apiFetch(url,opts={}){const h={...getAuthHeaders(), ...(opts.headers||{})}; if(opts.body && !(opts.body instanceof FormData) && !h['Content-Type']) h['Content-Type']='application/json'; const r=await fetch(url,{...opts,headers:h}); if(r.status===401){location.href='/login.html'; throw new Error('Auth');} if(!r.ok) throw new Error((await r.text()).slice(0,300)); return r.json();}
+function esc(s){const d=document.createElement('div'); d.textContent=s??''; return d.innerHTML;}
+function setTab(n){document.querySelectorAll('.qc-hub-tab').forEach(b=>{const on=b.dataset.tab===n; b.classList.toggle('active',on); b.setAttribute('aria-selected',String(on));}); document.querySelectorAll('.qc-hub-panel').forEach(p=> p.classList.toggle('active', p.id==='panel-'+n)); history.replaceState(null,'','#'+n);}
+document.querySelectorAll('.qc-hub-tab').forEach(b=> b.addEventListener('click',()=> setTab(b.dataset.tab)));
+if(location.hash) setTab(location.hash.slice(1));
+async function loadAtt(){
+  const d=$('#att-date').value; $('#att-status').textContent='Loading…';
+  try{const qs=d?('?date='+encodeURIComponent(d)):''; const j=await apiFetch('/api/attendance'+qs); const rows=j.data||j.rows||j.attendance||[]; const tb=$('#att-body'); tb.innerHTML=''; if(!rows.length) $('#att-empty').classList.remove('hidden'); else $('#att-empty').classList.add('hidden'); rows.forEach(r=>{const tr=document.createElement('tr'); tr.className='border-t'; tr.innerHTML=`<td class="p-2">${esc(r.staff_name||r.name||'')}</td><td class="p-2">${esc((r.check_in||r.clock_in||'').slice(0,16))}</td><td class="p-2">${esc(r.status||'')}</td>`; tb.appendChild(tr);}); $('#att-status').textContent=rows.length+' rows';}catch(e){$('#att-status').textContent=e.message;}
+}
+async function loadTasks(){
+  $('#tasks-status').textContent='Loading…';
+  try{const j=await apiFetch('/api/tasks'); const rows=j.data||j.rows||j.tasks||[]; const tb=$('#tasks-body'); tb.innerHTML=''; if(!rows.length) $('#tasks-empty').classList.remove('hidden'); else $('#tasks-empty').classList.add('hidden'); rows.forEach(r=>{const tr=document.createElement('tr'); tr.className='border-t'; tr.innerHTML=`<td class="p-2">${esc(r.title||r.task||'')}</td><td class="p-2">${esc(r.assignee_name||r.staff_name||'')}</td><td class="p-2">${esc(r.status||'')}</td>`; tb.appendChild(tr);}); $('#tasks-status').textContent=rows.length+' rows';}catch(e){$('#tasks-status').textContent=e.message;}
+}
+async function loadDaily(){
+  $('#daily-status').textContent='Loading…';
+  try{const j=await apiFetch('/api/daily-tasks'); const rows=j.data||j.rows||[]; const tb=$('#daily-body'); tb.innerHTML=''; if(!rows.length) $('#daily-empty').classList.remove('hidden'); else $('#daily-empty').classList.add('hidden'); rows.forEach(r=>{const tr=document.createElement('tr'); tr.className='border-t'; tr.innerHTML=`<td class="p-2">${esc(r.title||r.task||'')}</td><td class="p-2">${esc((r.date||r.task_date||'').slice(0,10))}</td><td class="p-2">${esc(r.status||'')}</td>`; tb.appendChild(tr);}); $('#daily-status').textContent=rows.length+' rows';}catch(e){$('#daily-status').textContent=e.message;}
+}
+$('#btn-att').addEventListener('click', loadAtt);
+$('#btn-tasks').addEventListener('click', loadTasks);
+$('#btn-daily').addEventListener('click', loadDaily);
+$('#btn-refresh').addEventListener('click', ()=>{const t=document.querySelector('.qc-hub-tab.active').dataset.tab; if(t==='attendance') loadAtt(); if(t==='tasks') loadTasks(); if(t==='daily') loadDaily();});
+(function init(){const el=$('#att-date'); if(el) el.valueAsDate=new Date(); loadAtt();})();
+</script>
+</body>
+</html>
