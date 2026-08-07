@@ -237,7 +237,7 @@ let stockFilterMgr=null;
 
 function toast(msg, err=false){ const t=document.getElementById('toast'); t.textContent=msg; t.className='toast show '+(err?'bg-red-600':''); setTimeout(()=>t.className='toast',3000); }
 function esc(s){ return (s==null?'':String(s)).replace(/[&<>"']/g,c=>({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
-async function apiFetch(url, opts={}){ const r=await fetch(url,{credentials:'include',headers:{'Content-Type':'application/json', ...(opts.headers||{})}, ...opts}); const j=await r.json().catch(()=>({})); if(!r.ok) throw new Error(j.message||('HTTP '+r.status)); return j; }
+async function apiFetch(url, opts={}){ const auth = (typeof getAuthHeaders==='function' ? getAuthHeaders() : {}); const r=await fetch(url,{credentials:'include',headers:{...auth, ...(opts.headers||{})}, ...opts}); if(r.status===401){ window.location.href='/login.html'; throw new Error('Authentication required'); } const j=await r.json().catch(()=>({})); if(!r.ok) throw new Error(j.message||('HTTP '+r.status)); return j; }
 
 function switchTab(name){
   document.querySelectorAll('.hub-tab').forEach(b=> b.classList.toggle('active', b.dataset.tab===name));
