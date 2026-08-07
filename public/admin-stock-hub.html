@@ -1,0 +1,575 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="theme-color" content="#667eea">
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+<title>Stock Hub — Quality Colours Manager</title>
+<link rel="stylesheet" href="/css/tailwind.css?v=849f1b5c">
+<link rel="stylesheet" href="/css/design-system.css?v=876c7d73">
+<link rel="stylesheet" href="/css/zoho-common.css?v=b2e96640">
+<link rel="stylesheet" href="/css/stock-filters.css?v=b857440e">
+<script src="/js/auth-helper.js?v=7101c516"></script>
+<script src="/js/stock-filters.js?v=c951d5f4"></script>
+<script src="/js/qc-escape.js?v=32133ff2"></script>
+<script src="/universal-nav-loader.js?v=6b4a6dbe"></script>
+<script>requireAdminOrRedirect();</script>
+<style>
+body{ background:#f8fafb; font-family:Inter, -apple-system, BlinkMacSystemFont, sans-serif;}
+.hub-tabs{ display:flex; gap:6px; overflow-x:auto; scrollbar-width:none; padding:2px; border-bottom:1px solid #e5e7eb; background:white;}
+.hub-tabs::-webkit-scrollbar{ display:none; }
+.hub-tab{ padding:10px 16px; font-size:0.8125rem; font-weight:500; color:#64748b; border:none; background:none; cursor:pointer; white-space:nowrap; border-bottom:2px solid transparent; margin-bottom:-1px; transition: all 0.18s; }
+.hub-tab:hover{ color:#334155; background:#f8fafc; }
+.hub-tab.active{ color:#3b4b9a; font-weight:600; border-bottom-color:#667eea; background:#eef2ff; }
+.hub-pane{ display:none; }
+.hub-pane.active{ display:block; }
+.stat-card{ background:white; border-radius:10px; padding:14px 16px; box-shadow:0 1px 3px rgba(0,0,0,0.06); border:1px solid #e5e7eb; }
+.stat-card .label{ font-size:0.68rem; color:#64748b; font-weight:600; text-transform:uppercase; letter-spacing:0.04em; }
+.stat-card .value{ font-size:1.45rem; font-weight:700; color:#0f172a; margin-top:4px; }
+.stat-card .hint{ font-size:0.72rem; color:#94a3b8; margin-top:2px; }
+.kpi-accent{ border-left:3px solid; }
+.qc-table{ width:100%; border-collapse:collapse; font-size:0.8125rem; }
+.qc-table th{ background:#f8fafc; border-bottom:1px solid #e2e8f0; padding:8px 10px; font-weight:600; color:#475569; text-align:left; white-space:nowrap; }
+.qc-table td{ padding:8px 10px; border-bottom:1px solid #f1f5f9; }
+.qc-table tbody tr:hover{ background:#f8fafc; }
+.badge{ display:inline-block; font-size:0.68rem; font-weight:600; padding:2px 8px; border-radius:999px; }
+.badge-critical{ background:#fee2e2; color:#991b1b; }
+.badge-high{ background:#ffedd5; color:#9a3412; }
+.badge-medium{ background:#fef3c7; color:#92400e; }
+.badge-low{ background:#dbeafe; color:#1e40af; }
+.status-dot{ display:inline-block; width:8px; height:8px; border-radius:50%; }
+.dot-out{ background:#ef4444; } .dot-below{ background:#f97316; } .dot-near{ background:#eab308; } .dot-healthy{ background:#22c55e; }
+.location-chip{ padding:6px 12px; border-radius:999px; font-size:0.75rem; font-weight:500; border:1px solid #e5e7eb; background:white; cursor:pointer; white-space:nowrap; }
+.location-chip.active{ background:#667eea; color:white; border-color:#667eea; }
+.selected-row{ background:#eef2ff !important; }
+.quick-action{ display:flex; align-items:center; gap:10px; padding:10px 12px; background:white; border:1px solid #e5e7eb; border-radius:8px; cursor:pointer; transition:all 0.15s; }
+.quick-action:hover{ border-color:#667eea; background:#f8fafb; }
+.filter-panel{ background:white; border:1px solid #e5e7eb; border-radius:8px; padding:12px; }
+@media(max-width:768px){ .hub-tabs{ gap:2px; } .hub-tab{ padding:8px 10px; font-size:0.75rem; } }
+</style>
+</head>
+<body data-page="zoho-stock-hub">
+<div id="toast" class="toast" role="alert"></div>
+
+<div class="max-w-[1400px] mx-auto px-3 md:px-6 py-4">
+  <!-- Header -->
+  <div class="flex flex-col md:flex-row md:items-center justify-between gap-3 mb-4">
+    <div>
+      <h1 class="text-xl md:text-2xl font-bold text-gray-900 tracking-tight">Stock Hub</h1>
+      <p class="text-sm text-gray-500 mt-0.5">Check, reorder and move stock — one place.</p>
+    </div>
+    <div class="flex items-center gap-2 flex-wrap">
+      <button onclick="syncStock()" id="btnSyncStock" class="px-3 py-2 bg-white border border-gray-300 rounded-lg text-sm font-medium hover:bg-gray-50">Sync Stock</button>
+      <button onclick="runReorderCheck()" id="btnReorderCheck" class="px-3 py-2 bg-gray-900 text-white rounded-lg text-sm font-medium hover:bg-black">Check Reorder</button>
+      <button onclick="openCreateCheck()" class="px-3 py-2 bg-[#667eea] text-white rounded-lg text-sm font-medium hover:bg-[#5a6fd6]">New Stock Check</button>
+    </div>
+  </div>
+
+  <!-- Overview stats -->
+  <div id="overviewStats" class="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
+    <div class="stat-card kpi-accent" style="border-left-color:#667eea"><div class="label">Total SKUs</div><div class="value" id="kpiTotal">—</div><div class="hint" id="kpiTotalHint">across locations</div></div>
+    <div class="stat-card kpi-accent" style="border-left-color:#f97316"><div class="label">Below reorder</div><div class="value" id="kpiReorder">—</div><div class="hint"><span id="kpiCritical">0 critical</span> · <span id="kpiHigh">0 high</span></div></div>
+    <div class="stat-card kpi-accent" style="border-left-color:#eab308"><div class="label">Low stock (≤5)</div><div class="value" id="kpiLow">—</div><div class="hint">needs attention</div></div>
+    <div class="stat-card kpi-accent" style="border-left-color:#22c55e"><div class="label">Pending checks</div><div class="value" id="kpiChecks">—</div><div class="hint" id="kpiChecksHint">awaiting count</div></div>
+  </div>
+
+  <!-- Tab bar -->
+  <div class="hub-tabs" id="hubTabs">
+    <button class="hub-tab active" data-tab="overview" onclick="switchTab('overview')">Overview</button>
+    <button class="hub-tab" data-tab="stock" onclick="switchTab('stock')">Stock Levels</button>
+    <button class="hub-tab" data-tab="reorder" onclick="switchTab('reorder')">Reorder <span id="tabReorderBadge" class="ml-1 hidden bg-red-500 text-white text-[10px] px-1.5 py-0.5 rounded-full"></span></button>
+    <button class="hub-tab" data-tab="checks" onclick="switchTab('checks')">Stock Checks</button>
+    <button class="hub-tab" data-tab="migrate" onclick="switchTab('migrate')">Migrate</button>
+  </div>
+
+  <div class="bg-white rounded-b-lg shadow-sm border border-t-0 border-gray-200 p-3 md:p-5 min-h-[420px]">
+
+  <!-- OVERVIEW PANE -->
+  <div id="pane-overview" class="hub-pane active">
+    <div class="grid md:grid-cols-3 gap-4">
+      <div class="md:col-span-2 space-y-3">
+        <h3 class="text-sm font-semibold text-gray-800">At a glance</h3>
+        <div id="overviewReorderList" class="space-y-2"></div>
+        <div id="overviewLowList" class="space-y-2"></div>
+      </div>
+      <div class="space-y-3">
+        <h3 class="text-sm font-semibold text-gray-800">Quick actions</h3>
+        <div class="quick-action" onclick="switchTab('reorder')"><span class="w-8 h-8 rounded-lg bg-amber-50 border border-amber-200 flex items-center justify-center text-amber-600">!</span><div><div class="text-sm font-medium">Review reorder alerts</div><div class="text-xs text-gray-500"><span id="qaReorderCount">—</span> items below level</div></div></div>
+        <div class="quick-action" onclick="switchTab('stock')"><span class="w-8 h-8 rounded-lg bg-blue-50 border border-blue-200 flex items-center justify-center text-blue-600">#</span><div><div class="text-sm font-medium">Browse stock by location</div><div class="text-xs text-gray-500">Search, filter, sort</div></div></div>
+        <div class="quick-action" onclick="switchTab('checks')"><span class="w-8 h-8 rounded-lg bg-emerald-50 border border-emerald-200 flex items-center justify-center text-emerald-600">✓</span><div><div class="text-sm font-medium">Stock checks</div><div class="text-xs text-gray-500" id="qaChecksCount">pending assignments</div></div></div>
+        <div class="quick-action" onclick="switchTab('migrate')"><span class="w-8 h-8 rounded-lg bg-violet-50 border border-violet-200 flex items-center justify-center text-violet-600">⇄</span><div><div class="text-sm font-medium">Warehouse → Business</div><div class="text-xs text-gray-500">One-click migration</div></div></div>
+        <div class="bg-gray-50 rounded-lg p-3 border border-gray-200">
+          <div class="text-xs font-semibold text-gray-600 mb-1">How it works</div>
+          <ol class="text-xs text-gray-500 list-decimal ml-4 space-y-1">
+            <li>Scan Reorder for critical items</li>
+            <li>Select → Create Stock Check (1 click)</li>
+            <li>Staff counts on mobile, you review & adjust</li>
+          </ol>
+        </div>
+      </div>
+    </div>
+    <div class="mt-4">
+      <div class="flex items-center justify-between mb-2"><h3 class="text-sm font-semibold text-gray-800">Recent checks</h3><button onclick="switchTab('checks')" class="text-xs text-[#667eea] font-medium">View all →</button></div>
+      <div id="overviewChecks" class="overflow-x-auto"><div class="text-sm text-gray-400 py-4">Loading…</div></div>
+    </div>
+  </div>
+
+  <!-- STOCK PANE -->
+  <div id="pane-stock" class="hub-pane">
+    <div id="locationChips" class="flex gap-2 overflow-x-auto pb-2 mb-3" style="scrollbar-width:none"></div>
+    <div class="flex flex-col md:flex-row gap-2 mb-3">
+      <input id="stockSearch" type="text" placeholder="Search name or SKU…" class="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-sm" oninput="debounceStockSearch()">
+      <select id="stockSort" onchange="loadStock()" class="px-3 py-2 border border-gray-300 rounded-lg text-sm bg-white">
+        <option value="name_asc">Name A→Z</option><option value="name_desc">Name Z→A</option><option value="stock_asc">Stock low→high</option><option value="stock_desc">Stock high→low</option><option value="updated_desc">Recently updated</option>
+      </select>
+      <label class="flex items-center gap-2 text-sm px-2"><input type="checkbox" id="stockLowOnly" onchange="loadStock()"> Low only</label>
+      <button onclick="stockFilterMgr && stockFilterMgr.togglePanel()" class="px-3 py-2 border border-gray-300 rounded-lg text-sm bg-white">Filters <span id="stockFilterBadge" class="ml-1 text-xs bg-gray-100 px-1.5 py-0.5 rounded-full">0</span></button>
+    </div>
+    <div id="stockFilterPanel" class="filter-panel hidden mb-3"></div>
+    <div id="stockFilterChips" class="flex flex-wrap gap-1 mb-3"></div>
+    <div id="stockSelectionBar" class="hidden items-center justify-between bg-[#eef2ff] border border-indigo-200 rounded-lg px-3 py-2 mb-3">
+      <span class="text-sm font-medium text-indigo-700"><span id="stockSelCount">0</span> selected</span>
+      <div class="flex gap-2">
+        <button onclick="clearStockSelection()" class="px-3 py-1.5 bg-white border border-gray-300 rounded-lg text-xs">Clear</button>
+        <button onclick="addStockToCheck()" class="px-3 py-1.5 bg-[#667eea] text-white rounded-lg text-xs font-medium">Add to Stock Check</button>
+      </div>
+    </div>
+    <div id="stockLoading" class="text-center py-8 text-gray-400 text-sm">Select a location to view stock</div>
+    <div id="stockTableWrap" class="hidden overflow-x-auto border border-gray-200 rounded-lg">
+      <table class="qc-table"><thead><tr><th style="width:28px"><input type="checkbox" id="stockSelectAll" onchange="toggleStockSelectAll(this)"></th><th>Item</th><th>SKU</th><th class="text-right">Qty</th><th class="text-right">Rate</th><th class="text-right">Value</th><th class="text-center">Status</th></tr></thead><tbody id="stockBody"></tbody></table>
+    </div>
+    <div id="stockPagination" class="flex items-center justify-between mt-3 text-sm hidden"><span id="stockPageInfo" class="text-gray-500"></span><div id="stockPageBtns" class="flex gap-1"></div></div>
+  </div>
+
+  <!-- REORDER PANE -->
+  <div id="pane-reorder" class="hub-pane">
+    <div class="flex flex-wrap items-center justify-between gap-2 mb-3">
+      <div class="flex gap-2 text-xs">
+        <span class="badge badge-critical" id="rCritical">0 critical</span><span class="badge badge-high" id="rHigh">0 high</span><span class="badge badge-medium" id="rMed">0 medium</span><span class="badge badge-low" id="rLow">0 low</span>
+      </div>
+      <div class="flex gap-2">
+        <select id="reorderStatus" onchange="loadReorder()" class="px-2 py-1.5 border border-gray-300 rounded-lg text-xs bg-white"><option value="">All status</option><option value="active">Active</option><option value="acknowledged">Acknowledged</option><option value="resolved">Resolved</option></select>
+        <select id="reorderSeverity" onchange="loadReorder()" class="px-2 py-1.5 border border-gray-300 rounded-lg text-xs bg-white"><option value="">All severity</option><option value="critical">Critical</option><option value="high">High</option><option value="medium">Medium</option><option value="low">Low</option></select>
+      </div>
+    </div>
+    <div id="reorderSelectionBar" class="hidden items-center justify-between bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 mb-3">
+      <span class="text-sm font-medium text-amber-800"><span id="reorderSelCount">0</span> selected</span>
+      <div class="flex gap-2">
+        <button onclick="clearReorderSelection()" class="px-3 py-1.5 bg-white border border-gray-300 rounded-lg text-xs">Clear</button>
+        <button onclick="createCheckFromReorder()" class="px-3 py-1.5 bg-gray-900 text-white rounded-lg text-xs font-medium">Create Stock Check</button>
+        <button onclick="bulkAcknowledge()" class="px-3 py-1.5 bg-white border border-gray-300 rounded-lg text-xs">Acknowledge</button>
+      </div>
+    </div>
+    <div id="reorderLoading" class="text-center py-8 text-gray-400 text-sm">Loading reorder alerts…</div>
+    <div id="reorderTableWrap" class="hidden overflow-x-auto border border-gray-200 rounded-lg">
+      <table class="qc-table"><thead><tr><th style="width:28px"><input type="checkbox" id="reorderSelectAll" onchange="toggleReorderSelectAll(this)"></th><th>Item</th><th>Location</th><th class="text-right">Stock</th><th class="text-right">Reorder at</th><th>Severity</th><th>Status</th><th></th></tr></thead><tbody id="reorderBody"></tbody></table>
+    </div>
+    <div id="reorderPagination" class="flex items-center justify-between mt-3 text-sm hidden"><span id="reorderPageInfo" class="text-gray-500"></span><div id="reorderPageBtns" class="flex gap-1"></div></div>
+  </div>
+
+  <!-- CHECKS PANE -->
+  <div id="pane-checks" class="hub-pane">
+    <div class="flex flex-wrap gap-2 mb-3 items-end">
+      <select id="checksStatus" onchange="loadChecks()" class="px-3 py-2 border border-gray-300 rounded-lg text-sm bg-white"><option value="">All status</option><option value="pending">Pending</option><option value="submitted">Submitted</option><option value="reviewed">Reviewed</option><option value="adjusted">Adjusted</option><option value="cancelled">Cancelled</option></select>
+      <select id="checksBranch" onchange="loadChecks()" class="px-3 py-2 border border-gray-300 rounded-lg text-sm bg-white"><option value="">All branches</option></select>
+      <input type="date" id="checksFrom" onchange="loadChecks()" class="px-3 py-2 border border-gray-300 rounded-lg text-sm">
+      <input type="date" id="checksTo" onchange="loadChecks()" class="px-3 py-2 border border-gray-300 rounded-lg text-sm">
+      <button onclick="loadChecks()" class="px-3 py-2 bg-white border border-gray-300 rounded-lg text-sm">Refresh</button>
+      <button onclick="openCreateCheck()" class="ml-auto px-3 py-2 bg-gray-900 text-white rounded-lg text-sm font-medium">New check</button>
+    </div>
+    <div id="checksLoading" class="text-center py-8 text-gray-400 text-sm">Loading assignments…</div>
+    <div id="checksTableWrap" class="hidden overflow-x-auto border border-gray-200 rounded-lg">
+      <table class="qc-table"><thead><tr><th>Date</th><th>Branch</th><th>Staff</th><th class="text-center">Items</th><th>Status</th><th>Checked</th><th></th></tr></thead><tbody id="checksBody"></tbody></table>
+    </div>
+    <div id="checksPagination" class="flex items-center justify-between mt-3 text-sm hidden"><span id="checksPageInfo" class="text-gray-500"></span><div id="checksPageBtns" class="flex gap-1"></div></div>
+
+    <!-- Create form (collapsible) -->
+    <div id="createCheckPanel" class="hidden mt-4 border border-gray-200 rounded-lg p-4 bg-gray-50">
+      <h4 class="text-sm font-semibold mb-3">New Stock Check</h4>
+      <div class="grid md:grid-cols-4 gap-3 mb-3">
+        <div><label class="text-xs font-semibold text-gray-600">Branch</label><select id="ccBranch" class="w-full mt-1 px-3 py-2 border border-gray-300 rounded-lg text-sm bg-white" onchange="onCcBranchChange()"><option value="">Select</option></select></div>
+        <div><label class="text-xs font-semibold text-gray-600">Location</label><select id="ccLocation" class="w-full mt-1 px-3 py-2 border border-gray-300 rounded-lg text-sm bg-white"><option value="">Auto</option></select></div>
+        <div><label class="text-xs font-semibold text-gray-600">Staff</label><select id="ccStaff" class="w-full mt-1 px-3 py-2 border border-gray-300 rounded-lg text-sm bg-white"><option value="">Select</option></select></div>
+        <div><label class="text-xs font-semibold text-gray-600">Date</label><input type="date" id="ccDate" class="w-full mt-1 px-3 py-2 border border-gray-300 rounded-lg text-sm"></div>
+      </div>
+      <label class="flex items-center gap-2 text-sm mb-3"><input type="checkbox" id="ccShowQty"> <span>Show system qty to staff</span></label>
+      <div class="mb-3">
+        <label class="text-xs font-semibold text-gray-600">Items (<span id="ccCount">0</span> selected)</label>
+        <div class="flex gap-2 mt-1">
+          <input type="text" id="ccSearch" placeholder="Search name or SKU…" class="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-sm" oninput="ccSearchProducts()">
+          <div id="ccResults" class="hidden absolute bg-white border border-gray-200 rounded-lg shadow-lg max-h-48 overflow-auto w-64 mt-10 z-10"></div>
+        </div>
+        <div id="ccSelected" class="mt-2 space-y-1 max-h-40 overflow-auto"></div>
+      </div>
+      <textarea id="ccNotes" rows="2" placeholder="Instructions (optional)" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm mb-3"></textarea>
+      <div class="flex gap-2"><button onclick="submitCreateCheck()" id="ccSubmitBtn" class="px-4 py-2 bg-[#667eea] text-white rounded-lg text-sm font-medium">Create</button><button onclick="closeCreateCheck()" class="px-4 py-2 bg-white border border-gray-300 rounded-lg text-sm">Cancel</button></div>
+    </div>
+  </div>
+
+  <!-- MIGRATE PANE -->
+  <div id="pane-migrate" class="hub-pane">
+    <div class="flex items-center justify-between mb-3">
+      <p class="text-sm text-gray-500">Move all warehouse stock to business locations. Paired Zoho adjustments run automatically.</p>
+      <div class="flex gap-2"><button id="btnMigrateSync" onclick="syncStock()" class="px-3 py-2 bg-white border border-gray-300 rounded-lg text-sm">Sync</button><button onclick="loadMigrate()" class="px-3 py-2 bg-white border border-gray-300 rounded-lg text-sm">Refresh</button></div>
+    </div>
+    <div id="migrateLoading" class="text-center py-8 text-gray-400 text-sm">Loading warehouse stock…</div>
+    <div id="migrateContent" class="hidden space-y-3"></div>
+    <div class="mt-4 flex gap-2"><button id="btnTransferAll" onclick="transferAll()" class="px-4 py-2 bg-gray-900 text-white rounded-lg text-sm font-medium">Transfer All Branches</button>
+      <span id="migrateStatus" class="text-sm text-gray-500 self-center"></span></div>
+  </div>
+
+  </div>
+</div>
+
+<!-- Review slide panel -->
+<div id="reviewOverlay" class="fixed inset-0 bg-black/40 hidden" style="z-index:9997" onclick="closeReview()"></div>
+<div id="reviewPanel" class="fixed top-0 right-0 w-full md:w-[640px] h-full bg-white shadow-2xl hidden overflow-auto" style="z-index:9998"><div class="sticky top-0 bg-white border-b px-4 py-3 flex items-center justify-between"><h3 id="reviewTitle" class="font-semibold">Review</h3><button onclick="closeReview()" class="px-2 py-1 border rounded text-sm">Close</button></div><div id="reviewContent" class="p-4"></div></div>
+
+<script>
+const API_SC='/api/stock-check';
+const API_Z='/api/zoho';
+const API_SM='/api/stock-migration';
+let locations=[], branches=[], reorderCache=[], stockCache=[], pendingCheckItems=[];
+let selectedStock=new Set(), selectedReorder=new Set();
+let currentLocationId=null, stockPage=1, stockTotal=0, reorderPage=1, reorderTotal=0, checksPage=1, checksTotal=0;
+let stockFilterMgr=null;
+
+function toast(msg, err=false){ const t=document.getElementById('toast'); t.textContent=msg; t.className='toast show '+(err?'bg-red-600':''); setTimeout(()=>t.className='toast',3000); }
+function esc(s){ return (s==null?'':String(s)).replace(/[&<>"']/g,c=>({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+async function apiFetch(url, opts={}){ const r=await fetch(url,{credentials:'include',headers:{'Content-Type':'application/json', ...(opts.headers||{})}, ...opts}); const j=await r.json().catch(()=>({})); if(!r.ok) throw new Error(j.message||('HTTP '+r.status)); return j; }
+
+function switchTab(name){
+  document.querySelectorAll('.hub-tab').forEach(b=> b.classList.toggle('active', b.dataset.tab===name));
+  document.querySelectorAll('.hub-pane').forEach(p=> p.classList.toggle('active', p.id==='pane-'+name));
+  if(name==='stock' && !locations.length) initStock();
+  if(name==='reorder') loadReorder();
+  if(name==='checks') loadChecks();
+  if(name==='migrate') loadMigrate();
+  history.replaceState(null,'','#'+name);
+}
+
+// ---------- OVERVIEW ----------
+async function loadOverview(){
+  try{
+    const [stockDash, reorderSum, checks] = await Promise.all([
+      apiFetch(API_Z+'/stock?limit=1').catch(()=>null),
+      apiFetch(API_Z+'/reorder/alerts/summary').catch(()=>null),
+      apiFetch(API_SC+'/assignments?limit=5').catch(()=>null)
+    ]);
+    if(stockDash){ document.getElementById('kpiTotal').textContent = stockDash.total ?? '—'; }
+    const rs = reorderSum && reorderSum.data ? reorderSum.data : reorderSum;
+    if(rs){ document.getElementById('kpiReorder').textContent = (rs.active_count||0); document.getElementById('kpiCritical').textContent=(rs.critical_count||0)+' critical'; document.getElementById('kpiHigh').textContent=(rs.high_count||0)+' high'; document.getElementById('qaReorderCount').textContent=rs.active_count||0;
+      document.getElementById('rCritical').textContent=(rs.critical_count||0)+' critical'; document.getElementById('rHigh').textContent=(rs.high_count||0)+' high'; document.getElementById('rMed').textContent=(rs.medium_count||0)+' med'; document.getElementById('rLow').textContent=(rs.low_count||0)+' low';
+      const badge=document.getElementById('tabReorderBadge'); if(rs.active_count>0){ badge.textContent=rs.active_count; badge.classList.remove('hidden'); } else badge.classList.add('hidden');
+    }
+    try{
+      const lowRes = await apiFetch(API_Z+'/stock/by-location?location_id='+(locations[0]?.zoho_location_id||'')+'&stock_status=low_stock&limit=5').catch(()=>null);
+      if(lowRes && lowRes.data){ document.getElementById('kpiLow').textContent = lowRes.pagination ? lowRes.pagination.total : lowRes.data.length; }
+    }catch{}
+    if(checks && checks.data){
+      const pending = checks.data.filter(c=>c.status==='pending').length;
+      document.getElementById('kpiChecks').textContent = checks.pagination ? checks.pagination.total : checks.data.length;
+      document.getElementById('kpiChecksHint').textContent = pending+' pending';
+      document.getElementById('qaChecksCount').textContent = (checks.pagination?checks.pagination.total:checks.data.length)+' assignments';
+      // overview checks table
+      const oc=document.getElementById('overviewChecks');
+      if(checks.data.length){ oc.innerHTML='<table class="qc-table"><thead><tr><th>Date</th><th>Branch</th><th>Staff</th><th>Status</th><th></th></tr></thead><tbody>'+checks.data.slice(0,5).map(a=>'<tr><td>'+esc(a.check_date)+'</td><td>'+esc(a.branch_name)+'</td><td>'+esc(a.staff_name)+'</td><td><span class="badge" style="background:#fef3c7">'+esc(a.status)+'</span></td><td><button onclick="openReview('+a.id+')" class="text-xs text-[#667eea]">Review</button></td></tr>').join('')+'</tbody></table>'; } else oc.innerHTML='<div class="text-sm text-gray-400">No checks yet</div>';
+    }
+    // top reorder items preview
+    try{
+      const ro=await apiFetch(API_Z+'/reorder/alerts?limit=5&status=active').catch(()=>null);
+      const list=document.getElementById('overviewReorderList');
+      const items=(ro && (ro.data||ro.alerts||ro.rows))||[];
+      if(items.length){ list.innerHTML='<div class="text-xs font-semibold text-gray-600">Top reorder alerts</div>'+items.slice(0,5).map(r=>'<div class="flex items-center justify-between bg-white border rounded-lg px-3 py-2"><div><div class="text-sm font-medium">'+esc(r.item_name||r.zoho_item_name||'')+'</div><div class="text-xs text-gray-500">'+esc(r.zoho_location_name||r.location_name||'')+' · '+esc(r.severity||'')+'</div></div><div class="text-right"><div class="text-sm font-semibold">'+(r.stock_on_hand ?? r.current_stock ?? '-')+'</div><div class="text-xs text-gray-400">/ '+(r.reorder_level ?? '-')+'</div></div></div>').join(''); } else list.innerHTML='<div class="text-xs text-gray-400">No active reorder alerts</div>';
+    }catch{}
+  }catch(e){ console.error(e); }
+}
+
+// ---------- STOCK ----------
+async function initStock(){
+  try{
+    const [locRes, fOpts] = await Promise.all([
+      apiFetch(API_Z+'/locations').catch(()=> ({data:[]})),
+      apiFetch(API_Z+'/stock/filter-options').catch(()=>null)
+    ]);
+    // zoho locations map fallback
+    let locs=[];
+    if(Array.isArray(locRes)) locs=locRes;
+    else if(locRes && locRes.data) locs=locRes.data;
+    else if(locRes && locRes.locations) locs=locRes.locations;
+    // try alternative endpoint: we know branches->locations via /api/stock-check/locations but for overview we can use zoho_locations_map via branches
+    if(!locs.length){
+      try{ const br=await apiFetch('/api/branches'); branches=br.data||br||[]; for(const b of branches){ const lr=await apiFetch(API_SC+'/locations/'+b.id).catch(()=>({data:[]})); (lr.data||[]).forEach(l=> locs.push({...l, branch_name:b.name})); } }catch{}
+    }
+    locations=locs;
+    branches = branches.length?branches:(await apiFetch('/api/branches').then(r=>r.data||r).catch(()=>[]));
+    fillLocationChips();
+    fillBranchSelects();
+    if(locations.length){ currentLocationId=locations[0].zoho_location_id; highlightChip(); loadStock(); }
+    // setup filter manager for stock
+    if(window.StockFilters && fOpts){
+      const brands=fOpts.brands||[], cats=fOpts.categories||[], map=fOpts.brandCategories||{};
+      stockFilterMgr=new StockFilters({ brands, categories:cats, brandCategories:map, panelId:'stockFilterPanel', chipsId:'stockFilterChips', badgeId:'stockFilterBadge', onApply: loadStock });
+    }
+  }catch(e){ console.error('initStock',e); }
+}
+function fillLocationChips(){
+  const c=document.getElementById('locationChips');
+  c.innerHTML=locations.map(l=> '<button class="location-chip" data-loc="'+esc(l.zoho_location_id)+'" onclick="selectLocation(\''+esc(l.zoho_location_id)+'\')">'+esc(l.zoho_location_name||l.branch_name||l.zoho_location_id)+'</button>').join('');
+}
+function highlightChip(){ document.querySelectorAll('.location-chip').forEach(ch=> ch.classList.toggle('active', ch.dataset.loc===String(currentLocationId))); }
+function selectLocation(id){ currentLocationId=id; stockPage=1; selectedStock.clear(); updateStockSelectionBar(); highlightChip(); loadStock(); }
+let stockDebounce=null;
+function debounceStockSearch(){ clearTimeout(stockDebounce); stockDebounce=setTimeout(()=>{ stockPage=1; loadStock(); },400); }
+async function loadStock(){
+  if(!currentLocationId){ document.getElementById('stockLoading').textContent='No location available'; return; }
+  document.getElementById('stockLoading').textContent='Loading…'; document.getElementById('stockLoading').classList.remove('hidden');
+  try{
+    const q=new URLSearchParams({ location_id: currentLocationId, page: stockPage, limit: 25, sort: document.getElementById('stockSort').value, search: document.getElementById('stockSearch').value.trim() });
+    if(document.getElementById('stockLowOnly').checked) q.set('stock_status','low_stock');
+    if(stockFilterMgr){ const f=stockFilterMgr.getSelected(); if(f.brands.length) q.set('brands', f.brands.join(',')); if(f.categories.length) q.set('categories', f.categories.join(',')); }
+    const res=await apiFetch(API_Z+'/stock/by-location?'+q.toString());
+    const rows=res.data||res.items||res.rows||[];
+    stockCache=rows;
+    stockTotal=res.pagination?res.pagination.total:rows.length;
+    renderStock(rows);
+    renderStockPagination(res.pagination);
+    document.getElementById('stockLoading').classList.add('hidden');
+    document.getElementById('stockTableWrap').classList.remove('hidden');
+    document.getElementById('kpiTotal').textContent = res.pagination?res.pagination.total:rows.length;
+    // low count quick
+    try{ const low=rows.filter(r=> (r.stock_on_hand||0) <=5 ).length; }catch{}
+  }catch(e){ document.getElementById('stockLoading').textContent='Failed: '+e.message; }
+}
+function renderStock(rows){
+  const tb=document.getElementById('stockBody');
+  if(!rows.length){ tb.innerHTML='<tr><td colspan="7" class="text-center py-6 text-gray-400">No items</td></tr>'; return; }
+  tb.innerHTML=rows.map(r=>{
+    const qty=Number(r.stock_on_hand||0);
+    const status = qty<=0?'out': qty<=5?'below':'healthy';
+    const dot = status==='out'?'dot-out': status==='below'?'dot-below':'dot-healthy';
+    const checked = selectedStock.has(String(r.zoho_item_id));
+    return '<tr class="'+(checked?'selected-row':'')+'"><td><input type="checkbox" '+(checked?'checked':'')+' onchange="toggleStockRow(\''+esc(r.zoho_item_id)+'\', this)"></td><td><div class="font-medium">'+esc(r.item_name||r.zoho_item_name)+'</div><div class="text-xs text-gray-400">'+esc(r.sku||r.zoho_sku||'')+'</div></td><td class="text-xs">'+esc(r.sku||r.zoho_sku||'')+'</td><td class="text-right font-semibold">'+qty+'</td><td class="text-right">'+esc(r.rate||r.zoho_rate||'')+'</td><td class="text-right">'+esc(r.stock_value||'')+'</td><td class="text-center"><span class="status-dot '+dot+'"></span></td></tr>';
+  }).join('');
+}
+function renderStockPagination(p){
+  const wrap=document.getElementById('stockPagination'); if(!p){ wrap.classList.add('hidden'); return; } wrap.classList.remove('hidden');
+  document.getElementById('stockPageInfo').textContent='Page '+p.page+' of '+p.pages+' · '+p.total+' items';
+  const btns=document.getElementById('stockPageBtns'); btns.innerHTML='<button '+(p.page<=1?'disabled':'')+' onclick="stockPage--;loadStock()" class="px-2 py-1 border rounded text-xs">Prev</button><button '+(p.page>=p.pages?'disabled':'')+' onclick="stockPage++;loadStock()" class="px-2 py-1 border rounded text-xs">Next</button>';
+}
+function toggleStockRow(id, el){ if(el.checked) selectedStock.add(String(id)); else selectedStock.delete(String(id)); updateStockSelectionBar(); }
+function toggleStockSelectAll(el){ if(el.checked) stockCache.forEach(r=> selectedStock.add(String(r.zoho_item_id))); else stockCache.forEach(r=> selectedStock.delete(String(r.zoho_item_id))); renderStock(stockCache); updateStockSelectionBar(); }
+function updateStockSelectionBar(){ const bar=document.getElementById('stockSelectionBar'); document.getElementById('stockSelCount').textContent=selectedStock.size; bar.style.display = selectedStock.size ? 'flex' : 'none'; bar.classList.toggle('hidden', !selectedStock.size); }
+function clearStockSelection(){ selectedStock.clear(); renderStock(stockCache); updateStockSelectionBar(); document.getElementById('stockSelectAll').checked=false; }
+function addStockToCheck(){ if(!selectedStock.size) return toast('Select items first', true); pendingCheckItems = stockCache.filter(r=> selectedStock.has(String(r.zoho_item_id))).map(r=> ({ zoho_item_id:r.zoho_item_id, item_name:r.item_name||r.zoho_item_name, sku:r.sku||r.zoho_sku })); // carry location
+  // remember location
+  window._pendingHubLocation = currentLocationId;
+  openCreateCheck();
+  toast(pendingCheckItems.length+' items queued'); }
+
+// ---------- REORDER ----------
+async function loadReorder(){
+  document.getElementById('reorderLoading').textContent='Loading…'; document.getElementById('reorderLoading').classList.remove('hidden');
+  try{
+    const q=new URLSearchParams({ page: reorderPage, limit: 25 });
+    const st=document.getElementById('reorderStatus').value; if(st) q.set('status', st);
+    const se=document.getElementById('reorderSeverity').value; if(se) q.set('severity', se);
+    const res=await apiFetch(API_Z+'/reorder/alerts?'+q.toString());
+    const rows=res.data||res.alerts||res.rows||res.items||[];
+    reorderCache=rows; reorderTotal=res.pagination?res.pagination.total:rows.length;
+    renderReorder(rows); renderReorderPagination(res.pagination);
+    document.getElementById('reorderLoading').classList.add('hidden'); document.getElementById('reorderTableWrap').classList.remove('hidden');
+  }catch(e){ document.getElementById('reorderLoading').textContent='Failed: '+e.message; }
+}
+function renderReorder(rows){
+  const tb=document.getElementById('reorderBody');
+  if(!rows.length){ tb.innerHTML='<tr><td colspan="8" class="text-center py-6 text-gray-400">No alerts</td></tr>'; return; }
+  tb.innerHTML=rows.map(r=>{
+    const sev=(r.severity||'low').toLowerCase();
+    const checked=selectedReorder.has(String(r.id||r.zoho_item_id+'|'+r.zoho_location_id));
+    return '<tr class="'+(checked?'selected-row':'')+'"><td><input type="checkbox" '+(checked?'checked':'')+' onchange="toggleReorderRow(\''+esc(r.id||r.zoho_item_id+'|'+r.zoho_location_id)+'\', this)"></td><td><div class="font-medium">'+esc(r.item_name||r.zoho_item_name||'')+'</div><div class="text-xs text-gray-400">'+esc(r.sku||r.zoho_sku||'')+'</div></td><td class="text-xs">'+esc(r.zoho_location_name||r.location_name||'')+'</td><td class="text-right">'+esc(r.stock_on_hand ?? r.current_stock ?? '')+'</td><td class="text-right">'+esc(r.reorder_level ?? '')+'</td><td><span class="badge badge-'+esc(sev)+'">'+esc(sev)+'</span></td><td><span class="badge" style="background:#f1f5f9">'+esc(r.status||'active')+'</span></td><td><button onclick="ackOne('+ (r.id||0) +')" class="text-xs text-[#667eea]">Ack</button></td></tr>';
+  }).join('');
+}
+function renderReorderPagination(p){ const w=document.getElementById('reorderPagination'); if(!p){ w.classList.add('hidden'); return; } w.classList.remove('hidden'); document.getElementById('reorderPageInfo').textContent='Page '+p.page+' of '+p.pages+' · '+p.total; const b=document.getElementById('reorderPageBtns'); b.innerHTML='<button '+(p.page<=1?'disabled':'')+' onclick="reorderPage--;loadReorder()" class="px-2 py-1 border rounded text-xs">Prev</button><button '+(p.page>=p.pages?'disabled':'')+' onclick="reorderPage++;loadReorder()" class="px-2 py-1 border rounded text-xs">Next</button>'; }
+function toggleReorderRow(key, el){ const k=String(key); if(el.checked) selectedReorder.add(k); else selectedReorder.delete(k); updateReorderBar(); }
+function toggleReorderSelectAll(el){ if(el.checked) reorderCache.forEach(r=> selectedReorder.add(String(r.id||r.zoho_item_id+'|'+r.zoho_location_id))); else reorderCache.forEach(r=> selectedReorder.delete(String(r.id||r.zoho_item_id+'|'+r.zoho_location_id))); renderReorder(reorderCache); updateReorderBar(); }
+function updateReorderBar(){ const bar=document.getElementById('reorderSelectionBar'); document.getElementById('reorderSelCount').textContent=selectedReorder.size; bar.style.display = selectedReorder.size?'flex':'none'; bar.classList.toggle('hidden', !selectedReorder.size); }
+function clearReorderSelection(){ selectedReorder.clear(); renderReorder(reorderCache); updateReorderBar(); document.getElementById('reorderSelectAll').checked=false; }
+async function ackOne(id){ if(!id) return; try{ await apiFetch(API_Z+'/reorder/alerts/'+id+'/acknowledge',{method:'PUT'}); toast('Acknowledged'); loadReorder(); }catch(e){ toast(e.message,true);} }
+async function bulkAcknowledge(){ if(!selectedReorder.size) return; const ids=[...selectedReorder].map(k=> Number(k)).filter(Boolean); for(const id of ids){ try{ await apiFetch(API_Z+'/reorder/alerts/'+id+'/acknowledge',{method:'PUT'});}catch{} } toast('Acknowledged '+ids.length); clearReorderSelection(); loadReorder(); }
+function createCheckFromReorder(){
+  if(!selectedReorder.size) return toast('Select alerts first', true);
+  const items=[]; let loc=null;
+  for(const k of selectedReorder){ const r=reorderCache.find(x=> String(x.id||x.zoho_item_id+'|'+x.zoho_location_id)===k); if(r){ items.push({zoho_item_id:r.zoho_item_id, item_name:r.item_name||r.zoho_item_name, sku:r.sku||r.zoho_sku}); loc = loc || r.zoho_location_id; } }
+  pendingCheckItems=items; window._pendingHubLocation=loc;
+  openCreateCheck(); toast(items.length+' items from reorder queued');
+  // optional: clear after?
+}
+
+// ---------- CHECKS ----------
+function fillBranchSelects(){
+  const opts=branches.map(b=> '<option value="'+b.id+'">'+esc(b.name)+'</option>').join('');
+  document.getElementById('checksBranch').innerHTML='<option value="">All branches</option>'+opts;
+  document.getElementById('ccBranch').innerHTML='<option value="">Select</option>'+opts;
+}
+async function loadBranchesAndStaff(){
+  if(!branches.length){ try{ const br=await apiFetch('/api/branches'); branches=br.data||br||[]; fillBranchSelects(); }catch{} }
+  try{ const u=await apiFetch('/api/users?limit=100').catch(()=> apiFetch('/api/users')); const users=u.data||u.users||u||[]; const staff=users.filter(x=> ['staff','sales_staff','branch_manager','manager'].includes((x.role||'').toLowerCase())); document.getElementById('ccStaff').innerHTML='<option value="">Select</option>'+staff.map(s=> '<option value="'+s.id+'">'+esc(s.full_name||s.username||s.name||('User '+s.id))+'</option>').join(''); }catch(e){ console.error(e); }
+}
+async function loadChecks(){
+  document.getElementById('checksLoading').textContent='Loading…'; document.getElementById('checksLoading').classList.remove('hidden');
+  try{
+    const q=new URLSearchParams({ page: checksPage, limit: 20 });
+    const st=document.getElementById('checksStatus').value; if(st) q.set('status', st);
+    const br=document.getElementById('checksBranch').value; if(br) q.set('branch_id', br);
+    const f=document.getElementById('checksFrom').value; if(f) q.set('from_date', f);
+    const t=document.getElementById('checksTo').value; if(t) q.set('to_date', t);
+    const res=await apiFetch(API_SC+'/assignments?'+q.toString());
+    const rows=res.data||[];
+    checksTotal=res.pagination?res.pagination.total:rows.length;
+    renderChecks(rows); renderChecksPagination(res.pagination);
+    document.getElementById('checksLoading').classList.add('hidden'); document.getElementById('checksTableWrap').classList.remove('hidden');
+  }catch(e){ document.getElementById('checksLoading').textContent='Failed: '+e.message; }
+}
+function renderChecks(rows){
+  const tb=document.getElementById('checksBody');
+  if(!rows.length){ tb.innerHTML='<tr><td colspan="7" class="text-center py-6 text-gray-400">No assignments</td></tr>'; return; }
+  tb.innerHTML=rows.map(a=> '<tr><td class="text-xs">'+esc((a.check_date||'').split('T')[0])+'</td><td>'+esc(a.branch_name||'')+'</td><td>'+esc(a.staff_name||'')+'</td><td class="text-center">'+esc(a.item_count||'')+'</td><td><span class="badge" style="background:#eef2ff">'+esc(a.status)+'</span></td><td class="text-xs">'+esc(a.submitted_count||0)+'/'+esc(a.item_count||0)+'</td><td><button onclick="openReview('+a.id+')" class="px-2 py-1 bg-white border rounded text-xs">Review</button>'+(a.status==='pending' ? ' <button onclick="deleteCheck('+a.id+')" class="text-xs text-red-600">Delete</button>':'')+'</td></tr>').join('');
+}
+function renderChecksPagination(p){ const w=document.getElementById('checksPagination'); if(!p){ w.classList.add('hidden'); return; } w.classList.remove('hidden'); document.getElementById('checksPageInfo').textContent='Page '+p.page+' of '+p.pages+' · '+p.total; const b=document.getElementById('checksPageBtns'); b.innerHTML='<button '+(p.page<=1?'disabled':'')+' onclick="checksPage--;loadChecks()" class="px-2 py-1 border rounded text-xs">Prev</button><button '+(p.page>=p.pages?'disabled':'')+' onclick="checksPage++;loadChecks()" class="px-2 py-1 border rounded text-xs">Next</button>'; }
+async function deleteCheck(id){ if(!confirm('Delete this assignment?')) return; try{ await apiFetch(API_SC+'/assignments/'+id,{method:'DELETE'}); toast('Deleted'); loadChecks(); }catch(e){ toast(e.message,true);} }
+
+// Create check panel
+async function openCreateCheck(){
+  switchTab('checks');
+  document.getElementById('createCheckPanel').classList.remove('hidden');
+  document.getElementById('ccDate').valueAsDate=new Date();
+  await loadBranchesAndStaff();
+  // if pending items, show them
+  renderCcSelected();
+  // if location from hub pending, try to select
+  if(window._pendingHubLocation){
+    // try to set location select after branch change
+    // find branch for location
+    const loc = locations.find(l=> String(l.zoho_location_id)===String(window._pendingHubLocation));
+    if(loc){ document.getElementById('ccBranch').value = String(loc.local_branch_id||''); await onCcBranchChange(); document.getElementById('ccLocation').value = String(loc.zoho_location_id); }
+  }
+  document.getElementById('createCheckPanel').scrollIntoView({behavior:'smooth'});
+}
+function closeCreateCheck(){ document.getElementById('createCheckPanel').classList.add('hidden'); pendingCheckItems=[]; renderCcSelected(); }
+function renderCcSelected(){
+  const c=document.getElementById('ccSelected');
+  document.getElementById('ccCount').textContent=pendingCheckItems.length;
+  if(!pendingCheckItems.length){ c.innerHTML='<div class="text-xs text-gray-400">No items selected — add from Stock or Reorder, or search below</div>'; return; }
+  c.innerHTML=pendingCheckItems.map((it,i)=> '<div class="flex items-center justify-between bg-white border rounded px-2 py-1 text-sm"><span>'+esc(it.item_name)+' <span class="text-xs text-gray-400">'+esc(it.sku||'')+'</span></span><button onclick="removeCcItem('+i+')" class="text-red-500 text-xs">Remove</button></div>').join('');
+}
+function removeCcItem(i){ pendingCheckItems.splice(i,1); renderCcSelected(); }
+async function onCcBranchChange(){
+  const bid=document.getElementById('ccBranch').value;
+  const sel=document.getElementById('ccLocation');
+  sel.innerHTML='<option value="">Auto</option>';
+  if(!bid) return;
+  try{ const res=await apiFetch(API_SC+'/locations/'+bid); (res.data||[]).forEach(l=>{ const o=document.createElement('option'); o.value=l.zoho_location_id; o.textContent=l.zoho_location_name; sel.appendChild(o); }); }catch(e){ console.error(e); }
+}
+let ccSearchTimer=null;
+async function ccSearchProducts(){
+  clearTimeout(ccSearchTimer);
+  const q=document.getElementById('ccSearch').value.trim();
+  const box=document.getElementById('ccResults');
+  if(q.length<2){ box.classList.add('hidden'); return; }
+  ccSearchTimer=setTimeout(async()=>{
+    try{
+      const res=await apiFetch('/api/zoho/items/search?q='+encodeURIComponent(q)+'&limit=10').catch(()=> apiFetch(API_Z+'/items/search?q='+encodeURIComponent(q)).catch(()=>null));
+      let items=[];
+      if(res && res.data) items=res.data;
+      else if(res && res.items) items=res.items;
+      // fallback: search via stock by location if branch selected
+      if(!items.length && document.getElementById('ccBranch').value){
+        const bid=document.getElementById('ccBranch').value;
+        // use stock search as proxy
+        const loc=document.getElementById('ccLocation').value || currentLocationId;
+        if(loc){ const s=await apiFetch(API_Z+'/stock/by-location?location_id='+loc+'&search='+encodeURIComponent(q)+'&limit=10').catch(()=>null); if(s && s.data) items=s.data.map(x=> ({zoho_item_id:x.zoho_item_id, name:x.item_name, sku:x.sku})); }
+      }
+      if(!items.length){ box.innerHTML='<div class="p-2 text-xs text-gray-400">No results</div>'; box.classList.remove('hidden'); return; }
+      box.innerHTML=items.slice(0,10).map(it=> '<div onclick="addCcItem(\''+esc(it.zoho_item_id)+'\',\''+esc((it.name||it.item_name||'').replace(/'/g,' '))+'\',\''+esc((it.sku||'').replace(/'/g,' '))+'\')" class="px-3 py-2 hover:bg-gray-50 cursor-pointer text-sm border-b">'+esc(it.name||it.item_name||it.zoho_item_name||'')+' <span class="text-xs text-gray-400">'+esc(it.sku||it.zoho_sku||'')+'</span></div>').join('');
+      box.classList.remove('hidden');
+    }catch(e){ console.error(e); }
+  },300);
+}
+function addCcItem(id,name,sku){ if(pendingCheckItems.find(x=> String(x.zoho_item_id)===String(id))) return toast('Already added', true); pendingCheckItems.push({zoho_item_id:id, item_name:name, sku}); renderCcSelected(); document.getElementById('ccResults').classList.add('hidden'); document.getElementById('ccSearch').value=''; }
+async function submitCreateCheck(){
+  const branch_id=document.getElementById('ccBranch').value;
+  const staff_id=document.getElementById('ccStaff').value;
+  const check_date=document.getElementById('ccDate').value;
+  const zoho_location_id=document.getElementById('ccLocation').value || window._pendingHubLocation || undefined;
+  if(!branch_id||!staff_id||!check_date) return toast('Branch, Staff, Date required', true);
+  if(!pendingCheckItems.length) return toast('Add at least one item', true);
+  const btn=document.getElementById('ccSubmitBtn'); btn.disabled=true; btn.textContent='Creating…';
+  try{
+    const res=await apiFetch(API_SC+'/assign',{method:'POST', body: JSON.stringify({ branch_id: Number(branch_id), staff_id: Number(staff_id), check_date, item_ids: pendingCheckItems.map(x=> String(x.zoho_item_id)), show_system_qty: document.getElementById('ccShowQty').checked?1:0, notes: document.getElementById('ccNotes').value.trim()||null, zoho_location_id })});
+    toast('Assignment #'+(res.data&&res.data.id?res.data.id:'')+' created');
+    closeCreateCheck(); selectedStock.clear(); selectedReorder.clear(); updateStockSelectionBar(); updateReorderBar(); loadChecks();
+  }catch(e){ toast(e.message,true);} finally{ btn.disabled=false; btn.textContent='Create'; }
+}
+
+// ---------- MIGRATE ----------
+async function loadMigrate(){
+  document.getElementById('migrateLoading').textContent='Loading…'; document.getElementById('migrateLoading').classList.remove('hidden');
+  try{
+    const res=await apiFetch(API_SM+'/warehouse-stock');
+    const branchesM=res.branches||[];
+    const wrap=document.getElementById('migrateContent');
+    if(!branchesM.length){ wrap.innerHTML='<div class="text-sm text-gray-400">No warehouse stock</div>'; } else {
+      wrap.innerHTML=branchesM.map(b=> '<div class="border rounded-lg p-3 bg-white"><div class="flex items-center justify-between"><div><div class="font-medium text-sm">'+esc(b.branch_name)+'</div><div class="text-xs text-gray-500">'+esc(b.warehouse_location_name||'')+' → '+esc(b.business_location_name||'')+' · '+b.total_items+' items</div></div><button onclick=\'transferBranch('+JSON.stringify(b).replace(/\'/g,"&#39;")+')\' class="px-3 py-1.5 bg-white border border-gray-300 rounded-lg text-xs">Transfer</button></div><div class="text-xs text-gray-400 mt-1">'+b.total_quantity+' total qty</div></div>').join('');
+    }
+    wrap.classList.remove('hidden'); document.getElementById('migrateLoading').classList.add('hidden');
+    window._migrateBranches=branchesM;
+  }catch(e){ document.getElementById('migrateLoading').textContent='Failed: '+e.message; }
+}
+async function transferBranch(b){
+  if(typeof b==='string') b=JSON.parse(b);
+  if(!confirm('Transfer '+b.total_items+' items for '+b.branch_name+'?')) return;
+  try{ document.getElementById('migrateStatus').textContent='Transferring…'; const res=await apiFetch(API_SM+'/transfer',{method:'POST', body: JSON.stringify({ branch_id:b.branch_id, branch_name:b.branch_name, from_location_id:b.warehouse_location_id, to_location_id:b.business_location_id, items:b.items })}); document.getElementById('migrateStatus').textContent=res.message||'Done'; toast('Transferred'); }catch(e){ document.getElementById('migrateStatus').textContent=e.message; toast(e.message,true); }
+}
+async function transferAll(){
+  const all=window._migrateBranches||[];
+  if(!all.length) return toast('No branches', true);
+  if(!confirm('Transfer ALL '+all.length+' branches?')) return;
+  try{ document.getElementById('migrateStatus').textContent='Transferring all…'; const res=await apiFetch(API_SM+'/transfer-all',{method:'POST', body: JSON.stringify({ branches: all })}); document.getElementById('migrateStatus').textContent='Done'; toast('All transferred'); loadMigrate(); }catch(e){ toast(e.message,true); document.getElementById('migrateStatus').textContent=e.message; }
+}
+
+// ---------- ACTIONS ----------
+async function syncStock(){
+  try{ toast('Sync started…'); await apiFetch(API_Z+'/stock/sync',{method:'POST'}); toast('Stock sync queued'); }catch(e){ try{ await apiFetch(API_SM+'/sync-stock',{method:'POST'}); toast('Stock sync queued'); }catch(ee){ toast(e.message,true); } }
+}
+async function runReorderCheck(){ try{ toast('Checking reorder…'); const r=await apiFetch(API_Z+'/reorder/check',{method:'POST'}); toast('Reorder check done'); loadOverview(); if(document.getElementById('pane-reorder').classList.contains('active')) loadReorder(); }catch(e){ toast(e.message,true);} }
+
+// Review panel (reuse)
+async function openReview(id){
+  document.getElementById('reviewOverlay').classList.remove('hidden'); document.getElementById('reviewPanel').classList.remove('hidden');
+  document.getElementById('reviewContent').innerHTML='<div class="text-sm text-gray-400">Loading…</div>';
+  try{
+    const res=await apiFetch(API_SC+'/assignments/'+id);
+    const d=res.data; document.getElementById('reviewTitle').textContent='Review #'+d.id+' · '+esc(d.branch_name||'')+' · '+esc((d.check_date||'').split('T')[0]);
+    const items=d.items||[];
+    document.getElementById('reviewContent').innerHTML='<div class="text-xs text-gray-500 mb-2">Staff: <strong>'+esc(d.staff_name||'')+'</strong> · Status: '+esc(d.status||'')+'</div><div class="overflow-x-auto border rounded-lg"><table class="qc-table"><thead><tr><th>Item</th><th>System</th><th>Reported</th><th>Diff</th></tr></thead><tbody>'+items.map(it=> '<tr><td><div class="font-medium">'+esc(it.item_name)+'</div><div class="text-xs text-gray-400">'+esc(it.item_sku||'')+'</div></td><td>'+esc(it.system_qty)+'</td><td>'+esc(it.reported_qty ?? '-')+'</td><td class="'+(Number(it.difference)>0?'text-emerald-600': Number(it.difference)<0?'text-red-600':'')+'">'+esc(it.difference ?? '-')+'</td></tr>').join('')+'</tbody></table></div><div class="mt-3 flex gap-2"><button onclick="closeReview()" class="px-3 py-2 bg-white border rounded-lg text-sm">Close</button></div>';
+  }catch(e){ document.getElementById('reviewContent').innerHTML='<div class="text-sm text-red-600">'+esc(e.message)+'</div>'; }
+}
+function closeReview(){ document.getElementById('reviewOverlay').classList.add('hidden'); document.getElementById('reviewPanel').classList.add('hidden'); }
+
+// init
+(async function(){
+  // tab from hash
+  const hash=(location.hash||'').replace('#','');
+  if(['overview','stock','reorder','checks','migrate'].includes(hash)) switchTab(hash);
+  loadOverview();
+  // preload branches for chips later
+  try{ const br=await apiFetch('/api/branches'); branches=br.data||br||[]; fillBranchSelects(); }catch{}
+  // if stock tab default load will happen on switch
+  if(document.getElementById('pane-stock').classList.contains('active')) initStock();
+})();
+document.addEventListener('click', e=>{ const box=document.getElementById('ccResults'); if(box && !e.target.closest('#ccResults') && !e.target.closest('#ccSearch')) box.classList.add('hidden'); });
+</script>
+</body>
+</html>

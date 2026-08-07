@@ -135,6 +135,9 @@
         }
         .qty-input:focus { border-color: #1B5E3B; }
         .qty-input.has-value { border-color: #a5b4fc; }
+        .stepper-btn{ width:32px; height:32px; border-radius:8px; border:1px solid #e2e8f0; background:white; font-size:1.05rem; font-weight:700; color:#334155; display:inline-flex; align-items:center; justify-content:center; cursor:pointer; flex-shrink:0; }
+        .stepper-btn:active{ background:#f1f5f9; transform:scale(0.96); }
+        .stepper-wrap{ display:flex; align-items:center; gap:4px; }
 
         /* Photo button — icon only, compact */
         .photo-row { flex-shrink: 0; display: flex; gap: 4px; align-items: center; margin-bottom: 0; }
@@ -1092,11 +1095,12 @@ function renderAssignment(a) {
                         </div>
                     </div>
 
-                    <div class="item-input-row">
-                        <label>Count:</label>
+                    <div class="item-input-row stepper-wrap">
+                        <button type="button" class="stepper-btn" onclick="stepQty(${a.id}, \'${item.zoho_item_id}\', -1)" aria-label="Decrease">−</button>
                         <input type="number" step="0.01" min="0" class="qty-input" id="qty-${a.id}-${item.zoho_item_id}"
                                data-assignment="${a.id}" data-zoho-id="${item.zoho_item_id}"
-                               placeholder="Enter quantity" oninput="onQtyInput(this, ${a.id}, '${item.zoho_item_id}')">
+                               placeholder="0" inputmode="decimal" oninput="onQtyInput(this, ${a.id}, '${item.zoho_item_id}')">
+                        <button type="button" class="stepper-btn" onclick="stepQty(${a.id}, \'${item.zoho_item_id}\', 1)" aria-label="Increase">+</button>
                     </div>
 
                     <div class="photo-row">
@@ -1130,6 +1134,19 @@ function renderAssignment(a) {
     return html;
 }
 
+function stepQty(assignmentId, zohoItemId, delta){
+    const el=document.getElementById(`qty-${assignmentId}-${zohoItemId}`);
+    if(!el) return;
+    let v=parseFloat(el.value)||0;
+    v=Math.max(0, v+delta);
+    // keep 2 decimals if needed, but integer steps are primary
+    el.value = (v % 1 === 0) ? String(Math.round(v)) : v.toFixed(2).replace(/\.00$/,'');
+    onQtyInput(el, assignmentId, zohoItemId);
+    // gentle auto-save debounce (1.2s)
+    clearTimeout(el._autoSaveTimer);
+    el._autoSaveTimer=setTimeout(()=>{ const btn=document.getElementById(`saveBtn-${assignmentId}`); if(btn && !btn.disabled) saveProgress(assignmentId); }, 1200);
+    el.focus();
+}
 function onQtyInput(el, assignmentId, zohoItemId) {
     if (el.value !== '') {
         el.classList.add('has-value');
