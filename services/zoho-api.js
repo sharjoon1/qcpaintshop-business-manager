@@ -72,6 +72,21 @@ async function createInvoice(invoiceData) {
     return await apiPost(`/invoices?organization_id=${orgId}`, invoiceData);
 }
 
+async function createEstimate(estimateData) {
+    const orgId = process.env.ZOHO_ORGANIZATION_ID;
+    return await apiPost(`/estimates?organization_id=${orgId}`, estimateData);
+}
+
+async function updateEstimate(estimateId, estimateData) {
+    const orgId = process.env.ZOHO_ORGANIZATION_ID;
+    return await apiPost(`/estimates/${estimateId}?organization_id=${orgId}`, estimateData);
+}
+
+async function sendEstimate(estimateId) {
+    const orgId = process.env.ZOHO_ORGANIZATION_ID;
+    return await apiPost(`/estimates/${estimateId}/status/sent?organization_id=${orgId}`, {});
+}
+
 /**
  * Get overdue invoices
  */
@@ -2737,6 +2752,9 @@ module.exports = {
     getContact,
     createContact,
     updateContact,
+    createEstimate,
+    updateEstimate,
+    sendEstimate,
     createSalesperson,
     listSalespersons,
     syncSalespersons,
