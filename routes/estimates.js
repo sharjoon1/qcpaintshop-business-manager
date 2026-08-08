@@ -1214,7 +1214,70 @@ router.patch('/:id/status', requirePermission('estimates', 'edit'), async (req, 
 });
 
 // ========================================
-// ESTIMATE HISTORY (uses estimate_status_history table)
+// PUSH TO ZOHO (Phase 3: Draft after Admin Approve, no second Zoho approval)
+// ========================================
+router.post('/:id/push-to-zoho', requirePermission('estimates', 'edit'), async (req, res) => {
+  try {
+    const estimateId = req.params.id;
+    const [estRows] = await pool.query('SELECT * FROM estimates WHERE id = ?', [estimateId]);
+    if (!estRows.length) return res.status(404).json({ error: 'Estimate not found' });
+    const est = estRows[0];
+    if (!estimateBranchAllowed(req, est.branch_id)) return res.status(403).json({ error: 'Not authorized' });
+    if (est.status !== 'approved' && est.status !== 'sent') return res.status(400).json({ error: 'Estimate must be approved before Zoho push' });
+    if (est.zoho_estimate_id && est.zoho_status !== 'not_pushed') return res.status(400).json({ error: 'Already pushed to Zoho', zoho_estimate_id: est.zoho_estimate_id });
+    try { await pool.query(`SELECT zoho_estimate_id FROM estimates LIMIT 1`); } catch(e){
+      await pool.query(`ALTER TABLE estimates ADD COLUMN zoho_estimate_id VARCHAR(100) NULL`);
+      await pool.query(`ALTER TABLE estimates ADD COLUMN zoho_contact_id VARCHAR(100) NULL`);
+      await pool.query(`ALTER TABLE estimates ADD COLUMN zoho_status ENUM('not_pushed','draft','sent','accepted','declined','invoiced') NOT NULL DEFAULT 'not_pushed'`);
+      await pool.query(`ALTER TABLE estimates ADD COLUMN zoho_response TEXT NULL`);
+      await pool.query(`ALTER TABLE estimates ADD COLUMN pushed_at DATETIME NULL`);
+    }
+    const zohoApi = require('../services/zoho-api');
+    let zohoContactId = est.zoho_contact_id;
+    if (!zohoContactId) {
+      const phone = (est.customer_phone||'').trim();
+      const email = (est.customer_email||'').trim();
+      if (phone) { const [hit]=await pool.query('SELECT zoho_contact_id FROM zoho_customers_map WHERE zoho_phone = ? LIMIT 1', [phone]); if(hit.length) zohoContactId=hit[0].zoho_contact_id; }
+      if (!zohoContactId && email) { const [hit]=await pool.query('SELECT zoho_contact_id FROM zoho_customers_map WHERE zoho_email = ? LIMIT 1', [email]); if(hit.length) zohoContactId=hit[0].zoho_contact_id; }
+      if (!zohoContactId) {
+        const payload={ contact_name: est.customer_name||'Walk-in Customer', contact_type:'customer' };
+        if(phone) payload.phone=phone;
+        if(email) payload.email=email;
+        if(est.customer_address) payload.billing_address={ address: est.customer_address };
+        const cr=await zohoApi.createContact(payload);
+        zohoContactId=cr?.contact?.contact_id||cr?.contact_id;
+        if(zohoContactId) await pool.query(`INSERT INTO zoho_customers_map (zoho_contact_id, zoho_contact_name, zoho_phone, zoho_email, last_synced_at) VALUES (?, ?, ?, ?, NOW()) ON DUPLICATE KEY UPDATE zoho_contact_name=VALUES(zoho_contact_name)`, [zohoContactId, est.customer_name, phone||null, email||null]);
+      }
+      if(zohoContactId) await pool.query('UPDATE estimates SET zoho_contact_id = ? WHERE id = ?', [zohoContactId, estimateId]);
+    }
+    if(!zohoContactId) return res.status(400).json({ error: 'Could not resolve Zoho contact' });
+    const [items]=await pool.query('SELECT * FROM estimate_items WHERE estimate_id = ? ORDER BY display_order', [estimateId]);
+    const line_items=items.map(it=>({ name:(it.item_description||'Item').slice(0,100), description:it.item_description||'', quantity:Number(it.quantity)||1, rate:Number(it.unit_price)||0 }));
+    if(Number(est.discount_amount)) line_items.push({ name:'Discount', description:'Discount', quantity:1, rate:-Math.abs(Number(est.discount_amount)) });
+    if(Number(est.transport_charge)) line_items.push({ name:'Transport Charges', description:'Transport', quantity:1, rate:Number(est.transport_charge) });
+    if(Number(est.labour_charge)) line_items.push({ name:'Labour Charges', description:'Labour', quantity:1, rate:Number(est.labour_charge) });
+    const payload={ customer_id: zohoContactId, estimate_number: est.estimate_number, date: est.estimate_date ? new Date(est.estimate_date).toISOString().slice(0,10) : new Date().toISOString().slice(0,10), expiry_date: est.valid_until ? new Date(est.valid_until).toISOString().slice(0,10) : undefined, line_items, notes: est.notes||'', terms: est.admin_notes||'' };
+    let zr;
+    try { zr=await zohoApi.createEstimate(payload); } catch(ze){ await pool.query('UPDATE estimates SET zoho_response = ?, zoho_status = ? WHERE id = ?', [String(ze.message).slice(0,4000), 'not_pushed', estimateId]); return res.status(502).json({ success:false, error:'Zoho Estimate create failed', details: ze.message }); }
+    const zid=zr?.estimate?.estimate_id||zr?.estimate_id||null;
+    await pool.query('UPDATE estimates SET zoho_estimate_id = ?, zoho_status = ?, zoho_response = ?, pushed_at = NOW() WHERE id = ?', [zid, 'draft', JSON.stringify(zr).slice(0,4000), estimateId]);
+    res.json({ success:true, zoho_estimate_id: zid, message:'Pushed to Zoho as draft (admin approved, no second Zoho approval needed). Staff can now Send to customer.' });
+  } catch(err){ console.error('push-to-zoho error',err); res.status(500).json({ error: err.message }); }
+});
+router.post('/:id/send-to-customer', requirePermission('estimates', 'edit'), async (req, res) => {
+  try {
+    const estimateId=req.params.id;
+    const [rows]=await pool.query('SELECT * FROM estimates WHERE id = ?', [estimateId]);
+    if(!rows.length) return res.status(404).json({ error:'Estimate not found' });
+    const est=rows[0];
+    if(!est.zoho_estimate_id) return res.status(400).json({ error:'Push to Zoho first' });
+    const zohoApi=require('../services/zoho-api');
+    await zohoApi.sendEstimate(est.zoho_estimate_id);
+    await pool.query('UPDATE estimates SET zoho_status = ?, status = ? WHERE id = ?', ['sent','sent', estimateId]);
+    res.json({ success:true, message:'Sent to customer via Zoho' });
+  } catch(err){ console.error('send-to-customer error',err); res.status(500).json({ error: err.message }); }
+});
+
 // ========================================
 router.get('/:id/history', requirePermission('estimates', 'view'), async (req, res) => {
     try {
