@@ -1621,6 +1621,43 @@ router.put('/permission/:id/approve', requirePermission('attendance', 'approve')
             );
         }
 
+        // D4 fix: an approved LEAVE must propagate to staff_attendance as
+        // status='on_leave'. Before this, the leave never created/updated an
+        // attendance row, so salary counted the same day BOTH as absence
+        // (absence_deduction) AND as leave (leave_deduction) — double-deducting
+        // an approved free leave. Upserting 'on_leave' lets salary's
+        // absent_days query (which counts status='absent') skip that day.
+        if (permission.request_type === 'leave') {
+            try {
+                const [userRows] = await pool.query(
+                    'SELECT branch_id FROM users WHERE id = ?', [permission.user_id]
+                );
+                const branchId = userRows.length ? userRows[0].branch_id : permission.branch_id;
+                if (branchId) {
+                    const [attRows] = await pool.query(
+                        'SELECT id, status FROM staff_attendance WHERE user_id = ? AND date = ?',
+                        [permission.user_id, permission.request_date]
+                    );
+                    if (attRows.length === 0) {
+                        await pool.query(
+                            `INSERT INTO staff_attendance (user_id, branch_id, date, status)
+                             VALUES (?, ?, ?, 'on_leave')`,
+                            [permission.user_id, branchId, permission.request_date]
+                        );
+                    } else if (attRows[0].status === 'absent') {
+                        // Approved leave overrides an admin-marked absence so the
+                        // staff isn't double-deducted.
+                        await pool.query(
+                            `UPDATE staff_attendance SET status = 'on_leave' WHERE id = ?`,
+                            [attRows[0].id]
+                        );
+                    }
+                }
+            } catch (leavePropErr) {
+                console.error('[Attendance] Leave propagation error:', leavePropErr.message);
+            }
+        }
+
         // Notify requesting staff
         const notifBody = permission.request_type === 're_clockin'
             ? 'Your re-clock-in request has been approved! You can now clock in again.'
@@ -3793,6 +3830,32 @@ router.put('/overtime-request/:id/approve', requireAuth, requirePermission('atte
             [otReq.attendance_id]
         );
 
+        // P0-6 fix: approving an OT request AFTER the staff already clocked out
+        // never used to set ot_approved_minutes, and salary pays OT exclusively
+        // from that column — so late approvals paid ₹0. Recompute it now from the
+        // attendance row's overtime_minutes (mirrors auto-clockout.js:522-535).
+        try {
+            const [attRows] = await pool.query(
+                `SELECT overtime_minutes FROM staff_attendance WHERE id = ?`,
+                [otReq.attendance_id]
+            );
+            if (attRows.length > 0) {
+                const otMinutes = Math.max(0, parseInt(attRows[0].overtime_minutes) || 0);
+                await pool.query(
+                    `UPDATE staff_attendance
+                     SET ot_approved_minutes = ? WHERE id = ? AND ot_approved_minutes IS NULL OR
+                         (id = ? AND ot_approved_minutes < ?)`,
+                    [otMinutes, otReq.attendance_id, otReq.attendance_id, otMinutes]
+                );
+                await pool.query(
+                    "UPDATE overtime_requests SET approved_minutes = ? WHERE id = ?",
+                    [otMinutes, requestId]
+                );
+            }
+        } catch (otErr) {
+            console.error('OT approve ot_approved_minutes recompute error:', otErr.message);
+        }
+
         // Notify staff
         try {
             const [reviewer] = await pool.query("SELECT full_name FROM users WHERE id = ?", [reviewerId]);
@@ -4301,6 +4364,30 @@ router.post('/eod-submit', requireAuth, async (req, res) => {
     } catch (err) {
         console.error('EOD submit error:', err);
         res.status(500).json({ success: false, message: 'Server error' });
+    }
+});
+
+/**
+ * GET / - Bare attendance list for a date (admin-work-hub widget).
+ * Returns staff attendance rows with staff name, clock-in, status.
+ */
+router.get('/', requirePermission('attendance', 'view'), async (req, res) => {
+    try {
+        const date = req.query.date || getTodayIST();
+        const [rows] = await pool.query(
+            `SELECT a.id, a.user_id, u.full_name AS staff_name, u.username,
+                    a.date, a.clock_in_time AS check_in, a.clock_out_time AS check_out,
+                    a.status, a.is_late, a.total_working_minutes
+             FROM staff_attendance a
+             JOIN users u ON a.user_id = u.id
+             WHERE a.date = ?
+             ORDER BY u.full_name`,
+            [date]
+        );
+        res.json({ success: true, data: rows, rows, attendance: rows });
+    } catch (error) {
+        console.error('Attendance list error:', error);
+        res.status(500).json({ success: false, message: 'Failed to load attendance' });
     }
 });
 

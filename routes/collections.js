@@ -660,6 +660,65 @@ router.get('/promises', perm, async (req, res) => {
     }
 });
 
+/**
+ * Record a real local money record (billing_payments) for a collection that
+ * happened through collections (promise kept / payment link verified).
+ *
+ * Before this fix, money collected via promises or pay-links never touched
+ * billing_payments — billing showed unpaid and Zoho-only records diverged.
+ *
+ * Matches the local billing_invoice by its Zoho invoice id/number (the only
+ * stable link between the two worlds). If no local invoice exists yet (never
+ * pushed / created in Zoho only), the payment is skipped with matched=false —
+ * the promise/link row itself remains the record of truth there.
+ */
+async function recordLocalPayment({ zohoInvoiceId, zohoInvoiceNumber, amount, paymentMethod, paymentReference, paymentDate, receivedBy }) {
+    if (!amount || parseFloat(amount) <= 0) return { matched: false, reason: 'no-amount' };
+
+    let rows;
+    if (zohoInvoiceId) {
+        [rows] = await pool.query(
+            'SELECT id, grand_total FROM billing_invoices WHERE zoho_invoice_id = ? AND deleted_at IS NULL LIMIT 1',
+            [zohoInvoiceId]
+        );
+    }
+    if (!rows || rows.length === 0) {
+        [rows] = await pool.query(
+            'SELECT id, grand_total FROM billing_invoices WHERE zoho_invoice_number = ? AND deleted_at IS NULL LIMIT 1',
+            [zohoInvoiceNumber]
+        );
+    }
+    if (!rows || rows.length === 0) return { matched: false, reason: 'no-local-invoice' };
+
+    const invoiceId = rows[0].id;
+    const paid = parseFloat(amount);
+
+    // Insert payment, then re-sum (mirrors billing.js recalcInvoicePaymentTotals).
+    const [ins] = await pool.query(
+        `INSERT INTO billing_payments
+         (invoice_id, amount, payment_method, payment_reference, payment_date, received_by, notes)
+         VALUES (?, ?, ?, ?, ?, ?, ?)`,
+        [invoiceId, paid, paymentMethod || 'upi', paymentReference || null,
+         paymentDate || new Date().toISOString().split('T')[0], receivedBy,
+         'Recorded from collections (promise/payment link)']
+    );
+
+    const [paySum] = await pool.query(
+        'SELECT COALESCE(SUM(amount), 0) AS total_paid FROM billing_payments WHERE invoice_id = ? AND deleted_at IS NULL',
+        [invoiceId]
+    );
+    const totalPaid = Number(paySum[0].total_paid);
+    const grandTotal = Number(rows[0].grand_total) || 0;
+    const balanceDue = Math.max(0, grandTotal - totalPaid);
+    const paymentStatus = totalPaid <= 0 ? 'unpaid' : (balanceDue <= 0.01 ? 'paid' : 'partial');
+    await pool.query(
+        `UPDATE billing_invoices SET amount_paid = ?, balance_due = ?, payment_status = ?, updated_at = NOW() WHERE id = ?`,
+        [totalPaid, balanceDue, paymentStatus, invoiceId]
+    );
+
+    return { matched: true, paymentId: ins.insertId, invoiceId, totalPaid, balanceDue };
+}
+
 router.post('/promises', perm, async (req, res) => {
     try {
         const { zoho_invoice_id, zoho_customer_id, customer_name, promise_date, promise_amount, notes, follow_up_date } = req.body;
@@ -744,6 +803,33 @@ router.put('/promises/:id', perm, async (req, res) => {
                 if (req.body.promise_date) p.promise_date = req.body.promise_date;
                 if (req.body.follow_up_date) p.follow_up_date = req.body.follow_up_date;
                 queuePromiseReminder(pool, p, req.user, 'updated').catch(() => {});
+            }
+        }
+
+        // Money collected against a kept/partial promise must create a real
+        // billing_payments record (D4 fix) — otherwise billing & Zoho never see it.
+        if ((status === 'kept' || status === 'partial') && actual_amount && parseFloat(actual_amount) > 0) {
+            const [promRow] = await pool.query(
+                `SELECT * FROM payment_promises WHERE id = ?`, [req.params.id]
+            );
+            const prom = promRow[0];
+            if (prom) {
+                try {
+                    const rec = await recordLocalPayment({
+                        zohoInvoiceId: prom.zoho_invoice_id,
+                        zohoInvoiceNumber: null,
+                        amount: actual_amount,
+                        paymentMethod: req.body.payment_method || 'upi',
+                        paymentReference: `promise-${prom.id}`,
+                        paymentDate: actual_payment_date,
+                        receivedBy: req.user.id
+                    });
+                    if (rec.matched) {
+                        console.log(`[Collections] Promise #${prom.id} → billing_payment #${rec.paymentId} (invoice ${rec.invoiceId})`);
+                    }
+                } catch (recErr) {
+                    console.error('[Collections] recordLocalPayment error:', recErr.message);
+                }
             }
         }
 
@@ -995,6 +1081,32 @@ router.post('/pay-verify', requirePermission('collections', 'view'), async (req,
             `UPDATE payment_links SET status='paid', zoho_payment_id=?, paid_at=NOW() WHERE zoho_payment_link_id=?`,
             [zohoStatus.payment_id || null, link_id]
         );
+
+        // D4 fix: a verified paid link must also create the local billing_payments
+        // record + refresh invoice totals, else billing shows unpaid forever.
+        try {
+            const [linkRows] = await pool.query(
+                `SELECT invoice_id, zoho_invoice_number, amount, customer_phone FROM payment_links
+                 WHERE zoho_payment_link_id = ? LIMIT 1`, [link_id]
+            );
+            if (linkRows[0]) {
+                const rec = await recordLocalPayment({
+                    zohoInvoiceId: linkRows[0].invoice_id || null,
+                    zohoInvoiceNumber: linkRows[0].zoho_invoice_number || null,
+                    amount: linkRows[0].amount,
+                    paymentMethod: 'upi',
+                    paymentReference: `paylink-${link_id}`,
+                    paymentDate: new Date().toISOString().split('T')[0],
+                    receivedBy: req.user.id
+                });
+                if (rec.matched) {
+                    console.log(`[Collections] Pay-link ${link_id} → billing_payment #${rec.paymentId} (invoice ${rec.invoiceId})`);
+                }
+            }
+        } catch (recErr) {
+            console.error('[Collections] pay-verify recordLocalPayment error:', recErr.message);
+        }
+
         res.json({ success: true, paid: true, payment_id: zohoStatus.payment_id });
     } catch (e) { res.status(500).json({ success: false, error: e.message }); }
 });

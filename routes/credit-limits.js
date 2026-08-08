@@ -110,6 +110,36 @@ async function checkCreditBeforeInvoice(dbPool, zohoContactId, invoiceAmount) {
 // ═══════════════════════════════════════════════════════════════
 
 // GET /api/credit-limits/customers — list all Zoho customers with credit info
+router.get('/', requirePermission('credit_limits', 'view'), async (req, res) => {
+    try {
+        // Same data as /customers (credit limits list) — bare route was called by
+        // admin-crm-hub but never existed → 404. Reuse identical query.
+        const { search } = req.query;
+        let where = 'WHERE 1=1';
+        const params = [];
+        if (search) {
+            where += ' AND (zcm.zoho_contact_name LIKE ? OR zcm.zoho_phone LIKE ?)';
+            params.push(`%${search}%`, `%${search}%`);
+        }
+        const [rows] = await pool.query(`
+            SELECT zcm.id, zcm.zoho_contact_name as name, zcm.zoho_contact_name as customer_name,
+                   zcm.zoho_phone as phone, zcm.zoho_contact_id,
+                   zcm.credit_limit, zcm.zoho_outstanding as used,
+                   zcm.zoho_outstanding as credit_used,
+                   (zcm.credit_limit - zcm.zoho_outstanding) as credit_available,
+                   zcm.branch_id, b.name as branch_name
+            FROM zoho_customers_map zcm
+            LEFT JOIN branches b ON zcm.branch_id = b.id
+            ${where}
+            ORDER BY zcm.zoho_contact_name ASC
+        `, params);
+        res.json({ success: true, data: rows, rows });
+    } catch (e) {
+        console.error('[CreditLimits] List error:', e.message);
+        res.status(500).json({ error: e.message });
+    }
+});
+
 router.get('/customers', requirePermission('credit_limits', 'view'), async (req, res) => {
     try {
         const { search, status, sort, branch } = req.query;
@@ -250,7 +280,11 @@ router.post('/check', requirePermission('credit_limits', 'view'), async (req, re
         const limit = Number(c.credit_limit);
         const used = Number(c.credit_used);
         const available = limit - used;
-        const allowed = limit === 0 ? true : available >= Number(amount); // 0 limit = no limit set
+        // D6 fix: align with checkCreditBeforeInvoice — a 0 limit means "no limit
+        // set" and blocks credit (customer must request a limit), NOT "unlimited".
+        // The old code here treated 0 as unlimited, giving opposite answers from
+        // the push-time gate in the same module.
+        const allowed = limit === 0 ? false : available >= Number(amount);
 
         res.json({
             allowed,

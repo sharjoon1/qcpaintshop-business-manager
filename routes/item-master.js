@@ -192,6 +192,34 @@ function extractColorFromName(name) {
 // ========================================================================
 
 // GET /items — List items with filters & pagination
+router.get('/', requireAuth, async (req, res) => {
+    try {
+        // Bare item-master list (admin-catalog-hub calls it; route never existed).
+        const { q, limit = 20 } = req.query;
+        const lim = Math.min(parseInt(limit) || 20, 100);
+        let where = 'WHERE 1=1';
+        const params = [];
+        if (q) {
+            where += ' AND (zim.zoho_item_name LIKE ? OR zim.zoho_sku LIKE ? OR zim.zoho_cf_product_name LIKE ?)';
+            params.push(`%${q}%`, `%${q}%`, `%${q}%`);
+        }
+        const [rows] = await pool.query(`
+            SELECT zim.id, zim.zoho_item_name AS item_name, zim.zoho_sku AS sku,
+                   zim.zoho_cf_product_name AS product_name,
+                   zim.zoho_brand AS brand, zim.zoho_category_name AS category,
+                   zim.zoho_rate AS rate, zim.status
+            FROM zoho_items_map zim
+            ${where}
+            ORDER BY zim.zoho_item_name ASC
+            LIMIT ?
+        `, [...params, lim]);
+        res.json({ success: true, data: rows, items: rows, rows });
+    } catch (e) {
+        console.error('[ItemMaster] List error:', e.message);
+        res.status(500).json({ error: e.message });
+    }
+});
+
 router.get('/items', requireAuth, validateQuery(itemsQuerySchema), async (req, res) => {
     try {
         const { brand, category, search, status, sort, order } = req.query;

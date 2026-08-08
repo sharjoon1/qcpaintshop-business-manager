@@ -574,6 +574,32 @@ router.get('/admin/summary', requirePermission('tasks', 'view'), async (req, res
     }
 });
 
+// GET / - Bare admin list of daily task submissions (admin-work-hub widget).
+// Returns one row per staff/day with completion info + staff name.
+router.get('/', requireAuth, async (req, res) => {
+    try {
+        const { date, limit = 50 } = req.query;
+        let query = `
+            SELECT dts.id, dts.user_id, u.full_name AS staff_name, dts.task_date,
+                   dts.total_tasks, dts.completed_tasks,
+                   CASE WHEN dts.completed_tasks >= dts.total_tasks AND dts.total_tasks > 0
+                        THEN 'completed' ELSE 'pending' END AS status,
+                   dts.submitted_at
+            FROM daily_task_submissions dts
+            JOIN users u ON u.id = dts.user_id
+            WHERE 1=1`;
+        const params = [];
+        if (date) { query += ' AND dts.task_date = ?'; params.push(date); }
+        query += ' ORDER BY dts.task_date DESC, u.full_name LIMIT ?';
+        params.push(parseInt(limit) || 50);
+        const [rows] = await pool.query(query, params);
+        res.json({ success: true, data: rows, rows });
+    } catch (error) {
+        console.error('Error listing daily task submissions:', error);
+        res.status(500).json({ success: false, error: 'Failed to load daily tasks' });
+    }
+});
+
 module.exports = {
     router,
     setPool

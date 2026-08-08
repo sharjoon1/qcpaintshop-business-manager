@@ -1238,23 +1238,36 @@ router.post('/reorder/create-po', requirePermission('zoho', 'reorder'), async (r
         const tax = Number(tax_amount) || 0;
         const grand_total = subtotal + tax;
 
-        const [result] = await pool.query(
-            `INSERT INTO vendor_purchase_orders
-                (vendor_id, po_number, subtotal, tax_amount, grand_total, expected_date, notes,
-                 source, source_reference, created_by)
-             VALUES (?, ?, ?, ?, ?, ?, ?, 'reorder_alert', ?, ?)`,
-            [vendor_id, po_number, subtotal, tax, grand_total, expected_date || null,
-             notes || null, `items=${items.length}`, req.user.id]
-        );
-        const poId = result.insertId;
-
-        for (const it of items) {
-            const amount = Number(it.quantity) * Number(it.unit_price);
-            await pool.query(
-                `INSERT INTO vendor_po_items (po_id, zoho_item_id, item_name, quantity, unit_price, amount)
-                 VALUES (?, ?, ?, ?, ?, ?)`,
-                [poId, it.zoho_item_id || null, it.item_name, it.quantity, it.unit_price, amount]
+        // Transaction: header + items must insert atomically (D1 fix — a failed item
+        // insert used to leave an orphaned draft PO with zero items, e.g. PO-00012)
+        const conn = await pool.getConnection();
+        let poId;
+        try {
+            await conn.beginTransaction();
+            const [result] = await conn.query(
+                `INSERT INTO vendor_purchase_orders
+                    (vendor_id, po_number, subtotal, tax_amount, grand_total, expected_date, notes,
+                     source, source_reference, created_by)
+                 VALUES (?, ?, ?, ?, ?, ?, ?, 'reorder_alert', ?, ?)`,
+                [vendor_id, po_number, subtotal, tax, grand_total, expected_date || null,
+                 notes || null, `items=${items.length}`, req.user.id]
             );
+            poId = result.insertId;
+
+            for (const it of items) {
+                const lineTotal = Number(it.quantity) * Number(it.unit_price);
+                await conn.query(
+                    `INSERT INTO vendor_po_items (po_id, zoho_item_id, item_name, quantity, unit_price, line_total)
+                     VALUES (?, ?, ?, ?, ?, ?)`,
+                    [poId, it.zoho_item_id || null, it.item_name, it.quantity, it.unit_price, lineTotal]
+                );
+            }
+            await conn.commit();
+        } catch (err) {
+            await conn.rollback();
+            throw err;
+        } finally {
+            conn.release();
         }
 
         // Optional immediate push

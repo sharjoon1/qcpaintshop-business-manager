@@ -547,6 +547,28 @@ async function forwardInvoicePayments({ invoiceId, zohoInvoiceId }) {
         }
     }
 
+    // D5 fix: refresh the customer's outstanding balance immediately after a
+    // successful payment sync, instead of waiting for the hourly syncCustomers.
+    // Otherwise a customer who paid minutes ago still reads as fully outstanding
+    // and credit "used" stays stale (billing and credit views disagree).
+    if (summary.synced > 0 && zohoInvoice && zohoInvoice.customer_id) {
+        try {
+            const contactResp = await zohoAPI.getContact(zohoInvoice.customer_id);
+            const contact = contactResp && (contactResp.contact || contactResp.data);
+            const outstanding = contact && Number(contact.outstanding_receivable_amount);
+            if (outstanding !== null && outstanding !== undefined && !isNaN(outstanding)) {
+                await pool.query(
+                    `UPDATE zoho_customers_map
+                     SET zoho_outstanding = ?, last_synced_at = NOW()
+                     WHERE zoho_contact_id = ?`,
+                    [outstanding, zohoInvoice.customer_id]
+                );
+            }
+        } catch (refreshErr) {
+            console.warn('[billing-zoho] outstanding refresh skipped:', refreshErr.message);
+        }
+    }
+
     return summary;
 }
 

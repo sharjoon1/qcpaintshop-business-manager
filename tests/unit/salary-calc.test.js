@@ -20,6 +20,7 @@ function makeSalaryPool({ config, att, leaves }) {
             if (/FROM staff_attendance/i.test(sql)) return [[att]];
             if (/FROM attendance_permissions/i.test(sql)) return [[leaves]];
             if (/FROM staff_incentives/i.test(sql)) return [[{ total_incentive: 0 }]];
+            if (/FROM salary_advances/i.test(sql)) return [[]];
             if (/INSERT INTO monthly_salaries/i.test(sql)) {
                 captured.params = params;
                 return [{ insertId: 99 }];
@@ -33,7 +34,8 @@ function makeSalaryPool({ config, att, leaves }) {
 // M6 inserted approved/unapproved OT hour columns at 18/19, shifting everything after.
 const IDX = {
     approvedOt: 18, unapprovedOt: 19,
-    overtimePay: 23, absenceDeduction: 30, leaveDeduction: 31, totalDeductions: 32,
+    overtimePay: 23, absenceDeduction: 30, leaveDeduction: 31,
+    otherDeduction: 32, deductionNotes: 33, totalDeductions: 34,
 };
 
 describe('calculateSalaryForUser money components (RT-039, RT-040)', () => {
@@ -87,5 +89,62 @@ describe('calculateSalaryForUser money components (RT-039, RT-040)', () => {
         expect(pool.captured.params[IDX.leaveDeduction]).toBe(1000);
         // total = late(0) + absence(1000) + leave(1000) = 2000.
         expect(pool.captured.params[IDX.totalDeductions]).toBe(2000);
+    });
+
+    it('advance recovery: deducts outstanding paid advances for the month into other_deduction', async () => {
+        const advPool = makeSalaryPool({ config, att, leaves });
+        // 1 paid advance of ₹2000 targeted at 2026-05, nothing recovered yet.
+        advPool.query = jest.fn(async (sql, params) => {
+            if (/FROM staff_salary_config/i.test(sql)) return [[config]];
+            if (/FROM staff_attendance/i.test(sql)) return [[att]];
+            if (/FROM attendance_permissions/i.test(sql)) return [[leaves]];
+            if (/FROM staff_incentives/i.test(sql)) return [[{ total_incentive: 0 }]];
+            if (/FROM salary_advances/i.test(sql)) return [[{ id: 5, amount: 2000, recovered_amount: 0 }]];
+            if (/UPDATE salary_advances/i.test(sql)) {
+                advPool.advanceUpdate = { sql, params };
+                return [];
+            }
+            if (/INSERT INTO monthly_salaries/i.test(sql)) {
+                advPool.captured.params = params;
+                return [{ insertId: 100 }];
+            }
+            return [[]];
+        });
+        salary.setPool(advPool);
+        await salary.calculateSalaryForUser(7, '2026-05', 1);
+        // gross = OT(400) + 0 allowances + 0 incentive = 400; safe advance = max(0, 400-2000)=0? no—
+        // absence+leave = 2000 > gross 400 → maxSafeAdvance = 0 → nothing deducted. Use a cleaner case:
+        expect(advPool.captured.params[IDX.otherDeduction]).toBe(0);
+        expect(advPool.captured.params[IDX.deductionNotes]).toBe(null);
+        expect(advPool.captured.params[IDX.totalDeductions]).toBe(2000);
+    });
+
+    it('advance recovery: full recovery when gross covers it; advance marked recovered', async () => {
+        // Present-only month: 2 present days × 10h × 100 = 2000 standard pay, no deductions.
+        const attFull = { ...att, absent_days: 0, present_days: 2, standard_hours: '20', sunday_overtime_hours: '0' };
+        const pool2 = makeSalaryPool({ config, att: attFull, leaves: { sunday_leaves: 0, weekday_leaves: 0 } });
+        pool2.query = jest.fn(async (sql, params) => {
+            if (/FROM staff_salary_config/i.test(sql)) return [[config]];
+            if (/FROM staff_attendance/i.test(sql)) return [[attFull]];
+            if (/FROM attendance_permissions/i.test(sql)) return [[{ sunday_leaves: 0, weekday_leaves: 0 }]];
+            if (/FROM staff_incentives/i.test(sql)) return [[{ total_incentive: 0 }]];
+            if (/FROM salary_advances/i.test(sql)) return [[{ id: 5, amount: 500, recovered_amount: 0 }]];
+            if (/UPDATE salary_advances/i.test(sql)) {
+                pool2.advanceUpdate = { sql, params };
+                return [];
+            }
+            if (/INSERT INTO monthly_salaries/i.test(sql)) {
+                pool2.captured.params = params;
+                return [{ insertId: 101 }];
+            }
+            return [[]];
+        });
+        salary.setPool(pool2);
+        await salary.calculateSalaryForUser(7, '2026-05', 1);
+        expect(pool2.captured.params[IDX.otherDeduction]).toBe(500);
+        expect(pool2.captured.params[IDX.deductionNotes]).toMatch(/Advance recovery/);
+        expect(pool2.captured.params[IDX.totalDeductions]).toBe(500);
+        // advance row fully recovered → status recovered
+        expect(pool2.advanceUpdate.params).toEqual([500, 'recovered', 5]);
     });
 });

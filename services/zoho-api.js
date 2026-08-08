@@ -2218,14 +2218,21 @@ async function checkReorderAlerts() {
     let skipped = 0;
 
     for (const item of lowStockItems) {
-        // Calculate severity
+        // Calculate severity — D9 fix: use the SAME bands as
+        // reorder-compute-service.computeSeverity (ratio ≤0.25 critical,
+        // ≤0.50 high, ≤0.75 medium, else low). Previously this writer used
+        // different thresholds (0/25/50) than the compute service (25/50/75),
+        // so the same stock level got different severities depending on which
+        // engine wrote the alert (alert flapping).
         let severity = 'low';
-        if (item.stock_on_hand <= 0) {
+        const level = Number(item.reorder_level);
+        if (Number(item.stock_on_hand) <= 0) {
             severity = 'critical';
-        } else if (item.stock_on_hand < item.reorder_level * 0.25) {
-            severity = 'high';
-        } else if (item.stock_on_hand < item.reorder_level * 0.50) {
-            severity = 'medium';
+        } else if (level > 0) {
+            const ratio = Number(item.stock_on_hand) / level;
+            if (ratio <= 0.25) severity = 'critical';
+            else if (ratio <= 0.50) severity = 'high';
+            else if (ratio <= 0.75) severity = 'medium';
         }
 
         // Check if active alert already exists
@@ -2558,10 +2565,10 @@ async function attachBillAttachment(billId, filePath) {
     form.append('attachment', fs.createReadStream(filePath));
     // Zoho Books: POST /bills/{id}/attachment?organization_id=...
     const headers = form.getHeaders();
-    const url = `${getBaseUrl()}/bills/${billId}/attachment?organization_id=${orgId}`;
+    const url = `${API_BASE}/bills/${billId}/attachment?organization_id=${orgId}`;
     // Use apiPost with multipart - fallback to raw fetch
     const { default: fetch } = await import('node-fetch');
-    const resp = await fetch(url, { method: 'POST', headers: { ...headers, Authorization: `Zoho-oauthtoken ${await getAccessToken()}` }, body: form });
+    const resp = await fetch(url, { method: 'POST', headers: { ...headers, 'Authorization': `Zoho-oauthtoken ${await zohoOAuth.getAccessToken()}` }, body: form });
     const json = await resp.json();
     if (json.code !== 0) throw new Error(json.message || 'Zoho attachment failed');
     return json;
