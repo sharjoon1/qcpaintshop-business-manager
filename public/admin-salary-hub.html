@@ -8,7 +8,7 @@
 <link rel="stylesheet" href="/css/design-system.css">
 <link rel="stylesheet" href="/css/qc-ui.css">
 <style>
-:root{--hub-accent:#667eea}
+:root{--hub-accent:#0F3A5F}
 .qc-hub-tabs{display:flex;gap:.25rem;overflow-x:auto;padding:.5rem 0;border-bottom:1px solid #e5e7eb}
 .qc-hub-tab{white-space:nowrap;padding:.6rem 1rem;border-radius:8px 8px 0 0;font-weight:600;font-size:.85rem;color:#64748b;border:1px solid transparent;border-bottom:none;cursor:pointer;background:#f8fafc}
 .qc-hub-tab.active{background:#fff;color:var(--hub-accent);border-color:#e5e7eb;box-shadow:0 -2px 8px rgba(0,0,0,.04)}
@@ -45,7 +45,7 @@
       <div class="flex flex-wrap gap-2 mb-3">
         <input id="flt-month" type="month" class="border rounded-lg px-3 py-2 text-sm">
         <select id="flt-branch" class="border rounded-lg px-3 py-2 text-sm"><option value="">All branches</option></select>
-        <button id="btn-load-monthly" class="px-3 py-2 rounded-lg text-white text-sm" style="background:#667eea">Load</button>
+        <button id="btn-load-monthly" class="px-3 py-2 rounded-lg text-white text-sm" style="background:#0F3A5F">Load</button>
         <span id="monthly-status" class="text-sm text-slate-500 self-center"></span>
       </div>
       <div id="monthly-empty" class="text-sm text-slate-500 py-8 text-center hidden">No data — month select panni Load pannunga.</div>
@@ -62,7 +62,7 @@
     <div class="qc-card mt-4">
       <div class="flex gap-2 mb-3">
         <input id="pay-month" type="month" class="border rounded-lg px-3 py-2 text-sm">
-        <button id="btn-load-payments" class="px-3 py-2 rounded-lg text-white text-sm" style="background:#667eea">Load payments</button>
+        <button id="btn-load-payments" class="px-3 py-2 rounded-lg text-white text-sm" style="background:#0F3A5F">Load payments</button>
         <span id="pay-status" class="text-sm text-slate-500 self-center"></span>
       </div>
       <div id="pay-empty" class="text-sm text-slate-500 py-8 text-center hidden">No payments.</div>
@@ -72,7 +72,7 @@
 
   <section id="panel-advances" class="qc-hub-panel">
     <div class="qc-card mt-4">
-      <div class="flex gap-2 mb-3"><button id="btn-load-adv" class="px-3 py-2 rounded-lg text-white text-sm" style="background:#667eea">Load advances</button><span id="adv-status" class="text-sm text-slate-500 self-center"></span></div>
+      <div class="flex gap-2 mb-3"><button id="btn-load-adv" class="px-3 py-2 rounded-lg text-white text-sm" style="background:#0F3A5F">Load advances</button><span id="adv-status" class="text-sm text-slate-500 self-center"></span></div>
       <div id="adv-empty" class="text-sm text-slate-500 py-8 text-center hidden">No advances.</div>
       <table class="w-full text-sm"><thead class="text-slate-500"><tr><th class="text-left p-2">Staff</th><th class="text-right p-2">Amount</th><th class="text-left p-2">Status</th></tr></thead><tbody id="adv-body"></tbody></table>
     </div>
@@ -80,7 +80,7 @@
 
   <section id="panel-reports" class="qc-hub-panel">
     <div class="qc-card mt-4">
-      <div class="flex gap-2 mb-3"><input id="rep-month" type="month" class="border rounded-lg px-3 py-2 text-sm"><button id="btn-load-rep" class="px-3 py-2 rounded-lg text-white text-sm" style="background:#667eea">Load report</button><span id="rep-status" class="text-sm text-slate-500 self-center"></span></div>
+      <div class="flex gap-2 mb-3"><input id="rep-month" type="month" class="border rounded-lg px-3 py-2 text-sm"><button id="btn-load-rep" class="px-3 py-2 rounded-lg text-white text-sm" style="background:#0F3A5F">Load report</button><span id="rep-status" class="text-sm text-slate-500 self-center"></span></div>
       <div id="rep-empty" class="text-sm text-slate-500 py-8 text-center hidden">No report data.</div>
       <div id="rep-summary" class="grid grid-cols-2 md:grid-cols-4 gap-3"></div>
     </div>

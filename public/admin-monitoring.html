@@ -41,7 +41,7 @@
         .issue-row.critical { background: #fef2f2; border-left: 4px solid #ef4444; }
         .issue-row.warning { background: #fffbeb; border-left: 4px solid #f59e0b; }
         .quick-btn { padding: 10px 16px; border-radius: 8px; font-size: 13px; font-weight: 600; border: 1px solid #e2e8f0; background: white; cursor: pointer; color: #334155; transition: all 0.2s; display: flex; align-items: center; gap: 6px; }
-        .quick-btn:hover { background: #f8fafc; border-color: #667eea; color: #667eea; }
+        .quick-btn:hover { background: #f8fafc; border-color: #0F3A5F; color: #0F3A5F; }
         .refresh-spin { animation: spin 1s linear infinite; }
         @keyframes spin { 100% { transform: rotate(360deg); } }
         @media (max-width: 1024px) { .mon-grid-4, .mon-grid-6 { grid-template-columns: repeat(2, 1fr); } .mon-grid-3 { grid-template-columns: 1fr; } }
@@ -60,10 +60,10 @@
         </div>
         <div style="display: flex; gap: 8px; align-items: center;">
             <label style="font-size: 12px; color: #64748b; display: flex; align-items: center; gap: 4px;">
-                <input type="checkbox" id="autoRefresh" checked style="accent-color: #667eea;">
+                <input type="checkbox" id="autoRefresh" checked style="accent-color: #0F3A5F;">
                 Auto (30s)
             </label>
-            <button data-action="load-dashboard" class="quick-btn" id="refreshBtn" style="background: linear-gradient(135deg, #667eea, #764ba2); color: white; border: none;">
+            <button data-action="load-dashboard" class="quick-btn" id="refreshBtn" style="background: linear-gradient(135deg, #0F3A5F, #1A4A6E); color: white; border: none;">
                 <svg id="refreshIcon" style="width:16px;height:16px;" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
                 Refresh
             </button>
@@ -114,7 +114,7 @@
     <div class="mon-card" style="margin-top: 16px;">
         <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px;">
             <h3 style="font-size: 15px; font-weight: 600; color: #0f172a;">Recent Errors</h3>
-            <a href="admin-system-health.html" style="font-size: 12px; color: #667eea; text-decoration: none; font-weight: 600;">View All</a>
+            <a href="admin-system-health.html" style="font-size: 12px; color: #0F3A5F; text-decoration: none; font-weight: 600;">View All</a>
         </div>
         <div id="errorsTable" style="overflow-x: auto;"><div style="text-align:center;padding:16px;color:#94a3b8;">Loading...</div></div>
     </div>

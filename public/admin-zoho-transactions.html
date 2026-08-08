@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="theme-color" content="#667eea">
+    <meta name="theme-color" content="#0F3A5F">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <link rel="manifest" href="/manifest.json">
@@ -26,7 +26,7 @@
             border-radius: 12px;
             padding: 1.25rem;
             box-shadow: 0 2px 8px rgba(0,0,0,0.06);
-            border-left: 4px solid var(--accent, #667eea);
+            border-left: 4px solid var(--accent, #0F3A5F);
             transition: transform 0.2s;
         }
         .summary-card:hover { transform: translateY(-2px); }
@@ -60,7 +60,7 @@
         /* Spinner */
         .spinner {
             border: 3px solid #e5e7eb;
-            border-top-color: #667eea;
+            border-top-color: #0F3A5F;
             border-radius: 50%;
             width: 2rem;
             height: 2rem;
@@ -118,7 +118,7 @@
                 </svg>
                 Export CSV
             </button>
-            <button onclick="openGenerateModal()" class="inline-flex items-center gap-2 px-4 py-2 text-white text-sm font-semibold rounded-lg transition shadow-sm" style="background: #667eea;" onmouseover="this.style.background='#5a6fd6'" onmouseout="this.style.background='#667eea'">
+            <button onclick="openGenerateModal()" class="inline-flex items-center gap-2 px-4 py-2 text-white text-sm font-semibold rounded-lg transition shadow-sm" style="background: #0F3A5F;" onmouseover="this.style.background='#5a6fd6'" onmouseout="this.style.background='#0F3A5F'">
                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
                 </svg>
@@ -133,24 +133,24 @@
             <div>
                 <label class="block text-sm font-medium text-gray-700 mb-1">From Date</label>
                 <input type="date" id="fromDate"
-                    class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500">
+                    class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-[#0F3A5F] focus:border-indigo-500">
             </div>
             <div>
                 <label class="block text-sm font-medium text-gray-700 mb-1">To Date</label>
                 <input type="date" id="toDate"
-                    class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500">
+                    class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-[#0F3A5F] focus:border-indigo-500">
             </div>
             <div>
                 <label class="block text-sm font-medium text-gray-700 mb-1">Location</label>
                 <select id="locationFilter"
-                    class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500">
+                    class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-[#0F3A5F] focus:border-indigo-500">
                     <option value="">All Locations</option>
                 </select>
             </div>
             <div>
                 <button onclick="applyFilters()" id="applyBtn"
-                    class="w-full text-white px-6 py-2 rounded-lg text-sm font-medium transition focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2"
-                    style="background: #667eea;" onmouseover="this.style.background='#5a6fd6'" onmouseout="this.style.background='#667eea'">
+                    class="w-full text-white px-6 py-2 rounded-lg text-sm font-medium transition focus:ring-2 focus:ring-[#0F3A5F] focus:ring-offset-2"
+                    style="background: #0F3A5F;" onmouseover="this.style.background='#5a6fd6'" onmouseout="this.style.background='#0F3A5F'">
                     Apply
                 </button>
             </div>
@@ -159,7 +159,7 @@
 
     <!-- Summary Cards -->
     <div id="summaryCardsLoading" class="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4 mb-6">
-        <div class="summary-card" style="border-left-color: #667eea;">
+        <div class="summary-card" style="border-left-color: #0F3A5F;">
             <div class="skeleton" style="width: 50px; height: 28px;"></div>
             <div class="skeleton mt-2" style="width: 80px; height: 16px;"></div>
             <div class="card-label">Total Invoices</div>
@@ -182,14 +182,14 @@
     </div>
     <div id="summaryCards" class="hidden grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4 mb-6">
         <!-- Total Invoices -->
-        <div class="summary-card" style="border-left-color: #667eea;">
+        <div class="summary-card" style="border-left-color: #0F3A5F;">
             <div class="flex justify-between items-start">
                 <div>
                     <div class="card-count" id="invoiceCount">0</div>
                     <div class="card-amount" id="invoiceAmount">Rs. 0</div>
                     <div class="card-label">Total Invoices</div>
                 </div>
-                <svg class="w-6 h-6 text-indigo-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg class="w-6 h-6 text-[#5B7EA6] flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
                 </svg>
             </div>
@@ -319,19 +319,19 @@
             <div>
                 <label class="block text-sm font-medium text-gray-700 mb-1">From Date</label>
                 <input type="date" id="generateFromDate"
-                    class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500">
+                    class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-[#0F3A5F] focus:border-indigo-500">
             </div>
             <div>
                 <label class="block text-sm font-medium text-gray-700 mb-1">To Date</label>
                 <input type="date" id="generateToDate"
-                    class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500">
+                    class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-[#0F3A5F] focus:border-indigo-500">
             </div>
         </div>
         <div class="border-t px-6 py-4 flex justify-end gap-3">
             <button onclick="closeGenerateModal()" class="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 font-medium rounded-lg text-sm transition">Cancel</button>
             <button onclick="generateReport()" id="generateBtn"
                 class="inline-flex items-center gap-2 px-5 py-2 text-white font-medium rounded-lg text-sm transition"
-                style="background: #667eea;" onmouseover="this.style.background='#5a6fd6'" onmouseout="this.style.background='#667eea'">
+                style="background: #0F3A5F;" onmouseover="this.style.background='#5a6fd6'" onmouseout="this.style.background='#0F3A5F'">
                 <svg id="generateSpinner" class="w-4 h-4 hidden animate-spin" fill="none" viewBox="0 0 24 24">
                     <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
                     <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
@@ -619,7 +619,7 @@
                 var soPct = (soAmt / total) * barWidth;
                 var poPct = (poAmt / total) * barWidth;
 
-                if (invAmt > 0) html += '<div class="comparison-bar" style="width: ' + invPct + '%; background: #667eea;" title="Invoices: ' + formatCurrency(invAmt) + '"></div>';
+                if (invAmt > 0) html += '<div class="comparison-bar" style="width: ' + invPct + '%; background: #0F3A5F;" title="Invoices: ' + formatCurrency(invAmt) + '"></div>';
                 if (billAmt > 0) html += '<div class="comparison-bar" style="width: ' + billPct + '%; background: #ef4444;" title="Bills: ' + formatCurrency(billAmt) + '"></div>';
                 if (soAmt > 0) html += '<div class="comparison-bar" style="width: ' + soPct + '%; background: #10b981;" title="Sales Orders: ' + formatCurrency(soAmt) + '"></div>';
                 if (poAmt > 0) html += '<div class="comparison-bar" style="width: ' + poPct + '%; background: #f59e0b;" title="Purchase Orders: ' + formatCurrency(poAmt) + '"></div>';
@@ -627,7 +627,7 @@
 
             html += '  </div>';
             html += '  <div class="flex flex-wrap gap-3 mt-2 text-xs text-gray-500">';
-            html += '    <span><span class="inline-block w-2 h-2 rounded-full mr-1" style="background:#667eea;"></span>Inv: ' + formatCurrency(invAmt) + '</span>';
+            html += '    <span><span class="inline-block w-2 h-2 rounded-full mr-1" style="background:#0F3A5F;"></span>Inv: ' + formatCurrency(invAmt) + '</span>';
             html += '    <span><span class="inline-block w-2 h-2 rounded-full mr-1" style="background:#ef4444;"></span>Bills: ' + formatCurrency(billAmt) + '</span>';
             html += '    <span><span class="inline-block w-2 h-2 rounded-full mr-1" style="background:#10b981;"></span>SO: ' + formatCurrency(soAmt) + '</span>';
             html += '    <span><span class="inline-block w-2 h-2 rounded-full mr-1" style="background:#f59e0b;"></span>PO: ' + formatCurrency(poAmt) + '</span>';
@@ -667,7 +667,7 @@
             tableHtml += '  <td class="px-4 py-3 text-gray-400"><span class="expand-icon" id="icon-' + rowId + '">&#9654;</span></td>';
             tableHtml += '  <td class="px-4 py-3 font-medium text-gray-800 whitespace-nowrap">' + formatDate(date) + '</td>';
             tableHtml += '  <td class="px-4 py-3 text-gray-700">' + escapeHtml(location) + '</td>';
-            tableHtml += '  <td class="px-4 py-3 text-center font-semibold" style="color: #667eea;">' + invCount + '</td>';
+            tableHtml += '  <td class="px-4 py-3 text-center font-semibold" style="color: #0F3A5F;">' + invCount + '</td>';
             tableHtml += '  <td class="px-4 py-3 text-right text-gray-800">' + formatCurrency(invAmount) + '</td>';
             tableHtml += '  <td class="px-4 py-3 text-center font-semibold text-red-600">' + billCount + '</td>';
             tableHtml += '  <td class="px-4 py-3 text-right text-gray-800">' + formatCurrency(billAmount) + '</td>';
@@ -714,7 +714,7 @@
             cardsHtml += '    <svg class="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path></svg>';
             cardsHtml += '  </div>';
             cardsHtml += '  <div class="grid grid-cols-2 gap-2 text-xs">';
-            cardsHtml += '    <div class="flex items-center gap-1"><span class="w-2 h-2 rounded-full" style="background:#667eea;"></span><span class="text-gray-600">Invoices:</span> <span class="font-semibold">' + invCount + '</span> <span class="text-gray-400">(' + formatCurrency(invAmount) + ')</span></div>';
+            cardsHtml += '    <div class="flex items-center gap-1"><span class="w-2 h-2 rounded-full" style="background:#0F3A5F;"></span><span class="text-gray-600">Invoices:</span> <span class="font-semibold">' + invCount + '</span> <span class="text-gray-400">(' + formatCurrency(invAmount) + ')</span></div>';
             cardsHtml += '    <div class="flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-red-500"></span><span class="text-gray-600">Bills:</span> <span class="font-semibold">' + billCount + '</span> <span class="text-gray-400">(' + formatCurrency(billAmount) + ')</span></div>';
             cardsHtml += '    <div class="flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-green-500"></span><span class="text-gray-600">SO:</span> <span class="font-semibold">' + soCount + '</span> <span class="text-gray-400">(' + formatCurrency(soAmount) + ')</span></div>';
             cardsHtml += '    <div class="flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-yellow-500"></span><span class="text-gray-600">PO:</span> <span class="font-semibold">' + poCount + '</span> <span class="text-gray-400">(' + formatCurrency(poAmount) + ')</span></div>';
@@ -795,7 +795,7 @@
             var status = item.status || '--';
 
             var typeColor = 'text-gray-700';
-            if (type.toLowerCase().indexOf('invoice') >= 0) typeColor = 'text-indigo-600';
+            if (type.toLowerCase().indexOf('invoice') >= 0) typeColor = 'text-[#0F3A5F]';
             else if (type.toLowerCase().indexOf('bill') >= 0) typeColor = 'text-red-600';
             else if (type.toLowerCase().indexOf('sales') >= 0) typeColor = 'text-green-600';
             else if (type.toLowerCase().indexOf('purchase') >= 0) typeColor = 'text-yellow-600';
@@ -854,7 +854,7 @@
                     var status = item.status || '--';
 
                     var typeBg = 'bg-gray-50 border-gray-200';
-                    if (type.toLowerCase().indexOf('invoice') >= 0) typeBg = 'bg-indigo-50 border-indigo-200';
+                    if (type.toLowerCase().indexOf('invoice') >= 0) typeBg = 'bg-[#EBF2F8] border-[#C0D5E8]';
                     else if (type.toLowerCase().indexOf('bill') >= 0) typeBg = 'bg-red-50 border-red-200';
                     else if (type.toLowerCase().indexOf('sales') >= 0) typeBg = 'bg-green-50 border-green-200';
                     else if (type.toLowerCase().indexOf('purchase') >= 0) typeBg = 'bg-yellow-50 border-yellow-200';
@@ -927,7 +927,7 @@
 
         for (var i = startPage; i <= endPage; i++) {
             if (i === currentPage) {
-                html += '<button class="px-3 py-1.5 pag-mob text-sm rounded-lg text-white font-medium" style="background:#667eea;">' + i + '</button>';
+                html += '<button class="px-3 py-1.5 pag-mob text-sm rounded-lg text-white font-medium" style="background:#0F3A5F;">' + i + '</button>';
             } else {
                 html += '<button onclick="goToPage(' + i + ')" class="px-3 py-1.5 pag-mob text-sm rounded-lg border border-gray-300 text-gray-700 hover:bg-gray-100">' + i + '</button>';
             }

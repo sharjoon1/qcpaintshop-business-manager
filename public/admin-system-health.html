@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
-    <meta name="theme-color" content="#667eea">
+    <meta name="theme-color" content="#0F3A5F">
     <link rel="manifest" href="/manifest.json">
     <link rel="icon" type="image/png" href="/icons/icon-192x192.png">
     <title>System Health - Quality Colours Manager</title>
@@ -29,7 +29,7 @@
         .sev-medium { background: #fefce8; color: #ca8a04; }
         .sev-low { background: #f0fdf4; color: #16a34a; }
         .tab-btn { padding: 8px 16px; border-radius: 8px; font-size: 0.8125rem; font-weight: 500; cursor: pointer; border: 1px solid transparent; transition: all 0.2s; }
-        .tab-btn.active { background: linear-gradient(135deg, #667eea, #764ba2); color: #fff; }
+        .tab-btn.active { background: linear-gradient(135deg, #0F3A5F, #1A4A6E); color: #fff; }
         .tab-btn:not(.active) { color: #64748b; }
         .tab-btn:not(.active):hover { background: #f1f5f9; }
         .tab-content { display: none; }
@@ -53,7 +53,7 @@
         <div class="flex gap-2">
             <button onclick="runHealthCheck()" id="healthCheckBtn"
                 class="inline-flex items-center gap-2 px-4 py-2 rounded-lg text-white font-medium text-sm"
-                style="background: linear-gradient(135deg, #667eea, #764ba2);">
+                style="background: linear-gradient(135deg, #0F3A5F, #1A4A6E);">
                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/></svg>
                 Run Health Check
             </button>
@@ -223,7 +223,7 @@
         <div class="flex justify-between items-center mb-4">
             <div class="text-sm text-gray-500" id="integrityStatus">Click "Validate" to check data integrity</div>
             <button onclick="runIntegrityCheck()" id="integrityBtn"
-                class="px-4 py-2 rounded-lg text-white text-sm font-medium" style="background:#667eea;">
+                class="px-4 py-2 rounded-lg text-white text-sm font-medium" style="background:#0F3A5F;">
                 Validate Integrity
             </button>
         </div>
@@ -592,7 +592,7 @@ async function loadPreventionReport() {
             '<div class="bg-white rounded-lg p-3 shadow-sm border text-center"><div class="text-xl font-bold text-gray-800">' + d.errorStats.total24h + '</div><div class="text-xs text-gray-400">Errors (24h)</div></div>' +
             '<div class="bg-white rounded-lg p-3 shadow-sm border text-center"><div class="text-xl font-bold text-gray-800">' + d.dataIntegrity.failed + '</div><div class="text-xs text-gray-400">Integrity Issues</div></div>' +
             '<div class="bg-white rounded-lg p-3 shadow-sm border text-center"><div class="text-xl font-bold text-gray-800">' + d.codeQuality.highComplexity + '</div><div class="text-xs text-gray-400">Complex Files</div></div>' +
-            '<div class="bg-white rounded-lg p-3 shadow-sm border text-center"><div class="text-xl font-bold" style="color:#667eea">' + d.totalRecommendations + '</div><div class="text-xs text-gray-400">Recommendations</div></div>' +
+            '<div class="bg-white rounded-lg p-3 shadow-sm border text-center"><div class="text-xl font-bold" style="color:#0F3A5F">' + d.totalRecommendations + '</div><div class="text-xs text-gray-400">Recommendations</div></div>' +
             '</div>';
 
         // Recommendations
@@ -643,7 +643,7 @@ function esc(str) {
 }
 
 function showToast(msg, type) {
-    var colors = { success: '#22c55e', error: '#ef4444', info: '#667eea' };
+    var colors = { success: '#22c55e', error: '#ef4444', info: '#0F3A5F' };
     var toast = document.createElement('div');
     toast.style.cssText = 'position:fixed;top:20px;right:20px;padding:12px 20px;border-radius:8px;color:#fff;font-size:14px;z-index:9999;box-shadow:0 4px 12px rgba(0,0,0,0.15);background:' + (colors[type] || colors.info) + ';';
     toast.textContent = msg;

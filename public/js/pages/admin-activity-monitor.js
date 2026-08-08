@@ -138,7 +138,7 @@ function renderSummaryCards(data) {
         renderSummaryCard('Active', activeCount, '#10b981', '#d1fae5') +
         renderSummaryCard('Idle', idleCount, '#f59e0b', '#fef3c7') +
         renderSummaryCard('On Break', breakCount, '#3b82f6', '#dbeafe') +
-        renderSummaryCard('Total Tracked', activeCount + idleCount + breakCount, '#667eea', '#eef2ff');
+        renderSummaryCard('Total Tracked', activeCount + idleCount + breakCount, '#0F3A5F', '#eef2ff');
 
     // Activity type cards
     let typeHtml = '';
@@ -433,10 +433,10 @@ function switchTab(tab) {
     document.getElementById('tabContentLive').style.display = tab === 'live' ? '' : 'none';
     document.getElementById('tabContentReport').style.display = tab === 'report' ? '' : 'none';
 
-    document.getElementById('tabLive').style.color = tab === 'live' ? '#667eea' : '#64748b';
-    document.getElementById('tabLive').style.borderBottomColor = tab === 'live' ? '#667eea' : 'transparent';
-    document.getElementById('tabReport').style.color = tab === 'report' ? '#667eea' : '#64748b';
-    document.getElementById('tabReport').style.borderBottomColor = tab === 'report' ? '#667eea' : 'transparent';
+    document.getElementById('tabLive').style.color = tab === 'live' ? '#0F3A5F' : '#64748b';
+    document.getElementById('tabLive').style.borderBottomColor = tab === 'live' ? '#0F3A5F' : 'transparent';
+    document.getElementById('tabReport').style.color = tab === 'report' ? '#0F3A5F' : '#64748b';
+    document.getElementById('tabReport').style.borderBottomColor = tab === 'report' ? '#0F3A5F' : 'transparent';
 
     if (tab === 'report' && !document.getElementById('reportDate').value) {
         document.getElementById('reportDate').value = todayISO();
@@ -504,7 +504,7 @@ function renderReportSummary(data) {
     var avgIdlePct = Math.round(data.reduce(function(s, r) { return s + r.idle_percent; }, 0) / totalStaff);
 
     document.getElementById('reportSummaryCards').innerHTML =
-        renderSummaryCard('Total Staff', totalStaff, '#667eea', '#eef2ff') +
+        renderSummaryCard('Total Staff', totalStaff, '#0F3A5F', '#eef2ff') +
         renderSummaryCard('Active Time', formatMinutes(totalActive), '#10b981', '#d1fae5') +
         '<div class="summary-card"><div style="width:36px;height:36px;border-radius:10px;background:#fef3c7;display:flex;align-items:center;justify-content:center;margin:0 auto 8px;"><div style="width:12px;height:12px;border-radius:50%;background:#f59e0b;"></div></div><div class="summary-value" style="color:#f59e0b;">' + formatMinutes(totalIdle) + '</div><div class="summary-label">வேலை செய்யாமல் இருந்த நேரம்</div></div>' +
         renderSummaryCard('Avg Idle %', avgIdlePct + '%', avgIdlePct > 30 ? '#ef4444' : '#f59e0b', avgIdlePct > 30 ? '#fef2f2' : '#fef3c7');

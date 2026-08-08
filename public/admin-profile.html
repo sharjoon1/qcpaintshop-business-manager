@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="theme-color" content="#667eea">
+    <meta name="theme-color" content="#0F3A5F">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <link rel="manifest" href="/manifest.json">
@@ -18,10 +18,10 @@
     <style>
         .section-card { background: white; border-radius: 12px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); padding: 24px; margin-bottom: 20px; }
         .section-title { font-size: 15px; font-weight: 700; color: #1f2937; margin-bottom: 16px; display: flex; align-items: center; gap: 8px; }
-        .section-title svg { width: 20px; height: 20px; color: #667eea; }
+        .section-title svg { width: 20px; height: 20px; color: #0F3A5F; }
         .field-label { font-size: 12px; font-weight: 600; color: #6b7280; margin-bottom: 4px; display: block; }
         .field-input { width: 100%; padding: 9px 14px; border: 1px solid #e5e7eb; border-radius: 8px; font-size: 14px; outline: none; transition: border 0.2s, box-shadow 0.2s; }
-        .field-input:focus { border-color: #667eea; box-shadow: 0 0 0 3px rgba(102,126,234,0.15); }
+        .field-input:focus { border-color: #0F3A5F; box-shadow: 0 0 0 3px rgba(15,58,95,0.15); }
         .field-input:disabled { background: #f9fafb; color: #6b7280; cursor: not-allowed; }
         .status-badge { display: inline-flex; align-items: center; gap: 6px; padding: 4px 12px; border-radius: 20px; font-size: 12px; font-weight: 600; }
         .status-complete { background: #d1fae5; color: #065f46; }
@@ -61,7 +61,7 @@
 
     <div class="max-w-4xl mx-auto p-4 sm:p-6" style="padding-top: 1.5rem;">
         <!-- Profile Header -->
-        <div class="bg-gradient-to-r from-purple-600 to-indigo-600 rounded-xl shadow-lg p-6 sm:p-8 mb-6 text-white">
+        <div class="bg-gradient-to-r from-purple-600 to-[#1A4A6E] rounded-xl shadow-lg p-6 sm:p-8 mb-6 text-white">
             <div class="flex flex-col sm:flex-row items-center sm:items-start gap-5">
                 <div class="relative">
                     <div class="w-28 h-28 bg-white rounded-full flex items-center justify-center shadow-xl">
@@ -296,7 +296,7 @@
             <button type="button" id="cancelBtn" class="flex-1 px-6 py-3 border border-gray-300 rounded-lg text-gray-700 font-semibold hover:bg-gray-50 transition bg-white shadow-sm">
                 Cancel
             </button>
-            <button type="button" id="btnSave" class="flex-1 px-6 py-3 bg-gradient-to-r from-purple-600 to-indigo-600 text-white rounded-lg font-semibold hover:from-purple-700 hover:to-indigo-700 transition shadow-lg">
+            <button type="button" id="btnSave" class="flex-1 px-6 py-3 bg-gradient-to-r from-purple-600 to-[#1A4A6E] text-white rounded-lg font-semibold hover:from-purple-700 hover:to-indigo-700 transition shadow-lg">
                 Save All Changes
             </button>
         </div>
@@ -326,7 +326,7 @@
                 <div class="bg-yellow-50 border border-yellow-200 rounded-lg p-3">
                     <p class="text-xs text-yellow-800">After changing your password, you'll need to login again.</p>
                 </div>
-                <button type="submit" class="w-full px-6 py-3 bg-indigo-600 text-white rounded-lg font-semibold hover:bg-indigo-700 transition">
+                <button type="submit" class="w-full px-6 py-3 bg-[#0F3A5F] text-white rounded-lg font-semibold hover:bg-[#0C2E4D] transition">
                     Update Password
                 </button>
             </form>
@@ -355,7 +355,7 @@
                         class="w-full text-center text-xl tracking-widest font-mono border-2 border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:border-indigo-500 mb-2"
                         placeholder="000000">
                     <div id="qrError" class="hidden text-red-600 text-sm text-center mb-2"></div>
-                    <button id="confirmTotpBtn" class="w-full py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold rounded-lg transition mb-2">Verify & Enable 2FA</button>
+                    <button id="confirmTotpBtn" class="w-full py-2.5 bg-[#0F3A5F] hover:bg-[#0C2E4D] text-white font-semibold rounded-lg transition mb-2">Verify & Enable 2FA</button>
                     <button id="qrCancelBtn" class="w-full py-2 text-gray-500 text-sm hover:text-gray-700">Cancel</button>
                 </div>
             </div>

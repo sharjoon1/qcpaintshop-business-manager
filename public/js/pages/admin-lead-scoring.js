@@ -87,7 +87,7 @@ function renderTopLeads(leads) {
         const statusColors = {
             'new': 'bg-blue-100 text-blue-700', 'contacted': 'bg-yellow-100 text-yellow-700',
             'interested': 'bg-green-100 text-green-700', 'quoted': 'bg-purple-100 text-purple-700',
-            'negotiating': 'bg-indigo-100 text-indigo-700', 'follow_up': 'bg-orange-100 text-orange-700'
+            'negotiating': 'bg-[#D6E5F0] text-[#0F3A5F]', 'follow_up': 'bg-orange-100 text-orange-700'
         };
         const statusCls = statusColors[l.status] || 'bg-gray-100 text-gray-700';
         const budget = l.estimated_budget ? '₹' + Number(l.estimated_budget).toLocaleString('en-IN') : '--';
@@ -110,7 +110,7 @@ function renderTopLeads(leads) {
             <td class="px-4 py-3 hidden lg:table-cell text-xs text-gray-500 max-w-[200px] truncate">${escHtml(l.ai_recommendation || l.next_action || '--')}</td>
             <td class="px-4 py-3 text-right">
                 <button data-action="show-lead-detail" data-id="${l.id}" class="text-xs px-2 py-1 rounded bg-gray-100 hover:bg-gray-200 text-gray-600 mr-1">Detail</button>
-                <button data-action="predict-conversion" data-id="${l.id}" class="text-xs px-2 py-1 rounded text-white" style="background:#667eea;">Predict</button>
+                <button data-action="predict-conversion" data-id="${l.id}" class="text-xs px-2 py-1 rounded text-white" style="background:#0F3A5F;">Predict</button>
             </td>
         </tr>`;
     }).join('');
@@ -221,7 +221,7 @@ async function showLeadDetail(id) {
             html += renderPrediction(d.prediction);
         } else {
             html += `<div class="text-center">
-                <button data-action="predict-conversion" data-id="${id}" class="px-4 py-2 rounded-lg text-white text-sm font-medium" style="background:#667eea;">
+                <button data-action="predict-conversion" data-id="${id}" class="px-4 py-2 rounded-lg text-white text-sm font-medium" style="background:#0F3A5F;">
                     Generate Conversion Prediction
                 </button>
             </div>`;
@@ -280,7 +280,7 @@ async function showLeadDetail(id) {
         // Action buttons
         html += `<div class="flex gap-2 pt-2 border-t border-gray-100">
             <a href="/admin-leads.html" class="flex-1 text-center px-3 py-2 rounded-lg bg-gray-100 text-gray-700 text-sm font-medium hover:bg-gray-200">View Full Lead</a>
-            <button data-action="predict-conversion" data-id="${id}" class="flex-1 px-3 py-2 rounded-lg text-white text-sm font-medium" style="background:#667eea;">Refresh Prediction</button>
+            <button data-action="predict-conversion" data-id="${id}" class="flex-1 px-3 py-2 rounded-lg text-white text-sm font-medium" style="background:#0F3A5F;">Refresh Prediction</button>
         </div>`;
 
         content.innerHTML = html;
@@ -296,7 +296,7 @@ function renderPrediction(p) {
     const factors = p.factors || (p.factors_json ? JSON.parse(p.factors_json) : []);
 
     return `<div class="bg-gradient-to-br from-indigo-50 to-purple-50 rounded-lg p-4 border border-indigo-100">
-        <div class="text-sm font-medium text-indigo-700 mb-3">Conversion Prediction</div>
+        <div class="text-sm font-medium text-[#0F3A5F] mb-3">Conversion Prediction</div>
         <div class="flex items-center gap-4 mb-3">
             <div class="text-3xl font-bold" style="color:${probColor}">${prob}%</div>
             <div class="text-sm text-gray-600">
@@ -402,7 +402,7 @@ function escHtml(str) {
 }
 
 function showToast(msg, type) {
-    const colors = { success: '#22c55e', error: '#ef4444', info: '#667eea' };
+    const colors = { success: '#22c55e', error: '#ef4444', info: '#0F3A5F' };
     const toast = document.createElement('div');
     toast.style.cssText = `position:fixed;top:20px;right:20px;padding:12px 20px;border-radius:8px;color:#fff;font-size:14px;z-index:9999;box-shadow:0 4px 12px rgba(0,0,0,0.15);background:${colors[type] || colors.info};`;
     toast.textContent = msg;

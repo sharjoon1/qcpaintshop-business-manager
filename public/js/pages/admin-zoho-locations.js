@@ -2,7 +2,7 @@
 // so the page runs under the enforced strict CSP. Verbatim move of all functions; inline on*=
 // handlers converted to addEventListener + data-action delegation. No logic changes, no renames,
 // escaping helpers untouched. The inline onmouseover/onmouseout background swaps are replaced by a
-// CSS hover rule (same #667eea → #5a6fd6 effect) added to the page <style>, since they cannot remain
+// CSS hover rule (same #0F3A5F → #0C2E4D effect) added to the page <style>, since they cannot remain
 // as inline handlers under CSP.
 
 // ========================
@@ -191,13 +191,13 @@ function renderLocations() {
             ) +
             '<div class="mb-3">' +
                 '<label class="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1.5">Mapped Branch</label>' +
-                '<select id="branch-select-' + loc.id + '" data-action="branch-change" data-id="' + loc.id + '" class="branch-select w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:border-transparent" style="focus:ring-color: #667eea;">' +
+                '<select id="branch-select-' + loc.id + '" data-action="branch-change" data-id="' + loc.id + '" class="branch-select w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:border-transparent" style="focus:ring-color: #0F3A5F;">' +
                     branchOptions +
                 '</select>' +
             '</div>' +
             '<div class="flex items-center justify-between">' +
                 '<span class="text-xs text-gray-400">Last synced: ' + lastSynced + '</span>' +
-                '<button id="save-btn-' + loc.id + '" data-action="save-mapping" data-id="' + loc.id + '" class="inline-flex items-center gap-1.5 px-3 py-1.5 text-white text-xs font-semibold rounded-lg transition opacity-50 cursor-not-allowed" style="background: #667eea;" disabled>' +
+                '<button id="save-btn-' + loc.id + '" data-action="save-mapping" data-id="' + loc.id + '" class="inline-flex items-center gap-1.5 px-3 py-1.5 text-white text-xs font-semibold rounded-lg transition opacity-50 cursor-not-allowed" style="background: #0F3A5F;" disabled>' +
                     '<svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">' +
                         '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>' +
                     '</svg>' +
@@ -218,7 +218,7 @@ function onBranchChange(locationId) {
         btn.disabled = false;
         btn.classList.remove('opacity-50', 'cursor-not-allowed');
         // Original inline onmouseover/onmouseout background swaps replaced by CSS hover
-        // (btn-save-map:hover rule in <style>) — same #667eea → #5a6fd6 effect, CSP-safe.
+        // (btn-save-map:hover rule in <style>) — same #0F3A5F → #0C2E4D effect, CSP-safe.
     }
 }
 
@@ -284,7 +284,7 @@ async function saveMapping(locationId) {
         // Reset button after delay
         setTimeout(function() {
             btn.innerHTML = originalHtml;
-            btn.style.background = '#667eea';
+            btn.style.background = '#0F3A5F';
         }, 2000);
 
         updateSummary();

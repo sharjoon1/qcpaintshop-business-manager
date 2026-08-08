@@ -8,7 +8,7 @@
 <link rel="stylesheet" href="/css/design-system.css">
 <link rel="stylesheet" href="/css/qc-ui.css">
 <style>
-:root{--hub-accent:#667eea}
+:root{--hub-accent:#0F3A5F}
 .qc-hub-tabs{display:flex;gap:.25rem;overflow-x:auto;padding:.5rem 0;border-bottom:1px solid #e5e7eb}
 .qc-hub-tab{white-space:nowrap;padding:.6rem 1rem;border-radius:8px 8px 0 0;font-weight:600;font-size:.85rem;color:#64748b;border:1px solid transparent;border-bottom:none;cursor:pointer;background:#f8fafc}
 .qc-hub-tab.active{background:#fff;color:var(--hub-accent);border-color:#e5e7eb}
@@ -34,28 +34,28 @@
 
   <section id="panel-products" class="qc-hub-panel active">
     <div class="qc-card mt-4">
-      <div class="flex gap-2 mb-3"><input id="prod-q" placeholder="Search products…" class="border rounded-lg px-3 py-2 text-sm w-64"><button id="btn-prod" class="px-3 py-2 rounded-lg text-white text-sm" style="background:#667eea">Search</button><span id="prod-status" class="text-sm text-slate-500 self-center"></span></div>
+      <div class="flex gap-2 mb-3"><input id="prod-q" placeholder="Search products…" class="border rounded-lg px-3 py-2 text-sm w-64"><button id="btn-prod" class="px-3 py-2 rounded-lg text-white text-sm" style="background:#0F3A5F">Search</button><span id="prod-status" class="text-sm text-slate-500 self-center"></span></div>
       <div id="prod-empty" class="hidden text-sm text-slate-500 py-8 text-center">No products.</div>
       <table class="w-full text-sm"><thead class="text-slate-500"><tr><th class="text-left p-2">Name</th><th class="text-left p-2">Brand</th><th class="text-left p-2">Category</th></tr></thead><tbody id="prod-body"></tbody></table>
     </div>
   </section>
   <section id="panel-brands" class="qc-hub-panel">
     <div class="qc-card mt-4">
-      <div class="flex gap-2 mb-3"><button id="btn-brands" class="px-3 py-2 rounded-lg text-white text-sm" style="background:#667eea">Load brands</button><span id="brands-status" class="text-sm text-slate-500 self-center"></span></div>
+      <div class="flex gap-2 mb-3"><button id="btn-brands" class="px-3 py-2 rounded-lg text-white text-sm" style="background:#0F3A5F">Load brands</button><span id="brands-status" class="text-sm text-slate-500 self-center"></span></div>
       <div id="brands-empty" class="hidden text-sm text-slate-500 py-8 text-center">No brands.</div>
       <table class="w-full text-sm"><thead class="text-slate-500"><tr><th class="text-left p-2">Brand</th><th class="text-left p-2">Products</th></tr></thead><tbody id="brands-body"></tbody></table>
     </div>
   </section>
   <section id="panel-categories" class="qc-hub-panel">
     <div class="qc-card mt-4">
-      <div class="flex gap-2 mb-3"><button id="btn-cats" class="px-3 py-2 rounded-lg text-white text-sm" style="background:#667eea">Load categories</button><span id="cats-status" class="text-sm text-slate-500 self-center"></span></div>
+      <div class="flex gap-2 mb-3"><button id="btn-cats" class="px-3 py-2 rounded-lg text-white text-sm" style="background:#0F3A5F">Load categories</button><span id="cats-status" class="text-sm text-slate-500 self-center"></span></div>
       <div id="cats-empty" class="hidden text-sm text-slate-500 py-8 text-center">No categories.</div>
       <table class="w-full text-sm"><thead class="text-slate-500"><tr><th class="text-left p-2">Category</th><th class="text-left p-2">Products</th></tr></thead><tbody id="cats-body"></tbody></table>
     </div>
   </section>
   <section id="panel-master" class="qc-hub-panel">
     <div class="qc-card mt-4">
-      <div class="flex gap-2 mb-3"><input id="master-q" placeholder="Search item master…" class="border rounded-lg px-3 py-2 text-sm w-64"><button id="btn-master" class="px-3 py-2 rounded-lg text-white text-sm" style="background:#667eea">Search</button><span id="master-status" class="text-sm text-slate-500 self-center"></span></div>
+      <div class="flex gap-2 mb-3"><input id="master-q" placeholder="Search item master…" class="border rounded-lg px-3 py-2 text-sm w-64"><button id="btn-master" class="px-3 py-2 rounded-lg text-white text-sm" style="background:#0F3A5F">Search</button><span id="master-status" class="text-sm text-slate-500 self-center"></span></div>
       <div id="master-empty" class="hidden text-sm text-slate-500 py-8 text-center">No items.</div>
       <table class="w-full text-sm"><thead class="text-slate-500"><tr><th class="text-left p-2">Item</th><th class="text-left p-2">SKU</th><th class="text-right p-2">Rate</th></tr></thead><tbody id="master-body"></tbody></table>
       <a href="/admin-item-master.html" class="inline-block mt-3 text-sm text-blue-600">Open Item Master →</a>

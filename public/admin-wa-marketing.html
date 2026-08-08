@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="theme-color" content="#667eea">
+    <meta name="theme-color" content="#0F3A5F">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <link rel="manifest" href="/manifest.json">
@@ -21,7 +21,7 @@
     <style>
         .tab-btn { padding: 8px 16px; font-size: 0.8125rem; font-weight: 500; border-radius: 8px; border: 1px solid transparent; cursor: pointer; transition: all 0.2s; background: none; color: #64748b; white-space: nowrap; }
         .tab-btn:hover { background: #f1f5f9; color: #334155; }
-        .tab-btn.active { background: linear-gradient(135deg, #667eea, #764ba2); color: #fff; font-weight: 600; box-shadow: 0 2px 8px rgba(102,126,234,0.3); }
+        .tab-btn.active { background: linear-gradient(135deg, #0F3A5F, #1A4A6E); color: #fff; font-weight: 600; box-shadow: 0 2px 8px rgba(15,58,95,0.3); }
         .stat-card { background: #fff; border-radius: 12px; padding: 1.25rem; box-shadow: 0 1px 3px rgba(0,0,0,0.06); border: 1px solid #f1f5f9; }
         .stat-value { font-size: 1.75rem; font-weight: 700; color: #1e293b; }
         .stat-label { font-size: 0.75rem; color: #94a3b8; font-weight: 500; text-transform: uppercase; letter-spacing: 0.05em; }
@@ -44,7 +44,7 @@
         .data-table tr:hover { background: #f8fafc; }
         .action-btn { padding: 4px 10px; border-radius: 6px; font-size: 0.75rem; font-weight: 500; cursor: pointer; border: 1px solid #e2e8f0; background: #fff; color: #475569; transition: all 0.15s; }
         .action-btn:hover { background: #f1f5f9; border-color: #cbd5e1; }
-        .action-btn.primary { background: linear-gradient(135deg, #667eea, #764ba2); color: #fff; border-color: transparent; }
+        .action-btn.primary { background: linear-gradient(135deg, #0F3A5F, #1A4A6E); color: #fff; border-color: transparent; }
         .action-btn.primary:hover { opacity: 0.9; }
         .action-btn.danger { color: #dc2626; border-color: #fecaca; }
         .action-btn.danger:hover { background: #fef2f2; }
@@ -60,9 +60,9 @@
         .form-group { margin-bottom: 1rem; }
         .form-group label { display: block; font-size: 0.8125rem; font-weight: 600; color: #475569; margin-bottom: 0.375rem; }
         .form-group input, .form-group select, .form-group textarea { width: 100%; padding: 8px 12px; border: 1px solid #e2e8f0; border-radius: 8px; font-size: 0.875rem; color: #334155; transition: border-color 0.2s; }
-        .form-group input:focus, .form-group select:focus, .form-group textarea:focus { outline: none; border-color: #667eea; box-shadow: 0 0 0 3px rgba(102,126,234,0.1); }
+        .form-group input:focus, .form-group select:focus, .form-group textarea:focus { outline: none; border-color: #0F3A5F; box-shadow: 0 0 0 3px rgba(15,58,95,0.1); }
         .form-group textarea { resize: vertical; min-height: 100px; }
-        .var-btn { display: inline-flex; padding: 2px 8px; margin: 2px; border-radius: 4px; font-size: 0.6875rem; background: #f1f5f9; color: #667eea; cursor: pointer; border: 1px solid #e2e8f0; font-weight: 500; }
+        .var-btn { display: inline-flex; padding: 2px 8px; margin: 2px; border-radius: 4px; font-size: 0.6875rem; background: #f1f5f9; color: #0F3A5F; cursor: pointer; border: 1px solid #e2e8f0; font-weight: 500; }
         .var-btn:hover { background: #e0e7ff; }
         .spin-helper { display: inline-flex; padding: 2px 8px; margin: 2px; border-radius: 4px; font-size: 0.6875rem; background: #fef3c7; color: #d97706; cursor: pointer; border: 1px solid #fde68a; font-weight: 500; }
         .spin-helper:hover { background: #fde68a; }
@@ -70,7 +70,7 @@
         .wizard-step.active { display: block; }
         .wizard-nav { display: flex; gap: 0.5rem; margin-bottom: 1.5rem; overflow-x: auto; }
         .wizard-nav-item { padding: 6px 14px; border-radius: 20px; font-size: 0.75rem; font-weight: 500; color: #94a3b8; background: #f8fafc; border: 1px solid #e2e8f0; white-space: nowrap; cursor: pointer; }
-        .wizard-nav-item.active { background: linear-gradient(135deg, #667eea, #764ba2); color: #fff; border-color: transparent; }
+        .wizard-nav-item.active { background: linear-gradient(135deg, #0F3A5F, #1A4A6E); color: #fff; border-color: transparent; }
         .wizard-nav-item.done { background: #dcfce7; color: #16a34a; border-color: #bbf7d0; }
         .engine-indicator { display: inline-flex; align-items: center; gap: 6px; padding: 4px 12px; border-radius: 20px; font-size: 0.75rem; font-weight: 600; }
         .engine-running { background: #dcfce7; color: #16a34a; }
@@ -83,10 +83,10 @@
         .filter-chip { display: inline-flex; align-items: center; gap: 4px; padding: 3px 10px; border-radius: 20px; font-size: 0.6875rem; background: #e0e7ff; color: #4338ca; font-weight: 500; }
         .filter-chip .remove { cursor: pointer; font-weight: 700; margin-left: 2px; }
         .progress-bar-bg { width: 100%; height: 6px; background: #f1f5f9; border-radius: 3px; overflow: hidden; }
-        .progress-bar-fill { height: 100%; background: linear-gradient(135deg, #667eea, #764ba2); border-radius: 3px; transition: width 0.3s; }
+        .progress-bar-fill { height: 100%; background: linear-gradient(135deg, #0F3A5F, #1A4A6E); border-radius: 3px; transition: width 0.3s; }
         .template-card { background: #fff; border: 1px solid #f1f5f9; border-radius: 12px; padding: 1rem; cursor: pointer; transition: all 0.2s; }
-        .template-card:hover { border-color: #667eea; box-shadow: 0 2px 8px rgba(102,126,234,0.1); }
-        .template-card.selected { border-color: #667eea; background: #f5f3ff; }
+        .template-card:hover { border-color: #0F3A5F; box-shadow: 0 2px 8px rgba(15,58,95,0.1); }
+        .template-card.selected { border-color: #0F3A5F; background: #f5f3ff; }
     </style>
 </head>
 <body data-page="wa-marketing" class="bg-gray-50">
@@ -357,7 +357,7 @@
                     </div>
                 </div>
                 <div class="flex items-center gap-2">
-                    <span id="imSelCount" class="text-sm font-bold text-indigo-600"></span>
+                    <span id="imSelCount" class="text-sm font-bold text-[#0F3A5F]"></span>
                     <button class="action-btn primary" id="imSendBtn" onclick="openInstantComposer()" style="display:none">Send Instant Message</button>
                 </div>
             </div>
@@ -365,7 +365,7 @@
             <!-- Select controls -->
             <div class="flex items-center justify-between mb-2">
                 <div class="flex items-center gap-2">
-                    <label class="flex items-center gap-1 cursor-pointer text-xs font-semibold text-indigo-600">
+                    <label class="flex items-center gap-1 cursor-pointer text-xs font-semibold text-[#0F3A5F]">
                         <input type="checkbox" id="imSelectAllPage" onchange="imToggleSelectAll()" class="w-4 h-4 rounded">
                         Select All on Page
                     </label>
@@ -559,14 +559,14 @@
 
                     <div class="flex items-center justify-between mb-2">
                         <div class="flex items-center gap-2">
-                            <label class="flex items-center gap-1 cursor-pointer text-xs font-semibold text-indigo-600">
+                            <label class="flex items-center gap-1 cursor-pointer text-xs font-semibold text-[#0F3A5F]">
                                 <input type="checkbox" id="wizSelectAll" onchange="toggleSelectAll()" class="w-4 h-4 rounded">
                                 Select All on Page
                             </label>
                             <button type="button" class="action-btn text-xs" onclick="selectAllFiltered()">Select ALL Matching</button>
                         </div>
                         <div class="flex items-center gap-2">
-                            <span id="audienceCount" class="text-sm font-bold text-indigo-600"></span>
+                            <span id="audienceCount" class="text-sm font-bold text-[#0F3A5F]"></span>
                             <span class="text-xs text-gray-400" id="browseTotal"></span>
                         </div>
                     </div>
@@ -728,8 +728,8 @@
             </div>
             <div class="modal-body">
                 <div class="mb-3 p-3 rounded-lg" style="background:#eef2ff;border:1px solid #c7d2fe">
-                    <span class="text-sm font-semibold text-indigo-700" id="imComposerCount">0 leads selected</span>
-                    <span class="text-xs text-indigo-500 ml-2">Messages will be sent with 5-15s delay between each</span>
+                    <span class="text-sm font-semibold text-[#0F3A5F]" id="imComposerCount">0 leads selected</span>
+                    <span class="text-xs text-[#0F3A5F] ml-2">Messages will be sent with 5-15s delay between each</span>
                 </div>
 
                 <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-3">
@@ -963,7 +963,7 @@ function renderCampaignChart(campaigns) {
         data: {
             labels,
             datasets: [
-                { label: 'Sent', data: campaigns.map(c => c.sent_count || 0), backgroundColor: 'rgba(102,126,234,0.7)', borderRadius: 4 },
+                { label: 'Sent', data: campaigns.map(c => c.sent_count || 0), backgroundColor: 'rgba(15,58,95,0.7)', borderRadius: 4 },
                 { label: 'Failed', data: campaigns.map(c => c.failed_count || 0), backgroundColor: 'rgba(220,38,38,0.5)', borderRadius: 4 }
             ]
         },
@@ -983,7 +983,7 @@ function renderHourlyChart(hourly) {
         data: {
             labels,
             datasets: [
-                { label: 'Sent', data: sentData, borderColor: '#667eea', backgroundColor: 'rgba(102,126,234,0.1)', fill: true, tension: 0.3 },
+                { label: 'Sent', data: sentData, borderColor: '#0F3A5F', backgroundColor: 'rgba(15,58,95,0.1)', fill: true, tension: 0.3 },
                 { label: 'Failed', data: failData, borderColor: '#dc2626', backgroundColor: 'rgba(220,38,38,0.1)', fill: true, tension: 0.3, borderDash: [5, 5] }
             ]
         },
@@ -1005,7 +1005,7 @@ async function loadCampaigns() {
         tbody.innerHTML = (data.campaigns || []).map(c => {
             const pct = c.total_leads > 0 ? Math.round((c.sent_count / c.total_leads) * 100) : 0;
             return `<tr>
-                <td class="font-medium"><a href="#" onclick="viewCampaignDetail(${c.id});return false" class="text-indigo-600 hover:underline">${esc(c.name)}</a></td>
+                <td class="font-medium"><a href="#" onclick="viewCampaignDetail(${c.id});return false" class="text-[#0F3A5F] hover:underline">${esc(c.name)}</a></td>
                 <td>${esc(c.branch_name || '-')}</td>
                 <td>${c.message_type}</td>
                 <td><span class="badge badge-${c.status}">${c.status}</span></td>
@@ -1319,7 +1319,7 @@ async function browseLeads() {
         const tbody = document.getElementById('browseLeadsBody');
         tbody.innerHTML = (data.leads || []).map(l => {
             const checked = selectAllMode || selectedLeadIds.has(l.id) ? 'checked' : '';
-            return `<tr onclick="toggleLeadRow(${l.id}, event)" style="cursor:pointer" class="${checked ? 'bg-indigo-50' : ''}">
+            return `<tr onclick="toggleLeadRow(${l.id}, event)" style="cursor:pointer" class="${checked ? 'bg-[#EBF2F8]' : ''}">
                 <td><input type="checkbox" class="lead-cb w-4 h-4" data-id="${l.id}" ${checked} onchange="toggleLead(${l.id}, this.checked)"></td>
                 <td class="font-medium">${esc(l.name)}</td>
                 <td>${esc(l.phone)}</td>
@@ -1357,7 +1357,7 @@ function toggleLeadRow(id, event) {
     const cb = event.currentTarget.querySelector('.lead-cb');
     cb.checked = !cb.checked;
     toggleLead(id, cb.checked);
-    event.currentTarget.classList.toggle('bg-indigo-50', cb.checked);
+    event.currentTarget.classList.toggle('bg-[#EBF2F8]', cb.checked);
 }
 
 function toggleSelectAll() {
@@ -1442,7 +1442,7 @@ function buildReviewSummary() {
         </div>
         <div class="stat-card">
             <h4 class="font-semibold text-sm text-gray-700 mb-2">Audience</h4>
-            <p class="text-sm font-bold text-indigo-600">${selCount} contacts selected</p>
+            <p class="text-sm font-bold text-[#0F3A5F]">${selCount} contacts selected</p>
         </div>
         <div class="stat-card">
             <h4 class="font-semibold text-sm text-gray-700 mb-2">Anti-Block</h4>
@@ -1734,7 +1734,7 @@ async function browseInstantLeads() {
         const tbody = document.getElementById('imLeadsBody');
         tbody.innerHTML = (data.leads || []).map(l => {
             const checked = imSelectedLeads.has(l.id) ? 'checked' : '';
-            return `<tr onclick="imToggleRow(${l.id}, event)" style="cursor:pointer" class="${checked ? 'bg-indigo-50' : ''}">
+            return `<tr onclick="imToggleRow(${l.id}, event)" style="cursor:pointer" class="${checked ? 'bg-[#EBF2F8]' : ''}">
                 <td><input type="checkbox" class="im-cb w-4 h-4" data-id="${l.id}" ${checked} onchange="imToggleLead(${l.id}, this.checked)"></td>
                 <td class="font-medium">${esc(l.name)}</td>
                 <td>${esc(l.phone)}</td>
@@ -1769,7 +1769,7 @@ function imToggleRow(id, event) {
     const cb = event.currentTarget.querySelector('.im-cb');
     cb.checked = !cb.checked;
     imToggleLead(id, cb.checked);
-    event.currentTarget.classList.toggle('bg-indigo-50', cb.checked);
+    event.currentTarget.classList.toggle('bg-[#EBF2F8]', cb.checked);
 }
 
 function imToggleSelectAll() {

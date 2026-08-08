@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="theme-color" content="#667eea">
+    <meta name="theme-color" content="#0F3A5F">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <link rel="manifest" href="/manifest.json">
@@ -26,9 +26,9 @@
         .summary-card { padding: 20px; border-radius: 8px; color: white; }
         .summary-card h3 { font-size: 14px; opacity: 0.9; }
         .summary-card .value { font-size: 28px; font-weight: 700; margin-top: 5px; }
-        .card-purple { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); }
+        .card-purple { background: linear-gradient(135deg, #0F3A5F 0%, #1A4A6E 100%); }
         .card-green { background: linear-gradient(135deg, #4CAF50 0%, #45a049 100%); }
-        .card-orange { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); }
+        .card-orange { background: linear-gradient(135deg, #0F3A5F 0%, #1A4A6E 100%); }
         .card-gold { background: linear-gradient(135deg, #FFD700 0%, #FFA500 100%); color: #333; }
 
         .filters { background: white; padding: 15px 20px; border-radius: 10px; margin-bottom: 20px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
@@ -38,7 +38,7 @@
         .form-group input, .form-group select { padding: 8px 12px; border: 1px solid #ddd; border-radius: 6px; font-size: 14px; }
 
         .btn { padding: 8px 16px; border: none; border-radius: 6px; cursor: pointer; font-size: 13px; font-weight: 500; display: inline-flex; align-items: center; gap: 6px; }
-        .btn-primary { background: linear-gradient(135deg, #667eea, #764ba2); color: white; }
+        .btn-primary { background: linear-gradient(135deg, #0F3A5F, #1A4A6E); color: white; }
         .btn-success { background: #28a745; color: white; }
         .btn-danger { background: #dc3545; color: white; }
         .btn-warning { background: #ffc107; color: #333; }
@@ -125,7 +125,7 @@
         <div class="header" id="slabsSection">
             <div class="header-top">
                 <div>
-                    <h2 style="font-size:18px;"><i class="fas fa-layer-group" style="color:#667eea;"></i> Incentive Slabs</h2>
+                    <h2 style="font-size:18px;"><i class="fas fa-layer-group" style="color:#0F3A5F;"></i> Incentive Slabs</h2>
                     <p style="color: #666; margin-top: 3px; font-size: 13px;">Amount-based incentive tiers for estimate payments</p>
                 </div>
                 <div style="display: flex; gap: 10px; align-items: center;">
@@ -517,7 +517,7 @@
 
                 return `<tr>
                     <td><strong>${esc(i.staff_name)}</strong></td>
-                    <td>${esc(i.lead_name) || '-'} ${i.lead_phone ? `<br><small style="color:#888">${esc(i.lead_phone)}</small>` : ''}${i.invoice_reference ? `<br><small style="color:#667eea;">Ref: ${esc(i.invoice_reference)}</small>` : ''}</td>
+                    <td>${esc(i.lead_name) || '-'} ${i.lead_phone ? `<br><small style="color:#888">${esc(i.lead_phone)}</small>` : ''}${i.invoice_reference ? `<br><small style="color:#0F3A5F;">Ref: ${esc(i.invoice_reference)}</small>` : ''}</td>
                     <td><span class="badge badge-${typeColors[i.lead_type]}">${esc(i.lead_type)}</span></td>
                     <td><span class="badge ${sourceColors[i.source] || 'badge-info'}">${sourceLabels[i.source] || esc(i.source) || 'Legacy'}</span></td>
                     <td>${i.incentive_month}</td>

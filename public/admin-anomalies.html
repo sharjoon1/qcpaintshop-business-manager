@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
-    <meta name="theme-color" content="#667eea">
+    <meta name="theme-color" content="#0F3A5F">
     <link rel="manifest" href="/manifest.json">
     <link rel="icon" type="image/png" href="/icons/icon-192x192.png">
     <title>Anomaly Detection - Quality Colours Manager</title>
@@ -31,14 +31,14 @@
         .badge-resolved { background: #f0fdf4; color: #16a34a; }
         .badge-false_positive { background: #f1f5f9; color: #64748b; }
         .type-icon { width: 36px; height: 36px; border-radius: 10px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
-        .type-revenue { background: linear-gradient(135deg, #667eea20, #764ba220); color: #667eea; }
+        .type-revenue { background: linear-gradient(135deg, #0F3A5F20, #1A4A6E20); color: #0F3A5F; }
         .type-attendance { background: linear-gradient(135deg, #06b6d420, #0891b220); color: #0891b2; }
         .type-stock { background: linear-gradient(135deg, #f5970020, #ea580c20); color: #ea580c; }
         .type-collection { background: linear-gradient(135deg, #22c55e20, #16a34a20); color: #16a34a; }
         .type-api_usage { background: linear-gradient(135deg, #ef444420, #dc262620); color: #dc2626; }
         .filter-btn { padding: 6px 14px; border-radius: 20px; font-size: 0.75rem; font-weight: 500; border: 1px solid #e2e8f0; cursor: pointer; transition: all 0.2s; }
-        .filter-btn:hover { border-color: #667eea; color: #667eea; }
-        .filter-btn.active { background: linear-gradient(135deg, #667eea, #764ba2); color: white; border-color: transparent; }
+        .filter-btn:hover { border-color: #0F3A5F; color: #0F3A5F; }
+        .filter-btn.active { background: linear-gradient(135deg, #0F3A5F, #1A4A6E); color: white; border-color: transparent; }
         .scan-pulse { animation: pulse 2s infinite; }
         @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
         .slide-panel { position: fixed; top: 0; right: -480px; width: 480px; max-width: 100vw; height: 100vh; background: white; box-shadow: -4px 0 20px rgba(0,0,0,0.15); z-index: 1050; transition: right 0.3s ease; overflow-y: auto; }
@@ -59,7 +59,7 @@
         <div class="flex gap-2">
             <button onclick="runScan()" id="scanBtn"
                 class="inline-flex items-center gap-2 px-4 py-2 rounded-lg text-white font-medium text-sm"
-                style="background: linear-gradient(135deg, #667eea, #764ba2);">
+                style="background: linear-gradient(135deg, #0F3A5F, #1A4A6E);">
                 <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
                 Run Scan
             </button>
@@ -89,7 +89,7 @@
         </div>
         <div class="bg-white rounded-xl p-4 shadow-sm border border-gray-100 anomaly-card">
             <div class="text-xs text-gray-400 mb-1">Detection Rate</div>
-            <div class="text-2xl font-bold" style="color: #667eea;" id="detectionRate">--</div>
+            <div class="text-2xl font-bold" style="color: #0F3A5F;" id="detectionRate">--</div>
             <div class="text-xs text-gray-500 mt-1">avg/day (14d)</div>
         </div>
     </div>
@@ -199,7 +199,7 @@ function renderTrendChart(trend) {
         data: {
             labels: trend.map(t => new Date(t.day).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })),
             datasets: [
-                { label: 'Total', data: trend.map(t => t.count), backgroundColor: 'rgba(102,126,234,0.3)', borderColor: '#667eea', borderWidth: 1 },
+                { label: 'Total', data: trend.map(t => t.count), backgroundColor: 'rgba(15,58,95,0.3)', borderColor: '#0F3A5F', borderWidth: 1 },
                 { label: 'Critical', data: trend.map(t => t.critical), backgroundColor: 'rgba(239,68,68,0.6)', borderColor: '#ef4444', borderWidth: 1 },
                 { label: 'High', data: trend.map(t => t.high), backgroundColor: 'rgba(249,115,22,0.6)', borderColor: '#f97316', borderWidth: 1 }
             ]
@@ -215,7 +215,7 @@ function renderTrendChart(trend) {
 function renderCategoryChart(byType) {
     const ctx = document.getElementById('categoryChart').getContext('2d');
     if (categoryChart) categoryChart.destroy();
-    const colors = { revenue: '#667eea', attendance: '#0891b2', stock: '#ea580c', collection: '#22c55e', api_usage: '#ef4444', custom: '#8b5cf6' };
+    const colors = { revenue: '#0F3A5F', attendance: '#0891b2', stock: '#ea580c', collection: '#22c55e', api_usage: '#ef4444', custom: '#8b5cf6' };
     categoryChart = new Chart(ctx, {
         type: 'doughnut',
         data: {

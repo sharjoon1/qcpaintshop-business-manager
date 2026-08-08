@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="theme-color" content="#667eea">
+    <meta name="theme-color" content="#0F3A5F">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <link rel="manifest" href="/manifest.json">
@@ -33,10 +33,10 @@
             border-left: none;
             border-right: none;
         }
-        .tab-btn:hover { color: #667eea; }
+        .tab-btn:hover { color: #0F3A5F; }
         .tab-btn.active {
-            color: #667eea;
-            border-bottom-color: #667eea;
+            color: #0F3A5F;
+            border-bottom-color: #0F3A5F;
         }
 
         .summary-card {
@@ -110,7 +110,7 @@
             <p class="text-gray-500 text-sm mt-1">Auto-generated purchase orders based on 90-day sales data</p>
         </div>
         <div class="mt-3 sm:mt-0">
-            <button id="calcBtn" onclick="runCalculation()" class="inline-flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-indigo-500 to-purple-600 hover:from-indigo-600 hover:to-purple-700 text-white text-sm font-semibold rounded-lg transition shadow-sm">
+            <button id="calcBtn" onclick="runCalculation()" class="inline-flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-[#0F3A5F] to-purple-600 hover:from-indigo-600 hover:to-purple-700 text-white text-sm font-semibold rounded-lg transition shadow-sm">
                 <svg id="calcIcon" class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z"></path>
                 </svg>
@@ -181,7 +181,7 @@
                     <div class="skeleton" style="width: 40px; height: 28px;"></div>
                 </div>
             </div>
-            <div class="summary-card" style="border-left-color: #667eea;">
+            <div class="summary-card" style="border-left-color: #0F3A5F;">
                 <div class="text-xs font-semibold text-gray-500 uppercase">Total</div>
                 <div class="text-2xl font-bold text-gray-800 mt-1" id="summTotal">
                     <div class="skeleton" style="width: 40px; height: 28px;"></div>
@@ -327,7 +327,7 @@
                 </div>
                 <div class="mt-4 flex items-center justify-between">
                     <div id="allocationValidation" class="text-sm"></div>
-                    <button onclick="saveBranchAllocations()" class="inline-flex items-center gap-2 px-5 py-2 bg-gradient-to-r from-indigo-500 to-purple-600 hover:from-indigo-600 hover:to-purple-700 text-white text-sm font-semibold rounded-lg transition shadow-sm">
+                    <button onclick="saveBranchAllocations()" class="inline-flex items-center gap-2 px-5 py-2 bg-gradient-to-r from-[#0F3A5F] to-purple-600 hover:from-indigo-600 hover:to-purple-700 text-white text-sm font-semibold rounded-lg transition shadow-sm">
                         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
                         </svg>
@@ -384,7 +384,7 @@
                     <input type="number" id="newCategoryQty" min="1" placeholder="e.g. 10" class="w-full rounded-lg border-gray-300 border px-3 py-2 text-sm focus:ring-2 focus:ring-purple-500 focus:border-purple-500">
                 </div>
                 <div>
-                    <button onclick="addCategoryDefault()" class="w-full inline-flex items-center justify-center gap-2 px-5 py-2 bg-gradient-to-r from-indigo-500 to-purple-600 hover:from-indigo-600 hover:to-purple-700 text-white text-sm font-semibold rounded-lg transition shadow-sm">
+                    <button onclick="addCategoryDefault()" class="w-full inline-flex items-center justify-center gap-2 px-5 py-2 bg-gradient-to-r from-[#0F3A5F] to-purple-600 hover:from-indigo-600 hover:to-purple-700 text-white text-sm font-semibold rounded-lg transition shadow-sm">
                         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path>
                         </svg>
@@ -610,7 +610,7 @@
                 '<td class="px-4 py-3 text-gray-700">' + escHtml(s.branch_name || '-') + '</td>' +
                 '<td class="px-4 py-3 text-right font-mono ' + (parseFloat(s.current_stock) === 0 ? 'text-red-600 font-bold' : 'text-gray-700') + '">' + formatNum(s.current_stock) + '</td>' +
                 '<td class="px-4 py-3 text-right font-mono text-gray-700">' + formatNum(s.branch_reorder_threshold) + '</td>' +
-                '<td class="px-4 py-3 text-right font-mono font-semibold text-indigo-600">' + formatNum(s.suggested_qty) + '</td>' +
+                '<td class="px-4 py-3 text-right font-mono font-semibold text-[#0F3A5F]">' + formatNum(s.suggested_qty) + '</td>' +
                 '<td class="px-4 py-3 text-center"><span class="badge-status badge-' + s.status + '">' + s.status + '</span></td>' +
                 '<td class="px-4 py-3 text-center">' +
                     (s.status === 'pending' ?
@@ -889,7 +889,7 @@
                     '<span class="badge-status ' + (c.is_active ? 'badge-ordered' : 'badge-dismissed') + '">' + (c.is_active ? 'Active' : 'Inactive') + '</span>' +
                 '</td>' +
                 '<td class="px-4 py-3 text-center">' +
-                    '<button onclick="saveCategoryDefault(' + c.id + ')" class="text-indigo-600 hover:text-indigo-800 text-xs font-semibold mr-2">Save</button>' +
+                    '<button onclick="saveCategoryDefault(' + c.id + ')" class="text-[#0F3A5F] hover:text-[#0C2E4D] text-xs font-semibold mr-2">Save</button>' +
                     '<button onclick="deleteCategoryDefault(' + c.id + ')" class="text-red-500 hover:text-red-700 text-xs font-semibold">Delete</button>' +
                 '</td>';
             tbody.appendChild(tr);
@@ -996,7 +996,7 @@
                 '<td class="px-4 py-3 text-center">' + b.pending_count + '</td>' +
                 '<td class="px-4 py-3 text-center text-green-600">' + b.ordered_count + '</td>' +
                 '<td class="px-4 py-3 text-center">' + b.unique_items + '</td>' +
-                '<td class="px-4 py-3 text-center"><button onclick="viewBatch(\'' + escAttr(b.batch_id) + '\')" class="text-indigo-600 hover:text-indigo-800 text-xs font-semibold">View</button></td>';
+                '<td class="px-4 py-3 text-center"><button onclick="viewBatch(\'' + escAttr(b.batch_id) + '\')" class="text-[#0F3A5F] hover:text-[#0C2E4D] text-xs font-semibold">View</button></td>';
             tbody.appendChild(tr);
         });
     }

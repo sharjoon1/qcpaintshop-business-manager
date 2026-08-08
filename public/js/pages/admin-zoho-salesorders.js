@@ -45,14 +45,14 @@ async function loadSalesOrders(page = 1) {
         }
         tbody.innerHTML = allRows.map(so => `
             <tr class="hover:bg-gray-50 cursor-pointer" data-action="open-so-modal" data-tid="${escHtml(so.transaction_id)}" data-sonum="${escHtml(so.so_number || '')}">
-                <td class="px-3 py-2 font-medium text-indigo-700 whitespace-nowrap">${escHtml(so.so_number || so.transaction_id) || '-'}</td>
+                <td class="px-3 py-2 font-medium text-[#0F3A5F] whitespace-nowrap">${escHtml(so.so_number || so.transaction_id) || '-'}</td>
                 <td class="px-3 py-2 whitespace-nowrap text-gray-700">${so.date || '-'}</td>
                 <td class="px-3 py-2 text-gray-800 max-w-[140px] truncate">${escHtml(so.customer_name) || '-'}</td>
                 <td class="px-3 py-2 text-gray-500 hidden md:table-cell">${so.location_id || '-'}</td>
                 <td class="px-3 py-2 text-right font-medium text-gray-800">${formatCurrency(so.total)}</td>
                 <td class="px-3 py-2 text-center">${statusBadge(so.status)}</td>
                 <td class="px-3 py-2 text-center hidden sm:table-cell">
-                    <button class="text-xs px-2 py-1 rounded bg-indigo-50 text-indigo-700 hover:bg-indigo-100">View</button>
+                    <button class="text-xs px-2 py-1 rounded bg-[#EBF2F8] text-[#0F3A5F] hover:bg-[#D6E5F0]">View</button>
                 </td>
             </tr>
         `).join('');
@@ -112,9 +112,9 @@ async function openSOModal(transactionId, soNumber) {
                 </div>` : '<p class="text-sm text-gray-500">No line items available.</p>'}
                 <div class="flex justify-between items-center pt-2 border-t">
                     <strong class="text-gray-700">Total</strong>
-                    <strong class="text-lg text-indigo-700">${formatCurrency(so.total)}</strong>
+                    <strong class="text-lg text-[#0F3A5F]">${formatCurrency(so.total)}</strong>
                 </div>
-                ${so.salesorder_id ? `<a href="https://books.zoho.in/app#salesorders/${so.salesorder_id}" target="_blank" class="block text-center text-sm text-indigo-600 hover:underline mt-2">Open in Zoho &rarr;</a>` : ''}
+                ${so.salesorder_id ? `<a href="https://books.zoho.in/app#salesorders/${so.salesorder_id}" target="_blank" class="block text-center text-sm text-[#0F3A5F] hover:underline mt-2">Open in Zoho &rarr;</a>` : ''}
             </div>
         `;
     } catch (e) {

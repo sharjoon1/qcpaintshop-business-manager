@@ -32,10 +32,10 @@ function switchTab(tab) {
     document.getElementById('expensesSection').classList.toggle('hidden', tab !== 'expenses');
     document.getElementById('creditNotesSection').classList.toggle('hidden', tab !== 'creditnotes');
     document.getElementById('tabExpenses').className = tab === 'expenses'
-        ? 'px-4 py-2 text-sm font-medium rounded-lg bg-indigo-600 text-white'
+        ? 'px-4 py-2 text-sm font-medium rounded-lg bg-[#0F3A5F] text-white'
         : 'px-4 py-2 text-sm font-medium rounded-lg bg-white border border-gray-300 text-gray-700 hover:bg-gray-50';
     document.getElementById('tabCreditNotes').className = tab === 'creditnotes'
-        ? 'px-4 py-2 text-sm font-medium rounded-lg bg-indigo-600 text-white'
+        ? 'px-4 py-2 text-sm font-medium rounded-lg bg-[#0F3A5F] text-white'
         : 'px-4 py-2 text-sm font-medium rounded-lg bg-white border border-gray-300 text-gray-700 hover:bg-gray-50';
     if (tab === 'creditnotes') loadCreditNotes();
 }
@@ -97,7 +97,7 @@ async function loadCreditNotes(page = 1) {
         tbody.innerHTML = data.creditnotes.map(cn => `
             <tr class="hover:bg-gray-50">
                 <td class="px-3 py-2 whitespace-nowrap text-gray-700">${cn.date || '-'}</td>
-                <td class="px-3 py-2 font-medium text-indigo-700">${escHtml(cn.creditnote_number) || '-'}</td>
+                <td class="px-3 py-2 font-medium text-[#0F3A5F]">${escHtml(cn.creditnote_number) || '-'}</td>
                 <td class="px-3 py-2 text-gray-700 hidden sm:table-cell">${escHtml(cn.customer_name) || '-'}</td>
                 <td class="px-3 py-2 text-right font-medium">${formatCurrency(cn.total)}</td>
                 <td class="px-3 py-2 text-right text-blue-700 font-medium">${formatCurrency(cn.balance)}</td>

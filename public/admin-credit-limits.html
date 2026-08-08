@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="theme-color" content="#667eea">
+    <meta name="theme-color" content="#0F3A5F">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <link rel="manifest" href="/manifest.json">
@@ -32,9 +32,9 @@
         .cust-table thead { background: white; }
         .cust-table th { text-align: left; padding: 0.625rem 0.75rem; font-size: 0.6875rem; color: #6b7280; text-transform: uppercase; font-weight: 600; border-bottom: 2px solid #e5e7eb; white-space: nowrap; user-select: none; background: white; }
         .cust-table th.sortable { cursor: pointer; }
-        .cust-table th.sortable:hover { color: #667eea; }
+        .cust-table th.sortable:hover { color: #0F3A5F; }
         .cust-table th.sortable .sort-arrow { display: inline-block; margin-left: 3px; font-size: 0.625rem; opacity: 0.3; }
-        .cust-table th.sortable.sort-active .sort-arrow { opacity: 1; color: #667eea; }
+        .cust-table th.sortable.sort-active .sort-arrow { opacity: 1; color: #0F3A5F; }
         .cust-table td { padding: 0.625rem 0.75rem; border-bottom: 1px solid #f3f4f6; }
         .cust-table tbody tr:hover { background: #f9fafb; }
 
@@ -43,14 +43,14 @@
         .modal-box { background: white; border-radius: 16px; padding: 1.5rem; width: 100%; max-width: 520px; max-height: 90vh; overflow-y: auto; box-shadow: 0 20px 60px rgba(0,0,0,0.2); }
         .modal-box-lg { max-width: 800px; }
 
-        .btn-primary { padding: 0.5rem 1.25rem; border-radius: 8px; background: linear-gradient(135deg, #667eea, #764ba2); color: white; border: none; font-weight: 600; font-size: 0.8125rem; cursor: pointer; }
+        .btn-primary { padding: 0.5rem 1.25rem; border-radius: 8px; background: linear-gradient(135deg, #0F3A5F, #1A4A6E); color: white; border: none; font-weight: 600; font-size: 0.8125rem; cursor: pointer; }
         .btn-primary:hover { opacity: 0.9; }
         .btn-outline { padding: 0.5rem 1rem; border-radius: 8px; border: 1px solid #d1d5db; background: white; color: #374151; font-weight: 600; font-size: 0.8125rem; cursor: pointer; }
-        .btn-outline:hover { border-color: #667eea; color: #667eea; }
+        .btn-outline:hover { border-color: #0F3A5F; color: #0F3A5F; }
         .btn-sm { padding: 0.25rem 0.625rem; font-size: 0.6875rem; border-radius: 6px; }
 
         .filter-input { padding: 0.5rem 0.75rem; border-radius: 8px; border: 1px solid #d1d5db; font-size: 0.8125rem; outline: none; }
-        .filter-input:focus { border-color: #667eea; box-shadow: 0 0 0 3px rgba(102,126,234,0.1); }
+        .filter-input:focus { border-color: #0F3A5F; box-shadow: 0 0 0 3px rgba(15,58,95,0.1); }
 
         .sync-indicator { font-size: 0.6875rem; color: #9ca3af; display: inline-flex; align-items: center; gap: 0.25rem; }
         .sync-indicator .dot { width: 6px; height: 6px; border-radius: 50%; background: #22c55e; }
@@ -74,7 +74,7 @@
     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; flex-wrap: wrap; gap: 0.75rem;">
         <div>
             <h1 style="font-size: 1.375rem; font-weight: 700; color: #1f2937; display: flex; align-items: center; gap: 0.5rem;">
-                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#667eea" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 1v22M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6"/></svg>
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#0F3A5F" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 1v22M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6"/></svg>
                 Customer Credit Limits
             </h1>
             <p style="font-size: 0.8125rem; color: #6b7280;">Manage credit limits for Zoho customers <span class="sync-indicator" id="lastSyncedIndicator"></span></p>
@@ -97,7 +97,7 @@
             <div class="ov-label">Total Customers</div>
         </div>
         <div class="ov-card">
-            <div class="ov-value" style="color: #667eea;" id="ovTotalLimit">--</div>
+            <div class="ov-value" style="color: #0F3A5F;" id="ovTotalLimit">--</div>
             <div class="ov-label">Total Credit Limit</div>
         </div>
         <div class="ov-card">
@@ -594,7 +594,7 @@ function renderTable() {
             <td style="text-align:center;white-space:nowrap">
                 ${canManage ? `<button class="btn-outline btn-sm" onclick="openEditModal(${c.id})">Edit</button>` : ''}
                 <button class="btn-outline btn-sm" onclick="openDetailsModal(${c.id})" style="margin-left:2px">Details</button>
-                ${!canManage && (canRequest) && limit === 0 ? `<button class="btn-outline btn-sm" onclick="quickRequest(${c.id})" style="margin-left:2px;color:#667eea;border-color:#667eea;">Request</button>` : ''}
+                ${!canManage && (canRequest) && limit === 0 ? `<button class="btn-outline btn-sm" onclick="quickRequest(${c.id})" style="margin-left:2px;color:#0F3A5F;border-color:#0F3A5F;">Request</button>` : ''}
             </td>
         </tr>`;
     }).join('');
@@ -678,7 +678,7 @@ async function openDetailsModal(id) {
         <!-- Summary Cards -->
         <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:0.75rem;margin-bottom:1.5rem;">
             <div style="background:#eef2ff;padding:0.75rem;border-radius:10px;text-align:center">
-                <div style="font-size:1.25rem;font-weight:700;color:#667eea">${formatINR(c.credit_limit)}</div>
+                <div style="font-size:1.25rem;font-weight:700;color:#0F3A5F">${formatINR(c.credit_limit)}</div>
                 <div style="font-size:0.6875rem;color:#6b7280">Credit Limit</div>
             </div>
             <div style="background:#fef2f2;padding:0.75rem;border-radius:10px;text-align:center">
@@ -974,7 +974,7 @@ async function loadRequests() {
                     <span style="font-size:0.6875rem;font-weight:600;padding:2px 8px;border-radius:999px;background:${statusBg[r.status]||'#f3f4f6'};color:${statusColors[r.status]||'#6b7280'};text-transform:capitalize;">${r.status}</span>
                 </div>
                 <div style="display:flex;gap:1.5rem;font-size:0.8125rem;margin-bottom:0.5rem;">
-                    <div><span style="color:#6b7280">Requested:</span> <b style="color:#667eea">${formatINR(r.requested_amount)}</b></div>
+                    <div><span style="color:#6b7280">Requested:</span> <b style="color:#0F3A5F">${formatINR(r.requested_amount)}</b></div>
                     <div><span style="color:#6b7280">Current Limit:</span> <b>${r.current_limit > 0 ? formatINR(r.current_limit) : 'None'}</b></div>
                     <div><span style="color:#6b7280">Outstanding:</span> <b>${formatINR(r.zoho_outstanding)}</b></div>
                 </div>
@@ -1063,7 +1063,7 @@ function openApproveModal(id, name, amount, currentLimit, outstanding) {
     document.getElementById('approveNotes').value = '';
     document.getElementById('approveInfo').innerHTML = `
         <b>${escHtml(name)}</b><br>
-        <span style="color:#6b7280">Requested: <b style="color:#667eea">${formatINR(amount)}</b> &middot; Current Limit: <b>${currentLimit > 0 ? formatINR(currentLimit) : 'None'}</b> &middot; Outstanding: <b>${formatINR(outstanding)}</b></span>
+        <span style="color:#6b7280">Requested: <b style="color:#0F3A5F">${formatINR(amount)}</b> &middot; Current Limit: <b>${currentLimit > 0 ? formatINR(currentLimit) : 'None'}</b> &middot; Outstanding: <b>${formatINR(outstanding)}</b></span>
     `;
     document.getElementById('approveModal').classList.add('open');
 }

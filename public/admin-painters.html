@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="theme-color" content="#667eea">
+    <meta name="theme-color" content="#0F3A5F">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <link rel="manifest" href="/manifest.json">
@@ -11,7 +11,7 @@
     <link rel="apple-touch-icon" href="/icons/icon-192x192.png">
     <title>Painters - Quality Colours Business Manager</title>
     <link rel="stylesheet" href="/css/tailwind.css?v=849f1b5c">
-    <link rel="stylesheet" href="/css/design-system.css?v=876c7d73">
+    <link rel="stylesheet" href="/css/design-system.css?v=16beaa3b">
     <script src="/universal-nav-loader.js?v=6b4a6dbe"></script>
     <script src="/js/auth-helper.js?v=7101c516"></script>
     <script>requireAdminOrRedirect();</script>
@@ -19,7 +19,7 @@
         body { background: #f9fafb; }
         .tab-btn { padding: 0.5rem 1rem; border-radius: 0.5rem; font-size: 0.875rem; font-weight: 500; color: #64748b; cursor: pointer; transition: all 0.2s; border: 1px solid transparent; }
         .tab-btn:hover { background: #f1f5f9; color: #334155; }
-        .tab-btn.active { background: linear-gradient(135deg, #667eea, #764ba2); color: #fff; border-color: transparent; box-shadow: 0 2px 8px rgba(102,126,234,0.3); }
+        .tab-btn.active { background: linear-gradient(135deg, #0F3A5F, #1A4A6E); color: #fff; border-color: transparent; box-shadow: 0 2px 8px rgba(15,58,95,0.3); }
         .tab-content { display: none; }
         .tab-content.active { display: block; }
         .stat-card { background: #fff; border-radius: 12px; padding: 1.25rem; border: 1px solid #e8ecf1; }
@@ -36,7 +36,7 @@
         .badge-suspended { background: #e2e8f0; color: #475569; }
         .badge-paid { background: #dbeafe; color: #1e40af; }
         .btn-sm { padding: 0.375rem 0.75rem; border-radius: 0.375rem; font-size: 0.8125rem; font-weight: 500; cursor: pointer; transition: all 0.15s; border: none; }
-        .btn-primary { background: #667eea; color: #fff; }
+        .btn-primary { background: #0F3A5F; color: #fff; }
         .btn-primary:hover { background: #5a6fd6; }
         .btn-success { background: #10b981; color: #fff; }
         .btn-success:hover { background: #059669; }
@@ -62,7 +62,7 @@
         .form-group { margin-bottom: 1rem; }
         .form-group label { display: block; font-size: 0.8125rem; font-weight: 600; color: #374151; margin-bottom: 0.25rem; }
         .form-group input, .form-group select, .form-group textarea { width: 100%; padding: 0.5rem 0.75rem; border: 1px solid #d1d5db; border-radius: 0.375rem; font-size: 0.875rem; }
-        .form-group input:focus, .form-group select:focus { outline: none; border-color: #667eea; box-shadow: 0 0 0 3px rgba(102,126,234,0.1); }
+        .form-group input:focus, .form-group select:focus { outline: none; border-color: #0F3A5F; box-shadow: 0 0 0 3px rgba(15,58,95,0.1); }
         .empty-state { text-align: center; padding: 3rem; color: #94a3b8; }
         .empty-state svg { width: 48px; height: 48px; margin: 0 auto 1rem; stroke: #cbd5e1; }
         @media (max-width: 767px) {
@@ -82,7 +82,7 @@
         .group-btn { display:flex; flex-direction:column; align-items:center; justify-content:center; flex:1; padding:0.5rem 0.25rem; border-radius:0.5rem; font-size:0.75rem; font-weight:600; color:#64748b; cursor:pointer; transition:all 0.15s; background:transparent; border:none; min-height:44px; gap:1px; }
         .group-btn .grp-icon { font-size:1.1rem; line-height:1; }
         .group-btn .grp-label { font-size:0.68rem; white-space:nowrap; }
-        .group-btn.active { background:linear-gradient(135deg,#667eea,#764ba2); color:#fff; box-shadow:0 2px 8px rgba(102,126,234,0.3); }
+        .group-btn.active { background:linear-gradient(135deg,#0F3A5F,#1A4A6E); color:#fff; box-shadow:0 2px 8px rgba(15,58,95,0.3); }
         .group-badge { display:none; background:#ef4444; color:#fff; border-radius:9999px; font-size:0.6rem; font-weight:700; padding:1px 5px; margin-left:2px; vertical-align:middle; }
         .group-badge.show { display:inline; }
 
@@ -387,7 +387,7 @@
                             <span id="unmappedCount" class="text-xs bg-orange-100 text-orange-700 px-2 py-0.5 rounded-full"></span>
                         </div>
                         <div id="unmappedBody" class="hidden mt-3">
-                            <p class="text-xs text-gray-500 mb-2">These items exist in the rates table but aren't linked to any product. <a href="/admin-products.html?tab=zoho-import" class="text-indigo-600 hover:underline">Import them &rarr;</a></p>
+                            <p class="text-xs text-gray-500 mb-2">These items exist in the rates table but aren't linked to any product. <a href="/admin-products.html?tab=zoho-import" class="text-[#0F3A5F] hover:underline">Import them &rarr;</a></p>
                             <table class="data-table">
                                 <thead>
                                     <tr>
@@ -654,7 +654,7 @@
                     </div>
                 </div>
                 <!-- Mobile FAB to scroll to offer form -->
-                <button onclick="document.getElementById('offerFormTitle').scrollIntoView({behavior:'smooth'});document.getElementById('offerTitle').focus();" class="md:hidden" style="position:fixed;bottom:1.25rem;right:1.25rem;width:56px;height:56px;border-radius:9999px;background:linear-gradient(135deg,#667eea,#764ba2);color:#fff;border:none;font-size:1.5rem;box-shadow:0 4px 16px rgba(102,126,234,0.4);cursor:pointer;z-index:30;display:none;align-items:center;justify-content:center;" id="offerFab" aria-label="New Offer">+</button>
+                <button onclick="document.getElementById('offerFormTitle').scrollIntoView({behavior:'smooth'});document.getElementById('offerTitle').focus();" class="md:hidden" style="position:fixed;bottom:1.25rem;right:1.25rem;width:56px;height:56px;border-radius:9999px;background:linear-gradient(135deg,#0F3A5F,#1A4A6E);color:#fff;border:none;font-size:1.5rem;box-shadow:0 4px 16px rgba(15,58,95,0.4);cursor:pointer;z-index:30;display:none;align-items:center;justify-content:center;" id="offerFab" aria-label="New Offer">+</button>
             </div>
 
             <!-- Tab: Per-Painter Overrides -->
@@ -826,7 +826,7 @@
                             <h3 class="text-lg font-bold text-gray-800">Estimate Catalog</h3>
                             <p class="text-sm text-gray-500 mt-1">Products available for painter estimates</p>
                         </div>
-                        <a href="/admin-products.html" class="bg-gradient-to-r from-indigo-500 to-purple-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:opacity-90 transition">Manage Products</a>
+                        <a href="/admin-products.html" class="bg-gradient-to-r from-[#0F3A5F] to-purple-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:opacity-90 transition">Manage Products</a>
                     </div>
                     <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
                         <div class="bg-gray-50 rounded-xl p-4 text-center">
@@ -969,7 +969,7 @@
                         <div class="flex justify-between items-center mb-3">
                             <h3 class="text-lg font-semibold">Leads without branch</h3>
                             <div class="flex gap-2">
-                                <button onclick="runBulkImport()" class="px-3 py-1.5 bg-indigo-600 text-white rounded-lg text-sm">Run Initial PNTR Import</button>
+                                <button onclick="runBulkImport()" class="px-3 py-1.5 bg-[#0F3A5F] text-white rounded-lg text-sm">Run Initial PNTR Import</button>
                                 <button onclick="runIncrementalImport()" class="px-3 py-1.5 bg-gray-200 text-gray-800 rounded-lg text-sm">Incremental</button>
                             </div>
                         </div>
@@ -984,7 +984,7 @@
                         </div>
                         <div class="flex gap-2 mt-3">
                             <select id="mktBulkBranch" class="px-3 py-1.5 border rounded-lg text-sm"><option value="">Choose branch…</option></select>
-                            <button onclick="bulkAssignBranch()" class="px-3 py-1.5 bg-indigo-600 text-white rounded-lg text-sm">Assign Selected</button>
+                            <button onclick="bulkAssignBranch()" class="px-3 py-1.5 bg-[#0F3A5F] text-white rounded-lg text-sm">Assign Selected</button>
                         </div>
                     </div>
 
@@ -1028,7 +1028,7 @@
                             <input type="date" id="mktPerfFrom" class="px-2 py-1.5 border rounded-lg text-sm">
                             <input type="date" id="mktPerfTo" class="px-2 py-1.5 border rounded-lg text-sm">
                             <select id="mktPerfBranch" class="px-2 py-1.5 border rounded-lg text-sm"><option value="">All branches</option></select>
-                            <button onclick="loadMktPerf()" class="px-3 py-1.5 bg-indigo-600 text-white rounded-lg text-sm">Load</button>
+                            <button onclick="loadMktPerf()" class="px-3 py-1.5 bg-[#0F3A5F] text-white rounded-lg text-sm">Load</button>
                         </div>
                         <div class="overflow-x-auto">
                             <table class="w-full text-sm">
@@ -1049,7 +1049,7 @@
                             <label class="text-sm font-medium">From date: </label>
                             <input type="date" id="mktBfFrom" value="2025-12-01" class="px-2 py-1.5 border rounded-lg text-sm">
                             <button onclick="previewBackfill()" class="px-3 py-1.5 bg-gray-200 text-gray-800 rounded-lg text-sm ml-2">Preview</button>
-                            <button onclick="runBackfill()" id="mktBfRunBtn" disabled class="px-3 py-1.5 bg-indigo-600 text-white rounded-lg text-sm ml-2 disabled:opacity-50">Run</button>
+                            <button onclick="runBackfill()" id="mktBfRunBtn" disabled class="px-3 py-1.5 bg-[#0F3A5F] text-white rounded-lg text-sm ml-2 disabled:opacity-50">Run</button>
                         </div>
                         <pre id="mktBfPreview" class="bg-gray-900 text-green-300 text-xs p-3 rounded-lg whitespace-pre-wrap"></pre>
                     </div>
@@ -1067,7 +1067,7 @@
                             <label class="text-sm">Recycle not_interested<input type="number" id="mktCfgNotInt" class="w-full px-2 py-1.5 border rounded-lg text-sm"></label>
                             <label class="text-sm">Recycle unreachable<input type="number" id="mktCfgUnreach" class="w-full px-2 py-1.5 border rounded-lg text-sm"></label>
                             <label class="text-sm">Recycle active_painter<input type="number" id="mktCfgActive" class="w-full px-2 py-1.5 border rounded-lg text-sm"></label>
-                            <button onclick="saveMktCfg()" class="col-span-2 px-3 py-1.5 bg-indigo-600 text-white rounded-lg text-sm">Save</button>
+                            <button onclick="saveMktCfg()" class="col-span-2 px-3 py-1.5 bg-[#0F3A5F] text-white rounded-lg text-sm">Save</button>
                         </div>
                     </div>
                 </div>
@@ -1169,7 +1169,7 @@
                         <option value="">All branches</option>
                     </select>
                 </div>
-                <button onclick="loadAttendanceToday()" class="bg-indigo-600 text-white px-4 py-2 rounded">Load</button>
+                <button onclick="loadAttendanceToday()" class="bg-[#0F3A5F] text-white px-4 py-2 rounded">Load</button>
             </div>
             <div class="bg-white rounded-xl border border-gray-200 overflow-x-auto">
                 <table class="data-table w-full">
@@ -1187,7 +1187,7 @@
                     <label class="text-xs text-gray-600">Month</label>
                     <input type="month" id="att-month-picker" class="border rounded px-3 py-2">
                 </div>
-                <button onclick="loadAttendanceMonthly()" class="bg-indigo-600 text-white px-4 py-2 rounded">Load</button>
+                <button onclick="loadAttendanceMonthly()" class="bg-[#0F3A5F] text-white px-4 py-2 rounded">Load</button>
             </div>
             <div class="bg-white rounded-xl border border-gray-200 overflow-x-auto">
                 <table class="data-table w-full">
@@ -1203,7 +1203,7 @@
 
             <!-- Toggle pills -->
             <div class="flex gap-2 mb-4">
-                <button id="loc-pill-fleet" class="px-4 py-2 rounded-full text-sm font-medium bg-indigo-600 text-white" onclick="switchLocationPanel('fleet')">Live Fleet Map</button>
+                <button id="loc-pill-fleet" class="px-4 py-2 rounded-full text-sm font-medium bg-[#0F3A5F] text-white" onclick="switchLocationPanel('fleet')">Live Fleet Map</button>
                 <button id="loc-pill-replay" class="px-4 py-2 rounded-full text-sm font-medium bg-gray-100 text-gray-600" onclick="switchLocationPanel('replay')">Route Replay</button>
             </div>
 
@@ -1238,7 +1238,7 @@
                         <label class="text-xs text-gray-600 block mb-1">Date</label>
                         <input type="date" id="loc-replay-date" class="border rounded px-3 py-2 text-sm">
                     </div>
-                    <button onclick="loadRouteReplay()" class="bg-indigo-600 text-white px-4 py-2 rounded text-sm">Load Route</button>
+                    <button onclick="loadRouteReplay()" class="bg-[#0F3A5F] text-white px-4 py-2 rounded text-sm">Load Route</button>
                 </div>
                 <div id="loc-replay-map" style="height:500px;border-radius:12px;border:1px solid #e5e7eb;" class="w-full"></div>
                 <div id="loc-replay-stats" class="mt-3 flex gap-4 text-sm text-gray-600 hidden">
@@ -1377,7 +1377,7 @@
 
                             <!-- Send button -->
                             <button id="notif-send-btn" onclick="sendAdminNotification()"
-                                style="width:100%;padding:0.75rem;background:linear-gradient(135deg,#667eea,#764ba2);color:#fff;border:none;border-radius:10px;font-size:0.95rem;font-weight:700;cursor:pointer;letter-spacing:0.3px;">
+                                style="width:100%;padding:0.75rem;background:linear-gradient(135deg,#0F3A5F,#1A4A6E);color:#fff;border:none;border-radius:10px;font-size:0.95rem;font-weight:700;cursor:pointer;letter-spacing:0.3px;">
                                 🚀 Send Notification
                             </button>
                             <p id="notif-send-result" style="text-align:center;margin-top:0.75rem;font-size:0.875rem;display:none;"></p>
@@ -1836,7 +1836,7 @@
                             `).join('')}
                         </tbody>
                     </table>
-                    ${data.recentTransactions.length >= 20 ? `<div class="text-center mt-2"><button onclick="loadDetailTxns(${p.id},'all',100)" class="text-xs text-indigo-600 hover:underline">Load more (100)</button></div>` : ''}
+                    ${data.recentTransactions.length >= 20 ? `<div class="text-center mt-2"><button onclick="loadDetailTxns(${p.id},'all',100)" class="text-xs text-[#0F3A5F] hover:underline">Load more (100)</button></div>` : ''}
                     ` : '<p class="text-gray-400 text-sm">No transactions yet</p>'}
                     </div>
                 </div>
@@ -2741,7 +2741,7 @@
         if (pages <= 1) { container.innerHTML = ''; return; }
         let html = '';
         for (let i = 1; i <= pages; i++) {
-            html += `<button class="px-3 py-1 rounded text-sm ${i === page ? 'bg-indigo-600 text-white' : 'bg-gray-100'}" onclick="loadEstimates(${i})">${i}</button>`;
+            html += `<button class="px-3 py-1 rounded text-sm ${i === page ? 'bg-[#0F3A5F] text-white' : 'bg-gray-100'}" onclick="loadEstimates(${i})">${i}</button>`;
         }
         container.innerHTML = html;
     }
@@ -2934,8 +2934,8 @@
             </div>
 
             ${isCustomer && est.status === 'admin_review' ? `
-            <div class="flex items-center gap-3 mb-3 p-3 bg-indigo-50 rounded-lg">
-                <label class="text-sm font-medium text-indigo-800">Bulk Markup %:</label>
+            <div class="flex items-center gap-3 mb-3 p-3 bg-[#EBF2F8] rounded-lg">
+                <label class="text-sm font-medium text-[#0C2E4D]">Bulk Markup %:</label>
                 <input type="number" id="bulkMarkupPct" step="0.5" min="0" class="w-24 px-2 py-1.5 border rounded text-sm" placeholder="e.g. 20">
                 <button class="btn-sm btn-primary" onclick="applyBulkMarkup()">Apply to All</button>
             </div>` : ''}
@@ -2955,7 +2955,7 @@
                 <div class="flex justify-between mb-1"><span>Subtotal (Cost):</span><span>₹${parseFloat(est.subtotal).toLocaleString('en-IN')}</span></div>
                 <div class="flex justify-between font-bold border-t pt-1"><span>Grand Total (Cost):</span><span>₹${parseFloat(est.grand_total).toLocaleString('en-IN')}</span></div>
                 ${isCustomer && parseFloat(est.markup_grand_total) > 0 ? `
-                <div class="flex justify-between mt-2 pt-2 border-t font-bold text-indigo-600"><span>Markup Grand Total:</span><span>₹${parseFloat(est.markup_grand_total).toLocaleString('en-IN')}</span></div>
+                <div class="flex justify-between mt-2 pt-2 border-t font-bold text-[#0F3A5F]"><span>Markup Grand Total:</span><span>₹${parseFloat(est.markup_grand_total).toLocaleString('en-IN')}</span></div>
                 ${parseFloat(est.discount_amount) > 0 ? `<div class="flex justify-between text-red-600"><span>Discount (${parseFloat(est.discount_percentage)}%):</span><span>-₹${parseFloat(est.discount_amount).toLocaleString('en-IN')}</span></div>
                 <div class="flex justify-between font-bold text-green-700"><span>Final Total:</span><span>₹${parseFloat(est.final_grand_total).toLocaleString('en-IN')}</span></div>` : ''}
                 ` : ''}
@@ -3115,7 +3115,7 @@
         if (!preview) return;
         if (pct > 0) {
             // Get the markup or grand total from the summary section
-            const totalText = document.querySelector('.bg-gray-50.rounded-lg .font-bold span:last-child, .bg-gray-50.rounded-lg .text-indigo-600 span:last-child');
+            const totalText = document.querySelector('.bg-gray-50.rounded-lg .font-bold span:last-child, .bg-gray-50.rounded-lg .text-[#0F3A5F] span:last-child');
             const totalEl = document.querySelectorAll('.bg-gray-50.rounded-lg .flex.justify-between');
             let total = 0;
             totalEl.forEach(row => {
@@ -3972,7 +3972,7 @@
                         '<span class="text-xs text-gray-500">' + esc(p.brand_name || '') + '</span>' +
                         typeBadge +
                     '</div>' +
-                    '<a href="/admin-products.html" class="text-xs text-indigo-600 font-medium hover:underline">Edit</a>' +
+                    '<a href="/admin-products.html" class="text-xs text-[#0F3A5F] font-medium hover:underline">Edit</a>' +
                 '</div>';
             }).join('');
         } catch (err) {
@@ -4206,8 +4206,8 @@
 
     function switchMktSub(name) {
         document.querySelectorAll('.mkt-subtab').forEach(b => {
-            if (b.dataset.sub === name) b.classList.add('bg-indigo-100', 'text-indigo-700');
-            else b.classList.remove('bg-indigo-100', 'text-indigo-700');
+            if (b.dataset.sub === name) b.classList.add('bg-[#D6E5F0]', 'text-[#0F3A5F]');
+            else b.classList.remove('bg-[#D6E5F0]', 'text-[#0F3A5F]');
         });
         document.querySelectorAll('.mkt-sub').forEach(p => p.classList.toggle('hidden', p.dataset.pane !== name));
         if (name === 'unassigned') loadMktUnassigned();
@@ -4355,7 +4355,7 @@
                 '<div class="text-xs text-gray-500 mb-1">\uD83D\uDCDE ' + mktEsc(l.phone) + '</div>' +
                 '<div class="text-xs text-gray-400 mb-3">' + lastContact + (l.last_outcome ? ' \u2014 ' + mktEsc(l.last_outcome) : '') + '</div>' +
                 '<div class="flex gap-2">' +
-                    '<button onclick="event.stopPropagation(); openMktPanel(' + JSON.stringify(l).replace(/"/g, '&quot;') + ')" class="flex-1 py-2 bg-indigo-50 text-indigo-600 rounded-lg text-xs font-semibold">View / Log</button>' +
+                    '<button onclick="event.stopPropagation(); openMktPanel(' + JSON.stringify(l).replace(/"/g, '&quot;') + ')" class="flex-1 py-2 bg-[#EBF2F8] text-[#0F3A5F] rounded-lg text-xs font-semibold">View / Log</button>' +
                     (l.status !== 'converted' ? '<button onclick="event.stopPropagation(); openMktPanel(' + JSON.stringify(l).replace(/"/g, '&quot;') + ')" class="flex-1 py-2 text-white rounded-lg text-xs font-semibold" style="background:#1B5E3B">Convert \u2192</button>' : '') +
                 '</div>' +
             '</div>';
@@ -4552,7 +4552,7 @@
                 <div class="flex gap-1 mt-2">
                     <button onclick="resolveDupe(${d.id},'kept_original')" class="px-2 py-1 text-xs bg-gray-200 rounded">Keep Original</button>
                     <button onclick="resolveDupe(${d.id},'kept_duplicate')" class="px-2 py-1 text-xs bg-gray-200 rounded">Keep Duplicate</button>
-                    <button onclick="resolveDupe(${d.id},'merged')" class="px-2 py-1 text-xs bg-indigo-600 text-white rounded">Merge</button>
+                    <button onclick="resolveDupe(${d.id},'merged')" class="px-2 py-1 text-xs bg-[#0F3A5F] text-white rounded">Merge</button>
                     <button onclick="resolveDupe(${d.id},'ignored')" class="px-2 py-1 text-xs bg-gray-200 rounded">Ignore</button>
                 </div>
             </div>`
@@ -4569,7 +4569,7 @@
             `<tr class="border-t"><td class="p-2">${mktEsc(sp.zoho_salesperson_name)}</td>
              <td class="p-2">${mktEsc(sp.zoho_salesperson_phone || '')}</td>
              <td class="p-2"><input type="number" placeholder="Painter ID" id="mktSpP${sp.id}" class="w-24 px-2 py-1 border rounded text-sm">
-                 <button onclick="linkSp(${sp.id})" class="px-2 py-1 text-xs bg-indigo-600 text-white rounded">Link</button></td></tr>`
+                 <button onclick="linkSp(${sp.id})" class="px-2 py-1 text-xs bg-[#0F3A5F] text-white rounded">Link</button></td></tr>`
         ).join('') || '<tr><td class="p-4 text-center text-gray-500" colspan="3">No unmatched</td></tr>';
     }
     async function linkSp(id) {
@@ -5129,10 +5129,10 @@ function closeNotifDetail() {
         document.getElementById('loc-panel-fleet').style.display = panel === 'fleet' ? '' : 'none';
         document.getElementById('loc-panel-replay').style.display = panel === 'replay' ? '' : 'none';
         document.getElementById('loc-pill-fleet').className = panel === 'fleet'
-            ? 'px-4 py-2 rounded-full text-sm font-medium bg-indigo-600 text-white'
+            ? 'px-4 py-2 rounded-full text-sm font-medium bg-[#0F3A5F] text-white'
             : 'px-4 py-2 rounded-full text-sm font-medium bg-gray-100 text-gray-600';
         document.getElementById('loc-pill-replay').className = panel === 'replay'
-            ? 'px-4 py-2 rounded-full text-sm font-medium bg-indigo-600 text-white'
+            ? 'px-4 py-2 rounded-full text-sm font-medium bg-[#0F3A5F] text-white'
             : 'px-4 py-2 rounded-full text-sm font-medium bg-gray-100 text-gray-600';
         if (panel === 'fleet') {
             setTimeout(() => fleetMap && fleetMap.invalidateSize(), 100);

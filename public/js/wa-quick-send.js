@@ -74,13 +74,13 @@
 
             '.wqs-pills { display:flex;gap:8px;margin-bottom:16px }',
             '.wqs-pill { flex:1;padding:8px 0;border-radius:8px;border:none;cursor:pointer;font-size:13px;font-weight:600;text-align:center;transition:all .15s ease;background:#f1f5f9;color:#64748b }',
-            '.wqs-pill.wqs-active { background:linear-gradient(135deg,#667eea,#764ba2);color:#fff }',
+            '.wqs-pill.wqs-active { background:linear-gradient(135deg,#0F3A5F,#1A4A6E);color:#fff }',
 
             '.wqs-label { display:block;font-size:12px;font-weight:600;color:#64748b;margin-bottom:4px;text-transform:uppercase;letter-spacing:.5px }',
             '.wqs-field-group { margin-bottom:14px;position:relative }',
 
             '.wqs-input { width:100%;padding:10px 12px;border:1px solid #e2e8f0;border-radius:8px;font-size:14px;color:#1e293b;outline:none;box-sizing:border-box;transition:border-color .15s }',
-            '.wqs-input:focus { border-color:#667eea }',
+            '.wqs-input:focus { border-color:#0F3A5F }',
 
             '.wqs-to-name { font-size:12px;color:#64748b;margin-top:2px }',
 
@@ -93,10 +93,10 @@
             '.wqs-dd-empty { padding:10px 12px;font-size:13px;color:#94a3b8;text-align:center }',
 
             '.wqs-textarea { width:100%;min-height:100px;padding:10px 12px;border:1px solid #e2e8f0;border-radius:8px;font-size:14px;color:#1e293b;outline:none;resize:vertical;box-sizing:border-box;font-family:inherit;transition:border-color .15s }',
-            '.wqs-textarea:focus { border-color:#667eea }',
+            '.wqs-textarea:focus { border-color:#0F3A5F }',
             '.wqs-charcount { text-align:right;font-size:11px;color:#94a3b8;margin-top:2px }',
 
-            '.wqs-send-btn { width:100%;padding:12px;border:none;border-radius:10px;background:linear-gradient(135deg,#667eea,#764ba2);color:#fff;font-size:15px;font-weight:600;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;margin-top:8px;transition:opacity .15s }',
+            '.wqs-send-btn { width:100%;padding:12px;border:none;border-radius:10px;background:linear-gradient(135deg,#0F3A5F,#1A4A6E);color:#fff;font-size:15px;font-weight:600;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;margin-top:8px;transition:opacity .15s }',
             '.wqs-send-btn:disabled { opacity:0.6;cursor:not-allowed }',
 
             '.wqs-spinner { width:18px;height:18px;border:2px solid rgba(255,255,255,0.3);border-top-color:#fff;border-radius:50%;animation:wqs-spin .6s linear infinite;display:none }',

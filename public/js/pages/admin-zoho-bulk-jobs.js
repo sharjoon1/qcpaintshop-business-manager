@@ -198,7 +198,7 @@
             // Top row: type + status + chevron
             html += '<div class="flex items-center justify-between mb-3">';
             html += '<div class="flex items-center gap-3">';
-            html += '<div class="w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0" style="background: linear-gradient(135deg, #667eea, #764ba2);">';
+            html += '<div class="w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0" style="background: linear-gradient(135deg, #0F3A5F, #1A4A6E);">';
             html += '<svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg>';
             html += '</div>';
             html += '<div>';
@@ -259,7 +259,7 @@
                     html += '</button>';
                 }
                 if (status === 'failed') {
-                    html += '<button data-action="confirm-retry" data-id="' + job.id + '" class="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-semibold text-white bg-indigo-600 hover:bg-indigo-700 rounded-lg transition">';
+                    html += '<button data-action="confirm-retry" data-id="' + job.id + '" class="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-semibold text-white bg-[#0F3A5F] hover:bg-[#0C2E4D] rounded-lg transition">';
                     html += '<svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg>';
                     html += 'Retry Job';
                     html += '</button>';
@@ -282,7 +282,7 @@
     // --- Render Job Detail ---
     function renderJobDetail() {
         if (!expandedJobDetail) {
-            return '<div class="job-card-detail"><div class="flex items-center justify-center py-6"><svg class="w-5 h-5 animate-spin text-indigo-500 mr-2" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg><span class="text-sm text-gray-500">Loading details...</span></div></div>';
+            return '<div class="job-card-detail"><div class="flex items-center justify-center py-6"><svg class="w-5 h-5 animate-spin text-[#0F3A5F] mr-2" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg><span class="text-sm text-gray-500">Loading details...</span></div></div>';
         }
 
         var job = expandedJobDetail;
@@ -432,7 +432,7 @@
             'Retry Job',
             'This will retry all failed items in this bulk job. Do you want to continue?',
             'Retry Job',
-            'bg-indigo-600 hover:bg-indigo-700',
+            'bg-[#0F3A5F] hover:bg-[#0C2E4D]',
             function() { retryJob(jobId); }
         );
     }

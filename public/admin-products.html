@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="theme-color" content="#667eea">
+    <meta name="theme-color" content="#0F3A5F">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <link rel="manifest" href="/manifest.json">
@@ -263,7 +263,7 @@
                     <span class="text-sm text-gray-600"><strong id="bulkActionCount">0</strong> items mapped and ready to save</span>
                     <div class="flex gap-3">
                         <button onclick="clearBulkSelections()" class="px-4 py-2 border border-gray-300 rounded-lg text-sm font-semibold text-gray-600 hover:bg-gray-50">Clear All</button>
-                        <button onclick="saveBulkMappings()" class="px-6 py-2 bg-gradient-to-r from-indigo-500 to-purple-600 text-white rounded-lg text-sm font-semibold hover:from-indigo-600 hover:to-purple-700 transition">Save All Mappings</button>
+                        <button onclick="saveBulkMappings()" class="px-6 py-2 bg-gradient-to-r from-[#0F3A5F] to-purple-600 text-white rounded-lg text-sm font-semibold hover:from-indigo-600 hover:to-purple-700 transition">Save All Mappings</button>
                     </div>
                 </div>
             </div>
@@ -295,7 +295,7 @@
                         Group by product
                     </label>
                 </div>
-                <button onclick="syncZohoItems()" class="px-4 py-2 bg-gradient-to-r from-indigo-500 to-purple-600 text-white rounded-lg text-sm font-semibold hover:from-indigo-600 hover:to-purple-700 transition flex items-center gap-2" id="syncZohoItemsBtn">
+                <button onclick="syncZohoItems()" class="px-4 py-2 bg-gradient-to-r from-[#0F3A5F] to-purple-600 text-white rounded-lg text-sm font-semibold hover:from-indigo-600 hover:to-purple-700 transition flex items-center gap-2" id="syncZohoItemsBtn">
                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
                     Sync from Zoho Books
                 </button>
@@ -366,7 +366,7 @@
                     <span class="text-sm text-gray-600"><strong id="zohoImportCount">0</strong> items selected for import</span>
                     <div class="flex gap-3">
                         <button onclick="clearZohoSelection()" class="px-4 py-2 border border-gray-300 rounded-lg text-sm font-semibold text-gray-600 hover:bg-gray-50">Clear Selection</button>
-                        <button onclick="importZohoToProducts()" id="zohoImportBtn" class="px-6 py-2 bg-gradient-to-r from-indigo-500 to-purple-600 text-white rounded-lg text-sm font-semibold hover:from-indigo-600 hover:to-purple-700 transition flex items-center gap-2">
+                        <button onclick="importZohoToProducts()" id="zohoImportBtn" class="px-6 py-2 bg-gradient-to-r from-[#0F3A5F] to-purple-600 text-white rounded-lg text-sm font-semibold hover:from-indigo-600 hover:to-purple-700 transition flex items-center gap-2">
                             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"/></svg>
                             Import to Products
                         </button>
@@ -402,7 +402,7 @@
                 <span class="text-sm text-gray-500" id="reviewFooterInfo"></span>
                 <div class="flex gap-3">
                     <button onclick="closeImportReview()" class="px-4 py-2 border border-gray-300 rounded-lg text-sm font-semibold text-gray-600 hover:bg-gray-100">Cancel</button>
-                    <button onclick="confirmImport()" id="confirmImportBtn" class="px-6 py-2 bg-gradient-to-r from-indigo-500 to-purple-600 text-white rounded-lg text-sm font-semibold hover:from-indigo-600 hover:to-purple-700 transition">Import All</button>
+                    <button onclick="confirmImport()" id="confirmImportBtn" class="px-6 py-2 bg-gradient-to-r from-[#0F3A5F] to-purple-600 text-white rounded-lg text-sm font-semibold hover:from-indigo-600 hover:to-purple-700 transition">Import All</button>
                 </div>
             </div>
         </div>
@@ -425,7 +425,7 @@
                 <span class="text-sm text-gray-500" id="editReviewFooter"></span>
                 <div class="flex gap-3">
                     <button onclick="closeEditReview()" class="px-4 py-2 border border-gray-300 rounded-lg text-sm font-semibold text-gray-600 hover:bg-gray-100">Cancel</button>
-                    <button onclick="saveEditReview()" id="saveEditReviewBtn" class="px-6 py-2 bg-gradient-to-r from-indigo-500 to-purple-600 text-white rounded-lg text-sm font-semibold hover:from-indigo-600 hover:to-purple-700 transition">Save Changes</button>
+                    <button onclick="saveEditReview()" id="saveEditReviewBtn" class="px-6 py-2 bg-gradient-to-r from-[#0F3A5F] to-purple-600 text-white rounded-lg text-sm font-semibold hover:from-indigo-600 hover:to-purple-700 transition">Save Changes</button>
                 </div>
             </div>
         </div>
@@ -3197,6 +3197,6 @@
     </div>
     <button onclick="closeZohoFilterDrawer()" style="width:100%;background:#1B5E3B;color:#fff;border:none;border-radius:10px;padding:12px;font-size:0.9rem;font-weight:600;cursor:pointer;">Apply</button>
 </div>
-<button onclick="openAddModal()" data-permission-module="products" data-permission-action="add" class="fixed bottom-20 right-4 z-50 md:hidden bg-indigo-600 text-white rounded-full shadow-lg flex items-center justify-center" style="width:56px;height:56px;" aria-label="Add Product"><svg width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg></button>
+<button onclick="openAddModal()" data-permission-module="products" data-permission-action="add" class="fixed bottom-20 right-4 z-50 md:hidden bg-[#0F3A5F] text-white rounded-full shadow-lg flex items-center justify-center" style="width:56px;height:56px;" aria-label="Add Product"><svg width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg></button>
 </body>
 </html>

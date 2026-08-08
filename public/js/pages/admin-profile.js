@@ -415,7 +415,7 @@ async function load2FAStatus() {
             actionsEl.innerHTML = `<button data-action="disable-2fa" class="px-4 py-2 bg-red-50 hover:bg-red-100 text-red-700 border border-red-200 rounded-lg text-sm font-medium transition">Disable 2FA</button>`;
         } else {
             statusEl.innerHTML = '<span class="inline-flex items-center gap-1.5 px-3 py-1 bg-amber-100 text-amber-800 rounded-full text-sm font-medium">⚠ 2FA not enabled</span>';
-            actionsEl.innerHTML = `<button data-action="setup-2fa" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-sm font-semibold transition">Enable 2FA</button>`;
+            actionsEl.innerHTML = `<button data-action="setup-2fa" class="px-4 py-2 bg-[#0F3A5F] hover:bg-[#0C2E4D] text-white rounded-lg text-sm font-semibold transition">Enable 2FA</button>`;
         }
     } catch (e) { /* non-critical, skip */ }
 }

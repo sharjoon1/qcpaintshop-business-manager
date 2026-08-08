@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<meta name="theme-color" content="#667eea">
+<meta name="theme-color" content="#0F3A5F">
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <title>Stock Hub — Quality Colours Manager</title>
 <link rel="stylesheet" href="/css/tailwind.css?v=849f1b5c">
@@ -21,7 +21,7 @@ body{ background:#f8fafb; font-family:Inter, -apple-system, BlinkMacSystemFont, 
 .hub-tabs::-webkit-scrollbar{ display:none; }
 .hub-tab{ padding:10px 16px; font-size:0.8125rem; font-weight:500; color:#64748b; border:none; background:none; cursor:pointer; white-space:nowrap; border-bottom:2px solid transparent; margin-bottom:-1px; transition: all 0.18s; }
 .hub-tab:hover{ color:#334155; background:#f8fafc; }
-.hub-tab.active{ color:#3b4b9a; font-weight:600; border-bottom-color:#667eea; background:#eef2ff; }
+.hub-tab.active{ color:#3b4b9a; font-weight:600; border-bottom-color:#0F3A5F; background:#eef2ff; }
 .hub-pane{ display:none; }
 .hub-pane.active{ display:block; }
 .stat-card{ background:white; border-radius:10px; padding:14px 16px; box-shadow:0 1px 3px rgba(0,0,0,0.06); border:1px solid #e5e7eb; }
@@ -41,10 +41,10 @@ body{ background:#f8fafb; font-family:Inter, -apple-system, BlinkMacSystemFont, 
 .status-dot{ display:inline-block; width:8px; height:8px; border-radius:50%; }
 .dot-out{ background:#ef4444; } .dot-below{ background:#f97316; } .dot-near{ background:#eab308; } .dot-healthy{ background:#22c55e; }
 .location-chip{ padding:6px 12px; border-radius:999px; font-size:0.75rem; font-weight:500; border:1px solid #e5e7eb; background:white; cursor:pointer; white-space:nowrap; }
-.location-chip.active{ background:#667eea; color:white; border-color:#667eea; }
+.location-chip.active{ background:#0F3A5F; color:white; border-color:#0F3A5F; }
 .selected-row{ background:#eef2ff !important; }
 .quick-action{ display:flex; align-items:center; gap:10px; padding:10px 12px; background:white; border:1px solid #e5e7eb; border-radius:8px; cursor:pointer; transition:all 0.15s; }
-.quick-action:hover{ border-color:#667eea; background:#f8fafb; }
+.quick-action:hover{ border-color:#0F3A5F; background:#f8fafb; }
 .filter-panel{ background:white; border:1px solid #e5e7eb; border-radius:8px; padding:12px; }
 @media(max-width:768px){ .hub-tabs{ gap:2px; } .hub-tab{ padding:8px 10px; font-size:0.75rem; } }
 </style>
@@ -62,13 +62,13 @@ body{ background:#f8fafb; font-family:Inter, -apple-system, BlinkMacSystemFont, 
     <div class="flex items-center gap-2 flex-wrap">
       <button onclick="syncStock()" id="btnSyncStock" class="px-3 py-2 bg-white border border-gray-300 rounded-lg text-sm font-medium hover:bg-gray-50">Sync Stock</button>
       <button onclick="runReorderCheck()" id="btnReorderCheck" class="px-3 py-2 bg-gray-900 text-white rounded-lg text-sm font-medium hover:bg-black">Check Reorder</button>
-      <button onclick="openCreateCheck()" class="px-3 py-2 bg-[#667eea] text-white rounded-lg text-sm font-medium hover:bg-[#5a6fd6]">New Stock Check</button>
+      <button onclick="openCreateCheck()" class="px-3 py-2 bg-[#0F3A5F] text-white rounded-lg text-sm font-medium hover:bg-[#5a6fd6]">New Stock Check</button>
     </div>
   </div>
 
   <!-- Overview stats -->
   <div id="overviewStats" class="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
-    <div class="stat-card kpi-accent" style="border-left-color:#667eea"><div class="label">Total SKUs</div><div class="value" id="kpiTotal">—</div><div class="hint" id="kpiTotalHint">across locations</div></div>
+    <div class="stat-card kpi-accent" style="border-left-color:#0F3A5F"><div class="label">Total SKUs</div><div class="value" id="kpiTotal">—</div><div class="hint" id="kpiTotalHint">across locations</div></div>
     <div class="stat-card kpi-accent" style="border-left-color:#f97316"><div class="label">Below reorder</div><div class="value" id="kpiReorder">—</div><div class="hint"><span id="kpiCritical">0 critical</span> · <span id="kpiHigh">0 high</span></div></div>
     <div class="stat-card kpi-accent" style="border-left-color:#eab308"><div class="label">Low stock (≤5)</div><div class="value" id="kpiLow">—</div><div class="hint">needs attention</div></div>
     <div class="stat-card kpi-accent" style="border-left-color:#22c55e"><div class="label">Pending checks</div><div class="value" id="kpiChecks">—</div><div class="hint" id="kpiChecksHint">awaiting count</div></div>
@@ -111,11 +111,11 @@ body{ background:#f8fafb; font-family:Inter, -apple-system, BlinkMacSystemFont, 
       </div>
     </div>
     <div class="mt-4">
-      <div class="flex items-center justify-between mb-2"><h3 class="text-sm font-semibold text-gray-800">Recent checks</h3><button onclick="switchTab('checks')" class="text-xs text-[#667eea] font-medium">View all →</button></div>
+      <div class="flex items-center justify-between mb-2"><h3 class="text-sm font-semibold text-gray-800">Recent checks</h3><button onclick="switchTab('checks')" class="text-xs text-[#0F3A5F] font-medium">View all →</button></div>
       <div id="overviewChecks" class="overflow-x-auto"><div class="text-sm text-gray-400 py-4">Loading…</div></div>
     </div>
     <div class="mt-4">
-      <div class="flex items-center justify-between mb-2"><h3 class="text-sm font-semibold text-gray-800">Stock Value — Branch wise</h3><button onclick="loadValuation()" class="text-xs text-[#667eea] font-medium">Refresh</button></div>
+      <div class="flex items-center justify-between mb-2"><h3 class="text-sm font-semibold text-gray-800">Stock Value — Branch wise</h3><button onclick="loadValuation()" class="text-xs text-[#0F3A5F] font-medium">Refresh</button></div>
       <div id="valuationCards" class="grid md:grid-cols-3 gap-3"></div>
       <div id="valuationTotal" class="mt-2 text-sm font-semibold text-gray-800"></div>
     </div>
@@ -136,11 +136,11 @@ body{ background:#f8fafb; font-family:Inter, -apple-system, BlinkMacSystemFont, 
     </div>
     <div id="stockFilterPanel" class="filter-panel hidden mb-3"></div>
     <div id="stockFilterChips" class="flex flex-wrap gap-1 mb-3"></div>
-    <div id="stockSelectionBar" class="hidden items-center justify-between bg-[#eef2ff] border border-indigo-200 rounded-lg px-3 py-2 mb-3">
-      <span class="text-sm font-medium text-indigo-700"><span id="stockSelCount">0</span> selected</span>
+    <div id="stockSelectionBar" class="hidden items-center justify-between bg-[#eef2ff] border border-[#C0D5E8] rounded-lg px-3 py-2 mb-3">
+      <span class="text-sm font-medium text-[#0F3A5F]"><span id="stockSelCount">0</span> selected</span>
       <div class="flex gap-2">
         <button onclick="clearStockSelection()" class="px-3 py-1.5 bg-white border border-gray-300 rounded-lg text-xs">Clear</button>
-        <button onclick="addStockToCheck()" class="px-3 py-1.5 bg-[#667eea] text-white rounded-lg text-xs font-medium">Add to Stock Check</button>
+        <button onclick="addStockToCheck()" class="px-3 py-1.5 bg-[#0F3A5F] text-white rounded-lg text-xs font-medium">Add to Stock Check</button>
       </div>
     </div>
     <div id="stockLoading" class="text-center py-8 text-gray-400 text-sm">Select a location to view stock</div>
@@ -169,7 +169,7 @@ body{ background:#f8fafb; font-family:Inter, -apple-system, BlinkMacSystemFont, 
         <button onclick="clearReorderSelection()" class="px-3 py-1.5 bg-white border border-gray-300 rounded-lg text-xs">Clear</button>
         <button onclick="createCheckFromReorder()" class="px-3 py-1.5 bg-gray-900 text-white rounded-lg text-xs font-medium">Create Stock Check</button>
         <button onclick="bulkAcknowledge()" class="px-3 py-1.5 bg-white border border-gray-300 rounded-lg text-xs">Acknowledge</button>
-        <button onclick="smartCheckAutoQueue()" class="px-3 py-1.5 bg-[#667eea] text-white rounded-lg text-xs font-medium">Smart Check: Auto-queue</button>
+        <button onclick="smartCheckAutoQueue()" class="px-3 py-1.5 bg-[#0F3A5F] text-white rounded-lg text-xs font-medium">Smart Check: Auto-queue</button>
       </div>
     </div>
     <div id="reorderLoading" class="text-center py-8 text-gray-400 text-sm">Loading reorder alerts…</div>
@@ -214,7 +214,7 @@ body{ background:#f8fafb; font-family:Inter, -apple-system, BlinkMacSystemFont, 
         <div id="ccSelected" class="mt-2 space-y-1 max-h-40 overflow-auto"></div>
       </div>
       <textarea id="ccNotes" rows="2" placeholder="Instructions (optional)" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm mb-3"></textarea>
-      <div class="flex gap-2"><button onclick="submitCreateCheck()" id="ccSubmitBtn" class="px-4 py-2 bg-[#667eea] text-white rounded-lg text-sm font-medium">Create</button><button onclick="closeCreateCheck()" class="px-4 py-2 bg-white border border-gray-300 rounded-lg text-sm">Cancel</button></div>
+      <div class="flex gap-2"><button onclick="submitCreateCheck()" id="ccSubmitBtn" class="px-4 py-2 bg-[#0F3A5F] text-white rounded-lg text-sm font-medium">Create</button><button onclick="closeCreateCheck()" class="px-4 py-2 bg-white border border-gray-300 rounded-lg text-sm">Cancel</button></div>
     </div>
   </div>
 
@@ -226,13 +226,13 @@ body{ background:#f8fafb; font-family:Inter, -apple-system, BlinkMacSystemFont, 
       <select id="deadCategory" onchange="loadDead()" class="px-3 py-2 border border-gray-300 rounded-lg text-sm bg-white"><option value="">All Categories</option></select>
       <input id="deadSearch" type="text" placeholder="Search name or SKU..." class="flex-1 min-w-[150px] px-3 py-2 border border-gray-300 rounded-lg text-sm" oninput="debounceDeadSearch()">
       <button onclick="loadDead()" class="px-3 py-2 bg-white border border-gray-300 rounded-lg text-sm">Refresh</button>
-      <button onclick="smartCheckAutoQueue()" class="ml-auto px-3 py-2 bg-[#667eea] text-white rounded-lg text-sm font-medium">Smart Check: Auto-queue</button>
+      <button onclick="smartCheckAutoQueue()" class="ml-auto px-3 py-2 bg-[#0F3A5F] text-white rounded-lg text-sm font-medium">Smart Check: Auto-queue</button>
     </div>
     <div id="deadSelectionBar" class="hidden items-center justify-between bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 mb-3">
       <span class="text-sm font-medium text-gray-700"><span id="deadSelCount">0</span> selected</span>
       <div class="flex gap-2">
         <button onclick="clearDeadSelection()" class="px-3 py-1.5 bg-white border border-gray-300 rounded-lg text-xs">Clear</button>
-        <button onclick="addDeadToCheck()" class="px-3 py-1.5 bg-[#667eea] text-white rounded-lg text-xs font-medium">Add to Stock Check</button>
+        <button onclick="addDeadToCheck()" class="px-3 py-1.5 bg-[#0F3A5F] text-white rounded-lg text-xs font-medium">Add to Stock Check</button>
       </div>
     </div>
     <div id="deadLoading" class="text-center py-8 text-gray-400 text-sm">Select filters to view dead stock</div>
@@ -419,7 +419,7 @@ async function loadOverview(){
       document.getElementById('qaChecksCount').textContent = (checks.pagination?checks.pagination.total:checks.data.length)+' assignments';
       // overview checks table
       const oc=document.getElementById('overviewChecks');
-      if(checks.data.length){ oc.innerHTML='<table class="qc-table"><thead><tr><th>Date</th><th>Branch</th><th>Staff</th><th>Status</th><th></th></tr></thead><tbody>'+checks.data.slice(0,5).map(a=>'<tr><td>'+esc(a.check_date)+'</td><td>'+esc(a.branch_name)+'</td><td>'+esc(a.staff_name)+'</td><td><span class="badge" style="background:#fef3c7">'+esc(a.status)+'</span></td><td><button onclick="openReview('+a.id+')" class="text-xs text-[#667eea]">Review</button></td></tr>').join('')+'</tbody></table>'; } else oc.innerHTML='<div class="text-sm text-gray-400">No checks yet</div>';
+      if(checks.data.length){ oc.innerHTML='<table class="qc-table"><thead><tr><th>Date</th><th>Branch</th><th>Staff</th><th>Status</th><th></th></tr></thead><tbody>'+checks.data.slice(0,5).map(a=>'<tr><td>'+esc(a.check_date)+'</td><td>'+esc(a.branch_name)+'</td><td>'+esc(a.staff_name)+'</td><td><span class="badge" style="background:#fef3c7">'+esc(a.status)+'</span></td><td><button onclick="openReview('+a.id+')" class="text-xs text-[#0F3A5F]">Review</button></td></tr>').join('')+'</tbody></table>'; } else oc.innerHTML='<div class="text-sm text-gray-400">No checks yet</div>';
     }
     // valuation
     loadValuation().catch(()=>{});
@@ -542,7 +542,7 @@ function renderReorder(rows){
   tb.innerHTML=rows.map(r=>{
     const sev=(r.severity||'low').toLowerCase();
     const checked=selectedReorder.has(String(r.id||r.zoho_item_id+'|'+r.zoho_location_id));
-    return '<tr class="'+(checked?'selected-row':'')+'"><td><input type="checkbox" '+(checked?'checked':'')+' onchange="toggleReorderRow(\''+esc(r.id||r.zoho_item_id+'|'+r.zoho_location_id)+'\', this)"></td><td><div class="font-medium">'+esc(r.item_name||r.zoho_item_name||'')+'</div><div class="text-xs text-gray-400">'+esc(r.sku||r.zoho_sku||'')+'</div></td><td class="text-xs">'+esc(r.zoho_location_name||r.location_name||'')+'</td><td class="text-right">'+esc(r.stock_on_hand ?? r.current_stock ?? '')+'</td><td class="text-right">'+esc(r.reorder_level ?? '')+'</td><td><span class="badge badge-'+esc(sev)+'">'+esc(sev)+'</span></td><td><span class="badge" style="background:#f1f5f9">'+esc(r.status||'active')+'</span></td><td><button onclick="ackOne('+ (r.id||0) +')" class="text-xs text-[#667eea]">Ack</button></td></tr>';
+    return '<tr class="'+(checked?'selected-row':'')+'"><td><input type="checkbox" '+(checked?'checked':'')+' onchange="toggleReorderRow(\''+esc(r.id||r.zoho_item_id+'|'+r.zoho_location_id)+'\', this)"></td><td><div class="font-medium">'+esc(r.item_name||r.zoho_item_name||'')+'</div><div class="text-xs text-gray-400">'+esc(r.sku||r.zoho_sku||'')+'</div></td><td class="text-xs">'+esc(r.zoho_location_name||r.location_name||'')+'</td><td class="text-right">'+esc(r.stock_on_hand ?? r.current_stock ?? '')+'</td><td class="text-right">'+esc(r.reorder_level ?? '')+'</td><td><span class="badge badge-'+esc(sev)+'">'+esc(sev)+'</span></td><td><span class="badge" style="background:#f1f5f9">'+esc(r.status||'active')+'</span></td><td><button onclick="ackOne('+ (r.id||0) +')" class="text-xs text-[#0F3A5F]">Ack</button></td></tr>';
   }).join('');
 }
 function renderReorderPagination(p){ const w=document.getElementById('reorderPagination'); if(!p){ w.classList.add('hidden'); return; } w.classList.remove('hidden'); document.getElementById('reorderPageInfo').textContent='Page '+p.page+' of '+p.pages+' · '+p.total; const b=document.getElementById('reorderPageBtns'); b.innerHTML='<button '+(p.page<=1?'disabled':'')+' onclick="reorderPage--;loadReorder()" class="px-2 py-1 border rounded text-xs">Prev</button><button '+(p.page>=p.pages?'disabled':'')+' onclick="reorderPage++;loadReorder()" class="px-2 py-1 border rounded text-xs">Next</button>'; }

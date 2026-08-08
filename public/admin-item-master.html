@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="theme-color" content="#667eea">
+    <meta name="theme-color" content="#0F3A5F">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <link rel="manifest" href="/manifest.json">
@@ -19,13 +19,13 @@
     <style>
         body { background: #f9fafb; }
         .tab-btn { padding: 10px 16px; font-size: 0.8rem; cursor: pointer; border-bottom: 3px solid transparent; color: #64748b; font-weight: 500; white-space: nowrap; transition: all 0.15s; }
-        .tab-btn:hover { color: #667eea; }
-        .tab-btn.active { border-bottom: 3px solid #667eea; color: #667eea; font-weight: 700; }
+        .tab-btn:hover { color: #0F3A5F; }
+        .tab-btn.active { border-bottom: 3px solid #0F3A5F; color: #0F3A5F; font-weight: 700; }
         .toast { position: fixed; bottom: 20px; right: 20px; z-index: 9999; padding: 10px 20px; border-radius: 8px; font-size: 0.8rem; font-weight: 500; opacity: 0; transition: opacity 0.3s; pointer-events: none; }
         .toast.show { opacity: 1; pointer-events: auto; }
         .toast-success { background: #10b981; color: white; }
         .toast-error { background: #ef4444; color: white; }
-        .toast-info { background: #667eea; color: white; }
+        .toast-info { background: #0F3A5F; color: white; }
         .item-table { font-size: 0.75rem; }
         .item-table th { position: sticky; top: 0; z-index: 5; background: #f8fafc; }
         .item-table td, .item-table th { padding: 6px 8px; border-bottom: 1px solid #f1f5f9; }
@@ -40,7 +40,7 @@
         .slide-panel.open { right: 0; }
         .panel-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.3); z-index: 55; display: none; }
         .panel-overlay.open { display: block; }
-        .bulk-bar { position: fixed; bottom: 0; left: 0; right: 0; z-index: 40; background: white; border-top: 2px solid #667eea; box-shadow: 0 -4px 12px rgba(0,0,0,0.1); padding: 12px 24px; display: none; }
+        .bulk-bar { position: fixed; bottom: 0; left: 0; right: 0; z-index: 40; background: white; border-top: 2px solid #0F3A5F; box-shadow: 0 -4px 12px rgba(0,0,0,0.1); padding: 12px 24px; display: none; }
         .bulk-bar.show { display: flex; }
         .summary-card { transition: all 0.2s; cursor: pointer; }
         .summary-card:hover { transform: translateY(-2px); box-shadow: 0 4px 12px rgba(0,0,0,0.1); }
@@ -91,15 +91,15 @@
                     <div class="flex-1 min-w-[180px]">
                         <input type="text" id="filterSearch" placeholder="Search item name, SKU..." oninput="debounceSearch()" class="w-full px-3 py-1.5 border border-gray-300 rounded-lg text-xs focus:border-indigo-500 focus:outline-none">
                     </div>
-                    <button onclick="generateNamesSelected()" class="px-3 py-1.5 text-white text-xs font-semibold rounded-lg" style="background: linear-gradient(135deg, #667eea, #764ba2);">Auto-Generate Names</button>
+                    <button onclick="generateNamesSelected()" class="px-3 py-1.5 text-white text-xs font-semibold rounded-lg" style="background: linear-gradient(135deg, #0F3A5F, #1A4A6E);">Auto-Generate Names</button>
                     <button onclick="openBulkEditModal()" class="px-3 py-1.5 border border-gray-300 text-xs font-semibold rounded-lg text-gray-700 hover:bg-gray-50">Bulk Edit</button>
                 </div>
             </div>
 
             <!-- Summary Cards -->
             <div class="grid grid-cols-2 sm:grid-cols-5 gap-3 mb-4">
-                <div class="summary-card bg-white rounded-lg shadow-sm p-3 text-center border-l-4" style="border-left-color: #667eea;" onclick="applyFilter('status','all')">
-                    <div class="text-2xl font-bold" style="color: #667eea;" id="statTotal">-</div>
+                <div class="summary-card bg-white rounded-lg shadow-sm p-3 text-center border-l-4" style="border-left-color: #0F3A5F;" onclick="applyFilter('status','all')">
+                    <div class="text-2xl font-bold" style="color: #0F3A5F;" id="statTotal">-</div>
                     <div class="text-[10px] text-gray-500 font-medium">Total Items</div>
                 </div>
                 <div class="summary-card rounded-lg shadow-sm p-3 text-center border-l-4 border-green-400" style="background: #f0fdf4;" onclick="applyFilter('status','dpl_set')">
@@ -123,7 +123,7 @@
             <!-- Items Table -->
             <div class="bg-white rounded-xl shadow-sm overflow-hidden">
                 <div id="itemsLoading" class="text-center py-12">
-                    <svg class="inline w-8 h-8 animate-spin text-indigo-500" fill="none" viewBox="0 0 24 24">
+                    <svg class="inline w-8 h-8 animate-spin text-[#0F3A5F]" fill="none" viewBox="0 0 24 24">
                         <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
                         <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                     </svg>
@@ -165,7 +165,7 @@
             <div class="bg-white rounded-xl shadow-sm p-8 text-center max-w-lg mx-auto mt-6">
                 <h3 class="text-base font-bold text-gray-800 mb-2">This tool has moved</h3>
                 <p class="text-sm text-gray-500 mb-4">DPL pricing now lives in the main DPL Import tool.</p>
-                <a href="/admin-dpl.html" class="inline-block px-4 py-2 text-white text-sm font-semibold rounded-lg transition" style="background: linear-gradient(135deg, #667eea, #764ba2);">
+                <a href="/admin-dpl.html" class="inline-block px-4 py-2 text-white text-sm font-semibold rounded-lg transition" style="background: linear-gradient(135deg, #0F3A5F, #1A4A6E);">
                     Go to DPL Import &rarr;
                 </a>
             </div>
@@ -176,7 +176,7 @@
             <div class="bg-white rounded-xl shadow-sm p-8 text-center max-w-lg mx-auto mt-6">
                 <h3 class="text-base font-bold text-gray-800 mb-2">This tool has moved</h3>
                 <p class="text-sm text-gray-500 mb-4">DPL pricing now lives in the main DPL Import tool.</p>
-                <a href="/admin-dpl.html" class="inline-block px-4 py-2 text-white text-sm font-semibold rounded-lg transition" style="background: linear-gradient(135deg, #667eea, #764ba2);">
+                <a href="/admin-dpl.html" class="inline-block px-4 py-2 text-white text-sm font-semibold rounded-lg transition" style="background: linear-gradient(135deg, #0F3A5F, #1A4A6E);">
                     Go to DPL Import &rarr;
                 </a>
             </div>
@@ -195,14 +195,14 @@
                     <div class="flex-1 min-w-[160px]">
                         <input type="text" id="historySearch" placeholder="Search item name..." class="w-full px-3 py-1.5 border border-gray-300 rounded-lg text-xs focus:border-indigo-500 focus:outline-none">
                     </div>
-                    <button onclick="historyFilters.page=1; loadPriceHistory();" class="px-3 py-1.5 text-white text-xs font-semibold rounded-lg" style="background: linear-gradient(135deg, #667eea, #764ba2);">Search</button>
-                    <button onclick="downloadHistoryCsv()" class="px-3 py-1.5 border border-indigo-400 text-indigo-600 text-xs font-semibold rounded-lg hover:bg-indigo-50">Download CSV</button>
+                    <button onclick="historyFilters.page=1; loadPriceHistory();" class="px-3 py-1.5 text-white text-xs font-semibold rounded-lg" style="background: linear-gradient(135deg, #0F3A5F, #1A4A6E);">Search</button>
+                    <button onclick="downloadHistoryCsv()" class="px-3 py-1.5 border border-[#7AA3C6] text-[#0F3A5F] text-xs font-semibold rounded-lg hover:bg-[#EBF2F8]">Download CSV</button>
                 </div>
             </div>
 
             <!-- Loading -->
             <div id="historyLoading" class="hidden flex justify-center py-12">
-                <svg class="spinner w-8 h-8 text-indigo-500" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="3" stroke-dasharray="31" stroke-linecap="round"/></svg>
+                <svg class="spinner w-8 h-8 text-[#0F3A5F]" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="3" stroke-dasharray="31" stroke-linecap="round"/></svg>
             </div>
 
             <!-- Empty State -->
@@ -225,7 +225,7 @@
             <!-- Action Bar -->
             <div class="bg-white rounded-b-xl shadow-sm p-4 mb-4">
                 <div class="flex flex-wrap gap-2 items-center">
-                    <button onclick="runHealthCheck()" id="btnRunHealth" class="px-4 py-1.5 text-white text-xs font-semibold rounded-lg flex items-center gap-2" style="background: linear-gradient(135deg, #667eea, #764ba2);">
+                    <button onclick="runHealthCheck()" id="btnRunHealth" class="px-4 py-1.5 text-white text-xs font-semibold rounded-lg flex items-center gap-2" style="background: linear-gradient(135deg, #0F3A5F, #1A4A6E);">
                         <svg id="healthSpinner" class="hidden spinner w-4 h-4" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="3" stroke-dasharray="31" stroke-linecap="round"/></svg>
                         <span id="healthBtnText">Run Health Check</span>
                     </button>
@@ -299,8 +299,8 @@
                         <input type="number" id="editDpl" step="0.01" min="0" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-xs focus:border-indigo-500 focus:outline-none" oninput="updatePriceCalc()">
                     </div>
                     <!-- Live price calculation -->
-                    <div id="priceCalcBox" class="hidden bg-indigo-50 rounded-lg p-3">
-                        <div class="text-[10px] font-semibold text-indigo-600 uppercase mb-2">Calculated Prices</div>
+                    <div id="priceCalcBox" class="hidden bg-[#EBF2F8] rounded-lg p-3">
+                        <div class="text-[10px] font-semibold text-[#0F3A5F] uppercase mb-2">Calculated Prices</div>
                         <div class="flex justify-between text-xs">
                             <span class="text-gray-600">Purchase Price:</span>
                             <span class="font-bold text-gray-800" id="calcPurchase">-</span>
@@ -310,7 +310,7 @@
                             <span class="font-bold text-green-700" id="calcSales">-</span>
                         </div>
                     </div>
-                    <button type="submit" id="editSaveBtn" class="w-full py-2 text-white text-sm font-semibold rounded-lg transition" style="background: linear-gradient(135deg, #667eea, #764ba2);">
+                    <button type="submit" id="editSaveBtn" class="w-full py-2 text-white text-sm font-semibold rounded-lg transition" style="background: linear-gradient(135deg, #0F3A5F, #1A4A6E);">
                         Save Changes
                     </button>
                 </div>
@@ -340,7 +340,7 @@
                         <option value="">-- No change --</option>
                     </select>
                 </div>
-                <button onclick="applyBulkEdit()" class="w-full py-2 text-white text-sm font-semibold rounded-lg transition" style="background: linear-gradient(135deg, #667eea, #764ba2);">
+                <button onclick="applyBulkEdit()" class="w-full py-2 text-white text-sm font-semibold rounded-lg transition" style="background: linear-gradient(135deg, #0F3A5F, #1A4A6E);">
                     Apply to Selected
                 </button>
             </div>
@@ -368,7 +368,7 @@
             </div>
             <div class="flex justify-end gap-2 mt-4 pt-3 border-t">
                 <button onclick="closeNamePreview()" class="px-4 py-2 border border-gray-300 rounded-lg text-xs font-medium text-gray-600 hover:bg-gray-50">Cancel</button>
-                <button onclick="confirmGeneratedNames()" id="confirmNamesBtn" class="px-4 py-2 text-white text-xs font-semibold rounded-lg" style="background: linear-gradient(135deg, #667eea, #764ba2);">
+                <button onclick="confirmGeneratedNames()" id="confirmNamesBtn" class="px-4 py-2 text-white text-xs font-semibold rounded-lg" style="background: linear-gradient(135deg, #0F3A5F, #1A4A6E);">
                     Apply Names
                 </button>
             </div>
@@ -382,7 +382,7 @@
             <button onclick="document.getElementById('selectAll').checked=false; toggleSelectAll(); updateBulkBar();" class="text-xs text-gray-500 hover:text-gray-700 underline">Deselect all</button>
         </div>
         <div class="flex items-center gap-2">
-            <button onclick="generateNamesSelected()" class="px-3 py-1.5 text-white text-xs font-semibold rounded-lg" style="background: linear-gradient(135deg, #667eea, #764ba2);">Auto-Generate Names</button>
+            <button onclick="generateNamesSelected()" class="px-3 py-1.5 text-white text-xs font-semibold rounded-lg" style="background: linear-gradient(135deg, #0F3A5F, #1A4A6E);">Auto-Generate Names</button>
             <button onclick="openBulkEditModal()" class="px-3 py-1.5 border border-gray-300 text-xs font-semibold rounded-lg text-gray-700 hover:bg-gray-50">Bulk Edit</button>
         </div>
     </div>
@@ -417,9 +417,9 @@
                     </div>
                     <div>
                         <label class="block text-[10px] font-semibold text-gray-500 uppercase mb-1">PDF File</label>
-                        <input type="file" id="dplUploadFile" accept=".pdf" required class="w-full text-xs file:mr-2 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-indigo-50 file:text-indigo-600 hover:file:bg-indigo-100">
+                        <input type="file" id="dplUploadFile" accept=".pdf" required class="w-full text-xs file:mr-2 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-[#EBF2F8] file:text-[#0F3A5F] hover:file:bg-[#D6E5F0]">
                     </div>
-                    <button type="submit" id="dplUploadBtn" class="w-full py-2 text-white text-sm font-semibold rounded-lg transition" style="background: linear-gradient(135deg, #667eea, #764ba2);">
+                    <button type="submit" id="dplUploadBtn" class="w-full py-2 text-white text-sm font-semibold rounded-lg transition" style="background: linear-gradient(135deg, #0F3A5F, #1A4A6E);">
                         Upload DPL
                     </button>
                 </div>
@@ -449,7 +449,7 @@
                     <label class="block text-[10px] font-semibold text-gray-500 uppercase mb-1">Query</label>
                     <textarea id="notebookLmQuery" rows="3" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-xs focus:border-indigo-500 focus:outline-none resize-none">List all products with DPL prices. Format: product_name | pack_size | dpl_price</textarea>
                 </div>
-                <button onclick="submitNotebookLmQuery()" id="btnNotebookLm" class="w-full py-2 text-white text-sm font-semibold rounded-lg transition" style="background: linear-gradient(135deg, #667eea, #764ba2);">
+                <button onclick="submitNotebookLmQuery()" id="btnNotebookLm" class="w-full py-2 text-white text-sm font-semibold rounded-lg transition" style="background: linear-gradient(135deg, #0F3A5F, #1A4A6E);">
                     Query NotebookLM
                 </button>
             </div>
@@ -470,7 +470,7 @@
             <div id="pricePreviewContent" class="space-y-3"></div>
             <div class="flex justify-end gap-2 mt-4 pt-3 border-t">
                 <button onclick="closePricePreview()" class="px-4 py-2 border border-gray-300 rounded-lg text-xs font-medium text-gray-600 hover:bg-gray-50">Close</button>
-                <button onclick="closePricePreview(); applyPriceChanges();" class="px-4 py-2 text-white text-xs font-semibold rounded-lg" style="background: linear-gradient(135deg, #667eea, #764ba2);">
+                <button onclick="closePricePreview(); applyPriceChanges();" class="px-4 py-2 text-white text-xs font-semibold rounded-lg" style="background: linear-gradient(135deg, #0F3A5F, #1A4A6E);">
                     Confirm &amp; Apply
                 </button>
             </div>
@@ -734,7 +734,7 @@
         var endPage = Math.min(totalPages, startPage + 4);
         if (endPage - startPage < 4) startPage = Math.max(1, endPage - 4);
         for (var i = startPage; i <= endPage; i++) {
-            var activeClass = i === page ? 'bg-indigo-600 text-white border-indigo-600' : 'border-gray-300 hover:bg-gray-50';
+            var activeClass = i === page ? 'bg-[#0F3A5F] text-white border-[#0F3A5F]' : 'border-gray-300 hover:bg-gray-50';
             html += '<button onclick="goToPage(' + i + ')" class="px-2.5 py-1 border rounded text-xs font-medium ' + activeClass + '">' + i + '</button>';
         }
         if (page < totalPages) {
@@ -1014,7 +1014,7 @@
             Object.keys(byBrand).sort().forEach(function(brand) {
                 var items = byBrand[brand];
                 var latest = items[0]; // assume sorted by effective_date desc
-                html += '<div class="bg-white rounded-xl shadow-sm p-4 border-l-4" style="border-left-color: #667eea;">';
+                html += '<div class="bg-white rounded-xl shadow-sm p-4 border-l-4" style="border-left-color: #0F3A5F;">';
                 html += '<div class="flex items-start justify-between">';
                 html += '<div>';
                 html += '<h4 class="text-sm font-bold text-gray-800">' + esc(brand) + '</h4>';
@@ -1497,8 +1497,8 @@
         if (maxPct === -Infinity) maxPct = 0;
 
         var html = '';
-        html += '<div class="bg-indigo-50 rounded-lg p-4 text-center">';
-        html += '<div class="text-3xl font-bold" style="color: #667eea;">' + changes.length + '</div>';
+        html += '<div class="bg-[#EBF2F8] rounded-lg p-4 text-center">';
+        html += '<div class="text-3xl font-bold" style="color: #0F3A5F;">' + changes.length + '</div>';
         html += '<div class="text-xs text-gray-500 font-medium">Items to Update</div>';
         html += '</div>';
         html += '<div class="grid grid-cols-3 gap-3">';
@@ -1745,8 +1745,8 @@
             if (history.length === 0) { showToast('No history for this item', 'info'); return; }
 
             var html = '<tr class="item-timeline-row"><td colspan="7" class="p-0">';
-            html += '<div class="bg-indigo-50 p-3 mx-2 my-1 rounded-lg">';
-            html += '<div class="text-[10px] font-semibold text-indigo-600 uppercase mb-2">Full Price History for ' + esc(history[0].item_name || 'Item') + '</div>';
+            html += '<div class="bg-[#EBF2F8] p-3 mx-2 my-1 rounded-lg">';
+            html += '<div class="text-[10px] font-semibold text-[#0F3A5F] uppercase mb-2">Full Price History for ' + esc(history[0].item_name || 'Item') + '</div>';
             html += '<div class="space-y-1">';
             history.forEach(function(h) {
                 var dateStr = h.changed_at ? new Date(h.changed_at).toLocaleDateString('en-IN', { year: 'numeric', month: 'short', day: 'numeric' }) : '-';
@@ -1786,7 +1786,7 @@
         var endPage = Math.min(totalPages, startPage + 4);
         if (endPage - startPage < 4) startPage = Math.max(1, endPage - 4);
         for (var i = startPage; i <= endPage; i++) {
-            var activeClass = i === page ? 'bg-indigo-600 text-white border-indigo-600' : 'border-gray-300 hover:bg-gray-50';
+            var activeClass = i === page ? 'bg-[#0F3A5F] text-white border-[#0F3A5F]' : 'border-gray-300 hover:bg-gray-50';
             html += '<button onclick="historyGoToPage(' + i + ')" class="px-2.5 py-1 border rounded text-xs font-medium ' + activeClass + '">' + i + '</button>';
         }
         if (page < totalPages) {
@@ -1950,7 +1950,7 @@
                     sectionsHtml += '<td class="p-2"><span class="font-mono text-blue-600 text-[10px]">' + esc(item.sku || '-') + '</span></td>';
                     sectionsHtml += '<td class="p-2 text-gray-600">' + esc(item.current_value != null ? item.current_value : '-') + '</td>';
                     sectionsHtml += '<td class="p-2 text-green-700 font-medium">' + esc(item.expected_value != null ? item.expected_value : '-') + '</td>';
-                    sectionsHtml += '<td class="p-2 text-center"><button onclick="fixHealthItem(\'' + esc(item.zoho_item_id) + '\')" class="px-2 py-0.5 text-[10px] font-semibold rounded border border-indigo-300 text-indigo-600 hover:bg-indigo-50">Fix</button></td>';
+                    sectionsHtml += '<td class="p-2 text-center"><button onclick="fixHealthItem(\'' + esc(item.zoho_item_id) + '\')" class="px-2 py-0.5 text-[10px] font-semibold rounded border border-[#A3BFD9] text-[#0F3A5F] hover:bg-[#EBF2F8]">Fix</button></td>';
                     sectionsHtml += '</tr>';
                 });
                 if (items.length > 100) {

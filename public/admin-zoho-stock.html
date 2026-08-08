@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="theme-color" content="#667eea">
+    <meta name="theme-color" content="#0F3A5F">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <link rel="manifest" href="/manifest.json">
@@ -28,7 +28,7 @@
             border-radius: 12px;
             padding: 1.25rem;
             box-shadow: 0 2px 8px rgba(0,0,0,0.06);
-            border-left: 4px solid var(--accent, #667eea);
+            border-left: 4px solid var(--accent, #0F3A5F);
             transition: transform 0.2s;
         }
         .stat-card:hover { transform: translateY(-2px); }
@@ -60,10 +60,10 @@
         }
         .location-tab:hover { background: #f3f4f6; color: #374151; }
         .location-tab.active {
-            background: #667eea;
+            background: #0F3A5F;
             color: white;
-            border-color: #667eea;
-            box-shadow: 0 2px 8px rgba(102,126,234,0.3);
+            border-color: #0F3A5F;
+            box-shadow: 0 2px 8px rgba(15,58,95,0.3);
         }
 
         /* Status dots */
@@ -124,7 +124,7 @@
             width: 8px;
             height: 8px;
             border-radius: 50%;
-            background: #667eea;
+            background: #0F3A5F;
         }
     </style>
 </head>
@@ -145,7 +145,7 @@
             </div>
             <div class="flex items-center gap-2 flex-wrap">
                 <a href="/admin-zoho-stock-adjust.html" class="px-3 py-1.5 rounded-lg border border-gray-300 bg-white hover:bg-gray-50 text-xs font-medium text-gray-700 transition whitespace-nowrap">Adjust Stock &rarr;</a>
-                <button onclick="syncStock()" id="syncBtn" class="flex items-center gap-2 px-4 py-2 text-white text-sm font-semibold rounded-lg transition shadow-sm whitespace-nowrap" style="background: #667eea;" onmouseover="this.style.background='#5a6fd6'" onmouseout="this.style.background='#667eea'">
+                <button onclick="syncStock()" id="syncBtn" class="flex items-center gap-2 px-4 py-2 text-white text-sm font-semibold rounded-lg transition shadow-sm whitespace-nowrap" style="background: #0F3A5F;" onmouseover="this.style.background='#5a6fd6'" onmouseout="this.style.background='#0F3A5F'">
                     <svg id="syncIcon" class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
                     </svg>
@@ -156,7 +156,7 @@
 
         <!-- Summary Cards -->
         <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3 md:gap-4 mb-6">
-            <div class="stat-card" style="border-left-color: #667eea;">
+            <div class="stat-card" style="border-left-color: #0F3A5F;">
                 <div id="statTotalItems" class="stat-value"><div class="skeleton" style="width:50px;height:28px;"></div></div>
                 <div class="stat-label">Total Items</div>
             </div>
@@ -204,11 +204,11 @@
             <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 items-end">
                 <div>
                     <label class="block text-sm font-medium text-gray-700 mb-1">Search</label>
-                    <input type="text" id="searchInput" onkeyup="debounceSearch()" placeholder="Item name or SKU..." class="w-full rounded-lg border-gray-300 border px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-400 focus:border-indigo-400 outline-none">
+                    <input type="text" id="searchInput" onkeyup="debounceSearch()" placeholder="Item name or SKU..." class="w-full rounded-lg border-gray-300 border px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-400 focus:border-[#7AA3C6] outline-none">
                 </div>
                 <div>
                     <label class="block text-sm font-medium text-gray-700 mb-1">Sort by</label>
-                    <select id="sortSelect" onchange="onSortChange()" class="w-full rounded-lg border-gray-300 border px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-400 focus:border-indigo-400 outline-none bg-white">
+                    <select id="sortSelect" onchange="onSortChange()" class="w-full rounded-lg border-gray-300 border px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-400 focus:border-[#7AA3C6] outline-none bg-white">
                         <option value="name_asc">Name (A-Z)</option>
                         <option value="name_desc">Name (Z-A)</option>
                         <option value="sku_asc">SKU (A-Z)</option>
@@ -228,7 +228,7 @@
                 </div>
                 <div class="flex items-center gap-3 sm:pt-6">
                     <label class="flex items-center gap-2 cursor-pointer select-none">
-                        <input type="checkbox" id="lowStockToggle" onchange="applyFilters()" class="w-4 h-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500">
+                        <input type="checkbox" id="lowStockToggle" onchange="applyFilters()" class="w-4 h-4 rounded border-gray-300 text-[#0F3A5F] focus:ring-[#0F3A5F]">
                         <span class="text-sm font-medium text-gray-700">Low stock only</span>
                     </label>
                 </div>
@@ -250,7 +250,7 @@
 
         <!-- Loading State -->
         <div id="loadingState" class="text-center py-12">
-            <svg class="inline w-8 h-8 animate-spin text-indigo-600" fill="none" viewBox="0 0 24 24">
+            <svg class="inline w-8 h-8 animate-spin text-[#0F3A5F]" fill="none" viewBox="0 0 24 24">
                 <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
                 <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
             </svg>
@@ -264,7 +264,7 @@
             </svg>
             <h3 class="text-lg font-semibold text-gray-800 mb-2">No stock items found</h3>
             <p class="text-gray-600 mb-4">Try syncing stock from Zoho Books or adjusting your filters.</p>
-            <button onclick="syncStock()" class="inline-flex items-center gap-2 px-4 py-2 text-white text-sm font-semibold rounded-lg transition" style="background: #667eea;">
+            <button onclick="syncStock()" class="inline-flex items-center gap-2 px-4 py-2 text-white text-sm font-semibold rounded-lg transition" style="background: #0F3A5F;">
                 Sync Stock
             </button>
         </div>
@@ -720,7 +720,7 @@
                     '<td colspan="8" class="p-0">' +
                         '<div class="detail-panel' + (isExpanded ? ' open' : '') + '" id="detail-panel-' + escapeHtml(String(id)) + '">' +
                             '<div class="flex items-center justify-center py-4">' +
-                                '<svg class="w-5 h-5 animate-spin text-indigo-500" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>' +
+                                '<svg class="w-5 h-5 animate-spin text-[#0F3A5F]" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>' +
                                 '<span class="ml-2 text-sm text-gray-500">Loading details...</span>' +
                             '</div>' +
                         '</div>' +
@@ -808,7 +808,7 @@
 
             // Show loading inside panel
             detailPanel.innerHTML = '<div class="flex items-center justify-center py-4">' +
-                '<svg class="w-5 h-5 animate-spin text-indigo-500" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>' +
+                '<svg class="w-5 h-5 animate-spin text-[#0F3A5F]" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>' +
                 '<span class="ml-2 text-sm text-gray-500">Loading details...</span>' +
             '</div>';
             requestAnimationFrame(() => { detailPanel.classList.add('open'); });
@@ -849,7 +849,7 @@
             expandedItemId = itemId;
 
             detailPanel.innerHTML = '<div class="flex items-center justify-center py-4">' +
-                '<svg class="w-5 h-5 animate-spin text-indigo-500" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>' +
+                '<svg class="w-5 h-5 animate-spin text-[#0F3A5F]" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>' +
                 '<span class="ml-2 text-sm text-gray-500">Loading details...</span>' +
             '</div>';
             requestAnimationFrame(() => { detailPanel.classList.add('open'); });
@@ -977,7 +977,7 @@
 
             for (let i = startPage; i <= endPage; i++) {
                 if (i === currentPage) {
-                    html += '<button class="px-3 py-1.5 text-sm font-medium rounded-lg text-white transition" style="background: #667eea;">' + i + '</button>';
+                    html += '<button class="px-3 py-1.5 text-sm font-medium rounded-lg text-white transition" style="background: #0F3A5F;">' + i + '</button>';
                 } else {
                     html += '<button onclick="goToPage(' + i + ')" class="px-3 py-1.5 text-sm font-medium rounded-lg border border-gray-300 text-gray-700 hover:bg-gray-100 transition">' + i + '</button>';
                 }

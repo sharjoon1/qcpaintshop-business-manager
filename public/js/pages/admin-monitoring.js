@@ -239,7 +239,7 @@ function renderIssues(issues) {
                 <div style="font-size:13px;font-weight:600;color:#0f172a;">${sevBadge(i.severity)} ${i.title}</div>
                 <div style="font-size:12px;color:#475569;margin-top:2px;">${i.description}</div>
             </div>
-            ${i.action ? `<a href="${i.action}" style="font-size:12px;color:#667eea;font-weight:600;text-decoration:none;white-space:nowrap;">Fix &rarr;</a>` : ''}
+            ${i.action ? `<a href="${i.action}" style="font-size:12px;color:#0F3A5F;font-weight:600;text-decoration:none;white-space:nowrap;">Fix &rarr;</a>` : ''}
         </div>`).join('');
 }
 

@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
-    <meta name="theme-color" content="#667eea">
+    <meta name="theme-color" content="#0F3A5F">
     <link rel="manifest" href="/manifest.json">
     <link rel="icon" type="image/png" href="/icons/icon-192x192.png">
     <title>Bug Reports - Quality Colours Manager</title>
@@ -27,7 +27,7 @@
         .st-closed { background: #f1f5f9; color: #64748b; }
         .st-wont_fix { background: #f5f3ff; color: #7c3aed; }
         .tab-btn { padding: 8px 16px; border-radius: 8px; font-size: 0.8125rem; font-weight: 500; cursor: pointer; border: 1px solid transparent; transition: all 0.2s; }
-        .tab-btn.active { background: linear-gradient(135deg, #667eea, #764ba2); color: #fff; }
+        .tab-btn.active { background: linear-gradient(135deg, #0F3A5F, #1A4A6E); color: #fff; }
         .tab-btn:not(.active) { color: #64748b; }
         .tab-btn:not(.active):hover { background: #f1f5f9; }
         .tab-content { display: none; }
@@ -56,7 +56,7 @@
         <div class="flex gap-2">
             <button onclick="showCreateBugModal()"
                 class="inline-flex items-center gap-2 px-4 py-2 rounded-lg text-white font-medium text-sm"
-                style="background: linear-gradient(135deg, #667eea, #764ba2);">
+                style="background: linear-gradient(135deg, #0F3A5F, #1A4A6E);">
                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
                 Report Bug
             </button>
@@ -323,7 +323,7 @@
         </div>
         <div class="p-6 border-t border-gray-100 flex justify-end gap-3">
             <button onclick="closeCreateModal()" class="px-4 py-2 rounded-lg text-gray-600 border border-gray-200 text-sm">Cancel</button>
-            <button onclick="createBug()" class="px-4 py-2 rounded-lg text-white text-sm font-medium" style="background: linear-gradient(135deg, #667eea, #764ba2);">Create Bug Report</button>
+            <button onclick="createBug()" class="px-4 py-2 rounded-lg text-white text-sm font-medium" style="background: linear-gradient(135deg, #0F3A5F, #1A4A6E);">Create Bug Report</button>
         </div>
     </div>
 </div>
@@ -730,7 +730,7 @@ function renderAnalysis(data) {
                         <div class="w-24 text-xs text-gray-600 font-medium">${m.module}</div>
                         <div class="flex-1 bg-gray-100 rounded-full h-5 overflow-hidden">
                             <div class="h-full rounded-full flex items-center pl-2 text-xs text-white font-medium"
-                                style="width: ${Math.max(10, (m.count / maxCount) * 100)}%; background: ${m.severe_count > 0 ? 'linear-gradient(135deg, #ef4444, #dc2626)' : 'linear-gradient(135deg, #667eea, #764ba2)'}">
+                                style="width: ${Math.max(10, (m.count / maxCount) * 100)}%; background: ${m.severe_count > 0 ? 'linear-gradient(135deg, #ef4444, #dc2626)' : 'linear-gradient(135deg, #0F3A5F, #1A4A6E)'}">
                                 ${m.count}
                             </div>
                         </div>
@@ -754,7 +754,7 @@ function renderAnalysis(data) {
                     return `
                         <div class="flex-1 flex flex-col items-center justify-end gap-1">
                             <div class="text-xs text-gray-500">${d.count}</div>
-                            <div class="w-full rounded-t" style="height: ${Math.max(4, pct)}%; background: ${hasHigh ? '#ef4444' : '#667eea'}"></div>
+                            <div class="w-full rounded-t" style="height: ${Math.max(4, pct)}%; background: ${hasHigh ? '#ef4444' : '#0F3A5F'}"></div>
                             <div class="text-[10px] text-gray-400">${d.day?.substring(5, 10) || ''}</div>
                         </div>`;
                 }).join('')}

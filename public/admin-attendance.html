@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="theme-color" content="#667eea">
+    <meta name="theme-color" content="#0F3A5F">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <link rel="manifest" href="/manifest.json">
@@ -941,7 +941,7 @@
                 <div class="mb-3">
                     <label class="block text-sm font-semibold text-gray-700 mb-1">Minutes</label>
                     <div class="flex gap-2 items-center">
-                        <input type="number" id="adjustMinutes" min="1" max="600" placeholder="e.g. 30" class="flex-1 px-3 py-2 rounded-lg border border-gray-300 text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none" onchange="updateAdjustPreview()" oninput="updateAdjustPreview()">
+                        <input type="number" id="adjustMinutes" min="1" max="600" placeholder="e.g. 30" class="flex-1 px-3 py-2 rounded-lg border border-gray-300 text-sm focus:ring-2 focus:ring-[#0F3A5F] focus:border-indigo-500 outline-none" onchange="updateAdjustPreview()" oninput="updateAdjustPreview()">
                         <span class="text-sm text-gray-500">minutes</span>
                     </div>
                     <div class="flex gap-1 mt-2">
@@ -955,14 +955,14 @@
 
                 <div id="adjustPreview" class="mb-3 p-3 rounded-lg hidden" style="background:#eef2ff;border:1px solid #c7d2fe;">
                     <div class="flex justify-between text-sm">
-                        <span class="text-indigo-600 font-medium">New Working Time</span>
-                        <strong id="adjustNewTime" class="text-indigo-700"></strong>
+                        <span class="text-[#0F3A5F] font-medium">New Working Time</span>
+                        <strong id="adjustNewTime" class="text-[#0F3A5F]"></strong>
                     </div>
                 </div>
 
                 <div class="mb-4">
                     <label class="block text-sm font-semibold text-gray-700 mb-1">Reason <span class="text-red-500">*</span></label>
-                    <select id="adjustReason" class="w-full px-3 py-2 rounded-lg border border-gray-300 text-sm focus:ring-2 focus:ring-indigo-500 outline-none mb-2">
+                    <select id="adjustReason" class="w-full px-3 py-2 rounded-lg border border-gray-300 text-sm focus:ring-2 focus:ring-[#0F3A5F] outline-none mb-2">
                         <option value="">Select reason...</option>
                         <option value="Forgot OT request">Forgot OT request</option>
                         <option value="Late clock-in (was working)">Late clock-in (was working)</option>
@@ -972,12 +972,12 @@
                         <option value="Outside work not recorded">Outside work not recorded</option>
                         <option value="other">Other (specify below)</option>
                     </select>
-                    <input type="text" id="adjustReasonOther" placeholder="Additional notes (optional)" class="w-full px-3 py-2 rounded-lg border border-gray-300 text-sm focus:ring-2 focus:ring-indigo-500 outline-none">
+                    <input type="text" id="adjustReasonOther" placeholder="Additional notes (optional)" class="w-full px-3 py-2 rounded-lg border border-gray-300 text-sm focus:ring-2 focus:ring-[#0F3A5F] outline-none">
                 </div>
 
                 <div class="flex gap-3">
                     <button onclick="closeModal('adjustTimeModal')" class="flex-1 px-4 py-2.5 rounded-lg border border-gray-300 text-sm font-semibold text-gray-600 hover:bg-gray-50">Cancel</button>
-                    <button onclick="submitAdjustTime()" id="adjustSubmitBtn" class="flex-1 px-4 py-2.5 rounded-lg text-sm font-semibold text-white transition" style="background: linear-gradient(135deg, #667eea, #764ba2);">Apply Adjustment</button>
+                    <button onclick="submitAdjustTime()" id="adjustSubmitBtn" class="flex-1 px-4 py-2.5 rounded-lg text-sm font-semibold text-white transition" style="background: linear-gradient(135deg, #0F3A5F, #1A4A6E);">Apply Adjustment</button>
                 </div>
             </div>
         </div>

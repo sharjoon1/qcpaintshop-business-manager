@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="theme-color" content="#667eea">
+    <meta name="theme-color" content="#0F3A5F">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <link rel="manifest" href="/manifest.json">
@@ -53,7 +53,7 @@
         }
 
         /* CSP-safe replacement for the former inline onmouseover/onmouseout background swaps
-           (#667eea → #5a6fd6) on the sync buttons and the card "Save Mapping" buttons. */
+           (#0F3A5F → #5a6fd6) on the sync buttons and the card "Save Mapping" buttons. */
         button[data-action="save-mapping"]:not(:disabled):hover,
         #syncBtn:hover,
         #syncBtnEmpty:hover {
@@ -82,7 +82,7 @@
                 <p class="text-gray-500 text-sm mt-1" id="summaryText">Loading locations...</p>
             </div>
             <div class="mt-3 sm:mt-0 flex items-center gap-2">
-                <button id="syncBtn" class="inline-flex items-center gap-2 px-4 py-2 text-white text-sm font-semibold rounded-lg transition shadow-sm" style="background: #667eea;">
+                <button id="syncBtn" class="inline-flex items-center gap-2 px-4 py-2 text-white text-sm font-semibold rounded-lg transition shadow-sm" style="background: #0F3A5F;">
                     <svg id="syncIcon" class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
                     </svg>
@@ -135,7 +135,7 @@
                 </svg>
                 <h3 class="text-lg font-bold text-gray-600 mb-2">No Locations Found</h3>
                 <p class="text-gray-400 text-sm mb-4">Sync your Zoho Books locations to get started.</p>
-                <button id="syncBtnEmpty" class="inline-flex items-center gap-2 px-5 py-2.5 text-white text-sm font-semibold rounded-lg transition" style="background: #667eea;">
+                <button id="syncBtnEmpty" class="inline-flex items-center gap-2 px-5 py-2.5 text-white text-sm font-semibold rounded-lg transition" style="background: #0F3A5F;">
                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
                     </svg>

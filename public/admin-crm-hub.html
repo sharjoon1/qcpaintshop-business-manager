@@ -8,7 +8,7 @@
 <link rel="stylesheet" href="/css/design-system.css">
 <link rel="stylesheet" href="/css/qc-ui.css">
 <style>
-:root{--hub-accent:#667eea}
+:root{--hub-accent:#0F3A5F}
 .qc-hub-tabs{display:flex;gap:.25rem;overflow-x:auto;padding:.5rem 0;border-bottom:1px solid #e5e7eb}
 .qc-hub-tab{white-space:nowrap;padding:.6rem 1rem;border-radius:8px 8px 0 0;font-weight:600;font-size:.85rem;color:#64748b;border:1px solid transparent;border-bottom:none;cursor:pointer;background:#f8fafc}
 .qc-hub-tab.active{background:#fff;color:var(--hub-accent);border-color:#e5e7eb;box-shadow:0 -2px 8px rgba(0,0,0,.04)}
@@ -44,7 +44,7 @@
       <div class="flex flex-wrap gap-2 mb-3">
         <input id="leads-q" placeholder="Search leads…" class="border rounded-lg px-3 py-2 text-sm w-64">
         <select id="leads-status" class="border rounded-lg px-3 py-2 text-sm"><option value="">All status</option><option>new</option><option>contacted</option><option>qualified</option><option>won</option><option>lost</option></select>
-        <button id="btn-leads" class="px-3 py-2 rounded-lg text-white text-sm" style="background:#667eea">Search</button>
+        <button id="btn-leads" class="px-3 py-2 rounded-lg text-white text-sm" style="background:#0F3A5F">Search</button>
         <span id="leads-status-txt" class="text-sm text-slate-500 self-center"></span>
       </div>
       <div id="leads-empty" class="hidden text-sm text-slate-500 py-8 text-center">No leads.</div>
@@ -54,7 +54,7 @@
 
   <section id="panel-customers" class="qc-hub-panel">
     <div class="qc-card mt-4">
-      <div class="flex gap-2 mb-3"><input id="cust-q" placeholder="Search customers…" class="border rounded-lg px-3 py-2 text-sm w-64"><button id="btn-cust" class="px-3 py-2 rounded-lg text-white text-sm" style="background:#667eea">Search</button><span id="cust-status" class="text-sm text-slate-500 self-center"></span></div>
+      <div class="flex gap-2 mb-3"><input id="cust-q" placeholder="Search customers…" class="border rounded-lg px-3 py-2 text-sm w-64"><button id="btn-cust" class="px-3 py-2 rounded-lg text-white text-sm" style="background:#0F3A5F">Search</button><span id="cust-status" class="text-sm text-slate-500 self-center"></span></div>
       <div id="cust-empty" class="hidden text-sm text-slate-500 py-8 text-center">No customers.</div>
       <table class="w-full text-sm"><thead class="text-slate-500"><tr><th class="text-left p-2">Name</th><th class="text-left p-2">Phone</th><th class="text-left p-2">Type</th></tr></thead><tbody id="cust-body"></tbody></table>
     </div>
@@ -62,7 +62,7 @@
 
   <section id="panel-credit" class="qc-hub-panel">
     <div class="qc-card mt-4">
-      <div class="flex gap-2 mb-3"><button id="btn-credit" class="px-3 py-2 rounded-lg text-white text-sm" style="background:#667eea">Load credit limits</button><span id="credit-status" class="text-sm text-slate-500 self-center"></span></div>
+      <div class="flex gap-2 mb-3"><button id="btn-credit" class="px-3 py-2 rounded-lg text-white text-sm" style="background:#0F3A5F">Load credit limits</button><span id="credit-status" class="text-sm text-slate-500 self-center"></span></div>
       <div id="credit-empty" class="hidden text-sm text-slate-500 py-8 text-center">No credit data.</div>
       <table class="w-full text-sm"><thead class="text-slate-500"><tr><th class="text-left p-2">Customer</th><th class="text-right p-2">Limit</th><th class="text-right p-2">Used</th></tr></thead><tbody id="credit-body"></tbody></table>
     </div>
@@ -70,7 +70,7 @@
 
   <section id="panel-design" class="qc-hub-panel">
     <div class="qc-card mt-4">
-      <div class="flex gap-2 mb-3"><button id="btn-design" class="px-3 py-2 rounded-lg text-white text-sm" style="background:#667eea">Load design requests</button><span id="design-status" class="text-sm text-slate-500 self-center"></span></div>
+      <div class="flex gap-2 mb-3"><button id="btn-design" class="px-3 py-2 rounded-lg text-white text-sm" style="background:#0F3A5F">Load design requests</button><span id="design-status" class="text-sm text-slate-500 self-center"></span></div>
       <div id="design-empty" class="hidden text-sm text-slate-500 py-8 text-center">No design requests.</div>
       <table class="w-full text-sm"><thead class="text-slate-500"><tr><th class="text-left p-2">Customer</th><th class="text-left p-2">Status</th><th class="text-left p-2">Date</th></tr></thead><tbody id="design-body"></tbody></table>
     </div>

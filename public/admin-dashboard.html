@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="theme-color" content="#667eea">
+    <meta name="theme-color" content="#0F3A5F">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <link rel="manifest" href="/manifest.json">
@@ -59,13 +59,13 @@
         }
         .quick-link:hover {
             background: #f0f0ff;
-            border-color: #667eea;
+            border-color: #0F3A5F;
             color: #4338ca;
         }
         .quick-link svg {
             width: 18px;
             height: 18px;
-            stroke: #667eea;
+            stroke: #0F3A5F;
             fill: none;
             stroke-width: 1.75;
             stroke-linecap: round;
@@ -89,7 +89,7 @@
         /* Notice Board */
         .notice-card {
             padding: 12px 14px; border-radius: 10px; margin-bottom: 8px;
-            border-left: 4px solid #667eea; background: #f8fafc;
+            border-left: 4px solid #0F3A5F; background: #f8fafc;
         }
         .notice-card.urgent { border-left-color: #dc2626; background: #fef2f2; }
         .notice-card.important { border-left-color: #f59e0b; background: #fffbeb; }
@@ -97,7 +97,7 @@
         .notice-card .n-meta { font-size: 0.7rem; color: #94a3b8; margin-top: 2px; }
         .notice-card .n-body { font-size: 0.8rem; color: #475569; margin-top: 4px; }
         .notice-form textarea { width: 100%; padding: 10px; border: 1px solid #e2e8f0; border-radius: 8px; font-size: 0.8125rem; outline: none; resize: vertical; }
-        .notice-form textarea:focus { border-color: #667eea; }
+        .notice-form textarea:focus { border-color: #0F3A5F; }
 
         /* Activity cards */
         .act-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 12px; }
@@ -254,7 +254,7 @@
         <div class="card mb-6">
             <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;padding-bottom:8px;border-bottom:2px solid #e5e7eb;">
                 <h3 style="font-size:1.1rem;font-weight:700;color:#374151;margin:0;">🔍 What Staff Are Doing</h3>
-                <a href="/admin-activity-monitor.html" style="font-size:0.75rem;color:#667eea;font-weight:600;text-decoration:none;">View Full Monitor →</a>
+                <a href="/admin-activity-monitor.html" style="font-size:0.75rem;color:#0F3A5F;font-weight:600;text-decoration:none;">View Full Monitor →</a>
             </div>
             <div id="actSummary" style="display:flex;gap:12px;margin-bottom:14px;flex-wrap:wrap;">
                 <span class="act-badge act-badge-active" id="actActiveCount">0 Active</span>
@@ -270,7 +270,7 @@
         <div class="card mb-6">
             <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;padding-bottom:8px;border-bottom:2px solid #e5e7eb;">
                 <h3 style="font-size:1.1rem;font-weight:700;color:#374151;margin:0;">📢 Notice Board</h3>
-                <button onclick="document.getElementById('noticeForm').style.display=document.getElementById('noticeForm').style.display==='none'?'':'none'" style="font-size:0.75rem;color:#667eea;font-weight:600;background:none;border:none;cursor:pointer;">+ Post Notice</button>
+                <button onclick="document.getElementById('noticeForm').style.display=document.getElementById('noticeForm').style.display==='none'?'':'none'" style="font-size:0.75rem;color:#0F3A5F;font-weight:600;background:none;border:none;cursor:pointer;">+ Post Notice</button>
             </div>
             <!-- Post form (hidden) -->
             <div id="noticeForm" class="notice-form" style="display:none;margin-bottom:14px;padding:14px;background:#f8fafc;border-radius:10px;">
@@ -282,7 +282,7 @@
                         <option value="important">Important</option>
                         <option value="urgent">Urgent</option>
                     </select>
-                    <button onclick="postNotice()" style="padding:8px 18px;background:#667eea;color:white;border:none;border-radius:8px;font-weight:600;font-size:0.8rem;cursor:pointer;">Post</button>
+                    <button onclick="postNotice()" style="padding:8px 18px;background:#0F3A5F;color:white;border:none;border-radius:8px;font-weight:600;font-size:0.8rem;cursor:pointer;">Post</button>
                 </div>
             </div>
             <div id="noticeList">

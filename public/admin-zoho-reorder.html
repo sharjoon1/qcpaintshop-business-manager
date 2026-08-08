@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="theme-color" content="#667eea">
+    <meta name="theme-color" content="#0F3A5F">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <link rel="manifest" href="/manifest.json">
@@ -34,10 +34,10 @@
             border-left: none;
             border-right: none;
         }
-        .tab-btn:hover { color: #667eea; }
+        .tab-btn:hover { color: #0F3A5F; }
         .tab-btn.active {
-            color: #667eea;
-            border-bottom-color: #667eea;
+            color: #0F3A5F;
+            border-bottom-color: #0F3A5F;
         }
 
         /* Summary cards */
@@ -99,7 +99,7 @@
             cursor: pointer;
             transition: background 0.2s;
         }
-        .toggle-switch.on { background: #667eea; }
+        .toggle-switch.on { background: #0F3A5F; }
         .toggle-switch::after {
             content: '';
             position: absolute;
@@ -173,7 +173,7 @@
             <p class="hidden md:block text-gray-500 text-sm mt-1">Monitor stock levels and configure reorder thresholds</p>
         </div>
         <div class="flex-shrink-0">
-            <button id="checkReorderBtn" onclick="triggerReorderCheck()" class="inline-flex items-center gap-1.5 px-3 py-1.5 md:px-4 md:py-2 bg-gradient-to-r from-indigo-500 to-purple-600 hover:from-indigo-600 hover:to-purple-700 text-white text-xs md:text-sm font-semibold rounded-lg transition shadow-sm">
+            <button id="checkReorderBtn" onclick="triggerReorderCheck()" class="inline-flex items-center gap-1.5 px-3 py-1.5 md:px-4 md:py-2 bg-gradient-to-r from-[#0F3A5F] to-purple-600 hover:from-indigo-600 hover:to-purple-700 text-white text-xs md:text-sm font-semibold rounded-lg transition shadow-sm">
                 <svg id="checkReorderIcon" class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
                 </svg>
@@ -192,7 +192,7 @@
                 <label class="text-xs text-gray-600">Last</label>
                 <input type="number" id="backfillDays" value="30" min="1" max="730" class="w-14 px-2 py-1 border rounded text-sm">
                 <label class="text-xs text-gray-600">days</label>
-                <button id="backfillBtn" onclick="triggerBackfill()" class="px-3 py-1 bg-indigo-600 text-white rounded text-xs md:text-sm hover:bg-indigo-700">
+                <button id="backfillBtn" onclick="triggerBackfill()" class="px-3 py-1 bg-[#0F3A5F] text-white rounded text-xs md:text-sm hover:bg-[#0C2E4D]">
                     Back-fill
                 </button>
             </div>
@@ -284,7 +284,7 @@
                     <div class="skeleton" style="width: 40px; height: 28px;"></div>
                 </div>
             </div>
-            <div class="summary-card" style="border-left-color: #667eea;">
+            <div class="summary-card" style="border-left-color: #0F3A5F;">
                 <div class="text-xs font-semibold text-gray-500 uppercase">Total Active</div>
                 <div class="text-2xl font-bold text-gray-800 mt-1" id="summTotal">
                     <div class="skeleton" style="width: 40px; height: 28px;"></div>
@@ -350,7 +350,7 @@
         <div id="alertsTableContainer" class="hidden">
             <div class="bg-white rounded-lg shadow overflow-hidden">
                 <!-- Bulk action bar -->
-                <div class="bg-indigo-50 border-b border-indigo-100 px-4 py-2 flex items-center gap-3 flex-wrap">
+                <div class="bg-[#EBF2F8] border-b border-indigo-100 px-4 py-2 flex items-center gap-3 flex-wrap">
                     <span class="text-xs text-gray-600">Selected: <span id="alertsSelectedCount" class="font-semibold">0</span></span>
                     <button onclick="openBulkSnoozeAlerts()" class="px-3 py-1 text-xs bg-gray-700 hover:bg-gray-800 text-white font-semibold rounded transition">Snooze Selected</button>
                 </div>
@@ -505,7 +505,7 @@
                 </div>
             </div>
             <div class="mt-4">
-                <button onclick="createConfig()" class="inline-flex items-center gap-2 px-5 py-2 bg-gradient-to-r from-indigo-500 to-purple-600 hover:from-indigo-600 hover:to-purple-700 text-white text-sm font-semibold rounded-lg transition shadow-sm">
+                <button onclick="createConfig()" class="inline-flex items-center gap-2 px-5 py-2 bg-gradient-to-r from-[#0F3A5F] to-purple-600 hover:from-indigo-600 hover:to-purple-700 text-white text-sm font-semibold rounded-lg transition shadow-sm">
                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path>
                     </svg>
@@ -548,7 +548,7 @@
         <div class="bg-white rounded-lg shadow p-4 md:p-6">
             <div class="flex justify-between items-center mb-4">
                 <h3 class="text-lg font-semibold text-gray-800">Brand Lead Time Configuration</h3>
-                <button onclick="openBrandModal()" class="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold rounded-lg transition">+ Add Brand</button>
+                <button onclick="openBrandModal()" class="px-3 py-1.5 bg-[#0F3A5F] hover:bg-[#0C2E4D] text-white text-sm font-semibold rounded-lg transition">+ Add Brand</button>
             </div>
             <div class="overflow-x-auto">
                 <table class="min-w-full text-sm">
@@ -578,17 +578,17 @@
             <div class="flex gap-3 items-end mb-4 flex-wrap">
                 <div>
                     <label class="block text-xs text-gray-600 mb-1">Date</label>
-                    <input type="date" id="reportDate" class="border border-gray-300 rounded-lg px-2 py-1.5 text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500">
+                    <input type="date" id="reportDate" class="border border-gray-300 rounded-lg px-2 py-1.5 text-sm focus:ring-2 focus:ring-[#0F3A5F] focus:border-indigo-500">
                 </div>
                 <div>
                     <label class="block text-xs text-gray-600 mb-1">Branch</label>
-                    <select id="reportBranch" class="border border-gray-300 rounded-lg px-2 py-1.5 text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500">
+                    <select id="reportBranch" class="border border-gray-300 rounded-lg px-2 py-1.5 text-sm focus:ring-2 focus:ring-[#0F3A5F] focus:border-indigo-500">
                         <option value="">Consolidated</option>
                     </select>
                 </div>
                 <div>
                     <label class="block text-xs text-gray-600 mb-1" title="Period for sales velocity (both lookback window and display unit)">Period</label>
-                    <select id="reportPeriod" class="border border-gray-300 rounded-lg px-2 py-1.5 text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500">
+                    <select id="reportPeriod" class="border border-gray-300 rounded-lg px-2 py-1.5 text-sm focus:ring-2 focus:ring-[#0F3A5F] focus:border-indigo-500">
                         <option value="1">Day</option>
                         <option value="7">Week</option>
                         <option value="14">2 Weeks</option>
@@ -600,15 +600,15 @@
                 </div>
                 <div>
                     <label class="block text-xs text-gray-600 mb-1" id="reportMinAvgLabel" title="Hide slow-movers below this velocity (per selected period)">Min avg/2mo</label>
-                    <input type="number" step="0.1" min="0" id="reportMinAvg" value="0" class="w-20 border border-gray-300 rounded-lg px-2 py-1.5 text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500">
+                    <input type="number" step="0.1" min="0" id="reportMinAvg" value="0" class="w-20 border border-gray-300 rounded-lg px-2 py-1.5 text-sm focus:ring-2 focus:ring-[#0F3A5F] focus:border-indigo-500">
                 </div>
                 <div class="flex-1 min-w-[160px]">
                     <label class="block text-xs text-gray-600 mb-1">Search item / SKU / brand</label>
-                    <input type="text" id="reportSearch" placeholder="e.g. Ace Advanced" class="w-full border border-gray-300 rounded-lg px-2 py-1.5 text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500">
+                    <input type="text" id="reportSearch" placeholder="e.g. Ace Advanced" class="w-full border border-gray-300 rounded-lg px-2 py-1.5 text-sm focus:ring-2 focus:ring-[#0F3A5F] focus:border-indigo-500">
                 </div>
                 <div>
                     <label class="block text-xs text-gray-600 mb-1">Sort by</label>
-                    <select id="reportSort" class="border border-gray-300 rounded-lg px-2 py-1.5 text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500">
+                    <select id="reportSort" class="border border-gray-300 rounded-lg px-2 py-1.5 text-sm focus:ring-2 focus:ring-[#0F3A5F] focus:border-indigo-500">
                         <option value="severity">Severity (default)</option>
                         <option value="avg_desc">Avg (high → low)</option>
                         <option value="avg_asc">Avg (low → high)</option>
@@ -616,7 +616,7 @@
                         <option value="order_desc">Order qty (high → low)</option>
                     </select>
                 </div>
-                <button onclick="loadReport()" class="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold rounded-lg transition">Load</button>
+                <button onclick="loadReport()" class="px-3 py-1.5 bg-[#0F3A5F] hover:bg-[#0C2E4D] text-white text-sm font-semibold rounded-lg transition">Load</button>
                 <button onclick="downloadReportPdf()" class="px-3 py-1.5 border border-gray-300 hover:bg-gray-50 text-gray-700 text-sm font-medium rounded-lg transition">Download PDF</button>
                 <button onclick="openSendWhatsAppModal()" class="px-3 py-1.5 bg-green-600 hover:bg-green-700 text-white text-sm font-semibold rounded-lg transition">Send WhatsApp</button>
                 <button onclick="rerunReport()" class="px-3 py-1.5 bg-amber-600 hover:bg-amber-700 text-white text-sm font-semibold rounded-lg transition">Re-run</button>
@@ -636,17 +636,17 @@
             <div class="flex gap-3 items-end mb-3 flex-wrap">
                 <div>
                     <label class="block text-xs text-gray-600 mb-1">Branch</label>
-                    <select id="saBranch" class="border border-gray-300 rounded-lg px-2 py-1.5 text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500">
+                    <select id="saBranch" class="border border-gray-300 rounded-lg px-2 py-1.5 text-sm focus:ring-2 focus:ring-[#0F3A5F] focus:border-indigo-500">
                         <option value="">All</option>
                     </select>
                 </div>
                 <div>
                     <label class="block text-xs text-gray-600 mb-1">Brand</label>
-                    <input type="text" id="saBrand" class="border border-gray-300 rounded-lg px-2 py-1.5 text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500" placeholder="Asian Paints">
+                    <input type="text" id="saBrand" class="border border-gray-300 rounded-lg px-2 py-1.5 text-sm focus:ring-2 focus:ring-[#0F3A5F] focus:border-indigo-500" placeholder="Asian Paints">
                 </div>
                 <div>
                     <label class="block text-xs text-gray-600 mb-1">Period</label>
-                    <select id="saPeriod" class="border border-gray-300 rounded-lg px-2 py-1.5 text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500">
+                    <select id="saPeriod" class="border border-gray-300 rounded-lg px-2 py-1.5 text-sm focus:ring-2 focus:ring-[#0F3A5F] focus:border-indigo-500">
                         <option value="1">Day</option>
                         <option value="7">Week</option>
                         <option value="14">2 Weeks</option>
@@ -656,7 +656,7 @@
                         <option value="180">6 Months</option>
                     </select>
                 </div>
-                <button onclick="loadSalesAnalysis()" class="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold rounded-lg transition">Load</button>
+                <button onclick="loadSalesAnalysis()" class="px-3 py-1.5 bg-[#0F3A5F] hover:bg-[#0C2E4D] text-white text-sm font-semibold rounded-lg transition">Load</button>
                 <button onclick="exportSalesAnalysisCsv()" class="px-3 py-1.5 border border-gray-300 hover:bg-gray-50 text-gray-700 text-sm font-medium rounded-lg transition">Export CSV</button>
             </div>
             <div class="overflow-x-auto">
@@ -689,27 +689,27 @@
             <div class="flex gap-3 items-end mb-4 flex-wrap">
                 <div>
                     <label class="block text-xs text-gray-600 mb-1">Scan months back</label>
-                    <select id="vmMonthsBack" class="border border-gray-300 rounded-lg px-2 py-1.5 text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500">
+                    <select id="vmMonthsBack" class="border border-gray-300 rounded-lg px-2 py-1.5 text-sm focus:ring-2 focus:ring-[#0F3A5F] focus:border-indigo-500">
                         <option value="3">3 months</option>
                         <option value="6" selected>6 months</option>
                         <option value="12">12 months</option>
                         <option value="24">24 months</option>
                     </select>
                 </div>
-                <button onclick="runVendorScan()" id="vmScanBtn" class="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold rounded-lg transition">Scan Zoho Bills</button>
+                <button onclick="runVendorScan()" id="vmScanBtn" class="px-3 py-1.5 bg-[#0F3A5F] hover:bg-[#0C2E4D] text-white text-sm font-semibold rounded-lg transition">Scan Zoho Bills</button>
                 <div class="flex-1 min-w-[180px]">
                     <label class="block text-xs text-gray-600 mb-1">Search item / SKU</label>
-                    <input type="text" id="vmSearch" placeholder="e.g. Ace Advanced" class="w-full border border-gray-300 rounded-lg px-2 py-1.5 text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500">
+                    <input type="text" id="vmSearch" placeholder="e.g. Ace Advanced" class="w-full border border-gray-300 rounded-lg px-2 py-1.5 text-sm focus:ring-2 focus:ring-[#0F3A5F] focus:border-indigo-500">
                 </div>
                 <div>
                     <label class="block text-xs text-gray-600 mb-1">Brand</label>
-                    <select id="vmBrand" class="border border-gray-300 rounded-lg px-2 py-1.5 text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 min-w-[140px]">
+                    <select id="vmBrand" class="border border-gray-300 rounded-lg px-2 py-1.5 text-sm focus:ring-2 focus:ring-[#0F3A5F] focus:border-indigo-500 min-w-[140px]">
                         <option value="">All brands</option>
                     </select>
                 </div>
                 <div>
                     <label class="block text-xs text-gray-600 mb-1">Mapping</label>
-                    <select id="vmMappingStatus" onchange="loadVendorMapping()" class="border border-gray-300 rounded-lg px-2 py-1.5 text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500">
+                    <select id="vmMappingStatus" onchange="loadVendorMapping()" class="border border-gray-300 rounded-lg px-2 py-1.5 text-sm focus:ring-2 focus:ring-[#0F3A5F] focus:border-indigo-500">
                         <option value="">All</option>
                         <option value="mapped">Mapped only</option>
                         <option value="unmapped">Unmapped only</option>
@@ -717,13 +717,13 @@
                 </div>
                 <div>
                     <label class="block text-xs text-gray-600 mb-1">Push status</label>
-                    <select id="vmPushStatus" onchange="loadVendorMapping()" class="border border-gray-300 rounded-lg px-2 py-1.5 text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500">
+                    <select id="vmPushStatus" onchange="loadVendorMapping()" class="border border-gray-300 rounded-lg px-2 py-1.5 text-sm focus:ring-2 focus:ring-[#0F3A5F] focus:border-indigo-500">
                         <option value="">All</option>
                         <option value="pushed">Pushed only</option>
                         <option value="unpushed">Unpushed only</option>
                     </select>
                 </div>
-                <button onclick="loadVendorMapping()" class="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold rounded-lg transition">Load</button>
+                <button onclick="loadVendorMapping()" class="px-3 py-1.5 bg-[#0F3A5F] hover:bg-[#0C2E4D] text-white text-sm font-semibold rounded-lg transition">Load</button>
                 <button onclick="pushSelectedVendors()" id="vmPushSelectedBtn" class="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-semibold rounded-lg transition">Push Selected</button>
                 <button onclick="pushBulkVendors(false)" class="px-3 py-1.5 bg-green-600 hover:bg-green-700 text-white text-sm font-semibold rounded-lg transition" title="Push every item that has a primary vendor set">Push All Mapped</button>
                 <button onclick="pushBulkVendors(true)" class="px-3 py-1.5 bg-gray-200 hover:bg-gray-300 text-gray-700 text-sm font-medium rounded-lg transition" title="Skip items already pushed with no new mapping change">Push Only Unpushed</button>
@@ -731,13 +731,13 @@
             <div id="vmScanStatus" class="text-xs text-gray-600 mb-3"></div>
 
             <!-- Bulk brand → vendor -->
-            <div class="bg-indigo-50 border border-indigo-200 rounded-lg p-3 mb-4">
+            <div class="bg-[#EBF2F8] border border-[#C0D5E8] rounded-lg p-3 mb-4">
                 <div class="flex items-center justify-between mb-2 flex-wrap gap-2">
                     <div>
-                        <div class="text-sm font-semibold text-indigo-900">Bulk: Map a brand → single vendor</div>
-                        <div class="text-xs text-indigo-700">All active items of the chosen brand will be mapped to this vendor</div>
+                        <div class="text-sm font-semibold text-[#08233C]">Bulk: Map a brand → single vendor</div>
+                        <div class="text-xs text-[#0F3A5F]">All active items of the chosen brand will be mapped to this vendor</div>
                     </div>
-                    <button onclick="syncVendorsFromZohoTop(this)" id="vmSyncVendorsBtn" class="px-2.5 py-1 bg-white hover:bg-indigo-100 text-indigo-700 text-xs font-semibold border border-indigo-300 rounded-lg transition">↻ Sync vendors from Zoho</button>
+                    <button onclick="syncVendorsFromZohoTop(this)" id="vmSyncVendorsBtn" class="px-2.5 py-1 bg-white hover:bg-[#D6E5F0] text-[#0F3A5F] text-xs font-semibold border border-[#A3BFD9] rounded-lg transition">↻ Sync vendors from Zoho</button>
                 </div>
                 <div id="vmVendorCacheInfo" class="text-xs text-gray-500 mb-2"></div>
                 <div class="flex gap-2 items-start flex-wrap">
@@ -754,12 +754,12 @@
                                 oninput="onBulkVendorInput()" onfocus="showBulkVendorCombo()"
                                 onkeydown="onBulkVendorKey(event)"
                                 placeholder="Type to search vendors…"
-                                class="w-full border border-gray-300 rounded-lg px-2 py-1.5 text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500">
+                                class="w-full border border-gray-300 rounded-lg px-2 py-1.5 text-sm focus:ring-2 focus:ring-[#0F3A5F] focus:border-indigo-500">
                             <div id="vmBulkVendorDropdown" class="hidden absolute z-20 left-0 right-0 mt-1 bg-white border border-gray-200 rounded-lg shadow-lg max-h-56 overflow-y-auto text-sm"></div>
                         </div>
                     </div>
                     <div class="self-end">
-                        <button onclick="applyBrandVendor()" id="vmApplyBrandBtn" class="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold rounded-lg transition">Apply mapping</button>
+                        <button onclick="applyBrandVendor()" id="vmApplyBrandBtn" class="px-3 py-1.5 bg-[#0F3A5F] hover:bg-[#0C2E4D] text-white text-sm font-semibold rounded-lg transition">Apply mapping</button>
                     </div>
                 </div>
                 <div id="vmBulkBrandInfo" class="text-xs text-gray-600 mt-2"></div>
@@ -807,11 +807,11 @@
                 <button type="button" class="snooze-dur-btn px-3 py-2 text-sm border border-gray-300 rounded-lg hover:bg-gray-50" data-days="0">Forever</button>
             </div>
             <label class="block text-sm font-medium text-gray-700 mb-1">Reason / notes (optional)</label>
-            <textarea id="snoozeNotes" rows="2" placeholder="e.g. Seasonal — bring back in October" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"></textarea>
+            <textarea id="snoozeNotes" rows="2" placeholder="e.g. Seasonal — bring back in October" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-[#0F3A5F] focus:border-indigo-500"></textarea>
         </div>
         <div class="border-t px-6 py-4 flex justify-end gap-3">
             <button onclick="closeSnoozeModal()" class="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 text-sm font-medium rounded-lg">Cancel</button>
-            <button id="snoozeSubmit" onclick="submitSnooze()" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold rounded-lg">Snooze</button>
+            <button id="snoozeSubmit" onclick="submitSnooze()" class="px-4 py-2 bg-[#0F3A5F] hover:bg-[#0C2E4D] text-white text-sm font-semibold rounded-lg">Snooze</button>
         </div>
     </div>
 </div>
@@ -840,7 +840,7 @@
         <div class="p-6" id="createPoBody"></div>
         <div class="border-t px-6 py-4 flex justify-end gap-3">
             <button onclick="closeCreatePoModal()" class="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 text-sm font-medium rounded-lg">Cancel</button>
-            <button id="createPoSubmit" onclick="submitCreatePo()" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold rounded-lg">Create PO</button>
+            <button id="createPoSubmit" onclick="submitCreatePo()" class="px-4 py-2 bg-[#0F3A5F] hover:bg-[#0C2E4D] text-white text-sm font-semibold rounded-lg">Create PO</button>
         </div>
     </div>
 </div>
@@ -922,28 +922,28 @@
                 <input type="hidden" id="brandId">
                 <div class="mb-3">
                     <label class="block text-sm font-medium text-gray-700 mb-1">Brand name</label>
-                    <select id="brandNameSelect" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500">
+                    <select id="brandNameSelect" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-[#0F3A5F] focus:border-indigo-500">
                         <option value="">— Choose a brand —</option>
                     </select>
                     <input type="text" id="brandName" class="hidden w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" readonly>
                 </div>
                 <div class="mb-3">
                     <label class="block text-sm font-medium text-gray-700 mb-1">Lead time (days)</label>
-                    <input type="number" min="0" id="brandLead" required class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500">
+                    <input type="number" min="0" id="brandLead" required class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-[#0F3A5F] focus:border-indigo-500">
                 </div>
                 <div class="mb-3">
                     <label class="block text-sm font-medium text-gray-700 mb-1">Safety (days)</label>
-                    <input type="number" min="0" id="brandSafety" required class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500">
+                    <input type="number" min="0" id="brandSafety" required class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-[#0F3A5F] focus:border-indigo-500">
                 </div>
                 <div class="mb-4">
                     <label class="flex items-center gap-2 cursor-pointer">
-                        <input type="checkbox" id="brandActive" checked class="rounded border-gray-300 text-indigo-600">
+                        <input type="checkbox" id="brandActive" checked class="rounded border-gray-300 text-[#0F3A5F]">
                         <span class="text-sm text-gray-700">Active</span>
                     </label>
                 </div>
                 <div class="flex justify-end gap-3">
                     <button type="button" onclick="closeBrandModal()" class="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 text-sm font-medium rounded-lg transition">Cancel</button>
-                    <button type="submit" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold rounded-lg transition">Save</button>
+                    <button type="submit" class="px-4 py-2 bg-[#0F3A5F] hover:bg-[#0C2E4D] text-white text-sm font-semibold rounded-lg transition">Save</button>
                 </div>
             </form>
         </div>
@@ -1209,7 +1209,7 @@
             var actions = '';
 
             var poBtn = alert.zoho_item_id
-                ? '<button onclick="openCreatePoModal(\'' + alert.zoho_item_id + '\', ' + (Number(alert.reorder_level) || 0) + ', ' + JSON.stringify(alert.item_name || '').replace(/"/g, '&quot;') + ')" class="px-2.5 py-1 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 text-xs font-semibold rounded-lg transition mr-1" title="Create Purchase Order">PO</button>'
+                ? '<button onclick="openCreatePoModal(\'' + alert.zoho_item_id + '\', ' + (Number(alert.reorder_level) || 0) + ', ' + JSON.stringify(alert.item_name || '').replace(/"/g, '&quot;') + ')" class="px-2.5 py-1 bg-[#EBF2F8] hover:bg-[#D6E5F0] text-[#0F3A5F] text-xs font-semibold rounded-lg transition mr-1" title="Create Purchase Order">PO</button>'
                 : '';
             var snoozeBtn = (alert.zoho_item_id && alert.zoho_location_id)
                 ? '<button onclick="openSnoozeModal(\'' + alert.zoho_item_id + '\', \'' + alert.zoho_location_id + '\', ' + JSON.stringify(alert.item_name || '').replace(/"/g, '&quot;') + ')" class="px-2.5 py-1 bg-gray-100 hover:bg-gray-200 text-gray-700 text-xs font-semibold rounded-lg transition mr-1" title="Not needed now — hide this item">Snooze</button>'
@@ -1520,7 +1520,7 @@
                     '<div class="toggle-switch ' + (isActive ? 'on' : '') + '" id="cfgActive_' + id + '" onclick="toggleConfigActive(\'' + id + '\')"></div>' +
                 '</td>' +
                 '<td class="px-4 py-3 text-center">' +
-                    '<button onclick="saveConfig(\'' + id + '\')" class="px-2.5 py-1 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 text-xs font-semibold rounded-lg transition mr-1">Save</button>' +
+                    '<button onclick="saveConfig(\'' + id + '\')" class="px-2.5 py-1 bg-[#EBF2F8] hover:bg-[#D6E5F0] text-[#0F3A5F] text-xs font-semibold rounded-lg transition mr-1">Save</button>' +
                     '<button onclick="openDeleteModal(\'' + id + '\')" class="px-2.5 py-1 bg-red-50 hover:bg-red-100 text-red-700 text-xs font-semibold rounded-lg transition">Delete</button>' +
                 '</td>' +
                 '</tr>';
@@ -1899,7 +1899,7 @@
 
         for (var i = startPage; i <= endPage; i++) {
             if (i === currentPg) {
-                html += '<button class="px-3 py-1.5 text-sm rounded-lg text-white font-medium" style="background:#667eea;">' + i + '</button>';
+                html += '<button class="px-3 py-1.5 text-sm rounded-lg text-white font-medium" style="background:#0F3A5F;">' + i + '</button>';
             } else {
                 html += '<button onclick="' + fnName + '(' + i + ')" class="px-3 py-1.5 text-sm rounded-lg border border-gray-300 text-gray-700 hover:bg-gray-100">' + i + '</button>';
             }
@@ -1967,7 +1967,7 @@
                         : '<span class="badge-status badge-resolved">No</span>') +
                     '</td>' +
                     '<td class="px-3 py-2 text-right">' +
-                    '<button onclick=\'editBrand(' + JSON.stringify(b).replace(/'/g, '&#39;') + ')\' class="text-indigo-600 hover:text-indigo-800 text-xs font-medium">Edit</button>' +
+                    '<button onclick=\'editBrand(' + JSON.stringify(b).replace(/'/g, '&#39;') + ')\' class="text-[#0F3A5F] hover:text-[#0C2E4D] text-xs font-medium">Edit</button>' +
                     (!isDefault
                         ? ' <span class="text-gray-300 mx-1">|</span><button onclick=\'deleteBrand(' + JSON.stringify(b).replace(/'/g, '&#39;') + ')\' class="text-red-600 hover:text-red-800 text-xs font-medium">Delete</button>'
                         : '') +
@@ -2304,7 +2304,7 @@
 
         // Desktop table (hidden on mobile) + mobile cards (hidden on desktop)
         var bulkBar =
-            '<div class="bg-indigo-50 border-b border-indigo-100 px-4 py-2 flex items-center gap-3 flex-wrap mb-0 rounded-t">' +
+            '<div class="bg-[#EBF2F8] border-b border-indigo-100 px-4 py-2 flex items-center gap-3 flex-wrap mb-0 rounded-t">' +
                 '<span class="text-xs text-gray-600">Selected: <span id="reportSelectedCount" class="font-semibold">0</span></span>' +
                 '<button onclick="openBulkSnoozeReport()" class="px-3 py-1 text-xs bg-gray-700 hover:bg-gray-800 text-white font-semibold rounded transition">Snooze Selected</button>' +
             '</div>';
@@ -2357,11 +2357,11 @@
                     '<td class="px-2 py-2 text-right tabular-nums">' + (row.reorder_level != null ? row.reorder_level : '—') + '</td>' +
                     '<td class="px-2 py-2 text-right tabular-nums text-gray-500">' + (row.avg_daily_sales != null ? avgPeriod.toFixed(2) : '—') + '</td>' +
                     '<td class="px-2 py-2 text-right tabular-nums ' + daysClass + '">' + daysLeft + '</td>' +
-                    '<td class="px-2 py-2 text-right tabular-nums font-semibold text-indigo-700">' + (row.suggested_order_qty != null ? row.suggested_order_qty : '—') + '</td>' +
+                    '<td class="px-2 py-2 text-right tabular-nums font-semibold text-[#0F3A5F]">' + (row.suggested_order_qty != null ? row.suggested_order_qty : '—') + '</td>' +
                     '<td class="px-2 py-2">' + otherBranches + '</td>' +
                     '<td class="px-2 py-2 text-center whitespace-nowrap">' +
                         (row.zoho_item_id
-                            ? '<button onclick="openCreatePoModal(\'' + row.zoho_item_id + '\', ' + (Number(row.suggested_order_qty) || 0) + ', ' + JSON.stringify(row.item_name || '').replace(/"/g, '&quot;') + ')" class="px-2 py-1 text-xs bg-indigo-50 hover:bg-indigo-100 text-indigo-700 font-semibold rounded transition mr-1" title="Create PO for this item">+PO</button>'
+                            ? '<button onclick="openCreatePoModal(\'' + row.zoho_item_id + '\', ' + (Number(row.suggested_order_qty) || 0) + ', ' + JSON.stringify(row.item_name || '').replace(/"/g, '&quot;') + ')" class="px-2 py-1 text-xs bg-[#EBF2F8] hover:bg-[#D6E5F0] text-[#0F3A5F] font-semibold rounded transition mr-1" title="Create PO for this item">+PO</button>'
                             : '') +
                         (row.zoho_item_id && row.zoho_location_id
                             ? '<button onclick="openSnoozeModal(\'' + row.zoho_item_id + '\', \'' + row.zoho_location_id + '\', ' + JSON.stringify(row.item_name || '').replace(/"/g, '&quot;') + ')" class="px-2 py-1 text-xs bg-gray-100 hover:bg-gray-200 text-gray-700 font-semibold rounded transition" title="Hide this item from alerts + daily report">Snooze</button>'
@@ -2407,12 +2407,12 @@
                     '<div><div class="text-gray-500">Stock</div><div class="font-semibold tabular-nums">' + (row.current_stock != null ? row.current_stock : '—') + '</div></div>' +
                     '<div><div class="text-gray-500">Reorder @</div><div class="font-semibold tabular-nums">' + (row.reorder_level != null ? row.reorder_level : '—') + '</div></div>' +
                     '<div><div class="text-gray-500">Days left</div><div class="font-semibold tabular-nums ' + daysClass + '">' + daysLeft + '</div></div>' +
-                    '<div><div class="text-gray-500">Order</div><div class="font-semibold tabular-nums text-indigo-700">' + (row.suggested_order_qty != null ? row.suggested_order_qty : '—') + '</div></div>' +
+                    '<div><div class="text-gray-500">Order</div><div class="font-semibold tabular-nums text-[#0F3A5F]">' + (row.suggested_order_qty != null ? row.suggested_order_qty : '—') + '</div></div>' +
                     '</div>' +
                     otherChips +
                     (row.zoho_item_id
                         ? '<div class="mt-2 text-right flex gap-2 justify-end">' +
-                            '<button onclick="openCreatePoModal(\'' + row.zoho_item_id + '\', ' + (Number(row.suggested_order_qty) || 0) + ', ' + JSON.stringify(row.item_name || '').replace(/"/g, '&quot;') + ')" class="px-2.5 py-1 text-xs bg-indigo-50 hover:bg-indigo-100 text-indigo-700 font-semibold rounded transition">+ Create PO</button>' +
+                            '<button onclick="openCreatePoModal(\'' + row.zoho_item_id + '\', ' + (Number(row.suggested_order_qty) || 0) + ', ' + JSON.stringify(row.item_name || '').replace(/"/g, '&quot;') + ')" class="px-2.5 py-1 text-xs bg-[#EBF2F8] hover:bg-[#D6E5F0] text-[#0F3A5F] font-semibold rounded transition">+ Create PO</button>' +
                             (row.zoho_location_id
                                 ? '<button onclick="openSnoozeModal(\'' + row.zoho_item_id + '\', \'' + row.zoho_location_id + '\', ' + JSON.stringify(row.item_name || '').replace(/"/g, '&quot;') + ')" class="px-2.5 py-1 text-xs bg-gray-100 hover:bg-gray-200 text-gray-700 font-semibold rounded transition">Snooze</button>'
                                 : '') +
@@ -2827,7 +2827,7 @@
             if (!arrow) return;
             if (vmSort.key === key) {
                 arrow.textContent = vmSort.dir === 'desc' ? ' ▼' : ' ▲';
-                arrow.className = 'vm-sort-arrow text-xs text-indigo-600';
+                arrow.className = 'vm-sort-arrow text-xs text-[#0F3A5F]';
             } else {
                 arrow.textContent = ' ⇅';
                 arrow.className = 'vm-sort-arrow text-xs text-gray-300';
@@ -3006,9 +3006,9 @@
             dd.innerHTML = '<div class="px-3 py-2 text-gray-500">No matching vendor in the local list. Click the <b>↻ Sync vendors from Zoho</b> button above to pull the full vendor list from Zoho Books.</div>';
         } else {
             dd.innerHTML = list.map(function(v, i) {
-                var hl = i === _bulkVendorHighlight ? 'bg-indigo-50' : '';
+                var hl = i === _bulkVendorHighlight ? 'bg-[#EBF2F8]' : '';
                 var sub = [v.contact_person, v.phone].filter(Boolean).join(' · ');
-                return '<div class="px-3 py-2 cursor-pointer hover:bg-indigo-50 border-b last:border-b-0 ' + hl + '"' +
+                return '<div class="px-3 py-2 cursor-pointer hover:bg-[#EBF2F8] border-b last:border-b-0 ' + hl + '"' +
                     ' onmousedown="pickBulkVendor(' + i + ')">' +
                     '<div class="font-medium text-gray-800">' + escapeHtml(v.vendor_name || ('Vendor #' + v.id)) + '</div>' +
                     (sub ? '<div class="text-xs text-gray-500">' + escapeHtml(sub) + '</div>' : '') +
@@ -3147,7 +3147,7 @@
                             '<td class="px-2 py-1.5 text-center">' +
                                 (r.is_primary
                                     ? '<span class="text-xs text-gray-400">—</span>'
-                                    : '<button onclick="setPrimaryVendor(\'' + itemId + '\', ' + r.vendor_id + ')" class="px-2 py-1 text-xs bg-indigo-50 hover:bg-indigo-100 text-indigo-700 rounded">Set primary</button>') +
+                                    : '<button onclick="setPrimaryVendor(\'' + itemId + '\', ' + r.vendor_id + ')" class="px-2 py-1 text-xs bg-[#EBF2F8] hover:bg-[#D6E5F0] text-[#0F3A5F] rounded">Set primary</button>') +
                             '</td></tr>';
                   }).join('') + '</tbody></table></div>';
 
@@ -3155,7 +3155,7 @@
                 '<div class="mt-4 pt-4 border-t">' +
                     '<div class="flex items-center justify-between mb-1">' +
                         '<div class="text-xs uppercase text-gray-500 font-semibold">Pick any vendor</div>' +
-                        '<button onclick="refreshVendorsFromZoho(this)" class="text-xs text-indigo-600 hover:underline">↻ Sync from Zoho</button>' +
+                        '<button onclick="refreshVendorsFromZoho(this)" class="text-xs text-[#0F3A5F] hover:underline">↻ Sync from Zoho</button>' +
                     '</div>' +
                     '<div class="text-xs text-gray-500 mb-2">Any vendor in the local list (mirrored from Zoho Books contacts) can be mapped as primary, even without prior bill history.</div>' +
                     '<div class="flex gap-2 items-start">' +
@@ -3164,10 +3164,10 @@
                                 ' oninput="onVendorComboInput()" onfocus="showVendorCombo()"' +
                                 ' onkeydown="onVendorComboKey(event)"' +
                                 ' placeholder="Type to search — name, contact, phone…"' +
-                                ' class="w-full border border-gray-300 rounded-lg px-2 py-1.5 text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500">' +
+                                ' class="w-full border border-gray-300 rounded-lg px-2 py-1.5 text-sm focus:ring-2 focus:ring-[#0F3A5F] focus:border-indigo-500">' +
                             '<div id="vmPickDropdown" class="hidden absolute z-20 left-0 right-0 mt-1 bg-white border border-gray-200 rounded-lg shadow-lg max-h-64 overflow-y-auto text-sm"></div>' +
                         '</div>' +
-                        '<button onclick="setPrimaryFromPicker()" class="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold rounded-lg whitespace-nowrap">Set as primary</button>' +
+                        '<button onclick="setPrimaryFromPicker()" class="px-3 py-1.5 bg-[#0F3A5F] hover:bg-[#0C2E4D] text-white text-sm font-semibold rounded-lg whitespace-nowrap">Set as primary</button>' +
                     '</div>' +
                     '<div id="vmPickCount" class="text-xs text-gray-400 mt-1"></div>' +
                 '</div>';
@@ -3222,9 +3222,9 @@
             dd.innerHTML = '<div class="px-3 py-2 text-gray-400">No matching vendor. Try "↻ Sync from Zoho" above.</div>';
         } else {
             dd.innerHTML = list.map(function(v, i) {
-                var highlight = i === _vendorComboHighlight ? 'bg-indigo-50' : '';
+                var highlight = i === _vendorComboHighlight ? 'bg-[#EBF2F8]' : '';
                 var sub = [v.contact_person, v.phone].filter(Boolean).join(' · ');
-                return '<div class="px-3 py-2 cursor-pointer hover:bg-indigo-50 border-b last:border-b-0 ' + highlight + '"' +
+                return '<div class="px-3 py-2 cursor-pointer hover:bg-[#EBF2F8] border-b last:border-b-0 ' + highlight + '"' +
                     ' data-idx="' + i + '"' +
                     ' onmousedown="pickVendorCombo(' + i + ')">' +
                     '<div class="font-medium text-gray-800">' + escapeHtml(v.vendor_name || ('Vendor #' + v.id)) + '</div>' +
@@ -3376,7 +3376,7 @@
         var rate = Number(suggestion.unit_price || 0);
 
         document.getElementById('createPoBody').innerHTML =
-            '<div class="mb-3 p-3 bg-indigo-50 rounded">' +
+            '<div class="mb-3 p-3 bg-[#EBF2F8] rounded">' +
                 '<div class="font-medium">' + escapeHtml(itemName || item.item_name) + '</div>' +
                 '<div class="text-xs text-gray-500">SKU: ' + escapeHtml(item.sku || '') + (item.brand ? ' · ' + escapeHtml(item.brand) : '') + (item.unit ? ' · ' + escapeHtml(item.unit) : '') + '</div>' +
             '</div>' +
@@ -3457,18 +3457,18 @@
         // Default-select the 30-day chip
         document.querySelectorAll('.snooze-dur-btn').forEach(function(btn) {
             var d = parseInt(btn.getAttribute('data-days'), 10);
-            btn.classList.remove('bg-indigo-600', 'text-white', 'border-indigo-600');
+            btn.classList.remove('bg-[#0F3A5F]', 'text-white', 'border-[#0F3A5F]');
             btn.classList.add('border-gray-300');
             if (d === _snoozeSelectedDays) {
-                btn.classList.add('bg-indigo-600', 'text-white', 'border-indigo-600');
+                btn.classList.add('bg-[#0F3A5F]', 'text-white', 'border-[#0F3A5F]');
             }
             btn.onclick = function() {
                 _snoozeSelectedDays = d;
                 document.querySelectorAll('.snooze-dur-btn').forEach(function(b) {
-                    b.classList.remove('bg-indigo-600', 'text-white', 'border-indigo-600');
+                    b.classList.remove('bg-[#0F3A5F]', 'text-white', 'border-[#0F3A5F]');
                     b.classList.add('border-gray-300');
                 });
-                this.classList.add('bg-indigo-600', 'text-white', 'border-indigo-600');
+                this.classList.add('bg-[#0F3A5F]', 'text-white', 'border-[#0F3A5F]');
             };
         });
         document.getElementById('snoozeModal').classList.remove('hidden');
@@ -3560,16 +3560,16 @@
         // Default-select 30d chip
         document.querySelectorAll('.snooze-dur-btn').forEach(function(btn) {
             var d = parseInt(btn.getAttribute('data-days'), 10);
-            btn.classList.remove('bg-indigo-600', 'text-white', 'border-indigo-600');
+            btn.classList.remove('bg-[#0F3A5F]', 'text-white', 'border-[#0F3A5F]');
             btn.classList.add('border-gray-300');
-            if (d === _snoozeSelectedDays) btn.classList.add('bg-indigo-600', 'text-white', 'border-indigo-600');
+            if (d === _snoozeSelectedDays) btn.classList.add('bg-[#0F3A5F]', 'text-white', 'border-[#0F3A5F]');
             btn.onclick = function() {
                 _snoozeSelectedDays = d;
                 document.querySelectorAll('.snooze-dur-btn').forEach(function(b) {
-                    b.classList.remove('bg-indigo-600', 'text-white', 'border-indigo-600');
+                    b.classList.remove('bg-[#0F3A5F]', 'text-white', 'border-[#0F3A5F]');
                     b.classList.add('border-gray-300');
                 });
-                this.classList.add('bg-indigo-600', 'text-white', 'border-indigo-600');
+                this.classList.add('bg-[#0F3A5F]', 'text-white', 'border-[#0F3A5F]');
             };
         });
         document.getElementById('snoozeModal').classList.remove('hidden');
@@ -3605,16 +3605,16 @@
         document.getElementById('snoozeNotes').value = '';
         document.querySelectorAll('.snooze-dur-btn').forEach(function(btn) {
             var d = parseInt(btn.getAttribute('data-days'), 10);
-            btn.classList.remove('bg-indigo-600', 'text-white', 'border-indigo-600');
+            btn.classList.remove('bg-[#0F3A5F]', 'text-white', 'border-[#0F3A5F]');
             btn.classList.add('border-gray-300');
-            if (d === _snoozeSelectedDays) btn.classList.add('bg-indigo-600', 'text-white', 'border-indigo-600');
+            if (d === _snoozeSelectedDays) btn.classList.add('bg-[#0F3A5F]', 'text-white', 'border-[#0F3A5F]');
             btn.onclick = function() {
                 _snoozeSelectedDays = d;
                 document.querySelectorAll('.snooze-dur-btn').forEach(function(b) {
-                    b.classList.remove('bg-indigo-600', 'text-white', 'border-indigo-600');
+                    b.classList.remove('bg-[#0F3A5F]', 'text-white', 'border-[#0F3A5F]');
                     b.classList.add('border-gray-300');
                 });
-                this.classList.add('bg-indigo-600', 'text-white', 'border-indigo-600');
+                this.classList.add('bg-[#0F3A5F]', 'text-white', 'border-[#0F3A5F]');
             };
         });
         document.getElementById('snoozeModal').classList.remove('hidden');

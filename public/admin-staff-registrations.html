@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="theme-color" content="#667eea">
+    <meta name="theme-color" content="#0F3A5F">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <link rel="manifest" href="/manifest.json">
@@ -244,7 +244,7 @@
                 <div id="approvedActions" class="hidden">
                     <hr class="my-4">
                     <div class="flex gap-3 mb-2">
-                        <button onclick="openEditStaffModal()" class="flex-1 bg-gradient-to-r from-purple-600 to-indigo-600 text-white py-2.5 rounded-lg hover:from-purple-700 hover:to-indigo-700 transition text-sm font-semibold flex items-center justify-center gap-1.5">
+                        <button onclick="openEditStaffModal()" class="flex-1 bg-gradient-to-r from-purple-600 to-[#1A4A6E] text-white py-2.5 rounded-lg hover:from-purple-700 hover:to-indigo-700 transition text-sm font-semibold flex items-center justify-center gap-1.5">
                             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
                             Edit Staff Details
                         </button>
@@ -432,7 +432,7 @@
     <div id="editStaffModal" class="fixed inset-0 bg-black bg-opacity-50 modal-overlay z-[60] hidden flex items-start justify-center overflow-y-auto pt-16 sm:pt-20 pb-4 px-4">
         <div class="bg-white rounded-xl shadow-2xl w-full max-w-lg mb-8">
             <form id="editStaffForm" onsubmit="saveStaffEdit(event)">
-                <div class="bg-gradient-to-r from-purple-600 to-indigo-600 px-6 py-4 text-white rounded-t-2xl flex items-center justify-between">
+                <div class="bg-gradient-to-r from-purple-600 to-[#1A4A6E] px-6 py-4 text-white rounded-t-2xl flex items-center justify-between">
                     <h3 class="text-lg font-bold">Edit Staff Details</h3>
                     <button type="button" onclick="document.getElementById('editStaffModal').style.display='none'" class="text-white/80 hover:text-white text-2xl leading-none">&times;</button>
                 </div>
@@ -526,7 +526,7 @@
                     <button type="button" onclick="document.getElementById('editStaffModal').style.display='none'" class="flex-1 px-4 py-2.5 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-100 text-sm">
                         Cancel
                     </button>
-                    <button type="submit" id="btnSaveStaff" class="flex-1 px-4 py-2.5 bg-gradient-to-r from-purple-600 to-indigo-600 text-white rounded-lg hover:from-purple-700 hover:to-indigo-700 font-semibold text-sm">
+                    <button type="submit" id="btnSaveStaff" class="flex-1 px-4 py-2.5 bg-gradient-to-r from-purple-600 to-[#1A4A6E] text-white rounded-lg hover:from-purple-700 hover:to-indigo-700 font-semibold text-sm">
                         Save Changes
                     </button>
                 </div>
@@ -1088,7 +1088,7 @@
 
             const salaryTableHtml = `
                 <table style="width:100%;border-collapse:collapse;font-size:9pt;">
-                    <tr style="background:#667eea;">
+                    <tr style="background:#0F3A5F;">
                         <td style="padding:6px 10px;font-weight:600;color:white;">Component</td>
                         <td style="padding:6px 10px;font-weight:600;text-align:right;color:white;">Monthly (₹)</td>
                         <td style="padding:6px 10px;font-weight:600;text-align:right;color:white;">Annual (₹)</td>
@@ -1113,7 +1113,7 @@
                         <td style="padding:6px 10px;text-align:right;">₹${fmt(other)}</td>
                         <td style="padding:6px 10px;text-align:right;">₹${fmt(other * 12)}</td>
                     </tr>
-                    <tr style="background:linear-gradient(135deg,#667eea,#764ba2);">
+                    <tr style="background:linear-gradient(135deg,#0F3A5F,#1A4A6E);">
                         <td style="padding:6px 10px;color:white;font-weight:600;">Total CTC</td>
                         <td style="padding:6px 10px;color:white;font-weight:600;text-align:right;">₹${fmt(totalCTC)}</td>
                         <td style="padding:6px 10px;color:white;font-weight:600;text-align:right;">₹${fmt(annualCTC)}</td>
@@ -1128,19 +1128,19 @@
 
             document.getElementById('offerPreviewContent').innerHTML = `
                 <!-- PAGE 1: ENGLISH -->
-                <div style="height:10px;background:linear-gradient(to right,#667eea,#764ba2);"></div>
+                <div style="height:10px;background:linear-gradient(to right,#0F3A5F,#1A4A6E);"></div>
                 <div style="padding:25px 30px;font-family:Georgia,'Times New Roman',serif;color:#374151;">
                     <div style="text-align:center;margin-bottom:12px;">
-                        <h1 style="color:#667eea;font-size:18pt;margin:0;font-weight:700;">${escapeHtml(data.company_name)}</h1>
+                        <h1 style="color:#0F3A5F;font-size:18pt;margin:0;font-weight:700;">${escapeHtml(data.company_name)}</h1>
                         <p style="color:#6b7280;font-size:8.5pt;margin:3px 0 0;">${escapeHtml(data.company_address)}</p>
                     </div>
-                    <hr style="border:none;border-top:2px solid #667eea;margin:10px 0;">
+                    <hr style="border:none;border-top:2px solid #0F3A5F;margin:10px 0;">
                     <div style="display:flex;justify-content:space-between;margin:10px 0;font-size:9pt;">
                         <span>Date: ${escapeHtml(data.letter_date)}</span>
                         <span>Ref: ${escapeHtml(data.ref_number)}</span>
                     </div>
                     <div style="text-align:center;margin:15px 0;">
-                        <span style="background:#667eea;color:white;padding:5px 25px;border-radius:4px;font-size:12pt;letter-spacing:2px;font-weight:600;">OFFER LETTER</span>
+                        <span style="background:#0F3A5F;color:white;padding:5px 25px;border-radius:4px;font-size:12pt;letter-spacing:2px;font-weight:600;">OFFER LETTER</span>
                     </div>
                     <p style="font-size:10pt;margin:15px 0 8px;">Dear ${escapeHtml(data.employee_name)},</p>
                     <p style="font-size:9.5pt;line-height:1.6;text-align:justify;margin:8px 0;">${escapeHtml(data.offer_text)}</p>
@@ -1163,22 +1163,22 @@
                         </div>
                     </div>
                 </div>
-                <div style="height:10px;background:linear-gradient(to right,#764ba2,#667eea);font-size:7pt;color:white;text-align:center;line-height:10px;">Page 1 - English</div>
+                <div style="height:10px;background:linear-gradient(to right,#1A4A6E,#0F3A5F);font-size:7pt;color:white;text-align:center;line-height:10px;">Page 1 - English</div>
 
                 <!-- PAGE 2: TAMIL -->
-                <div style="height:10px;background:linear-gradient(to right,#667eea,#764ba2);margin-top:20px;"></div>
+                <div style="height:10px;background:linear-gradient(to right,#0F3A5F,#1A4A6E);margin-top:20px;"></div>
                 <div style="padding:25px 30px;font-family:'Noto Sans Tamil',Arial,sans-serif;color:#374151;">
                     <div style="text-align:center;margin-bottom:12px;">
-                        <h1 style="color:#667eea;font-size:18pt;margin:0;font-weight:700;">${escapeHtml(data.company_name)}</h1>
+                        <h1 style="color:#0F3A5F;font-size:18pt;margin:0;font-weight:700;">${escapeHtml(data.company_name)}</h1>
                         <p style="color:#6b7280;font-size:8.5pt;margin:3px 0 0;">${escapeHtml(data.company_address)}</p>
                     </div>
-                    <hr style="border:none;border-top:2px solid #667eea;margin:10px 0;">
+                    <hr style="border:none;border-top:2px solid #0F3A5F;margin:10px 0;">
                     <div style="display:flex;justify-content:space-between;margin:10px 0;font-size:9pt;">
                         <span>தேதி: ${escapeHtml(data.letter_date)}</span>
                         <span>குறிப்பு எண்: ${escapeHtml(data.ref_number)}</span>
                     </div>
                     <div style="text-align:center;margin:15px 0;">
-                        <span style="background:#667eea;color:white;padding:5px 25px;border-radius:4px;font-size:12pt;letter-spacing:1px;font-weight:600;">வேலை வாய்ப்பு கடிதம்</span>
+                        <span style="background:#0F3A5F;color:white;padding:5px 25px;border-radius:4px;font-size:12pt;letter-spacing:1px;font-weight:600;">வேலை வாய்ப்பு கடிதம்</span>
                     </div>
                     <p style="font-size:10pt;margin:15px 0 8px;">அன்புள்ள ${escapeHtml(data.employee_name)} அவர்களுக்கு,</p>
                     <p style="font-size:9.5pt;line-height:1.6;text-align:justify;margin:8px 0;">${escapeHtml(data.tamil_offer_text || '')}</p>
@@ -1201,7 +1201,7 @@
                         </div>
                     </div>
                 </div>
-                <div style="height:10px;background:linear-gradient(to right,#764ba2,#667eea);font-size:7pt;color:white;text-align:center;line-height:10px;">Page 2 - Tamil (தமிழ்)</div>
+                <div style="height:10px;background:linear-gradient(to right,#1A4A6E,#0F3A5F);font-size:7pt;color:white;text-align:center;line-height:10px;">Page 2 - Tamil (தமிழ்)</div>
 
                 ${aadharSection}
             `;

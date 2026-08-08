@@ -36,7 +36,7 @@ async function loadData() {
         content.classList.remove('hidden');
         showToast('Loaded ' + allItems.length + ' items', 'success');
     } catch(e) {
-        loading.innerHTML = '<p class="text-red-500">❌ ' + esc(e.message) + '</p><button data-action="loadData" class="mt-3 px-4 py-2 bg-indigo-500 text-white rounded-lg text-sm">Retry</button>';
+        loading.innerHTML = '<p class="text-red-500">❌ ' + esc(e.message) + '</p><button data-action="loadData" class="mt-3 px-4 py-2 bg-[#EBF2F8]0 text-white rounded-lg text-sm">Retry</button>';
         showToast('Error: ' + e.message, 'error');
     }
     icon.textContent = '🔄';
@@ -58,7 +58,7 @@ function renderSummary() {
             <span class="text-2xl font-bold text-gray-800">${totalMatched}</span>
             <span class="text-sm text-gray-400">/ ${totalAll}</span>
         </div>
-        <div class="progress-bar mt-2"><div class="progress-fill" style="width:${pct}%;background:linear-gradient(90deg,#667eea,#764ba2)"></div></div>
+        <div class="progress-bar mt-2"><div class="progress-fill" style="width:${pct}%;background:linear-gradient(90deg,#0F3A5F,#1A4A6E)"></div></div>
         <div class="flex justify-between mt-1 text-xs">
             <span class="text-green-600">${totalMatched} matched</span>
             <span class="text-amber-600">${totalUnmatched} unmatched</span>
@@ -172,7 +172,7 @@ function renderTable() {
         html += `<tr class="${isMatched ? 'row-matched' : 'row-unmatched'}">
             <td class="text-gray-400 text-xs">${i + 1}</td>
             <td class="text-xs">${esc(item.zoho_brand) || '-'}</td>
-            <td class="font-mono text-xs font-semibold text-indigo-700">${esc(item.zoho_sku) || '-'}</td>
+            <td class="font-mono text-xs font-semibold text-[#0F3A5F]">${esc(item.zoho_sku) || '-'}</td>
             <td class="text-xs max-w-xs truncate" title="${esc(item.zoho_item_name || '')}">${esc(item.zoho_item_name) || '-'}</td>
             <td class="text-right text-xs font-mono">${rate}</td>
             <td class="text-right text-xs font-mono">${dpl}</td>
@@ -198,7 +198,7 @@ function renderMobileCards() {
         html += `<div class="mb-2 p-3 rounded-lg border ${isMatched ? 'bg-green-50 border-green-200' : 'bg-amber-50 border-amber-200'}">
             <div class="flex justify-between items-start">
                 <div class="flex-1 min-w-0">
-                    <div class="text-xs font-mono font-bold text-indigo-700">${esc(item.zoho_sku) || '-'}</div>
+                    <div class="text-xs font-mono font-bold text-[#0F3A5F]">${esc(item.zoho_sku) || '-'}</div>
                     <div class="text-sm font-medium text-gray-800 truncate">${esc(item.zoho_item_name) || '-'}</div>
                     <div class="text-xs text-gray-500 mt-1">${esc(item.zoho_brand) || '-'}</div>
                 </div>
@@ -252,7 +252,7 @@ function showToast(msg, type = 'info') {
     const t = document.getElementById('toast');
     t.textContent = msg;
     t.className = 'toast show';
-    t.style.background = type === 'success' ? '#10b981' : type === 'error' ? '#ef4444' : '#667eea';
+    t.style.background = type === 'success' ? '#10b981' : type === 'error' ? '#ef4444' : '#0F3A5F';
     t.style.color = 'white';
     setTimeout(() => { t.classList.remove('show'); }, 3000);
 }

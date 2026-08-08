@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="theme-color" content="#667eea">
+    <meta name="theme-color" content="#0F3A5F">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <link rel="manifest" href="/manifest.json">
@@ -39,7 +39,7 @@
         .toast { position: fixed; bottom: 20px; right: 20px; z-index: 9999; padding: 10px 20px; border-radius: 8px; font-size: 0.8rem; font-weight: 500; opacity: 0; transition: opacity 0.3s; }
         .toast.show { opacity: 1; }
         .sort-icon { opacity: 0.3; font-size: 0.65rem; margin-left: 4px; }
-        .sort-icon.active { opacity: 1; color: #667eea; }
+        .sort-icon.active { opacity: 1; color: #0F3A5F; }
         @media (max-width: 767px) {
             .table-wrapper { display: none; }
             .mobile-cards { display: block !important; }
@@ -67,7 +67,7 @@
                 <button id="exportCsvBtn" class="px-4 py-2 bg-white border border-gray-200 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50 flex items-center gap-2">
                     📥 Export CSV
                 </button>
-                <a href="/admin-zoho-items-edit.html" class="px-4 py-2 bg-indigo-500 text-white rounded-lg text-sm font-medium hover:bg-indigo-600 flex items-center gap-2">
+                <a href="/admin-zoho-items-edit.html" class="px-4 py-2 bg-[#0F3A5F] text-white rounded-lg text-sm font-medium hover:bg-[#0F3A5F] flex items-center gap-2">
                     ✏️ Item Edits
                 </a>
             </div>
@@ -75,7 +75,7 @@
 
         <!-- Loading -->
         <div id="loading" class="text-center py-20">
-            <div class="inline-block w-8 h-8 border-3 border-indigo-200 border-t-indigo-600 rounded-full spinner" style="border-width:3px"></div>
+            <div class="inline-block w-8 h-8 border-3 border-[#C0D5E8] border-t-indigo-600 rounded-full spinner" style="border-width:3px"></div>
             <p class="text-gray-500 mt-3 text-sm">Loading match report...</p>
         </div>
 
@@ -86,10 +86,10 @@
 
             <!-- Filters -->
             <div class="filter-row flex gap-3 mb-4 items-center flex-wrap" style="flex-direction:row">
-                <select id="filterBrand" class="px-3 py-2 border border-gray-200 rounded-lg text-sm bg-white focus:ring-2 focus:ring-indigo-200 focus:border-indigo-400 outline-none">
+                <select id="filterBrand" class="px-3 py-2 border border-gray-200 rounded-lg text-sm bg-white focus:ring-2 focus:ring-indigo-200 focus:border-[#7AA3C6] outline-none">
                     <option value="all">All Brands</option>
                 </select>
-                <select id="filterStatus" class="px-3 py-2 border border-gray-200 rounded-lg text-sm bg-white focus:ring-2 focus:ring-indigo-200 focus:border-indigo-400 outline-none">
+                <select id="filterStatus" class="px-3 py-2 border border-gray-200 rounded-lg text-sm bg-white focus:ring-2 focus:ring-indigo-200 focus:border-[#7AA3C6] outline-none">
                     <option value="all">All Status</option>
                     <option value="matched">✅ Matched Only</option>
                     <option value="unmatched">⚠️ Unmatched Only</option>
@@ -97,7 +97,7 @@
                 <div class="relative flex-1 min-w-[200px]">
                     <span class="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">🔍</span>
                     <input id="filterSearch" type="text" placeholder="Search by name, SKU, product..."
-                           class="w-full pl-9 pr-3 py-2 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-indigo-200 focus:border-indigo-400 outline-none">
+                           class="w-full pl-9 pr-3 py-2 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-indigo-200 focus:border-[#7AA3C6] outline-none">
                 </div>
                 <span id="resultCount" class="text-xs text-gray-500 whitespace-nowrap"></span>
             </div>
