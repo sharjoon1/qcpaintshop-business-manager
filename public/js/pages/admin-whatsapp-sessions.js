@@ -74,7 +74,7 @@ function renderGeneralCard() {
             ${errorInfo}
             <div class="qr-container" id="qr-0" style="display:${status === 'qr_pending' || g.has_qr ? 'flex' : 'none'}">
                 <div class="text-center text-gray-400 text-xs">
-                    ${status === 'qr_pending' ? '<div class="spinner w-6 h-6 border-2 border-indigo-300 border-t-indigo-600 rounded-full mx-auto mb-2"></div>Loading QR...' : ''}
+                    ${status === 'qr_pending' ? '<div class="spinner w-6 h-6 border-2 border-[#A3BFD9] border-t-indigo-600 rounded-full mx-auto mb-2"></div>Loading QR...' : ''}
                 </div>
             </div>
             ${buttons}
@@ -145,7 +145,7 @@ function renderCards() {
                 ${errorInfo}
                 <div class="qr-container" id="qr-${s.branch_id}" style="display:${status === 'qr_pending' || s.has_qr ? 'flex' : 'none'}">
                     <div class="text-center text-gray-400 text-xs">
-                        ${status === 'qr_pending' ? '<div class="spinner w-6 h-6 border-2 border-indigo-300 border-t-indigo-600 rounded-full mx-auto mb-2"></div>Loading QR...' : ''}
+                        ${status === 'qr_pending' ? '<div class="spinner w-6 h-6 border-2 border-[#A3BFD9] border-t-indigo-600 rounded-full mx-auto mb-2"></div>Loading QR...' : ''}
                     </div>
                 </div>
                 ${buttons}

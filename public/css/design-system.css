@@ -1392,3 +1392,6 @@ body {
 
 /* Phase 4: hub tab focus ring */
 .qc-hub-tab:focus-visible{ outline:2px solid var(--color-primary); outline-offset:2px; }
+
+/* Fix: modals with hidden + responsive sm: classes must stay hidden */
+.hidden.fixed { display: none !important; }

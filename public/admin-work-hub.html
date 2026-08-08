@@ -8,7 +8,7 @@
 <link rel="stylesheet" href="/css/design-system.css">
 <link rel="stylesheet" href="/css/qc-ui.css">
 <style>
-:root{--hub-accent:#667eea}
+:root{--hub-accent:#0F3A5F}
 .qc-hub-tabs{display:flex;gap:.25rem;overflow-x:auto;padding:.5rem 0;border-bottom:1px solid #e5e7eb}
 .qc-hub-tab{white-space:nowrap;padding:.6rem 1rem;border-radius:8px 8px 0 0;font-weight:600;font-size:.85rem;color:#64748b;border:1px solid transparent;border-bottom:none;cursor:pointer;background:#f8fafc}
 .qc-hub-tab.active{background:#fff;color:var(--hub-accent);border-color:#e5e7eb}
@@ -34,7 +34,7 @@
 
   <section id="panel-attendance" class="qc-hub-panel active">
     <div class="qc-card mt-4">
-      <div class="flex gap-2 mb-3"><input id="att-date" type="date" class="border rounded-lg px-3 py-2 text-sm"><button id="btn-att" class="px-3 py-2 rounded-lg text-white text-sm" style="background:#667eea">Load attendance</button><span id="att-status" class="text-sm text-slate-500 self-center"></span></div>
+      <div class="flex gap-2 mb-3"><input id="att-date" type="date" class="border rounded-lg px-3 py-2 text-sm"><button id="btn-att" class="px-3 py-2 rounded-lg text-white text-sm" style="background:#0F3A5F">Load attendance</button><span id="att-status" class="text-sm text-slate-500 self-center"></span></div>
       <div id="att-empty" class="hidden text-sm text-slate-500 py-8 text-center">No attendance records.</div>
       <table class="w-full text-sm"><thead class="text-slate-500"><tr><th class="text-left p-2">Staff</th><th class="text-left p-2">Check-in</th><th class="text-left p-2">Status</th></tr></thead><tbody id="att-body"></tbody></table>
       <a href="/admin-attendance.html" class="inline-block mt-3 text-sm text-blue-600">Open Attendance →</a>
@@ -42,14 +42,14 @@
   </section>
   <section id="panel-tasks" class="qc-hub-panel">
     <div class="qc-card mt-4">
-      <div class="flex gap-2 mb-3"><button id="btn-tasks" class="px-3 py-2 rounded-lg text-white text-sm" style="background:#667eea">Load tasks</button><span id="tasks-status" class="text-sm text-slate-500 self-center"></span></div>
+      <div class="flex gap-2 mb-3"><button id="btn-tasks" class="px-3 py-2 rounded-lg text-white text-sm" style="background:#0F3A5F">Load tasks</button><span id="tasks-status" class="text-sm text-slate-500 self-center"></span></div>
       <div id="tasks-empty" class="hidden text-sm text-slate-500 py-8 text-center">No tasks.</div>
       <table class="w-full text-sm"><thead class="text-slate-500"><tr><th class="text-left p-2">Title</th><th class="text-left p-2">Assignee</th><th class="text-left p-2">Status</th></tr></thead><tbody id="tasks-body"></tbody></table>
     </div>
   </section>
   <section id="panel-daily" class="qc-hub-panel">
     <div class="qc-card mt-4">
-      <div class="flex gap-2 mb-3"><button id="btn-daily" class="px-3 py-2 rounded-lg text-white text-sm" style="background:#667eea">Load daily tasks</button><span id="daily-status" class="text-sm text-slate-500 self-center"></span></div>
+      <div class="flex gap-2 mb-3"><button id="btn-daily" class="px-3 py-2 rounded-lg text-white text-sm" style="background:#0F3A5F">Load daily tasks</button><span id="daily-status" class="text-sm text-slate-500 self-center"></span></div>
       <div id="daily-empty" class="hidden text-sm text-slate-500 py-8 text-center">No daily tasks.</div>
       <table class="w-full text-sm"><thead class="text-slate-500"><tr><th class="text-left p-2">Task</th><th class="text-left p-2">Date</th><th class="text-left p-2">Status</th></tr></thead><tbody id="daily-body"></tbody></table>
     </div>

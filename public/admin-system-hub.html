@@ -8,7 +8,7 @@
 <link rel="stylesheet" href="/css/design-system.css">
 <link rel="stylesheet" href="/css/qc-ui.css">
 <style>
-:root{--hub-accent:#667eea}
+:root{--hub-accent:#0F3A5F}
 .qc-hub-tabs{display:flex;gap:.25rem;overflow-x:auto;padding:.5rem 0;border-bottom:1px solid #e5e7eb}
 .qc-hub-tab{white-space:nowrap;padding:.6rem 1rem;border-radius:8px 8px 0 0;font-weight:600;font-size:.85rem;color:#64748b;border:1px solid transparent;border-bottom:none;cursor:pointer;background:#f8fafc}
 .qc-hub-tab.active{background:#fff;color:var(--hub-accent);border-color:#e5e7eb}
@@ -37,7 +37,7 @@
   </section>
   <section id="panel-health" class="qc-hub-panel">
     <div class="qc-card mt-4">
-      <div class="flex gap-2 mb-3"><button id="btn-health" class="px-3 py-2 rounded-lg text-white text-sm" style="background:#667eea">Check health</button><span id="health-status" class="text-sm text-slate-500 self-center"></span></div>
+      <div class="flex gap-2 mb-3"><button id="btn-health" class="px-3 py-2 rounded-lg text-white text-sm" style="background:#0F3A5F">Check health</button><span id="health-status" class="text-sm text-slate-500 self-center"></span></div>
       <div id="health-empty" class="hidden text-sm text-slate-500 py-8 text-center">No health data.</div>
       <pre id="health-pre" class="text-xs bg-slate-950 text-slate-200 rounded-lg p-3 overflow-auto max-h-96"></pre>
       <div class="flex gap-2 mt-3"><a href="/admin-system-health.html" class="px-3 py-2 rounded-lg border bg-white text-sm">System Health</a><a href="/admin-bug-reports.html" class="px-3 py-2 rounded-lg border bg-white text-sm">Bug Reports</a></div>
@@ -45,7 +45,7 @@
   </section>
   <section id="panel-monitor" class="qc-hub-panel">
     <div class="qc-card mt-4">
-      <div class="flex gap-2 mb-3"><button id="btn-mon" class="px-3 py-2 rounded-lg text-white text-sm" style="background:#667eea">Load monitor</button><span id="mon-status" class="text-sm text-slate-500 self-center"></span></div>
+      <div class="flex gap-2 mb-3"><button id="btn-mon" class="px-3 py-2 rounded-lg text-white text-sm" style="background:#0F3A5F">Load monitor</button><span id="mon-status" class="text-sm text-slate-500 self-center"></span></div>
       <div id="mon-empty" class="hidden text-sm text-slate-500 py-8 text-center">No monitor data.</div>
       <pre id="mon-pre" class="text-xs bg-slate-950 text-slate-200 rounded-lg p-3 overflow-auto max-h-96"></pre>
       <div class="flex gap-2 mt-3"><a href="/admin-monitoring.html" class="px-3 py-2 rounded-lg border bg-white text-sm">Monitoring</a><a href="/admin-anomalies.html" class="px-3 py-2 rounded-lg border bg-white text-sm">Anomalies</a></div>
@@ -53,7 +53,7 @@
   </section>
   <section id="panel-guides" class="qc-hub-panel">
     <div class="qc-card mt-4">
-      <div class="flex gap-2 mb-3"><button id="btn-guides" class="px-3 py-2 rounded-lg text-white text-sm" style="background:#667eea">Load guides</button><span id="guides-status" class="text-sm text-slate-500 self-center"></span></div>
+      <div class="flex gap-2 mb-3"><button id="btn-guides" class="px-3 py-2 rounded-lg text-white text-sm" style="background:#0F3A5F">Load guides</button><span id="guides-status" class="text-sm text-slate-500 self-center"></span></div>
       <div id="guides-empty" class="hidden text-sm text-slate-500 py-8 text-center">No guides.</div>
       <table class="w-full text-sm"><thead class="text-slate-500"><tr><th class="text-left p-2">Title</th><th class="text-left p-2">Updated</th></tr></thead><tbody id="guides-body"></tbody></table>
       <a href="/admin-guides.html" class="inline-block mt-3 text-sm text-blue-600">Open Guides →</a>

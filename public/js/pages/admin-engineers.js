@@ -73,7 +73,7 @@
         var gst = e.gst_number ? '<div class="text-xs text-gray-500 mt-0.5">GST ' + escHTML(e.gst_number) + '</div>' : '';
         return '<tr>'
           + '<td><div class="flex items-center gap-3">'
-          +   '<div class="w-9 h-9 rounded-full bg-indigo-100 text-indigo-700 flex items-center justify-center font-bold text-sm">' + escHTML(initial) + '</div>'
+          +   '<div class="w-9 h-9 rounded-full bg-[#D6E5F0] text-[#0F3A5F] flex items-center justify-center font-bold text-sm">' + escHTML(initial) + '</div>'
           +   '<div><div class="font-semibold text-gray-900">' + escHTML(e.full_name || '—') + '</div>'
           +     (e.designation ? '<div class="text-xs text-gray-500">' + escHTML(e.designation) + '</div>' : '')
           +   '</div></div></td>'
