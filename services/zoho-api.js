@@ -2550,6 +2550,23 @@ async function createBill(billData) {
     return await apiPost(`/bills?organization_id=${orgId}`, billData);
 }
 
+async function attachBillAttachment(billId, filePath) {
+    const orgId = process.env.ZOHO_ORGANIZATION_ID;
+    const fs = require('fs');
+    const FormData = require('form-data');
+    const form = new FormData();
+    form.append('attachment', fs.createReadStream(filePath));
+    // Zoho Books: POST /bills/{id}/attachment?organization_id=...
+    const headers = form.getHeaders();
+    const url = `${getBaseUrl()}/bills/${billId}/attachment?organization_id=${orgId}`;
+    // Use apiPost with multipart - fallback to raw fetch
+    const { default: fetch } = await import('node-fetch');
+    const resp = await fetch(url, { method: 'POST', headers: { ...headers, Authorization: `Zoho-oauthtoken ${await getAccessToken()}` }, body: form });
+    const json = await resp.json();
+    if (json.code !== 0) throw new Error(json.message || 'Zoho attachment failed');
+    return json;
+}
+
 // Transaction approval transitions. Zoho creates bills/invoices via API as
 // DRAFT. To take them out of draft: submit (→ pending approval) then approve
 // (→ open/finalized). When the org's approval workflow is OFF, submit/approve
@@ -2815,6 +2832,7 @@ module.exports = {
     getBills,
     getBill,
     createBill,
+    attachBillAttachment,
     submitBill,
     approveBill,
     markBillOpen,

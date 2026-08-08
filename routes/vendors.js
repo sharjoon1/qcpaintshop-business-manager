@@ -1220,6 +1220,17 @@ router.post('/bills/:id/push-zoho',
                 [zohoBillId || null, pushLocationId, pushLocationName, fin.state, id]
             );
 
+            // Same Bill Attached Zoho-vilum attached aagavendum — best-effort attach bill_image
+            if (bill.bill_image && zohoBillId) {
+                try {
+                    const path = require('path');
+                    const filePath = path.join(__dirname, '..', bill.bill_image.replace(/^\//, ''));
+                    await zohoAPI.attachBillAttachment(zohoBillId, filePath);
+                } catch (attErr) {
+                    console.error('Bill attachment push failed (non-fatal):', attErr.message);
+                }
+            }
+
             // Now that the bill is in Zoho, best-effort forward its still-pending
             // payments (SP-1 C5). Never fails the push — payment sync is
             // duplicate-proof and re-runnable per-payment.
