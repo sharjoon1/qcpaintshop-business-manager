@@ -30,6 +30,7 @@
     <button class="qc-hub-tab" data-tab="brands" role="tab">Brands</button>
     <button class="qc-hub-tab" data-tab="categories" role="tab">Categories</button>
     <button class="qc-hub-tab" data-tab="master" role="tab">Item Master</button>
+    <button class="qc-hub-tab" data-tab="pending" role="tab">Pending Approval</button>
   </div>
 
   <section id="panel-products" class="qc-hub-panel active">
@@ -61,6 +62,37 @@
       <a href="/admin-item-master.html" class="inline-block mt-3 text-sm text-blue-600">Open Item Master →</a>
     </div>
   </section>
+  <section id="panel-pending" class="qc-hub-panel">
+    <div class="qc-card mt-4">
+      <div class="flex flex-wrap items-center gap-2 mb-3">
+        <select id="pending-status" class="border rounded-lg px-2 py-2 text-sm"><option value="pending">Pending</option><option value="pushed">Pushed</option><option value="rejected">Rejected</option><option value="failed">Failed</option><option value="all">All</option></select>
+        <button id="btn-pending" class="px-3 py-2 rounded-lg text-white text-sm" style="background:#0F3A5F">Load</button>
+        <button id="btn-new-req" class="ml-auto px-3 py-2 rounded-lg border text-sm bg-white">+ New Request</button>
+        <span id="pending-status-txt" class="text-sm text-slate-500"></span>
+      </div>
+      <div id="pending-empty" class="hidden text-sm text-slate-500 py-8 text-center">No requests.</div>
+      <div class="overflow-x-auto"><table class="w-full text-sm"><thead class="text-slate-700 border-b"><tr><th class="text-left p-2">Product</th><th class="text-left p-2">Brand</th><th class="text-left p-2">Pack</th><th class="text-right p-2">DPL</th><th class="text-left p-2">Requester</th><th class="text-left p-2">Status</th><th class="text-right p-2">Action</th></tr></thead><tbody id="pending-body"></tbody></table></div>
+    </div>
+    <dialog id="dlg-new-req" class="rounded-xl p-0 border shadow-lg" style="max-width:520px;width:96%">
+      <form method="dialog" class="p-4">
+        <h3 class="font-semibold text-slate-900 mb-3">New Product Request (→ Admin Approval → Zoho)</h3>
+        <div class="grid grid-cols-2 gap-3 text-sm">
+          <label>Brand <input id="req-brand" class="mt-1 border rounded-lg px-2 py-1.5 w-full" required></label>
+          <label>Category <input id="req-category" class="mt-1 border rounded-lg px-2 py-1.5 w-full" placeholder="e.g. INTERIOR EMULSION" required></label>
+          <label>Category Code <input id="req-catcode" class="mt-1 border rounded-lg px-2 py-1.5 w-full" placeholder="IE" required></label>
+          <label>Pack Size <input id="req-pack" class="mt-1 border rounded-lg px-2 py-1.5 w-full" placeholder="10 L" required></label>
+          <label>Product Name <input id="req-pname" class="mt-1 border rounded-lg px-2 py-1.5 w-full col-span-2" required></label>
+          <label>Base <input id="req-base" class="mt-1 border rounded-lg px-2 py-1.5 w-full" placeholder="optional"></label>
+          <label>Color <input id="req-color" class="mt-1 border rounded-lg px-2 py-1.5 w-full" placeholder="optional"></label>
+          <label>DPL <input id="req-dpl" type="number" step="0.01" class="mt-1 border rounded-lg px-2 py-1.5 w-full" required></label>
+          <label>Unit <input id="req-unit" class="mt-1 border rounded-lg px-2 py-1.5 w-full" value="nos"></label>
+          <label class="col-span-2">Description <input id="req-desc" class="mt-1 border rounded-lg px-2 py-1.5 w-full"></label>
+        </div>
+        <div class="flex justify-end gap-2 mt-4"><button type="button" id="btn-cancel-req" class="px-3 py-2 rounded-lg border text-sm">Cancel</button><button type="submit" id="btn-submit-req" class="px-3 py-2 rounded-lg text-white text-sm" style="background:#0F3A5F">Submit for Approval</button></div>
+        <p id="req-msg" class="text-sm text-slate-600 mt-2"></p>
+      </form>
+    </dialog>
+  </section>
 </main>
 <script src="/universal-nav-loader.js?v=6b4a6dbe"></script>
 <script>
@@ -79,7 +111,12 @@ $('#btn-prod').addEventListener('click', loadProd);
 $('#btn-brands').addEventListener('click', loadBrands);
 $('#btn-cats').addEventListener('click', loadCats);
 $('#btn-master').addEventListener('click', loadMaster);
-$('#btn-refresh').addEventListener('click', ()=>{const t=document.querySelector('.qc-hub-tab.active').dataset.tab; if(t==='products') loadProd(); if(t==='brands') loadBrands(); if(t==='categories') loadCats(); if(t==='master') loadMaster();});
+async function loadPending(){ const s=$('#pending-status').value; $('#pending-status-txt').textContent='Loading…'; try{ const j=await apiFetch('/api/item-master/pending-requests?status='+encodeURIComponent(s)+'&limit=50'); const rows=j.data||[]; const tb=$('#pending-body'); tb.innerHTML=''; if(!rows.length) $('#pending-empty').classList.remove('hidden'); else $('#pending-empty').classList.add('hidden'); rows.forEach(r=>{ const tr=document.createElement('tr'); tr.className='border-t'; const isPending=r.status==='pending'; tr.innerHTML=`<td class="p-2">${esc(r.product_name)}</td><td class="p-2">${esc(r.brand)}</td><td class="p-2">${esc(r.pack_size)}</td><td class="p-2 text-right">₹${Number(r.dpl).toLocaleString('en-IN')}</td><td class="p-2">${esc(r.requester_name||'')}</td><td class="p-2"><span class="px-2 py-0.5 rounded text-xs ${r.status==='pending'?'bg-amber-100 text-amber-700':r.status==='pushed'?'bg-emerald-100 text-emerald-700':r.status==='rejected'?'bg-slate-100 text-slate-600':'bg-red-100 text-red-700'}">${esc(r.status)}</span></td><td class="p-2 text-right">${isPending?`<button data-approve="${r.id}" class="px-2 py-1 rounded border text-xs mr-1">Approve → Zoho</button><button data-reject="${r.id}" class="px-2 py-1 rounded border text-xs">Reject</button>`:'<span class="text-xs text-slate-400">—</span>'}</td>`; tb.appendChild(tr); }); $('#pending-status-txt').textContent=rows.length+' rows'; tb.querySelectorAll('[data-approve]').forEach(b=> b.addEventListener('click', async()=>{ b.disabled=true; b.textContent='Pushing…'; try{ await apiFetch('/api/item-master/pending-requests/'+b.dataset.approve+'/approve',{method:'POST'}); loadPending(); }catch(e){ alert(e.message); b.disabled=false; b.textContent='Approve → Zoho'; }})); tb.querySelectorAll('[data-reject]').forEach(b=> b.addEventListener('click', async()=>{ const reason=prompt('Reject reason (optional)')||''; try{ await apiFetch('/api/item-master/pending-requests/'+b.dataset.reject+'/reject',{method:'POST', body: JSON.stringify({reason})}); loadPending(); }catch(e){ alert(e.message); }})); }catch(e){ $('#pending-status-txt').textContent=e.message; } }
+$('#btn-pending').addEventListener('click', loadPending);
+$('#btn-new-req').addEventListener('click', ()=> $('#dlg-new-req').showModal());
+$('#btn-cancel-req').addEventListener('click', ()=> $('#dlg-new-req').close());
+document.querySelector('#dlg-new-req form').addEventListener('submit', async (e)=>{ e.preventDefault(); const body={brand:$('#req-brand').value.trim(), category:$('#req-category').value.trim(), category_code:$('#req-catcode').value.trim(), pack_size:$('#req-pack').value.trim(), product_name:$('#req-pname').value.trim(), base_type:$('#req-base').value.trim()||null, color:$('#req-color').value.trim()||null, dpl: Number($('#req-dpl').value), unit:$('#req-unit').value.trim()||'nos', description:$('#req-desc').value.trim()||null}; if(!body.brand||!body.category||!body.category_code||!body.pack_size||!body.product_name||!body.dpl) { $('#req-msg').textContent='Fill required fields'; return; } $('#req-msg').textContent='Submitting…'; try{ await apiFetch('/api/item-master/pending-requests',{method:'POST', body: JSON.stringify(body)}); $('#req-msg').textContent='Submitted for admin approval'; setTimeout(()=>{ $('#dlg-new-req').close(); $('#req-msg').textContent=''; loadPending(); }, 600); }catch(err){ $('#req-msg').textContent=err.message; } });
+$('#btn-refresh').addEventListener('click', ()=>{const t=document.querySelector('.qc-hub-tab.active').dataset.tab; if(t==='products') loadProd(); if(t==='brands') loadBrands(); if(t==='categories') loadCats(); if(t==='master') loadMaster(); if(t==='pending') loadPending();});
 loadProd();
 </script>
 </body>

@@ -761,4 +761,129 @@ router.get('/health-check', requireAuth, async (req, res) => {
     }
 });
 
+// ─── Phase 1: Pending Product Requests (Admin Approval → Zoho) ─────────
+const pendingRequestSchema = z.object({
+  brand: z.string().min(1),
+  product_name: z.string().min(1),
+  category: z.string().min(1),
+  category_code: z.string().min(1).max(10),
+  base_type: z.string().optional().nullable(),
+  color: z.string().optional().nullable(),
+  pack_size: z.string().min(1),
+  unit: z.string().optional().default('nos'),
+  dpl: z.number().positive(),
+  hsn_sac: z.string().optional().nullable(),
+  description: z.string().optional().nullable(),
+  zoho_tax_id: z.string().optional().nullable(),
+});
+
+// POST /pending-requests — Staff creates a new product request (pending admin approval)
+router.post('/pending-requests', requireAuth, async (req, res) => {
+  try {
+    const parsed = pendingRequestSchema.safeParse(req.body);
+    if (!parsed.success) return res.status(400).json({ success: false, error: parsed.error.errors });
+    const d = parsed.data;
+    const purchase_rate = d.dpl;
+    const sales_rate = calculateSalesPrice(d.dpl);
+    const [result] = await pool.query(
+      `INSERT INTO pending_product_requests
+       (requester_user_id, brand, product_name, category, category_code, base_type, color, pack_size, unit, dpl, purchase_rate, sales_rate, hsn_sac, zoho_tax_id, description, status)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending')`,
+      [req.user.id, d.brand, d.product_name, d.category, d.category_code, d.base_type || null, d.color || null, d.pack_size, d.unit || 'nos', d.dpl, purchase_rate, sales_rate, d.hsn_sac || null, d.zoho_tax_id || null, d.description || null]
+    );
+    res.json({ success: true, id: result.insertId });
+  } catch (err) {
+    console.error('pending-request create error:', err);
+    res.status(500).json({ success: false, error: 'Failed to create request' });
+  }
+});
+
+// GET /pending-requests — List pending requests (admin sees all, staff sees own)
+router.get('/pending-requests', requireAuth, async (req, res) => {
+  try {
+    const { status = 'all', page = '1', limit = '20' } = req.query;
+    const p = Math.max(1, parseInt(page, 10) || 1);
+    const l = Math.min(100, Math.max(1, parseInt(limit, 10) || 20));
+    const o = (p - 1) * l;
+    const isAdmin = ['admin','administrator','super_admin','manager'].includes(String(req.user.role||'').toLowerCase());
+    const where = [];
+    const params = [];
+    if (status !== 'all') { where.push('status = ?'); params.push(status); }
+    if (!isAdmin) { where.push('requester_user_id = ?'); params.push(req.user.id); }
+    const wc = where.length ? 'WHERE ' + where.join(' AND ') : '';
+    const [rows] = await pool.query(
+      `SELECT p.*, u.name as requester_name FROM pending_product_requests p LEFT JOIN users u ON u.id = p.requester_user_id ${wc} ORDER BY p.created_at DESC LIMIT ? OFFSET ?`,
+      [...params, l, o]
+    );
+    const [cnt] = await pool.query(`SELECT COUNT(*) as total FROM pending_product_requests p ${wc}`, params);
+    res.json({ success: true, data: rows, pagination: { page: p, limit: l, total: cnt[0].total } });
+  } catch (err) {
+    console.error('pending-request list error:', err);
+    res.status(500).json({ success: false, error: 'Failed to list' });
+  }
+});
+
+// POST /pending-requests/:id/approve — Admin approves and pushes to Zoho (Zoho Items is master)
+router.post('/pending-requests/:id/approve', requireAuth, requirePermission('products','manage'), async (req, res) => {
+  try {
+    const id = parseInt(req.params.id, 10);
+    const [rows] = await pool.query('SELECT * FROM pending_product_requests WHERE id = ?', [id]);
+    if (!rows.length) return res.status(404).json({ success: false, error: 'Not found' });
+    const r = rows[0];
+    if (r.status !== 'pending') return res.status(400).json({ success: false, error: `Already ${r.status}` });
+    // Build Zoho item payload — Zoho Items is master
+    const itemName = `${r.category} ${r.brand} ${r.pack_size}${r.base_type ? ' ' + r.base_type : ''}${r.color ? ' ' + r.color : ''} (${r.product_name})`.trim();
+    const payload = {
+      name: itemName,
+      rate: r.sales_rate,
+      purchase_rate: r.purchase_rate,
+      unit: r.unit || 'nos',
+      description: r.description || itemName,
+      product_type: 'goods',
+      is_taxable: true,
+    };
+    if (r.hsn_sac) payload.hsn_or_sac = r.hsn_sac;
+    if (r.zoho_tax_id) payload.tax_id = r.zoho_tax_id;
+    // Brand / Category as Zoho custom fields (cf_* will be wrapped to custom_fields by zoho-api)
+    payload.cf_brand = r.brand;
+    payload.cf_category_name = r.category;
+    payload.cf_product_name = r.product_name;
+    payload.cf_dpl = String(r.dpl);
+    payload.cf_category_code = r.category_code;
+    if (r.base_type) payload.cf_base_type = r.base_type;
+    if (r.color) payload.cf_color = r.color;
+    let zohoItemId = null;
+    let zohoResp = null;
+    try {
+      const zohoApi = require('../services/zoho-api');
+      zohoResp = await zohoApi.createItem(payload);
+      zohoItemId = zohoResp?.item?.item_id || zohoResp?.item_id || null;
+    } catch (ze) {
+      await pool.query(`UPDATE pending_product_requests SET status='failed', zoho_response=? WHERE id=?`, [String(ze.message).slice(0, 2000), id]);
+      return res.status(502).json({ success: false, error: 'Zoho create failed', details: ze.message });
+    }
+    await pool.query(`UPDATE pending_product_requests SET status='pushed', zoho_item_id=?, zoho_response=?, approved_by=?, approved_at=NOW() WHERE id=?`, [zohoItemId, JSON.stringify(zohoResp).slice(0, 4000), req.user.id, id]);
+    res.json({ success: true, zoho_item_id: zohoItemId });
+  } catch (err) {
+    console.error('approve error:', err);
+    res.status(500).json({ success: false, error: 'Approve failed' });
+  }
+});
+
+// POST /pending-requests/:id/reject — Admin rejects
+router.post('/pending-requests/:id/reject', requireAuth, requirePermission('products','manage'), async (req, res) => {
+  try {
+    const id = parseInt(req.params.id, 10);
+    const reason = req.body.reason || null;
+    const [rows] = await pool.query('SELECT * FROM pending_product_requests WHERE id = ?', [id]);
+    if (!rows.length) return res.status(404).json({ success: false, error: 'Not found' });
+    if (rows[0].status !== 'pending') return res.status(400).json({ success: false, error: `Already ${rows[0].status}` });
+    await pool.query(`UPDATE pending_product_requests SET status='rejected', rejected_reason=?, approved_by=?, approved_at=NOW() WHERE id=?`, [reason, req.user.id, id]);
+    res.json({ success: true });
+  } catch (err) {
+    console.error('reject error:', err);
+    res.status(500).json({ success: false, error: 'Reject failed' });
+  }
+});
+
 module.exports = { router, setPool, calculateSalesPrice };
