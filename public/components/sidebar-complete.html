@@ -497,6 +497,9 @@
 
         /* Overlay hidden on desktop */
         .qc-sidebar-overlay { display: none !important; }
+        /* Fix center auto-align: main content should stretch, not mx-auto jump */
+        main, .main-content { max-width: none !important; margin-left: 0 !important; margin-right: 0 !important; }
+        .container { max-width: none !important; margin-left: 0 !important; margin-right: 0 !important; }
 
         /* Push page content */
         body {
@@ -532,21 +535,8 @@
         .qc-sidebar-logout svg { width: 16px; height: 16px; min-width: 16px; }
     }
 
-    /* ─── LARGE DESKTOP ≥ 1280px ─── */
-    @media (min-width: 1280px) {
-        .qc-sidebar { width: 268px; }
-        .qc-sidebar.collapsed { width: 64px; }
-        body { margin-left: 268px; }
-        body.sidebar-collapsed { margin-left: 64px; }
-        .qc-unified-header {
-            margin-left: -268px;
-            padding-left: 268px;
-        }
-        body.sidebar-collapsed .qc-unified-header {
-            margin-left: -64px;
-            padding-left: 64px;
-        }
-    }
+        /* LARGE DESKTOP: keep same 256/60 — prevents center jump */
+
 </style>
 
 <!-- Overlay -->
