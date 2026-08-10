@@ -60,15 +60,13 @@
         }
         grid.innerHTML = brandData.map(b => {
             const hidden = !!b.is_hidden;
-            return '<div class="rounded-xl border p-4 flex flex-col gap-2 ' + (hidden ? 'bg-gray-50 border-gray-200' : 'border-emerald-200 bg-emerald-50/40') + '">' +
-                '<div class="flex items-center justify-between">' +
-                    '<span class="font-bold text-gray-800 text-sm">' + esc(b.brand) + '</span>' +
-                    '<span class="text-xs px-2 py-0.5 rounded-full ' + (hidden ? 'bg-gray-200 text-gray-600' : 'bg-emerald-100 text-emerald-700') + '">' + (hidden ? 'Hidden' : 'Visible') + '</span>' +
-                '</div>' +
-                '<span class="text-xs text-gray-500">' + (b.product_count || 0) + ' catalog products</span>' +
-                '<div class="flex gap-1.5 mt-1">' +
-                    '<button data-brand="' + esc(b.brand) + '" data-show="1" class="brand-act flex-1 px-2 py-1 rounded-md border text-[11px] font-semibold bg-white hover:bg-emerald-50">Show all</button>' +
-                    '<button data-brand="' + esc(b.brand) + '" data-show="0" class="brand-act flex-1 px-2 py-1 rounded-md border text-[11px] font-semibold bg-white hover:bg-red-50">Hide all</button>' +
+            return '<div class="flex-none w-28 h-28 rounded-xl border flex flex-col items-center justify-between p-2 ' + (hidden ? 'bg-gray-50 border-gray-200' : 'border-emerald-200 bg-emerald-50/40') + '">' +
+                '<span class="text-[11px] font-bold text-gray-800 text-center leading-tight break-words" style="display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;">' + esc(b.brand) + '</span>' +
+                '<span class="text-[10px] text-gray-500">' + (b.product_count || 0) + ' products</span>' +
+                '<span class="text-[9px] px-1.5 py-0.5 rounded-full ' + (hidden ? 'bg-gray-200 text-gray-600' : 'bg-emerald-100 text-emerald-700') + '">' + (hidden ? 'Hidden' : 'Visible') + '</span>' +
+                '<div class="flex gap-1 w-full">' +
+                    '<button data-brand="' + esc(b.brand) + '" data-show="1" class="brand-act flex-1 px-1 py-0.5 rounded text-[9px] font-semibold bg-emerald-100 text-emerald-700 hover:bg-emerald-200">Show</button>' +
+                    '<button data-brand="' + esc(b.brand) + '" data-show="0" class="brand-act flex-1 px-1 py-0.5 rounded text-[9px] font-semibold bg-red-50 text-red-600 hover:bg-red-100">Hide</button>' +
                 '</div>' +
             '</div>';
         }).join('');
