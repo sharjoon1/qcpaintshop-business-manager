@@ -1294,5 +1294,94 @@ router.get('/:id/history', requirePermission('estimates', 'view'), async (req, r
     }
 });
 
+// ========================================
+// CONVERT APPROVED ESTIMATE → BILLING INVOICE (D2 fix)
+// ========================================
+// Before this, an approved estimate had NO path into billing_invoices unless a
+// payment was recorded first (record-payment) — credit customers who accepted an
+// estimate could never be invoiced through this module. This endpoint creates the
+// billing_invoice from the approved estimate with full customer identity, so the
+// billing pipeline (and Zoho push via billing-zoho-service) can take it over.
+router.post('/:id/convert-to-invoice', requirePermission('estimates', 'edit'), async (req, res) => {
+    const conn = await pool.getConnection();
+    try {
+        const estimateId = req.params.id;
+        const [estRows] = await pool.query('SELECT * FROM estimates WHERE id = ?', [estimateId]);
+        if (!estRows.length) return res.status(404).json({ error: 'Estimate not found' });
+        const est = estRows[0];
+        if (!estimateBranchAllowed(req, est.branch_id)) return res.status(403).json({ error: 'Not authorized for this estimate' });
+        if (est.status !== 'approved' && est.status !== 'sent') {
+            return res.status(400).json({ error: 'Estimate must be approved before converting to invoice' });
+        }
+        const [existing] = await pool.query(
+            'SELECT id, invoice_number FROM billing_invoices WHERE estimate_id = ? AND source = ? AND deleted_at IS NULL LIMIT 1',
+            [estimateId, 'estimate']
+        );
+        if (existing.length) {
+            return res.status(400).json({ error: 'Estimate already converted', invoice_id: existing[0].id, invoice_number: existing[0].invoice_number });
+        }
+
+        // Generate BI-YYYYMMDD-NNN (same generator logic as billing.js)
+        const now = new Date();
+        const dateStr = `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}${String(now.getDate()).padStart(2, '0')}`;
+        const [[{ lastNo }]] = await pool.query(
+            `SELECT COALESCE(MAX(CAST(SUBSTRING_INDEX(invoice_number, '-', -1) AS UNSIGNED)), 0) + 1 AS lastNo
+             FROM billing_invoices WHERE invoice_number LIKE ?`,
+            [`BI-${dateStr}-%`]
+        );
+        const invoiceNumber = `BI-${dateStr}-${String(lastNo).padStart(3, '0')}`;
+
+        await conn.beginTransaction();
+
+        const [invResult] = await conn.query(
+            `INSERT INTO billing_invoices
+             (invoice_number, source, estimate_id, customer_type, customer_id,
+              customer_name, customer_phone, customer_address,
+              subtotal, discount_amount, grand_total, amount_paid, balance_due,
+              payment_status, branch_id, created_by)
+             VALUES (?, 'estimate', ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, 'unpaid', ?, ?)`,
+            [
+                invoiceNumber, estimateId,
+                est.customer_id ? 'customer' : 'individual', est.customer_id || null,
+                est.customer_name || 'Walk-in Customer', est.customer_phone || null, est.customer_address || null,
+                est.subtotal || 0, est.discount_amount || 0, est.grand_total || 0,
+                est.grand_total || 0, est.branch_id, req.user.id
+            ]
+        );
+        const invoiceId = invResult.insertId;
+
+        // Copy estimate items → invoice items
+        const [estItems] = await conn.query(
+            'SELECT zoho_item_id, item_name, pack_size, quantity, unit_price, line_total FROM estimate_items WHERE estimate_id = ? AND deleted_at IS NULL',
+            [estimateId]
+        );
+        for (const it of estItems) {
+            await conn.query(
+                `INSERT INTO billing_invoice_items
+                 (invoice_id, zoho_item_id, item_name, pack_size, quantity, unit_price, line_total)
+                 VALUES (?, ?, ?, ?, ?, ?, ?)`,
+                [invoiceId, it.zoho_item_id || null, it.item_name || 'Item', it.pack_size || null,
+                 it.quantity, it.unit_price, it.line_total !== null && it.line_total !== undefined ? it.line_total : (it.quantity * it.unit_price)]
+            );
+        }
+
+        await conn.query("UPDATE estimates SET status = 'converted' WHERE id = ?", [estimateId]);
+        await conn.commit();
+
+        res.status(201).json({
+            success: true,
+            message: 'Estimate converted to invoice',
+            invoice_id: invoiceId,
+            invoice_number: invoiceNumber
+        });
+    } catch (err) {
+        try { await conn.rollback(); } catch (_) { /* already rolled back */ }
+        console.error('Convert estimate to invoice error:', err);
+        res.status(500).json({ error: err.message });
+    } finally {
+        conn.release();
+    }
+});
+
 // Exported for unit testing (pure functions, no DB). See tests/unit/estimate-pricing.test.js
 module.exports = { router, setPool, calculateItemPricing, calculateEstimateTotals };

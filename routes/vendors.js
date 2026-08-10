@@ -1636,6 +1636,49 @@ router.post('/purchase-orders/:id/convert-to-bill',
 
             await pool.query(`UPDATE vendor_purchase_orders SET status = 'received' WHERE id = ?`, [id]);
 
+            // D3 fix: receiving goods must update the local stock cache IMMEDIATELY.
+            // Before this, a PO→bill receipt changed nothing until the next
+            // 4-hourly Zoho stock sync, so the reorder chain kept running on
+            // pre-receipt stock. Only items with a location-attributable PO are
+            // updated (all legacy POs have zoho_location_id NULL — new reorder
+            // POs carry it, see reorder.js create-po).
+            if (po.zoho_location_id) {
+                try {
+                    for (const item of poItems) {
+                        if (!item.zoho_item_id) continue;
+                        const qty = Number(item.quantity) || 0;
+                        if (qty <= 0) continue;
+                        const [stockRows] = await pool.query(
+                            `SELECT id, stock_on_hand, available_stock FROM zoho_location_stock
+                             WHERE zoho_item_id = ? AND zoho_location_id = ? LIMIT 1`,
+                            [item.zoho_item_id, po.zoho_location_id]
+                        );
+                        if (stockRows.length) {
+                            const newStock = (Number(stockRows[0].stock_on_hand) || 0) + qty;
+                            const newAvail = (Number(stockRows[0].available_stock) || 0) + qty;
+                            await pool.query(
+                                `UPDATE zoho_location_stock SET stock_on_hand = ?, available_stock = ?, last_synced_at = NOW()
+                                 WHERE id = ?`,
+                                [newStock, newAvail, stockRows[0].id]
+                            );
+                        } else {
+                            await pool.query(
+                                `INSERT INTO zoho_location_stock
+                                 (zoho_item_id, zoho_location_id, item_name, sku, stock_on_hand, available_stock)
+                                 VALUES (?, ?, ?, ?, ?, ?)
+                                 ON DUPLICATE KEY UPDATE stock_on_hand = stock_on_hand + VALUES(stock_on_hand),
+                                    available_stock = available_stock + VALUES(available_stock)`,
+                                [item.zoho_item_id, po.zoho_location_id, item.item_name || null,
+                                 null, qty, qty]
+                            );
+                        }
+                    }
+                    console.log(`[Vendors] PO ${po.po_number} receipt applied to local stock cache`);
+                } catch (stockErr) {
+                    console.error('[Vendors] PO receipt stock update error:', stockErr.message);
+                }
+            }
+
             res.json({
                 success: true,
                 bill_id: billId,

@@ -630,8 +630,6 @@ async function calculateSalaryForUser(userId, month, calculatedBy) {
     // Leave deduction: excess leaves beyond free quota
     const leaveDeduction = excessLeaves * hourlyRate * WEEKDAY_HOURS_PER_DAY;
 
-    const totalDeductions = lateDeduction + absenceDeduction + leaveDeduction;
-
     // Incentive: sum of approved incentives for this staff+month
     const [incentiveRows] = await pool.query(
         `SELECT COALESCE(SUM(amount), 0) as total_incentive
@@ -640,6 +638,30 @@ async function calculateSalaryForUser(userId, month, calculatedBy) {
         [userId, month]
     );
     const incentiveAmount = parseFloat(incentiveRows[0].total_incentive) || 0;
+
+    // Advance recovery: paid advances whose recovery_month is this month are
+    // deducted from the salary. Idempotent — recovered_amount is advanced after
+    // the salary row is written, so a re-run finds nothing left to recover.
+    const [advanceRows] = await pool.query(
+        `SELECT id, amount, COALESCE(recovered_amount, 0) AS recovered_amount
+         FROM salary_advances
+         WHERE user_id = ? AND status = 'paid' AND recovery_month = ?
+           AND COALESCE(recovered_amount, 0) < amount`,
+        [userId, month]
+    );
+    const advanceOutstanding = advanceRows.reduce(
+        (s, a) => s + (parseFloat(a.amount) - parseFloat(a.recovered_amount)), 0
+    );
+    // Cap the deduction so net pay never goes negative.
+    const grossBeforeDeductions = standardHoursPay + sundayHoursPay + overtimePay
+        + totalAllowances + incentiveAmount;
+    const maxSafeAdvance = Math.max(0, grossBeforeDeductions - (lateDeduction + absenceDeduction + leaveDeduction));
+    const advanceDeduction = Math.min(advanceOutstanding, maxSafeAdvance);
+    const deductionNotes = advanceDeduction > 0
+        ? `Advance recovery (${advanceRows.length} advance${advanceRows.length > 1 ? 's' : ''})`
+        : null;
+
+    const totalDeductions = lateDeduction + absenceDeduction + leaveDeduction + advanceDeduction;
 
     // Upsert salary record atomically — prevents race condition on concurrent calculation requests.
     // Relies on UNIQUE KEY unique_user_month (user_id, salary_month).
@@ -654,9 +676,10 @@ async function calculateSalaryForUser(userId, month, calculatedBy) {
             standard_hours_pay, sunday_hours_pay, overtime_pay,
             transport_allowance, food_allowance, other_allowance, total_allowances,
             incentive_amount,
-            late_deduction, absence_deduction, leave_deduction, total_deductions,
+            late_deduction, absence_deduction, leave_deduction, other_deduction,
+            deduction_notes, total_deductions,
             status, calculation_date, calculated_by
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'calculated', NOW(), ?)
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'calculated', NOW(), ?)
         ON DUPLICATE KEY UPDATE
             branch_id = VALUES(branch_id), from_date = VALUES(from_date), to_date = VALUES(to_date),
             base_salary = VALUES(base_salary),
@@ -676,7 +699,8 @@ async function calculateSalaryForUser(userId, month, calculatedBy) {
             other_allowance = VALUES(other_allowance), total_allowances = VALUES(total_allowances),
             incentive_amount = VALUES(incentive_amount),
             late_deduction = VALUES(late_deduction), absence_deduction = VALUES(absence_deduction),
-            leave_deduction = VALUES(leave_deduction), total_deductions = VALUES(total_deductions),
+            leave_deduction = VALUES(leave_deduction), other_deduction = VALUES(other_deduction),
+            deduction_notes = VALUES(deduction_notes), total_deductions = VALUES(total_deductions),
             status = 'calculated', calculation_date = NOW(), calculated_by = VALUES(calculated_by)`,
         [
             userId, config.branch_id, month, fromDate, toDate, config.monthly_salary,
@@ -690,12 +714,32 @@ async function calculateSalaryForUser(userId, month, calculatedBy) {
             standardHoursPay, sundayHoursPay, overtimePay,
             transportAllowance, foodAllowance, otherAllowance, totalAllowances,
             incentiveAmount,
-            lateDeduction, absenceDeduction, leaveDeduction, totalDeductions,
+            lateDeduction, absenceDeduction, leaveDeduction, advanceDeduction,
+            deductionNotes, totalDeductions,
             calculatedBy
         ]
     );
     // insertId is the existing row's id on UPDATE (MariaDB/MySQL returns last_insert_id = existing id on duplicate)
     const salaryId = upsertResult.insertId;
+
+    // Mark advances as recovered (full or partial) — after the salary row is
+    // safely written, so a failed calculation never loses recovery tracking.
+    if (advanceDeduction > 0 && advanceRows.length > 0) {
+        let remaining = advanceDeduction;
+        for (const adv of advanceRows) {
+            if (remaining <= 0) break;
+            const outstanding = parseFloat(adv.amount) - parseFloat(adv.recovered_amount);
+            const thisRecovery = Math.min(outstanding, remaining);
+            if (thisRecovery <= 0) continue;
+            const newRecovered = parseFloat(adv.recovered_amount) + thisRecovery;
+            const newStatus = newRecovered >= parseFloat(adv.amount) - 0.005 ? 'recovered' : 'paid';
+            await pool.query(
+                `UPDATE salary_advances SET recovered_amount = ?, status = ? WHERE id = ?`,
+                [newRecovered, newStatus, adv.id]
+            );
+            remaining -= thisRecovery;
+        }
+    }
 
     return { salary_id: salaryId, message: 'Salary calculated successfully' };
 }

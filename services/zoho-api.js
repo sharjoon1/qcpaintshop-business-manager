@@ -2219,14 +2219,21 @@ async function checkReorderAlerts() {
     let skipped = 0;
 
     for (const item of lowStockItems) {
-        // Calculate severity
+        // Calculate severity — D9 fix: use the SAME bands as
+        // reorder-compute-service.computeSeverity (ratio ≤0.25 critical,
+        // ≤0.50 high, ≤0.75 medium, else low). Previously this writer used
+        // different thresholds (0/25/50) than the compute service (25/50/75),
+        // so the same stock level got different severities depending on which
+        // engine wrote the alert (alert flapping).
         let severity = 'low';
-        if (item.stock_on_hand <= 0) {
+        const level = Number(item.reorder_level);
+        if (Number(item.stock_on_hand) <= 0) {
             severity = 'critical';
-        } else if (item.stock_on_hand < item.reorder_level * 0.25) {
-            severity = 'high';
-        } else if (item.stock_on_hand < item.reorder_level * 0.50) {
-            severity = 'medium';
+        } else if (level > 0) {
+            const ratio = Number(item.stock_on_hand) / level;
+            if (ratio <= 0.25) severity = 'critical';
+            else if (ratio <= 0.50) severity = 'high';
+            else if (ratio <= 0.75) severity = 'medium';
         }
 
         // Check if active alert already exists

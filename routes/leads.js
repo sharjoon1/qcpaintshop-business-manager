@@ -30,6 +30,45 @@ function setPool(dbPool) {
 // ========================================
 
 /**
+ * Best-effort link a converted lead's local customer to the finance stack.
+ *
+ * D1 fix: before this, converted leads only wrote `customers` — billing/credit/
+ * collections all read `zoho_customers_map`, so the money side never saw the
+ * customer until a lucky Zoho sync matched the phone. Here we try to create the
+ * Zoho contact right away and insert/update the map row with local_customer_id.
+ *
+ * Deliberately non-blocking: any failure (Zoho down, no org id, duplicate) is
+ * logged and swallowed — the hourly syncCustomers matcher remains the fallback.
+ */
+async function linkConvertedLeadToZohoMap(customerId, lead) {
+    try {
+        const zohoAPI = require('../services/zoho-api');
+        if (!zohoAPI || typeof zohoAPI.createContact !== 'function') return;
+        const contactResp = await zohoAPI.createContact({
+            contact_name: lead.name,
+            contact_type: 'customer',
+            email: lead.email || undefined,
+            phone: lead.phone || undefined,
+        });
+        const contactId = contactResp?.contact?.contact_id;
+        if (!contactId) return;
+        await pool.query(
+            `INSERT INTO zoho_customers_map
+                (local_customer_id, zoho_contact_id, zoho_contact_name, zoho_email, zoho_phone)
+             VALUES (?, ?, ?, ?, ?)
+             ON DUPLICATE KEY UPDATE
+                local_customer_id = VALUES(local_customer_id),
+                zoho_contact_name = VALUES(zoho_contact_name),
+                zoho_email = VALUES(zoho_email),
+                zoho_phone = VALUES(zoho_phone)`,
+            [customerId, contactId, lead.name, lead.email || null, lead.phone || null]
+        );
+    } catch (err) {
+        console.warn(`[leads] linkConvertedLeadToZohoMap skipped (${err.message}) — sync fallback will handle`);
+    }
+}
+
+/**
  * Generate a unique lead number in the format LEAD-YYYYMMDD-XXXX
  */
 async function generateLeadNumber() {
@@ -1135,6 +1174,10 @@ router.post('/my/:id/convert', requirePermission('leads', 'own.edit'), async (re
         await connection.commit();
         connection.release();
         connection = null;
+
+        // D1 fix: immediately bridge the new customer into the finance stack
+        // (zoho_customers_map) instead of waiting for a lucky phone/email sync.
+        linkConvertedLeadToZohoMap(customerId, lead).catch(() => {});
 
         // NOTE: Zoho contact is NOT created here. It will be created later
         // when estimate is confirmed and payment is received.
@@ -2475,6 +2518,10 @@ router.post('/:id/convert', requirePermission('leads', 'convert'), async (req, r
         await connection.commit();
         connection.release();
         connection = null;
+
+        // D1 fix: immediately bridge the new customer into the finance stack
+        // (zoho_customers_map) instead of waiting for a lucky phone/email sync.
+        linkConvertedLeadToZohoMap(customerId, lead).catch(() => {});
 
         // NOTE: Zoho contact is NOT created here. It will be created later
         // when estimate is confirmed and payment is received.

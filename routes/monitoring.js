@@ -542,4 +542,52 @@ router.get('/usage', async (req, res) => {
     }
 });
 
+/**
+ * GET /summary — compact system-health snapshot for hub widgets
+ * (admin-system-hub calls this; the route never existed → 404).
+ * Delegates to the /overview data (same collectors) and flattens key facts.
+ */
+router.get('/summary', async (req, res) => {
+    try {
+        const now = new Date();
+        const istNow = now.toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' });
+        const [
+            systemInfo,
+            dbInfo,
+            pm2Info,
+            errorInfo,
+            integrations,
+            backgroundJobs,
+            businessToday,
+            topIssues
+        ] = await Promise.all([
+            getSystemInfo(),
+            getDatabaseInfo(),
+            getPM2Info(),
+            getErrorInfo(),
+            getIntegrationStatus(),
+            getBackgroundJobs(),
+            getBusinessMetrics(),
+            getTopIssues()
+        ]);
+
+        res.json({
+            success: true,
+            data: {
+                ist_time: istNow,
+                server: systemInfo,
+                database: dbInfo,
+                pm2: pm2Info,
+                errors: errorInfo,
+                integrations,
+                background_jobs: backgroundJobs,
+                business_today: businessToday,
+                top_issues: topIssues
+            }
+        });
+    } catch (e) {
+        res.status(500).json({ success: false, message: e.message });
+    }
+});
+
 module.exports = { router, setPool, setAutomationRegistry, setResponseTracker, setProductionMonitor };

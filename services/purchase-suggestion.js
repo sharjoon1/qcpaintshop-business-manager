@@ -36,7 +36,7 @@ async function getConfig() {
         days: parseInt(config.purchase_suggestion_days) || 90,
         multiplier: parseFloat(config.purchase_suggestion_multiplier) || 1.5,
         lowVolumeThreshold: parseInt(config.purchase_suggestion_low_volume_threshold) || 5,
-        branchCount: parseInt(config.purchase_suggestion_branch_count) || 5
+        branchCount: parseInt(config.purchase_suggestion_branch_count) || null
     };
 }
 
@@ -323,10 +323,22 @@ async function runFullCalculation(triggeredBy) {
     }
 
     // 4. Calculate global reorder levels
+    // D5 fix: branchCount now derives from the real number of branches when not
+    // explicitly configured — the old hardcoded 5 silently drifted as branches
+    // changed, skewing global reorder levels.
+    let branchCount = config.branchCount;
+    if (!branchCount) {
+        const [cntRows] = await pool.query(
+            `SELECT COUNT(DISTINCT local_branch_id) AS c FROM zoho_locations_map WHERE local_branch_id IS NOT NULL`
+        ).catch(() => [[]]);
+        const derived = cntRows && cntRows[0] ? parseInt(cntRows[0].c) : null;
+        if (derived && derived > 0) branchCount = derived;
+        else branchCount = 1;
+    }
     const globalLevels = calculateGlobalReorderLevels(salesData, categoryDefs, itemCategories, {
         days: config.days,
         lowVolumeThreshold: config.lowVolumeThreshold,
-        branchCount: config.branchCount
+        branchCount
     });
 
     // 5. Calculate per-branch thresholds

@@ -2109,13 +2109,23 @@ router.post('/me/attendance/check-in', requirePainterAuth, uploadPainterAttendan
             return res.status(400).json({ success: false, message: 'Invalid coordinates' });
         }
 
-        // Check if already checked in today
+        // Check if already checked in today (BOTH tables — legacy painter_attendance
+        // and current painter_attendance_checkins. Without the cross-check a painter
+        // could check in through each endpoint and earn points twice.)
         const [existing] = await pool.query(
             `SELECT id FROM painter_attendance
              WHERE painter_id = ? AND DATE(check_in_at) = CURDATE()`,
             [req.painter.id]
         );
         if (existing.length > 0) {
+            return res.status(400).json({ success: false, message: 'Already checked in today' });
+        }
+        const [existingV2] = await pool.query(
+            `SELECT id FROM painter_attendance_checkins
+             WHERE painter_id = ? AND checkin_date = CURDATE()`,
+            [req.painter.id]
+        );
+        if (existingV2.length > 0) {
             return res.status(400).json({ success: false, message: 'Already checked in today' });
         }
 
@@ -2306,6 +2316,19 @@ router.post('/me/attendance/checkin', requirePainterAuth, uploadPainterAttendanc
             return res.status(409).json({
                 code: 'ALREADY_CHECKED_IN',
                 existing_checkin: dup[0],
+                error: 'Already checked in today'
+            });
+        }
+        // Cross-guard: also reject if the painter checked in via the legacy
+        // painter_attendance endpoint today (kills the double-earn hole).
+        const [dupLegacy] = await pool.query(
+            `SELECT id FROM painter_attendance
+             WHERE painter_id = ? AND DATE(check_in_at) = CURDATE()`,
+            [painterId]
+        );
+        if (dupLegacy.length > 0) {
+            return res.status(409).json({
+                code: 'ALREADY_CHECKED_IN',
                 error: 'Already checked in today'
             });
         }

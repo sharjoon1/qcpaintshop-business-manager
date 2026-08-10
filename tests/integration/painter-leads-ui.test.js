@@ -106,10 +106,10 @@ describe('admin painter-leads dashboard (UI)', () => {
         expect(authGateMatches.length).toBeGreaterThanOrEqual(1);
     });
 
-    test('HTML page matches admin purple theme tokens', () => {
-        // The admin color tokens are #667eea → #764ba2.
-        expect(html).toMatch(/#667eea/);
-        expect(html).toMatch(/#764ba2/);
+    test('HTML page matches admin navy theme tokens', () => {
+        // The admin color tokens are now QC navy #0F3A5F (was purple #667eea/#764ba2
+        // before commit f6c0843 — the test was stale after that theme migration).
+        expect(html).toMatch(/#0F3A5F/);
     });
 
     test('HTML page links the controller script', () => {

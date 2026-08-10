@@ -1045,15 +1045,23 @@ router.post('/adjust/:id', requirePermission('zoho', 'stock_check'), idempotent(
             }
         }
 
-        // Also update zoho_location_stock cache with live values we fetched
+        // Also update zoho_location_stock cache — CRITICAL: write the POST-adjustment
+        // stock (the reported physical count), NOT the pre-adjustment live value.
+        // Before this fix the cache kept the pre-adjustment number, so every discrepant
+        // item left the reorder chain reading stale stock until the next sync.
         for (const item of items) {
-            if (item.current_system_qty !== null && item.current_system_qty !== undefined) {
-                await pool.query(
-                    `UPDATE zoho_location_stock SET stock_on_hand = ?, available_stock = ?, last_synced_at = NOW()
-                     WHERE zoho_item_id = ? AND zoho_location_id = ?`,
-                    [item.current_system_qty, item.current_system_qty, item.zoho_item_id, locationId]
-                );
-            }
+            if (item.current_system_qty === null || item.current_system_qty === undefined) continue;
+            // Zoho-rejected items: stock did not change, keep the fetched live value.
+            // Successfully adjusted items: stock now equals the physical count reported.
+            const postQty = failedIds.has(item.id)
+                ? parseFloat(item.current_system_qty)
+                : parseFloat(item.reported_qty);
+            if (postQty === null || postQty === undefined || isNaN(postQty)) continue;
+            await pool.query(
+                `UPDATE zoho_location_stock SET stock_on_hand = ?, available_stock = ?, last_synced_at = NOW()
+                 WHERE zoho_item_id = ? AND zoho_location_id = ?`,
+                [postQty, postQty, item.zoho_item_id, locationId]
+            );
         }
 
         const adjustmentId = adjustmentIds.length ? adjustmentIds.join(',') : null;

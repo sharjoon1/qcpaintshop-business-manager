@@ -1032,6 +1032,47 @@ app.get('/api/users', requirePermission('staff', 'view'), async (req, res) => {
     }
 });
 
+// /api/staff — alias for /api/users used by admin-geofence-logs (and future
+// hub widgets). Returns {success, data:[{id, full_name, role, phone}]}.
+app.get('/api/staff', requirePermission('staff', 'view'), async (req, res) => {
+    try {
+        const { role } = req.query;
+        let query = `SELECT id, full_name, username, role, phone, branch_id, status FROM users WHERE 1=1`;
+        const params = [];
+        if (role) { query += ' AND role = ?'; params.push(role); }
+        query += ' AND status = ? ORDER BY full_name';
+        params.push('active');
+        const [rows] = await pool.query(query, params);
+        res.json({ success: true, data: rows });
+    } catch (err) {
+        res.status(500).json({ success: false, error: err.message });
+    }
+});
+
+// /api/whatsapp/status + /api/wa/status — admin WhatsApp session status for
+// hub widgets (admin-growth-hub). Both aliases were called by the frontend but
+// had no backend route. Shape matches what whatsapp-sessions returns.
+app.get(['/api/whatsapp/status', '/api/wa/status'], requireAuth, async (req, res) => {
+    try {
+        let status = { status: 'disconnected', phone_number: null, has_qr: false };
+        try {
+            const s = whatsappSessionManager.getBranchStatus(-1);
+            if (s) status = s;
+        } catch (e) { /* session manager may not be initialized */ }
+        res.json({
+            success: true,
+            data: {
+                status: status.status || 'disconnected',
+                connected: status.status === 'connected',
+                phone: status.phone_number || null,
+                has_qr: !!status.has_qr
+            }
+        });
+    } catch (err) {
+        res.status(500).json({ success: false, error: err.message });
+    }
+});
+
 app.get('/api/users/:id', requireAuth, async (req, res) => {
     try {
         // Staff can only view their own profile; admin/manager can view any

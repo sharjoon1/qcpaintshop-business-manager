@@ -657,18 +657,36 @@ async function processWithdrawal(withdrawalId, action, adminId, paymentRef, note
     if (!withdrawal.length) throw new Error('Withdrawal not found');
 
     const w = withdrawal[0];
-    if (w.status !== 'pending') throw new Error(`Withdrawal already ${w.status}`);
 
-    if (action === 'approve' || action === 'paid') {
-        // Deduct points
-        await deductPoints(w.painter_id, w.pool, parseFloat(w.amount), 'withdrawal',
-            String(w.id), 'withdrawal', `Withdrawal #${w.id} ${action}d`, adminId);
-
+    if (action === 'approve') {
+        // Approval is a HOLD — points are NOT deducted until money actually moves
+        // (action='paid'). Previously approval deducted immediately, which left
+        // painters out of points when a payout never happened, and made the
+        // approved → paid transition impossible.
+        if (w.status !== 'pending') throw new Error(`Withdrawal already ${w.status}`);
+        await pool.query(
+            'UPDATE painter_withdrawals SET status = ?, processed_by = ?, processed_at = NOW(), notes = ? WHERE id = ?',
+            ['approved', adminId, notes || null, withdrawalId]
+        );
+    } else if (action === 'paid') {
+        if (w.status !== 'pending' && w.status !== 'approved') throw new Error(`Withdrawal already ${w.status}`);
+        // Deduct points ONLY on paid. Idempotency guard: withdrawals approved under
+        // the OLD logic (points deducted at approval) must not be deducted twice.
+        const [tx] = await pool.query(
+            `SELECT id FROM painter_point_transactions
+             WHERE painter_id = ? AND source = 'withdrawal' AND reference_id = ? LIMIT 1`,
+            [w.painter_id, String(w.id)]
+        );
+        if (tx.length === 0) {
+            await deductPoints(w.painter_id, w.pool, parseFloat(w.amount), 'withdrawal',
+                String(w.id), 'withdrawal', `Withdrawal #${w.id} paid`, adminId);
+        }
         await pool.query(
             'UPDATE painter_withdrawals SET status = ?, processed_by = ?, processed_at = NOW(), payment_reference = ?, notes = ? WHERE id = ?',
-            [action === 'paid' ? 'paid' : 'approved', adminId, paymentRef || null, notes || null, withdrawalId]
+            ['paid', adminId, paymentRef || null, notes || null, withdrawalId]
         );
     } else if (action === 'reject') {
+        if (w.status !== 'pending' && w.status !== 'approved') throw new Error(`Withdrawal already ${w.status}`);
         await pool.query(
             'UPDATE painter_withdrawals SET status = "rejected", processed_by = ?, processed_at = NOW(), notes = ? WHERE id = ?',
             [adminId, notes || null, withdrawalId]
