@@ -1,0 +1,152 @@
+[
+ {
+  "name": "CS101 - STYLE COLOR SMART - INTERIOR EMULSION - Birla Opus - 01 L",
+  "sku": "CS101",
+  "series": "STYLE COLOR SMART",
+  "base": "CS1"
+ },
+ {
+  "name": "CSWT01 - STYLE COLOR SMART - INTERIOR EMULSION - Birla Opus - 01 L",
+  "sku": "CSWT01",
+  "series": "STYLE COLOR SMART",
+  "base": "CSWT"
+ },
+ {
+  "name": "CSS9901 - STYLE COLOR SMART SHINE - INTERIOR EMULSION - Birla Opus - 01 L",
+  "sku": "CSS9901",
+  "series": "STYLE COLOR SMART SHINE",
+  "base": "CSS99"
+ },
+ {
+  "name": "CF1304 - STYLE COLOR FRESH - INTERIOR EMULSION - Birla Opus - 04 L",
+  "sku": "CF1304",
+  "series": "STYLE COLOR FRESH",
+  "base": "CF13"
+ },
+ {
+  "name": "PBWT20 - STYLE POWER BRIGHT - EXTERIOR EMULSION - Birla Opus - 20 L",
+  "sku": "PBWT20",
+  "series": "STYLE POWER BRIGHT",
+  "base": "PBWT"
+ },
+ {
+  "name": "NS120 - CALISTA NEO STAR - EXTERIOR EMULSION - Birla Opus - 20 L",
+  "sku": "NS120",
+  "series": "CALISTA NEO STAR",
+  "base": "NS1"
+ },
+ {
+  "name": "PWP01 - CALISTA PRO WHITE PRIMER - INTERIOR PRIMER - Birla Opus - 01 L",
+  "sku": "PWP01",
+  "series": "CALISTA PRO WHITE PRIMER",
+  "base": "PWP"
+ },
+ {
+  "name": "BS01 - N ANTIDUST EMULSION - INTERIOR EMULSION - Berger Paints - 01 L",
+  "sku": "",
+  "series": "ANTIDUST EMULSION",
+  "base": "N"
+ },
+ {
+  "name": "BS04 - N1 FEASY CLEAN FRESH EMULSION - INTERIOR EMULSION - Berger Paints - 04 L",
+  "sku": "",
+  "series": "FEASY CLEAN FRESH EMULSION",
+  "base": "N1"
+ },
+ {
+  "name": "BSGWN204L - N2 BISON GLOW EMULSION - INTERIOR EMULSION - Berger Paints - 04 L",
+  "sku": "BSGWN204L",
+  "series": "BISON GLOW EMULSION",
+  "base": "N2"
+ },
+ {
+  "name": "BSGWPO10L - PO BISON GLOW EMULSION - INTERIOR EMULSION - Berger Paints - 10 L",
+  "sku": "BSGWPO10L",
+  "series": "BISON GLOW EMULSION",
+  "base": "PO"
+ },
+ {
+  "name": "BSGWY01L - BISON GLOW EMULSION - INTERIOR EMULSION - Berger Paints - 01 L",
+  "sku": "BSGWY01L",
+  "series": "BISON GLOW EMULSION",
+  "base": null
+ },
+ {
+  "name": "BSNLTWT04L - BISON LITE - INTERIOR EMULSION - Berger Paints - 04 L",
+  "sku": "BSNLTWT04L",
+  "series": "BISON LITE",
+  "base": null
+ },
+ {
+  "name": "BS20 - EASY CLEAN FRESH INTERIOR EMULSION - Berger Paints - 20 L",
+  "sku": "",
+  "series": "EASY CLEAN FRESH INTERIOR EMULSION",
+  "base": null
+ },
+ {
+  "name": "ACCENT - HERO PREMIUM INT EMULSION - INTERIOR EMULSION - Shalimar Paints - 04L",
+  "sku": "",
+  "series": "ACCENT",
+  "base": "HERO PREMIUM INT EMULSION"
+ },
+ {
+  "name": "ACCENT - NO 1 SILK INT EMULSION - INTERIOR EMULSION - Shalimar Paints - 01L",
+  "sku": "",
+  "series": "ACCENT",
+  "base": "NO 1 SILK INT EMULSION"
+ },
+ {
+  "name": "ACCENT - SUPER SHAKTIMAN EXT EMULSION - EXTERIOR EMULSION - Shalimar Paints - 10L",
+  "sku": "",
+  "series": "ACCENT",
+  "base": "SUPER SHAKTIMAN EXT EMULSION"
+ },
+ {
+  "name": "ADALM01 - DSE ALUMINIUM ENAMEL - Addisons - 01L",
+  "sku": "ADALM01",
+  "series": "DSE ALUMINIUM ENAMEL",
+  "base": null
+ },
+ {
+  "name": "GEM01 - BLACK ENAMEL - Astral Paints - 01L",
+  "sku": "GEMBL01",
+  "series": "BLACK ENAMEL",
+  "base": null
+ },
+ {
+  "name": "BDR01 - BLACK EMULSION - EXTERIOR EMULSION - Crizon - 01 L",
+  "sku": "",
+  "series": "BLACK EMULSION",
+  "base": null
+ },
+ {
+  "name": "APTY01 - WALL PUTTY - Generic - 01 KG",
+  "sku": "",
+  "series": "WALL PUTTY",
+  "base": null
+ },
+ {
+  "name": "WP01 - 101 LW+ - WATER PROOFING - DR FIXIT - 01 KG",
+  "sku": "",
+  "series": "101 LW+",
+  "base": null
+ },
+ {
+  "name": "AP - ACE EXT EML AC17 3.6 LT -OWN - EXTERIOR EMULSION - Asian Paints - Nos",
+  "sku": "00519288237-OWN",
+  "series": "ACE EXT EML AC17",
+  "base": null
+ },
+ {
+  "name": "AP - APEX ULTIMA HQ17 900 ML -OWN - EXTERIOR EMULSION - Asian Paints - Nos",
+  "sku": "",
+  "series": "APEX ULTIMA HQ17",
+  "base": null
+ },
+ {
+  "name": "APCO - ADV GL ENL OX BLUE 1 LTR -OWN - ENAMEL - Asian Paints - Nos",
+  "sku": "",
+  "series": "ADV GL ENL OX BLUE",
+  "base": null
+ }
+]

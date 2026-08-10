@@ -3042,12 +3042,13 @@ router.get('/admin/catalog/products', requireAuth, requirePermission('painters',
         if (category) { filters.push('TRIM(zim.zoho_category_name) = ?'); params.push(category); }
         const where = filters.length ? ('AND ' + filters.join(' AND ')) : '';
         const [rows] = await pool.query(`
-            SELECT p.id AS product_id, p.name,
+            SELECT p.id AS product_id, p.name, p.product_type, p.main_base_key,
                    MAX(TRIM(zim.zoho_brand))         AS brand,
                    MAX(TRIM(zim.zoho_category_name)) AS category,
                    COALESCE(po.sort_order, 999) AS sort_order,
                    COALESCE(po.is_hidden, 0)    AS is_hidden,
-                   COUNT(DISTINCT ps.id) AS variant_count
+                   COUNT(DISTINCT ps.id) AS variant_count,
+                   GROUP_CONCAT(DISTINCT ps.base_key ORDER BY ps.base_key SEPARATOR ',') AS base_keys
               FROM products p
               JOIN pack_sizes ps ON ps.product_id = p.id AND ps.is_active = 1
               JOIN zoho_items_map zim ON zim.zoho_item_id = ps.zoho_item_id
@@ -3055,9 +3056,10 @@ router.get('/admin/catalog/products', requireAuth, requirePermission('painters',
               LEFT JOIN painter_catalog_product_order po ON po.product_id = p.id
              WHERE p.status = 'active'
                ${where}
-             GROUP BY p.id, p.name, po.sort_order, po.is_hidden
+             GROUP BY p.id, p.name, p.product_type, p.main_base_key, po.sort_order, po.is_hidden
              ORDER BY brand ASC, category ASC, sort_order ASC, p.name ASC
         `, params);
+        res.json({ success: true, products: rows.map(r => ({ ...r, base_keys: r.base_keys ? r.base_keys.split(',') : [] })) });
         res.json({ success: true, products: rows });
     } catch (e) {
         console.error('GET /admin/catalog/products:', e);
@@ -3088,6 +3090,38 @@ router.put('/admin/catalog/products/order', requireAuth, requirePermission('pain
         res.json({ success: true, updated: items.length });
     } catch (e) {
         console.error('PUT /admin/catalog/products/order:', e);
+        res.status(500).json({ success: false, message: e.message });
+    }
+});
+
+// Set the main (catalog-visible) tint base for a product. NULL clears the
+// override so every pack size shows again (default behaviour).
+router.put('/admin/catalog/products/main-base', requireAuth, requirePermission('painters', 'manage'), async (req, res) => {
+    try {
+        const productId = parseInt(req.body && req.body.product_id, 10);
+        const mainBaseKey = (req.body && req.body.main_base_key != null)
+            ? String(req.body.main_base_key).trim() : null;
+        if (!productId) {
+            return res.status(400).json({ success: false, message: 'product_id required' });
+        }
+        if (mainBaseKey !== null) {
+            const [rows] = await pool.query(
+                `SELECT DISTINCT ps.base_key FROM pack_sizes ps
+                 WHERE ps.product_id = ? AND ps.is_active = 1 AND ps.base_key IS NOT NULL`,
+                [productId]
+            );
+            const valid = rows.map(r => r.base_key);
+            if (!valid.includes(mainBaseKey)) {
+                return res.status(400).json({
+                    success: false,
+                    message: `main_base_key '${mainBaseKey}' is not a base of this product (${valid.join(', ') || 'none'})`
+                });
+            }
+        }
+        await pool.query('UPDATE products SET main_base_key = ? WHERE id = ?', [mainBaseKey, productId]);
+        res.json({ success: true, product_id: productId, main_base_key: mainBaseKey });
+    } catch (e) {
+        console.error('PUT /admin/catalog/products/main-base:', e);
         res.status(500).json({ success: false, message: e.message });
     }
 });

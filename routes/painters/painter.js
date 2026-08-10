@@ -1444,6 +1444,7 @@ router.get('/me/catalog', requirePainterAuth, async (req, res) => {
         const joins = `
             FROM products p
             INNER JOIN pack_sizes ps ON ps.product_id = p.id AND ps.is_active = 1
+                AND (p.main_base_key IS NULL OR ps.base_key = p.main_base_key OR ps.base_key IS NULL)
             INNER JOIN zoho_items_map zim ON zim.zoho_item_id = ps.zoho_item_id
                 AND (zim.zoho_status = 'active' OR zim.zoho_status IS NULL)
             ${catalogJoins}
@@ -1520,6 +1521,7 @@ router.get('/me/catalog', requirePainterAuth, async (req, res) => {
                     WHERE zls.zoho_item_id IN (
                         SELECT ps3.zoho_item_id FROM pack_sizes ps3
                         WHERE ps3.product_id = p.id AND ps3.is_active = 1
+                          AND (p.main_base_key IS NULL OR ps3.base_key = p.main_base_key OR ps3.base_key IS NULL)
                     )) > 0
             ) as stock_filtered`;
         }
@@ -1536,6 +1538,7 @@ router.get('/me/catalog', requirePainterAuth, async (req, res) => {
                     WHERE zls.zoho_item_id IN (
                         SELECT ps3.zoho_item_id FROM pack_sizes ps3
                         WHERE ps3.product_id = p.id AND ps3.is_active = 1
+                          AND (p.main_base_key IS NULL OR ps3.base_key = p.main_base_key OR ps3.base_key IS NULL)
                     )) as total_stock,
                    COUNT(DISTINCT ps.id) as variant_count,
                    MAX(TRIM(zim.zoho_brand))         as brand,
@@ -1560,6 +1563,7 @@ router.get('/me/catalog', requirePainterAuth, async (req, res) => {
                 WHERE zls.zoho_item_id IN (
                     SELECT ps3.zoho_item_id FROM pack_sizes ps3
                     WHERE ps3.product_id = p.id AND ps3.is_active = 1
+                      AND (p.main_base_key IS NULL OR ps3.base_key = p.main_base_key OR ps3.base_key IS NULL)
                 )) > 0` : ''}
             ORDER BY _brand_sort ASC, brand ASC,
                      _cat_sort   ASC, category ASC,
@@ -1612,10 +1616,12 @@ router.get('/me/catalog', requirePainterAuth, async (req, res) => {
                        ppr.regular_points_per_unit AS regular_points,
                        ppr.annual_eligible, ppr.annual_pct
                 FROM pack_sizes ps
+                INNER JOIN products pv ON pv.id = ps.product_id
                 INNER JOIN zoho_items_map zim ON zim.zoho_item_id = ps.zoho_item_id
                 LEFT JOIN painter_product_point_rates ppr
                     ON ppr.item_id = zim.zoho_item_id COLLATE utf8mb4_unicode_ci
                 WHERE ps.product_id IN (?) AND ps.is_active = 1
+                  AND (pv.main_base_key IS NULL OR ps.base_key = pv.main_base_key OR ps.base_key IS NULL)
                 ORDER BY ps.product_id, CAST(ps.size AS DECIMAL(10,2))
             `, [productIds]);
             // Build product-id -> {brand, category} lookup for per-variant override resolution
@@ -1729,11 +1735,13 @@ router.get('/me/catalog/:productId', requirePainterAuth, async (req, res) => {
                    zim.image_url,
                    ppr.regular_points_per_unit as points_per_unit, ppr.annual_eligible, ppr.annual_pct
             FROM pack_sizes ps
+            INNER JOIN products pv ON pv.id = ps.product_id
             INNER JOIN zoho_items_map zim ON zim.zoho_item_id = ps.zoho_item_id
                 AND (zim.zoho_status = 'active' OR zim.zoho_status IS NULL)
             LEFT JOIN painter_product_point_rates ppr
                 ON ppr.item_id = zim.zoho_item_id COLLATE utf8mb4_unicode_ci
             WHERE ps.product_id = ? AND ps.is_active = 1
+              AND (pv.main_base_key IS NULL OR ps.base_key = pv.main_base_key OR ps.base_key IS NULL)
             ORDER BY CAST(ps.size AS DECIMAL(10,2)) ASC
         `, [productId]);
 
@@ -1924,6 +1932,7 @@ router.get('/me/offer-products', requirePainterAuth, async (req, res) => {
                     ORDER BY CAST(ps6.size AS DECIMAL(10,2)) DESC LIMIT 1) as max_variant_size
             FROM products p
             INNER JOIN pack_sizes ps ON ps.product_id = p.id AND ps.is_active = 1
+                AND (p.main_base_key IS NULL OR ps.base_key = p.main_base_key OR ps.base_key IS NULL)
             INNER JOIN zoho_items_map zim ON zim.zoho_item_id = ps.zoho_item_id
                 AND (zim.zoho_status = 'active' OR zim.zoho_status IS NULL)
             LEFT JOIN painter_product_point_rates ppr

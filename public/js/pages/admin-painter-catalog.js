@@ -1,10 +1,13 @@
 // Painter Catalog Curation — admin controls which products appear in the
 // painter app catalog. Uses the existing painter_catalog_* endpoints:
 //   GET /api/painters/admin/catalog/brands      -> { success, brands:[{brand,sort_order,is_hidden,product_count}] }
-//   GET /api/painters/admin/catalog/products    -> { success, products:[{product_id,name,brand,category,sort_order,is_hidden,variant_count}] }
+//   GET /api/painters/admin/catalog/products    -> { success, products:[{product_id,name,brand,category,sort_order,is_hidden,variant_count,main_base_key,base_keys[]}] }
 //   PUT /api/painters/admin/catalog/brands/order    { items:[{brand,sort_order,is_hidden}] }
 //   PUT /api/painters/admin/catalog/products/order  { items:[{product_id,sort_order,is_hidden}] }
-// Everything starts hidden; the owner un-hides products per brand.
+//   PUT /api/painters/admin/catalog/products/main-base { product_id, main_base_key|null }
+// Everything starts hidden; the owner un-hides products per brand. Products with
+// multiple tint bases (emulsions) show a "Main base" picker — the painter catalog
+// then displays only that base's pack sizes.
 
 (function () {
     'use strict';
@@ -111,17 +114,52 @@
         $('#prodEmpty').classList.toggle('hidden', productData.length > 0);
         tb.innerHTML = productData.map(p => {
             const checked = !p.is_hidden;
-            return '<tr class="border-t">' +
+            const bases = p.product_type === 'area_wise' ? (p.base_keys || []).filter(Boolean) : [];
+            const multiBase = bases.length > 1;
+            const mainSel = multiBase
+                ? '<div class="flex items-center gap-1.5 mt-1.5">' +
+                    '<span class="text-[10px] uppercase tracking-wide text-gray-400">Main base</span>' +
+                    '<select data-mainbase="' + p.product_id + '" class="text-[11px] border border-gray-300 rounded-md px-1.5 py-0.5 bg-white">' +
+                        '<option value="">All bases</option>' +
+                        bases.map(b => '<option value="' + esc(b) + '"' + (p.main_base_key === b ? ' selected' : '') + '>' + esc(b) + '</option>').join('') +
+                    '</select>' +
+                  '</div>'
+                : '';
+            const baseChips = bases.length
+                ? '<div class="flex flex-wrap gap-1 mt-1">' + bases.map(b =>
+                    '<span class="text-[10px] px-1.5 py-0.5 rounded ' + (p.main_base_key === b ? 'bg-[#0F3A5F] text-white' : 'bg-gray-100 text-gray-500') + '">' + esc(b) + '</span>').join('') + '</div>'
+                : '';
+            return '<tr class="border-t align-top">' +
                 '<td class="p-2"><input type="checkbox" data-pid="' + p.product_id + '" ' + (checked ? 'checked' : '') + ' class="w-4 h-4 accent-[#0F3A5F]"></td>' +
-                '<td class="p-2 font-medium text-gray-800">' + esc(p.name) + '</td>' +
+                '<td class="p-2 font-medium text-gray-800">' + esc(p.name) + baseChips + mainSel + '</td>' +
                 '<td class="p-2 text-xs text-gray-500">' + esc(p.category || '—') + '</td>' +
                 '<td class="p-2 text-right text-xs text-gray-500">' + (p.variant_count || 0) + '</td>' +
             '</tr>';
         }).join('');
+        tb.querySelectorAll('select[data-mainbase]').forEach(sel => {
+            sel.addEventListener('change', () => setMainBase(parseInt(sel.dataset.mainbase, 10), sel.value));
+        });
         $('#prodCount').textContent = productData.length + ' shown';
         tb.querySelectorAll('input[type=checkbox]').forEach(cb => {
             cb.addEventListener('change', () => markDirty('Product visibility changed — save to apply'));
         });
+    }
+
+    // Set the main (catalog-visible) tint base for a product; '' clears it.
+    async function setMainBase(productId, baseKey) {
+        try {
+            const j = await api(API + '/products/main-base', {
+                method: 'PUT',
+                body: JSON.stringify({ product_id: productId, main_base_key: baseKey || null })
+            });
+            if (j.success) {
+                markDirty('Main base updated for #' + productId + ' — save to apply');
+                loadProducts();
+            }
+        } catch (e) {
+            alert('Failed to set main base: ' + e.message);
+            loadProducts();
+        }
     }
 
     function collectProducts() {
