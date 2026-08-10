@@ -90,6 +90,31 @@ function parseBase(itemName, sku, brand) {
     const parts = splitDashed(name);
     const b = String(brand || '').trim().toUpperCase();
     const code = String(sku || '').trim().toUpperCase();
+    // ── Legacy non-dashed names (pre-normalization leftovers):
+    //    "100 AJAX PAPER", "AF01 ANTIFOULING ADDISONS 01L", "ARALDITE 10GM"
+    //    → strip a leading size ("100 ") or SKU code ("AF01 "), then a trailing
+    //    size (" 10GM", " 01L") to recover the series.
+    if (!parts) {
+        let nm = name;
+        const sizeRe = /(\d+(?:\.\d+)?)\s*(L|LT|LTR|LITRE|LITRES|LITER|LITERS|KG|KGS|GM|G|GRAMS|ML|M|PC|PCS|PIECES|NOS|GM)\b/i;
+        const m = nm.match(sizeRe);
+        let series = nm;
+        if (m) {
+            const idx = m.index;
+            series = (nm.slice(0, idx) + ' ' + nm.slice(idx + m[0].length)).trim();
+        }
+        // strip leading size ("100 AJAX PAPER" -> "AJAX PAPER")
+        series = series.replace(/^\d+(?:\.\d+)?\s+/, '');
+        // strip leading SKU-like code ("AF01 ANTIFOULING..." -> "ANTIFOULING...")
+        series = series.replace(/^[A-Z]{2,8}\d{1,4}\s+/i, '');
+        series = series.trim();
+        // services / labour are not products
+        if (/\b(WORK|SERVICE|LABOUR|LABOR|CHARGES|FITTING)\b/i.test(series)) {
+            return { series: null, baseKey: null };
+        }
+        return { series: series || null, baseKey: null };
+    }
+
 
     // ── Birla Opus: "CS101 - STYLE COLOR SMART - INTERIOR EMULSION - Birla Opus - 01 L"
     if (b.indexOf('BIRLA') !== -1) {
@@ -113,6 +138,10 @@ function parseBase(itemName, sku, brand) {
     // ── Shalimar: "ACCENT - HERO PREMIUM INT EMULSION - INTERIOR EMULSION - Shalimar Paints - 04L"
     if (b.indexOf('SHALIMAR') !== -1) {
         if (parts && parts.length >= 2) {
+            // "AF01 - ANTIFOULING - MARINE - Shalimar Paints - 01L": parts[0] is a SKU code
+            if (/^[A-Z]{2,6}\d{1,4}$/i.test(parts[0])) {
+                return { series: parts[1], baseKey: null };
+            }
             return { series: parts[0], baseKey: parts[1] };
         }
         return { series: null, baseKey: null };
@@ -138,6 +167,20 @@ function parseBase(itemName, sku, brand) {
 
     // ── Generic fallback (enamels / stainers / colours / tools): no base grouping
     if (parts && parts.length >= 2) {
+        // "AMBER - BLACK - STAINER - Generic - 100G" / "SPRAY - BLUE - SPECIALITY COATS - Generic - 450ML"
+        // parts[1] must be a colour word (letters only) — "WP01 - 101 LW+ - WATER PROOFING" is an SKU+product
+        if (parts.length >= 4 && /^[A-Za-z][A-Za-z .\-]*$/.test(parts[1] || '') && /^(STAINER|ENAMEL|COLOURANT|DISTEMPER|TOOLS|ACCESSORIES|SPECIALITY(\s+COATS?)?|FLOOR(\s+COATS?)?|GENERAL|WATER(\s+PROOFING)?)$/i.test(parts[2] || '')) {
+            return { series: `${parts[0]} ${parts[1]}`.trim(), baseKey: null };
+        }
+        // "OXIDE - BLACK - Generic - 100G" → brand sits at parts[2]
+        // (only when parts[0] is a real range word, not an SKU code like "ADALM01")
+        if (parts.length >= 4 && !/^[A-Z]{2,8}\d/i.test(parts[0] || '') && /(paints|opus|addisons|astral|crizon|fixit|nippon|shalimar|berger|asian|generic)$/i.test(parts[2] || '')) {
+            return { series: `${parts[0]} ${parts[1]}`.trim(), baseKey: null };
+        }
+        // "FLOOR COAT TERRACOTTA EMULSION - Crizon - 04L" → brand sits at parts[1]
+        if (parts.length === 3 && /(paints|opus|addisons|astral|crizon|fixit|nippon|shalimar|berger|asian|generic)$/i.test(parts[1] || '')) {
+            return { series: parts[0], baseKey: null };
+        }
         return { series: parts.length >= 3 ? parts[1] : parts[0], baseKey: null };
     }
     return { series: null, baseKey: null };
@@ -160,7 +203,19 @@ const PRODUCT_KEYWORD = new RegExp(
     'HQ20N|HQ2N|AS11|AS22|SN3|SN21|UP20|AV6|' +
     'BLADE|TRAY|STENCIL|HANDLE|POWDER|KAVY|GERMAN|ORDINARY|SURYA|VANAVIL|ROBIN|OXIDE|' +
     'CHALK|CLOTH|COLOUR|PLASTIC|MASKING|TERMINATOR|FEVICOL|ARALDITE|POP|MAHALASA|' +
-    'BITUCOAT|HEAT|GAURD|GUARD|KRACK|MULTI|BRUSH',
+    'BITUCOAT|HEAT|GAURD|GUARD|KRACK|MULTI|BRUSH|AJAX|ROLLER|SCRAPPER|SPONG|ROUND|' +
+    'PADMASHRI|K2|HERO|BITU|ORDINARY|SURYA|VANAVIL|ROBIN|KAVY|GERMAN|CEM|HAPPY|' +
+    'FEASY|WALMASTA|TILE|GROUT|FLEX|RANGOLI|BISON|SMOOTH|ANTIDUST|LONG LIFE|' +
+    'EPOXY|ALUMINIUM|COPPER|BRASS|STEEL|ZINC|ANTIFOULING|CRACK|REPAIR|MASTER|' +
+    'SEAL|WATERPROOF|DAMP|STOP|GUARD|COAT|PRIMER|PUTTY|MELAMINE|FEVICOL|WASTE|' +
+    'CAP|CLOTH|GERMAN|KAVY|SURYA|POWDER|BLADE|STENCIL|HANDLE|TRAY|STICK|KIT|TAPE|' +
+    'METAL|METALLIC|OXIDE|TERRACOTTA|P.C.|HAMMER|TEXTURE|PU|POLY|NC|EPOXY|' +
+    'AMBER|MTC|DSE|SPRAY|OXIDE|ROBIN|SURYA|VANAVIL|GERMAN|KAVY|ORDINARY|MAHALASA|' +
+    'FEVICOL|DDL|ARALDITE|POP|K2|HERO|TILE|CAP|CLOTH|CHALK|PLASTIC|MASKING|' +
+    'COMBO|SPONG|ROUND|SCRAPPER|PADMASHRI|TERMINATOR|BITUCOAT|GROUT|CEM|' +
+    'ANTIFOULING|FEASY|HAPPY|PPG|SUPREMA|INTERTHANE|PIDIFIN|CRIZION|BORDER|' +
+    'APTE22N|SH13|TRACTOREMUL|TESHYNE|LW\+|URP|101|301|112|SUPER POWER|' +
+    'STAINER|BOARD|ENAMEL|EPOXY|PPG|SUPREMA',
     'i'
 );
 
@@ -193,6 +248,8 @@ function isSeriesConfident(series, brand) {
         if (s.length < 2) return false;
         return !BASE_CODE_ONLY.test(s);
     }
+    // Asian product codes after size-strip ("APTE22N", "SH13", "SUPREMA" colours) are real
+    if (b.indexOf('ASIAN') !== -1) return s.length >= 4;
     if (s.length < 3) return false;
     return PRODUCT_KEYWORD.test(s);
 }
