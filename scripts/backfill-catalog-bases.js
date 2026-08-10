@@ -220,6 +220,14 @@ function isAreaWise(productName, categoryName) {
             const hit = seriesToProduct.get(key);
             if (hit) productId = hit.product_id;
         }
+        // Remember this resolution so later items of the same series merge too
+        if (productId && info.series) {
+            const key = `${info.series}|||${info.brand}|||${info.category}`;
+            const cur = seriesToProduct.get(key);
+            if (!cur || cur.product_id !== productId) {
+                seriesToProduct.set(key, { product_id: productId, count: (cur ? cur.count : 0) + 1 });
+            }
+        }
         if (!productId) {
             // need a new product — brand/category lookup or create
             let bid = brandId.get(info.brand.toUpperCase());
@@ -297,7 +305,8 @@ function isAreaWise(productName, categoryName) {
     const finalPacks = DRY_RUN
         ? packs.concat(newPackRows.map((np) => ({ product_id: np.product_id, zoho_item_id: np.zoho_item_id, is_active: 1 })))
         : (await pool.query('SELECT id, product_id, zoho_item_id, is_active FROM pack_sizes'))[0];
-    const activeProducts = products.filter((p) => p.status === 'active');
+    const activeProducts = (DRY_RUN ? products : (await pool.query(`SELECT * FROM products`))[0])
+        .filter((p) => p.status === 'active');
     let bSet = 0, bSkip = 0;
     for (const prod of activeProducts) {
         if (prod.product_type !== 'area_wise') { bSkip++; continue; } // enamels/colours stay flat
