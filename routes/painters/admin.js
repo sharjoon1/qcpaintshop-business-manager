@@ -2934,7 +2934,9 @@ function _toNullableInt(v) {
 router.get('/admin/catalog/brands', requireAuth, requirePermission('painters', 'manage'), async (req, res) => {
     try {
         const [rows] = await pool.query(`
-            SELECT b.brand, b.sort_order, b.is_hidden,
+            SELECT b.brand,
+                   COALESCE(o.sort_order, 999) AS sort_order,
+                   COALESCE(o.is_hidden, 0)    AS is_hidden,
                    (SELECT COUNT(DISTINCT p.id)
                       FROM products p
                       JOIN pack_sizes ps ON ps.product_id = p.id AND ps.is_active = 1
@@ -2942,15 +2944,14 @@ router.get('/admin/catalog/brands', requireAuth, requirePermission('painters', '
                      WHERE p.status = 'active'
                        AND TRIM(zim.zoho_brand) = b.brand) AS product_count
               FROM (
-                SELECT brand, sort_order, is_hidden FROM painter_catalog_brand_order
-                UNION DISTINCT
-                SELECT DISTINCT TRIM(zim.zoho_brand) AS brand, 999 AS sort_order, 0 AS is_hidden
+                SELECT DISTINCT TRIM(zim.zoho_brand) AS brand
                   FROM products p
                   JOIN pack_sizes ps ON ps.product_id = p.id AND ps.is_active = 1
                   JOIN zoho_items_map zim ON zim.zoho_item_id = ps.zoho_item_id
                  WHERE p.status = 'active' AND TRIM(zim.zoho_brand) IS NOT NULL AND TRIM(zim.zoho_brand) != ''
               ) b
-             ORDER BY b.sort_order ASC, b.brand ASC
+              LEFT JOIN painter_catalog_brand_order o ON o.brand = b.brand
+             ORDER BY sort_order ASC, b.brand ASC
         `);
         res.json({ success: true, brands: rows });
     } catch (e) {
