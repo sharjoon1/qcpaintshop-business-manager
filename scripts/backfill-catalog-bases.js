@@ -220,14 +220,6 @@ function isAreaWise(productName, categoryName) {
             const hit = seriesToProduct.get(key);
             if (hit) productId = hit.product_id;
         }
-        // Remember this resolution so later items of the same series merge too
-        if (productId && info.series) {
-            const key = `${info.series}|||${info.brand}|||${info.category}`;
-            const cur = seriesToProduct.get(key);
-            if (!cur || cur.product_id !== productId) {
-                seriesToProduct.set(key, { product_id: productId, count: (cur ? cur.count : 0) + 1 });
-            }
-        }
         if (!productId) {
             // need a new product — brand/category lookup or create
             let bid = brandId.get(info.brand.toUpperCase());
@@ -271,6 +263,15 @@ function isAreaWise(productName, categoryName) {
             cCreated++;
         } else {
             cMerged++;
+        }
+
+        // Remember this resolution so later items of the same series merge too
+        if (productId && info.series) {
+            const key = `${info.series}|||${info.brand}|||${info.category}`;
+            const cur = seriesToProduct.get(key);
+            if (!cur || cur.product_id !== productId) {
+                seriesToProduct.set(key, { product_id: productId, count: (cur ? cur.count : 0) + 1 });
+            }
         }
 
         // pack_size row — base_key only makes sense for area_wise (emulsion) products

@@ -173,20 +173,25 @@ const PRODUCT_KEYWORD = new RegExp(
  * @param {string} [brand]
  * @returns {boolean}
  */
+// Tint-base codes that the Aug-2026 AI name normalization left as the whole
+// segment-2 series ("FLXBR01L - BR - INTERIOR EMULSION - ..."). These are NOT
+// series — accepting them would create junk products named "BR", "IV", "CS6".
+const BASE_CODE_ONLY = new RegExp(
+    '^(BR|IV|RD|W1|CREAM|N|N1|N2|P1|PO|Y|WT|DECO|' +
+    'CS|CSS|CF|NS|NSS|PB|PBS|TF|TL|TLI|TV|PE|PES|EW|EWS|ES|EC|ECM|OP|EPR|PWP|PFP|PHP|PSP|WPR|DISSB|WF|GRACE|LITE|AH|AB|SN|HQ|AS|AC|AV|UP|DLX|GEM|BDR|BS|CADT|SMT|FLX|LL|WM|SM|ECF|ECP|RNG|BSGW|BSN|BSNL|BSNN|BSGW|BSGWY|BSNLT)(\\d{0,3})?$',
+    'i'
+);
+
 function isSeriesConfident(series, brand) {
     const s = String(series || '').trim();
     if (!s) return false;
     const b = String(brand || '').toUpperCase();
     const validatedBrand = b.indexOf('BIRLA') !== -1 || b.indexOf('BERGER') !== -1 || b.indexOf('SHALIMAR') !== -1;
     if (validatedBrand) {
-        // The Aug-2026 AI name normalization stripped the series word from some
-        // items, leaving only the tint-base code as segment 2 ("FLXBR01L - BR -
-        // INTERIOR EMULSION - ..."). A bare base code is NOT a series — require a
-        // multi-word name or a product-ish keyword so we never create junk
-        // products named "BR", "IV", "RD", "W1", "CS6", "ECM1", ...
-        if (s.length < 3) return false;
-        if (s.indexOf(' ') !== -1) return true;
-        return PRODUCT_KEYWORD.test(s);
+        // Reject bare base codes; accept any other real series name (single-word
+        // names like "HAPPY" or "ACCENT" are legitimate product series).
+        if (s.length < 2) return false;
+        return !BASE_CODE_ONLY.test(s);
     }
     if (s.length < 3) return false;
     return PRODUCT_KEYWORD.test(s);
@@ -218,4 +223,4 @@ function pickMainBase(baseKeys) {
     return entries[0][0];
 }
 
-module.exports = { parseBase, pickMainBase, splitDashed, extractSizeLabel, birlaBaseFromCode, bergerBaseFromSegment, isSeriesConfident, PRODUCT_KEYWORD };
+module.exports = { parseBase, pickMainBase, splitDashed, extractSizeLabel, birlaBaseFromCode, bergerBaseFromSegment, isSeriesConfident, PRODUCT_KEYWORD, BASE_CODE_ONLY };

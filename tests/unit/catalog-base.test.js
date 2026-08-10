@@ -27,6 +27,8 @@ describe('catalog-base isSeriesConfident', () => {
         expect(isSeriesConfident('BISON GLOW EMULSION', 'Berger Paints')).toBe(true);
         expect(isSeriesConfident('ACCENT', 'Shalimar Paints')).toBe(true);
         expect(isSeriesConfident('MELAMINE', 'Shalimar Paints')).toBe(true);
+        expect(isSeriesConfident('HAPPY', 'Berger Paints')).toBe(true); // single-word real series
+        expect(isSeriesConfident('ONE PRO SMOOTH WALL PUTTY', 'Birla Opus')).toBe(true);
     });
     test('mangled names (bare base code as series) rejected even for validated brands', () => {
         expect(isSeriesConfident('BR', 'Berger Paints')).toBe(false);
