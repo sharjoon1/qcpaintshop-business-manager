@@ -96,7 +96,7 @@ async function loadCust(){
 }
 async function loadCredit(){
   $('#credit-status').textContent='Loading…';
-  try{const j=await apiFetch('/api/credit-limits'); const rows=j.data||j.rows||[]; const tb=$('#credit-body'); tb.innerHTML=''; if(!rows.length) $('#credit-empty').classList.remove('hidden'); else $('#credit-empty').classList.add('hidden'); rows.forEach(r=>{const tr=document.createElement('tr'); tr.className='border-t'; tr.innerHTML=`<td class="p-2">${esc(r.customer_name||r.name||'')}</td><td class="p-2 text-right">₹${Number(r.credit_limit||0).toLocaleString('en-IN')}</td><td class="p-2 text-right">₹${Number(r.used||r.outstanding||0).toLocaleString('en-IN')}</td>`; tb.appendChild(tr);}); $('#credit-status').textContent=rows.length+' rows';}catch(e){$('#credit-status').textContent=e.message;}
+  try{const j=await apiFetch('/api/credit-limits/customers'); const rows=j.data||j.rows||[]; const tb=$('#credit-body'); tb.innerHTML=''; if(!rows.length) $('#credit-empty').classList.remove('hidden'); else $('#credit-empty').classList.add('hidden'); rows.forEach(r=>{const tr=document.createElement('tr'); tr.className='border-t'; tr.innerHTML=`<td class="p-2">${esc(r.customer_name||r.name||'')}</td><td class="p-2 text-right">₹${Number(r.credit_limit||0).toLocaleString('en-IN')}</td><td class="p-2 text-right">₹${Number(r.credit_used||r.used||r.outstanding||0).toLocaleString('en-IN')}</td>`; tb.appendChild(tr);}); $('#credit-status').textContent=rows.length+' rows';}catch(e){$('#credit-status').textContent=e.message;}
 }
 async function loadDesign(){
   $('#design-status').textContent='Loading…';

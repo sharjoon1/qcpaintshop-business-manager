@@ -75,7 +75,7 @@ async function loadHealth(){
 }
 async function loadMon(){
   $('#mon-status').textContent='Loading…';
-  try{const j=await apiFetch('/api/monitoring/summary'); $('#mon-pre').textContent=JSON.stringify(j,null,2).slice(0,8000); $('#mon-status').textContent='Loaded'; $('#mon-empty').classList.add('hidden');}catch(e){$('#mon-status').textContent=e.message; $('#mon-pre').textContent=e.message;}
+  try{const j=await apiFetch('/api/monitoring/overview'); $('#mon-pre').textContent=JSON.stringify(j,null,2).slice(0,8000); $('#mon-status').textContent='Loaded'; $('#mon-empty').classList.add('hidden');}catch(e){$('#mon-status').textContent=e.message; $('#mon-pre').textContent=e.message;}
 }
 async function loadGuides(){
   $('#guides-status').textContent='Loading…';

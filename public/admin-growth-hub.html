@@ -72,7 +72,7 @@ document.querySelectorAll('.qc-hub-tab').forEach(b=> b.addEventListener('click',
 if(location.hash) setTab(location.hash.slice(1));
 async function loadWA(){
   $('#wa-status').textContent='Loading…';
-  try{const j=await apiFetch('/api/whatsapp/status'); const info=j.data||j||{}; const el=$('#wa-info'); el.innerHTML='<div class="text-slate-700">Status: '+esc(String(info.status||info.connected||'unknown'))+'</div>'+ (info.phone?'<div>Phone: '+esc(info.phone)+'</div>':''); $('#wa-status').textContent='Loaded'; if(!Object.keys(info).length) $('#wa-empty').classList.remove('hidden'); else $('#wa-empty').classList.add('hidden'); }catch(e){$('#wa-status').textContent=e.message; try{const j2=await apiFetch('/api/wa/status'); $('#wa-info').textContent=JSON.stringify(j2).slice(0,800);}catch(_){}}
+  try{const j=await apiFetch('/api/zoho/whatsapp-sessions/admin/status'); const info=(j.data&&j.data.session)||j.data||j||{}; const el=$('#wa-info'); el.innerHTML='<div class="text-slate-700">Status: '+esc(String(info.status||info.connected||'unknown'))+'</div>'+ (info.phone_number||info.phone?'<div>Phone: '+esc(info.phone_number||info.phone)+'</div>':''); $('#wa-status').textContent='Loaded'; if(!Object.keys(info).length) $('#wa-empty').classList.remove('hidden'); else $('#wa-empty').classList.add('hidden'); }catch(e){$('#wa-status').textContent=e.message; try{const j2=await apiFetch('/api/zoho/whatsapp-sessions/admin/status'); $('#wa-info').textContent=JSON.stringify(j2).slice(0,800);}catch(_){}}
 }
 async function loadPainters(){
   const q=$('#painter-q').value.trim(); $('#painters-status').textContent='Loading…';

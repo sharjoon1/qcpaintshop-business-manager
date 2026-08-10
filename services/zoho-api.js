@@ -12,6 +12,7 @@
  */
 
 const https = require('https');
+const fetch = require('node-fetch');
 const zohoOAuth = require('./zoho-oauth');
 const rateLimiter = require('./zoho-rate-limiter');
 
@@ -2558,10 +2559,10 @@ async function attachBillAttachment(billId, filePath) {
     form.append('attachment', fs.createReadStream(filePath));
     // Zoho Books: POST /bills/{id}/attachment?organization_id=...
     const headers = form.getHeaders();
-    const url = `${getBaseUrl()}/bills/${billId}/attachment?organization_id=${orgId}`;
-    // Use apiPost with multipart - fallback to raw fetch
-    const { default: fetch } = await import('node-fetch');
-    const resp = await fetch(url, { method: 'POST', headers: { ...headers, Authorization: `Zoho-oauthtoken ${await getAccessToken()}` }, body: form });
+    // Zoho Books attachment upload is multipart — raw fetch (apiPost is JSON-only)
+    const url = `${API_BASE}/bills/${billId}/attachment?organization_id=${orgId}`;
+    const token = await zohoOAuth.getAccessToken();
+    const resp = await fetch(url, { method: 'POST', headers: { ...headers, Authorization: `Zoho-oauthtoken ${token}` }, body: form });
     const json = await resp.json();
     if (json.code !== 0) throw new Error(json.message || 'Zoho attachment failed');
     return json;

@@ -5,7 +5,7 @@
 
 const express = require('express');
 const router = express.Router();
-const { requireAuth, requirePermission } = require('../middleware/permissionMiddleware');
+const { requireAuth, requirePermission, isFullAdmin, hasRolePermission } = require('../middleware/permissionMiddleware');
 const { validate, validateQuery } = require('../middleware/validate');
 const { z } = require('zod');
 const { execFile } = require('child_process');
@@ -892,7 +892,11 @@ router.get('/pending-requests', requireAuth, async (req, res) => {
       [...params, l, o]
     );
     const [cnt] = await pool.query(`SELECT COUNT(*) as total FROM pending_product_requests p ${wc}`, params);
-    res.json({ success: true, data: rows, pagination: { page: p, limit: l, total: cnt[0].total } });
+    // canApprove drives UI button visibility (staff see their own requests but
+    // never approve/reject — those endpoints enforce products.manage anyway).
+    const canApprove = isFullAdmin(req.user.role)
+        || await hasRolePermission(String(req.user.role || '').toLowerCase(), 'products', 'manage');
+    res.json({ success: true, data: rows, canApprove, pagination: { page: p, limit: l, total: cnt[0].total } });
   } catch (err) {
     console.error('pending-request list error:', err);
     res.status(500).json({ success: false, error: 'Failed to list' });

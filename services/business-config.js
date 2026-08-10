@@ -10,7 +10,12 @@
  *   const { vpa, payee } = await require('../services/business-config').getUpiConfig(pool);
  */
 
-const UPI_DEFAULTS = { vpa: '7418831122@superyes', payee: 'Quality Colours' };
+// E-5: fallback VPA/payee are env-overridable (BUSINESS_UPI_VPA / BUSINESS_UPI_PAYEE);
+// the ai_config rows (business_upi_vpa / business_upi_payee) still take precedence.
+const UPI_DEFAULTS = {
+    vpa: process.env.BUSINESS_UPI_VPA || '7418831122@superyes',
+    payee: process.env.BUSINESS_UPI_PAYEE || 'Quality Colours'
+};
 
 async function getUpiConfig(pool) {
     const out = { ...UPI_DEFAULTS };

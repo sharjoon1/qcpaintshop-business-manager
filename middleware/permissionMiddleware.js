@@ -462,6 +462,7 @@ module.exports = {
     requireRole,
     getUserPermissions,
     isFullAdmin,
+    hasRolePermission,
     FULL_ADMIN_ROLES,
     // A2 cache hooks
     resolveStaffSession,

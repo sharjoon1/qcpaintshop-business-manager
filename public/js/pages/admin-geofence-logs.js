@@ -21,11 +21,12 @@ async function loadFilters() {
         }
 
         // Load staff
-        const staffRes = await fetch('/api/staff?role=staff', { headers: getAuthHeaders() });
+        const staffRes = await fetch('/api/users?role=staff', { headers: getAuthHeaders() });
         const staffData = await staffRes.json();
-        if (staffData.success) {
+        const staffList = Array.isArray(staffData) ? staffData : (staffData.data || []);
+        if (staffList.length) {
             const sel = document.getElementById('filterStaff');
-            (staffData.data || []).forEach(s => {
+            staffList.forEach(s => {
                 sel.innerHTML += `<option value="${s.id}">${esc(s.full_name || s.name)}</option>`;
             });
         }

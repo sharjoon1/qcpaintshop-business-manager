@@ -206,6 +206,10 @@ app.use(cors({
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ limit: '10mb', extended: true }));
 
+// E-7: bodyless / no-Content-Type requests leave req.body undefined — normalize
+// it so OTP/auth/estimate handlers return a clean 400 instead of a 500 TypeError.
+app.use((req, res, next) => { if (req.body === undefined) req.body = {}; next(); });
+
 // S9+F5 Phase A — CSP violation sink for the Report-Only strict policy above.
 // Deduped by (page, directive, sample) with a hit counter so the 2,863 inline
 // handlers don't flood; capped buffer. Read via GET /api/csp-report (admin) to

@@ -69,7 +69,7 @@ document.querySelectorAll('.qc-hub-tab').forEach(b=> b.addEventListener('click',
 if(location.hash) setTab(location.hash.slice(1));
 async function loadAtt(){
   const d=$('#att-date').value; $('#att-status').textContent='Loading…';
-  try{const qs=d?('?date='+encodeURIComponent(d)):''; const j=await apiFetch('/api/attendance'+qs); const rows=j.data||j.rows||j.attendance||[]; const tb=$('#att-body'); tb.innerHTML=''; if(!rows.length) $('#att-empty').classList.remove('hidden'); else $('#att-empty').classList.add('hidden'); rows.forEach(r=>{const tr=document.createElement('tr'); tr.className='border-t'; tr.innerHTML=`<td class="p-2">${esc(r.staff_name||r.name||'')}</td><td class="p-2">${esc((r.check_in||r.clock_in||'').slice(0,16))}</td><td class="p-2">${esc(r.status||'')}</td>`; tb.appendChild(tr);}); $('#att-status').textContent=rows.length+' rows';}catch(e){$('#att-status').textContent=e.message;}
+  try{const qs=d?('?date='+encodeURIComponent(d)):''; const j=await apiFetch('/api/attendance/report'+qs); const rows=j.data||j.rows||j.attendance||[]; const tb=$('#att-body'); tb.innerHTML=''; if(!rows.length) $('#att-empty').classList.remove('hidden'); else $('#att-empty').classList.add('hidden'); rows.forEach(r=>{const tr=document.createElement('tr'); tr.className='border-t'; tr.innerHTML=`<td class="p-2">${esc(r.full_name||r.staff_name||r.name||'')}</td><td class="p-2">${esc((r.check_in||r.clock_in_time||r.clock_in||'').slice(0,16))}</td><td class="p-2">${esc(r.day_status||r.status||'')}</td>`; tb.appendChild(tr);}); $('#att-status').textContent=rows.length+' rows';}catch(e){$('#att-status').textContent=e.message;}
 }
 async function loadTasks(){
   $('#tasks-status').textContent='Loading…';
@@ -77,7 +77,7 @@ async function loadTasks(){
 }
 async function loadDaily(){
   $('#daily-status').textContent='Loading…';
-  try{const j=await apiFetch('/api/daily-tasks'); const rows=j.data||j.rows||[]; const tb=$('#daily-body'); tb.innerHTML=''; if(!rows.length) $('#daily-empty').classList.remove('hidden'); else $('#daily-empty').classList.add('hidden'); rows.forEach(r=>{const tr=document.createElement('tr'); tr.className='border-t'; tr.innerHTML=`<td class="p-2">${esc(r.title||r.task||'')}</td><td class="p-2">${esc((r.date||r.task_date||'').slice(0,10))}</td><td class="p-2">${esc(r.status||'')}</td>`; tb.appendChild(tr);}); $('#daily-status').textContent=rows.length+' rows';}catch(e){$('#daily-status').textContent=e.message;}
+  try{const j=await apiFetch('/api/daily-tasks/admin/summary'); const rows=(j.data&&j.data.submitted)||j.rows||[]; const tb=$('#daily-body'); tb.innerHTML=''; if(!rows.length) $('#daily-empty').classList.remove('hidden'); else $('#daily-empty').classList.add('hidden'); rows.forEach(r=>{const tr=document.createElement('tr'); tr.className='border-t'; tr.innerHTML=`<td class="p-2">${esc(r.user_name||r.staff_name||r.name||'')}</td><td class="p-2">${esc((r.task_date||r.date||'').slice(0,10))}</td><td class="p-2">${esc(r.status||(r.completed_tasks!=null?r.completed_tasks+'/'+r.total_tasks+' tasks':''))}</td>`; tb.appendChild(tr);}); $('#daily-status').textContent=rows.length+' rows';}catch(e){$('#daily-status').textContent=e.message;}
 }
 $('#btn-att').addEventListener('click', loadAtt);
 $('#btn-tasks').addEventListener('click', loadTasks);
