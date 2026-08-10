@@ -19,7 +19,7 @@
 
 'use strict';
 
-const BASE_TOKEN_RE = /^(N1|N2|P1|PO|WT|Y|N)\s*/i; // Berger base prefixes
+const BASE_TOKEN_RE = /^(N1|N2|P1|PO|WT|Y|N|BR|IV|RD|W1)\s*/i; // Berger base prefixes
 
 /**
  * Split an AI-normalized dashed item name into segments.

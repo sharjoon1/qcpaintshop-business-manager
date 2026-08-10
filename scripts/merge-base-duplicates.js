@@ -122,19 +122,100 @@ const DRY_RUN = process.argv.includes('--dry-run');
         }
     }
 
-    console.log(`Merge plans: ${plans.length}`);
-    for (const p of plans.slice(0, 50)) {
-        console.log(`  #${p.dup.pid} "${p.dup.name.slice(0, 34)}"  ->  #${p.fam.pid} "${p.fam.name.slice(0, 34)}"`);
+    // ── Berger family merge ─────────────────────────────────────────────────
+    // Owner policy: Berger family duplicates ("ANTIDUST EMULSION", "SMOOTH
+    // EMULSION", "WALMASTA EXT EMULSION", "WALMASTA GLOW", "RANGOLI R MATT
+    // EMULSION", "BR FLEXO EMULSION", ...) merge into one product per family,
+    // while Birla SHINE families stay separate.
+    const BASE_SUFFIX = /(BR|IV|RD|W1|N1|N2|P1|PO|Y|WT|N)$/i;
+    const GENERIC_CODES = new Set(['BS', 'EPR']); // Berger size-code BS01, primer size-code EPR01
+    const familyCodeOf = (pid) => {
+        const codes = new Map();
+        for (const r of byPid[pid] || []) {
+            const seg = String(r.zoho_item_name || '').split(' - ')[0].trim();
+            let letters = seg.replace(/[^A-Za-z]/g, '');
+            if (/[LMGKS]$/.test(letters) && letters.length > 3) letters = letters.slice(0, -1); // unit letter
+            if (letters.length > 1) letters = letters.replace(BASE_SUFFIX, '');
+            if (letters.length >= 2 && !GENERIC_CODES.has(letters)) codes.set(letters, (codes.get(letters) || 0) + 1);
+        }
+        const top = [...codes.entries()].sort((a, b) => b[1] - a[1])[0];
+        return top ? top[0] : null;
+    };
+    const bergerMembers = [];
+    for (const [pid, pi] of prodInfo) {
+        const b = (pi.brand || '').trim().toUpperCase();
+        if (b.indexOf('BERGER') === -1 || pi.type !== 'area_wise') continue;
+        const key = String(pi.name)
+            .replace(/^(BR|IV|RD|W1|N1?|N2|P1|PO|Y|WT)\s+/i, '')
+            .replace(/\s+(EXT\s+)?(GLOW\s+)?(R MATT\s+)?EMULSION$/i, '')
+            .replace(/\s+GLOW$/i, '')
+            .trim();
+        if (!key || key.length < 3) continue;
+        bergerMembers.push({ pid, name: pi.name, packs: (byPid[pid] || []).length, key, code: familyCodeOf(pid) });
     }
-    if (plans.length > 50) console.log(`  ... and ${plans.length - 50} more`);
-    console.log(`\nWould merge ${plans.length} duplicate products (${plans.reduce((s, p) => s + (byPid[p.dup.pid] || []).length, 0)} packs moved).`);
+    const bergerPlans = [];
+    const nameGroups = new Map();
+    for (const m of bergerMembers) {
+        if (!nameGroups.has(m.key)) nameGroups.set(m.key, []);
+        nameGroups.get(m.key).push(m);
+    }
+    for (const [key, members] of nameGroups) {
+        if (members.length < 2) continue;
+        // code guard: members must share a common family-code prefix, else the
+        // name collided across real families (both Feb products named "EMULSION"
+        // but one is FLEXO, the other BISON)
+        const codes = members.map((m) => m.code).filter(Boolean);
+        const common = (a, b) => { const min = Math.min(a.length, b.length); let i = 0; while (i < min && a[i] === b[i]) i++; return a.slice(0, i); };
+        let commonCode = codes[0] || null;
+        for (const code of codes) { commonCode = common(commonCode, code); if (!commonCode) break; }
+        if (!commonCode || commonCode.length < 2) continue;
+        const keeper = members.slice().sort((a, b) =>
+            a.name.length - b.name.length || b.packs - a.packs || a.pid - b.pid)[0];
+        for (const m of members) {
+            if (m.pid !== keeper.pid && !merged.has(m.pid)) {
+                bergerPlans.push({ dup: { pid: m.pid, name: m.name }, fam: { pid: keeper.pid, name: keeper.name, series: key }, code: commonCode });
+                merged.add(m.pid);
+            }
+        }
+    }
+    // code-based grouping for the leftovers (name collision like "EMULSION" ->
+    // FLEXO/BISON, "GLOW EMULSION" -> BISON GLOW). Only EMULSION-named or
+    // base-code-prefixed members — primer products share generic EPR codes and
+    // must never merge via code.
+    const codeGroups = new Map();
+    for (const m of bergerMembers) {
+        if (merged.has(m.pid) || !m.code) continue;
+        if (!/EMULSION/i.test(m.name) && !/^(BR|IV|RD|W1|N1?|N2|P1|PO|Y|WT)\s+/i.test(m.name)) continue;
+        if (!codeGroups.has(m.code)) codeGroups.set(m.code, []);
+        codeGroups.get(m.code).push(m);
+    }
+    for (const [code, members] of codeGroups) {
+        if (members.length < 2) continue;
+        const keeper = members.slice().sort((a, b) =>
+            a.name.length - b.name.length || b.packs - a.packs || a.pid - b.pid)[0];
+        for (const m of members) {
+            if (m.pid !== keeper.pid && !merged.has(m.pid)) {
+                bergerPlans.push({ dup: { pid: m.pid, name: m.name }, fam: { pid: keeper.pid, name: keeper.name, series: code }, code });
+                merged.add(m.pid);
+            }
+        }
+    }
+    console.log(`Berger family merge plans: ${bergerPlans.length}`);
+    for (const p of bergerPlans.slice(0, 40)) {
+        console.log(`  #${p.dup.pid} "${p.dup.name.slice(0, 34)}"  ->  #${p.fam.pid} "${p.fam.name.slice(0, 34)}"  [${p.fam.series}]`);
+    }
+    if (bergerPlans.length > 40) console.log(`  ... and ${bergerPlans.length - 40} more`);
 
-    if (!DRY_RUN && plans.length) {
+    console.log(`\nTotal merge plans (base-code + Berger family): ${plans.length + bergerPlans.length}`);
+    const allPlans = plans.concat(bergerPlans);
+    console.log(`Would merge ${allPlans.length} duplicate products (${allPlans.reduce((s, p) => s + (byPid[p.dup.pid] || []).length, 0)} packs moved).`);
+
+    if (!DRY_RUN && allPlans.length) {
         const conn = await pool.getConnection();
         try {
             await conn.beginTransaction();
             let movedPacks = 0, deactivated = 0;
-            for (const p of plans) {
+            for (const p of allPlans) {
                 const keeperId = p.fam.pid;
                 const dupeId = p.dup.pid;
                 const [mv] = await conn.query('UPDATE pack_sizes SET product_id = ? WHERE product_id = ?', [keeperId, dupeId]);
@@ -147,7 +228,6 @@ const DRY_RUN = process.argv.includes('--dry-run');
                 await conn.query('DELETE FROM painter_catalog_product_order WHERE product_id = ?', [dupeId]);
                 const [up] = await conn.query("UPDATE products SET status = 'inactive' WHERE id = ?", [dupeId]);
                 deactivated += up.affectedRows;
-                // recompute main for keeper (brand-aware)
                 const [packs] = await conn.query(
                     `SELECT ps.base_key FROM pack_sizes ps JOIN zoho_items_map zim ON zim.zoho_item_id = ps.zoho_item_id
                      WHERE ps.product_id = ? AND ps.is_active = 1`, [keeperId]);
@@ -163,6 +243,8 @@ const DRY_RUN = process.argv.includes('--dry-run');
         } finally {
             conn.release();
         }
+    } else if (!DRY_RUN) {
+        console.log(`\nLIVE: nothing to merge.`);
     }
 
     console.log(`\n${'='.repeat(64)}`);

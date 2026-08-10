@@ -30,6 +30,14 @@ describe('catalog-base isSeriesConfident', () => {
         expect(isSeriesConfident('HAPPY', 'Berger Paints')).toBe(true); // single-word real series
         expect(isSeriesConfident('ONE PRO SMOOTH WALL PUTTY', 'Birla Opus')).toBe(true);
     });
+    test('Berger BR/IV/RD/W1 base prefixes extracted', () => {
+        const r1 = parseBase('FLXBR01L - BR FLEXO EMULSION - INTERIOR EMULSION - Berger Paints - 01 L', '', 'Berger Paints');
+        expect(r1.baseKey).toBe('BR');
+        expect(r1.series).toBe('FLEXO EMULSION');
+        const r2 = parseBase('CADTIV01L - IV ANTIDUST EMULSION - INTERIOR EMULSION - Berger Paints - 01 L', '', 'Berger Paints');
+        expect(r2.baseKey).toBe('IV');
+        expect(r2.series).toBe('ANTIDUST EMULSION');
+    });
     test('mangled names (bare base code as series) rejected even for validated brands', () => {
         expect(isSeriesConfident('BR', 'Berger Paints')).toBe(false);
         expect(isSeriesConfident('IV', 'Berger Paints')).toBe(false);
