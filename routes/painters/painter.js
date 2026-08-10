@@ -1655,23 +1655,32 @@ router.get('/me/catalog', requirePainterAuth, async (req, res) => {
             }
         }
 
-        // Filter options
+        // Filter options — only from products VISIBLE to this painter
+        // (global product order + per-painter override hidden flags; otherwise
+        // brand/category chips linger after every product in a brand is hidden).
+        const fPainterId = (req.painter && req.painter.id) || 0;
         const [brands] = await pool.query(`
             SELECT DISTINCT zim.zoho_brand as brand
             FROM zoho_items_map zim
             INNER JOIN pack_sizes ps ON ps.zoho_item_id = zim.zoho_item_id AND ps.is_active = 1
             INNER JOIN products p ON p.id = ps.product_id AND p.status = 'active'
+            LEFT JOIN painter_catalog_product_order gp ON gp.product_id = p.id
+            LEFT JOIN painter_catalog_product_overrides ppo ON ppo.painter_id = ? AND ppo.product_id = p.id
             WHERE zim.zoho_brand IS NOT NULL AND zim.zoho_brand != ''
+              AND COALESCE(ppo.is_hidden, gp.is_hidden, 0) = 0
             ORDER BY zim.zoho_brand
-        `);
+        `, [fPainterId]);
         const [categories] = await pool.query(`
             SELECT DISTINCT zim.zoho_category_name as category
             FROM zoho_items_map zim
             INNER JOIN pack_sizes ps ON ps.zoho_item_id = zim.zoho_item_id AND ps.is_active = 1
             INNER JOIN products p ON p.id = ps.product_id AND p.status = 'active'
+            LEFT JOIN painter_catalog_product_order gp ON gp.product_id = p.id
+            LEFT JOIN painter_catalog_product_overrides ppo ON ppo.painter_id = ? AND ppo.product_id = p.id
             WHERE zim.zoho_category_name IS NOT NULL AND zim.zoho_category_name != ''
+              AND COALESCE(ppo.is_hidden, gp.is_hidden, 0) = 0
             ORDER BY zim.zoho_category_name
-        `);
+        `, [fPainterId]);
 
         res.json({
             success: true,

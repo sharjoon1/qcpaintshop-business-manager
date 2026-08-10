@@ -1,267 +1,72 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta name="theme-color" content="#1B5E3B">
-  <link rel="manifest" href="/manifest.json">
-  <link rel="icon" type="image/png" sizes="192x192" href="/icons/icon-192x192.png">
-  <title>Painter Catalogue — Quality Colours</title>
-  <link rel="stylesheet" href="/css/tailwind.css?v=849f1b5c">
-  <link rel="stylesheet" href="/css/design-system.css?v=16beaa3b">
-  <script src="/universal-nav-loader.js?v=6b4a6dbe"></script>
-  <script src="/js/auth-helper.js?v=7101c516"></script>
-  <script src="/js/pages/admin-painter-catalog-authguard.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js"></script>
-  <style>
-    body { background: #f0fdf4; }
-
-    .page-head { background: linear-gradient(135deg, #1B5E3B 0%, #154D31 100%); color: #fff; padding: 22px 24px; border-radius: 12px; margin-bottom: 22px; }
-    .page-head h1 { font-size: 19px; font-weight: 700; margin: 0; }
-    .page-head .sub { font-size: 12.5px; opacity: 0.85; margin-top: 6px; }
-
-    .tabbar { display: flex; gap: 4px; border-bottom: 1px solid #d1fae5; margin-bottom: 18px; flex-wrap: wrap; }
-    .tab-btn { padding: 10px 18px; font-size: 13px; font-weight: 600; color: #4b5563; cursor: pointer; border: 0; background: transparent; border-bottom: 2px solid transparent; transition: color 0.15s, border-color 0.15s; }
-    .tab-btn:hover { color: #1B5E3B; }
-    .tab-btn.active { color: #1B5E3B; border-bottom-color: #1B5E3B; }
-    .tab-pane { display: none; }
-    .tab-pane.active { display: block; }
-
-    .subtab-row { display: flex; gap: 6px; margin-bottom: 14px; flex-wrap: wrap; }
-    .subtab-btn { padding: 6px 14px; font-size: 12px; font-weight: 600; color: #4b5563; background: #fff; border: 1px solid #d1d5db; border-radius: 20px; cursor: pointer; transition: all 0.15s; }
-    .subtab-btn:hover { background: #f0fdf4; border-color: #1B5E3B; color: #1B5E3B; }
-    .subtab-btn.active { background: #1B5E3B; color: #fff; border-color: #1B5E3B; }
-
-    .panel { background: #fff; border: 1px solid #d1fae5; border-radius: 10px; box-shadow: 0 1px 2px rgba(0,0,0,0.03); }
-    .panel-head { padding: 14px 18px; border-bottom: 1px solid #ecfdf5; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px; }
-    .panel-title { font-size: 14px; font-weight: 700; color: #1f2937; }
-    .panel-sub { font-size: 11.5px; color: #6b7280; margin-top: 2px; }
-    .panel-body { padding: 4px; }
-    .panel-body.padded { padding: 18px; }
-
-    .toolbar { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
-    .filter-select { padding: 6px 12px; font-size: 12px; border: 1px solid #d1d5db; border-radius: 6px; background: #fff; color: #1f2937; min-width: 160px; }
-    .filter-input  { padding: 6px 12px; font-size: 12px; border: 1px solid #d1d5db; border-radius: 6px; background: #fff; color: #1f2937; min-width: 200px; }
-
-    .btn { padding: 8px 16px; border-radius: 6px; font-size: 12.5px; font-weight: 600; cursor: pointer; transition: all 0.15s; border: 1px solid transparent; }
-    .btn-primary { background: #1B5E3B; color: #fff; }
-    .btn-primary:hover { background: #154D31; }
-    .btn-outline { background: #fff; border-color: #d1d5db; color: #1f2937; }
-    .btn-outline:hover { background: #f9fafb; border-color: #9ca3af; }
-    .btn-ghost { background: transparent; color: #6b7280; }
-    .btn-ghost:hover { background: #f3f4f6; color: #1f2937; }
-    .btn-sm { padding: 4px 10px; font-size: 11px; }
-
-    .sort-list { list-style: none; margin: 0; padding: 0; }
-    .sort-item { display: flex; align-items: center; gap: 10px; padding: 10px 14px; border-bottom: 1px solid #f3f4f6; background: #fff; cursor: grab; user-select: none; }
-    .sort-item:last-child { border-bottom: 0; }
-    .sort-item:hover { background: #f9fafb; }
-    .sort-item.sortable-ghost { opacity: 0.5; background: #ecfdf5; }
-    .sort-item.sortable-drag { cursor: grabbing; box-shadow: 0 6px 18px rgba(0,0,0,0.12); }
-    .sort-item.is-hidden { opacity: 0.55; background: #f9fafb; }
-
-    .drag-handle { color: #9ca3af; font-size: 16px; flex-shrink: 0; line-height: 1; }
-    .sort-rank { width: 32px; font-size: 11px; color: #9ca3af; font-variant-numeric: tabular-nums; text-align: right; flex-shrink: 0; }
-    .sort-label { flex: 1; min-width: 0; font-size: 13px; color: #1f2937; font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-    .sort-label small { display: block; font-size: 11px; color: #6b7280; font-weight: 400; margin-top: 1px; }
-    .sort-count { font-size: 11px; color: #6b7280; flex-shrink: 0; }
-    .sort-controls { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
-
-    .switch { position: relative; display: inline-block; width: 36px; height: 20px; flex-shrink: 0; }
-    .switch input { opacity: 0; width: 0; height: 0; }
-    .switch .slider { position: absolute; cursor: pointer; inset: 0; background: #d1d5db; border-radius: 20px; transition: 0.2s; }
-    .switch .slider:before { content: ''; position: absolute; height: 14px; width: 14px; left: 3px; bottom: 3px; background: white; border-radius: 50%; transition: 0.2s; }
-    .switch input:checked + .slider { background: #ef4444; }
-    .switch input:checked + .slider:before { transform: translateX(16px); }
-    .switch-label { font-size: 10.5px; font-weight: 600; color: #6b7280; text-transform: uppercase; letter-spacing: 0.3px; }
-
-    .override-pill { display: inline-block; padding: 2px 8px; font-size: 10.5px; font-weight: 600; border-radius: 9999px; }
-    .override-pill.is-override { background: #fef3c7; color: #92400e; }
-    .override-pill.is-inherit  { background: #e5e7eb; color: #4b5563; }
-
-    .painter-select-bar { display: flex; gap: 10px; align-items: center; padding: 12px 18px; background: #fef3c7; border: 1px solid #fbbf24; border-radius: 10px; margin-bottom: 14px; flex-wrap: wrap; }
-    .painter-select-bar .label { font-size: 11.5px; font-weight: 700; color: #92400e; text-transform: uppercase; letter-spacing: 0.4px; }
-
-    .empty { padding: 32px 18px; text-align: center; color: #9ca3af; font-size: 13px; }
-    .loading { padding: 32px 18px; text-align: center; color: #6b7280; font-size: 13px; }
-
-    .toast { position: fixed; bottom: 24px; right: 24px; background: #1f2937; color: #fff; padding: 10px 16px; border-radius: 8px; font-size: 12.5px; box-shadow: 0 6px 18px rgba(0,0,0,0.2); opacity: 0; pointer-events: none; transform: translateY(8px); transition: all 0.2s; z-index: 9999; }
-    .toast.show { opacity: 1; transform: translateY(0); }
-    .toast.err { background: #b91c1c; }
-
-    @media (max-width: 640px) {
-      .sort-item { flex-wrap: wrap; }
-      .sort-controls { width: 100%; justify-content: flex-end; }
-      .filter-select, .filter-input { width: 100%; }
-    }
-  </style>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="theme-color" content="#0F3A5F">
+    <link rel="manifest" href="/manifest.json">
+    <link rel="icon" type="image/png" sizes="192x192" href="/icons/icon-192x192.png">
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <title>Painter Catalog Curation — Quality Colours Manager</title>
+    <script src="/js/auth-helper.js?v=7101c516"></script>
+    <script src="/js/pages/admin-painter-catalog-authguard.js?v=1"></script>
+    <link rel="stylesheet" href="/css/tailwind.css?v=849f1b5c">
+    <link rel="stylesheet" href="/css/design-system.css?v=16beaa3b">
+    <script src="/universal-nav-loader.js?v=6b4a6dbe"></script>
 </head>
-<body>
-  <div data-page="painter-catalog" data-sidebar></div>
-
-  <main class="content" style="padding: 22px;">
-    <div class="page-head">
-      <h1>Painter Catalogue — Ordering &amp; Visibility</h1>
-      <div class="sub">Set the order and visibility of brands, categories and products for the painter web view + Android app. Per-painter overrides take priority over global defaults.</div>
-    </div>
-
-    <div class="tabbar">
-      <button class="tab-btn active" data-tab="global">Global Defaults</button>
-      <button class="tab-btn"        data-tab="overrides">Per-Painter Overrides</button>
-    </div>
-
-    <!-- ===== GLOBAL TAB ===== -->
-    <div class="tab-pane active" id="tab-global">
-      <div class="subtab-row">
-        <button class="subtab-btn active" data-sub="g-brand">Brands</button>
-        <button class="subtab-btn"        data-sub="g-category">Categories</button>
-        <button class="subtab-btn"        data-sub="g-product">Products</button>
-      </div>
-
-      <!-- Brands -->
-      <div class="subtab-pane" id="sub-g-brand">
-        <div class="panel">
-          <div class="panel-head">
+<body class="bg-gray-50 sidebar-collapsed" data-page="painters">
+    <div class="container mx-auto p-6">
+        <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 mb-6">
             <div>
-              <div class="panel-title">Brand order</div>
-              <div class="panel-sub">Drag to reorder. Toggle <em>Hidden</em> to hide a brand from every painter.</div>
+                <h2 class="text-3xl font-bold text-gray-800">Painter Catalog Curation</h2>
+                <p class="text-sm text-gray-500 mt-1">Only the products you show here appear in the painter app. Everything starts hidden — pick per brand.</p>
             </div>
-            <button class="btn btn-primary" data-action="save-global-brand">Save Brand Order</button>
-          </div>
-          <div class="panel-body">
-            <ul class="sort-list" id="list-g-brand"><li class="loading">Loading…</li></ul>
-          </div>
+            <div class="flex gap-2">
+                <button id="btnHideAll" class="px-4 py-2 rounded-lg border text-sm bg-white font-semibold hover:bg-gray-50">Hide All Products</button>
+                <button id="btnRefresh" class="px-4 py-2 rounded-lg border text-sm bg-white font-semibold hover:bg-gray-50">↻ Refresh</button>
+            </div>
         </div>
-      </div>
 
-      <!-- Categories -->
-      <div class="subtab-pane" id="sub-g-category" style="display:none">
-        <div class="panel">
-          <div class="panel-head">
-            <div class="toolbar">
-              <select class="filter-select" id="filter-g-cat-brand">
-                <option value="">All brands</option>
-              </select>
-              <div>
-                <div class="panel-title">Category order</div>
-                <div class="panel-sub">Pick a brand to reorder its categories.</div>
-              </div>
-            </div>
-            <button class="btn btn-primary" data-action="save-global-category">Save Category Order</button>
-          </div>
-          <div class="panel-body">
-            <ul class="sort-list" id="list-g-category"><li class="empty">Select a brand to begin.</li></ul>
-          </div>
+        <!-- Save bar -->
+        <div id="saveBar" class="hidden sticky top-2 z-10 mb-4 bg-[#0F3A5F] text-white rounded-xl px-4 py-3 flex items-center justify-between shadow-lg">
+            <span id="saveMsg" class="text-sm font-medium">Unsaved changes</span>
+            <button id="btnSave" class="px-5 py-2 rounded-lg bg-white text-[#0F3A5F] text-sm font-bold hover:bg-gray-100">Save Changes</button>
         </div>
-      </div>
 
-      <!-- Products -->
-      <div class="subtab-pane" id="sub-g-product" style="display:none">
-        <div class="panel">
-          <div class="panel-head">
-            <div class="toolbar">
-              <select class="filter-select" id="filter-g-prod-brand">
-                <option value="">Select brand…</option>
-              </select>
-              <select class="filter-select" id="filter-g-prod-cat">
-                <option value="">All categories</option>
-              </select>
-              <div>
-                <div class="panel-title">Product order</div>
-                <div class="panel-sub">Pick brand + category to reorder products.</div>
-              </div>
-            </div>
-            <button class="btn btn-primary" data-action="save-global-product">Save Product Order</button>
-          </div>
-          <div class="panel-body">
-            <ul class="sort-list" id="list-g-product"><li class="empty">Select a brand to begin.</li></ul>
-          </div>
+        <!-- Brands -->
+        <div class="bg-white rounded-xl shadow-sm p-5 mb-4">
+            <h3 class="text-lg font-bold text-gray-800 mb-3">Brands</h3>
+            <div id="brandGrid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3"></div>
         </div>
-      </div>
+
+        <!-- Products of selected brand -->
+        <div class="bg-white rounded-xl shadow-sm p-5">
+            <div class="flex flex-wrap items-center gap-3 mb-3">
+                <h3 class="text-lg font-bold text-gray-800">Products</h3>
+                <select id="brandFilter" class="border rounded-lg px-3 py-2 text-sm"></select>
+                <select id="catFilter" class="border rounded-lg px-3 py-2 text-sm">
+                    <option value="">All categories</option>
+                </select>
+                <span class="text-xs text-gray-500" id="prodCount"></span>
+                <button id="btnShowBrand" class="ml-auto px-3 py-2 rounded-lg border text-xs bg-white font-semibold hover:bg-gray-50">Show all in filter</button>
+            </div>
+            <div id="prodEmpty" class="hidden text-sm text-slate-500 py-8 text-center">No products. Pick a brand above.</div>
+            <div class="overflow-x-auto">
+                <table class="w-full text-sm">
+                    <thead class="text-slate-500 border-b">
+                        <tr>
+                            <th class="text-left p-2 w-10">Show</th>
+                            <th class="text-left p-2">Product</th>
+                            <th class="text-left p-2">Category</th>
+                            <th class="text-right p-2">Variants</th>
+                        </tr>
+                    </thead>
+                    <tbody id="prodBody"></tbody>
+                </table>
+            </div>
+        </div>
     </div>
 
-    <!-- ===== OVERRIDES TAB ===== -->
-    <div class="tab-pane" id="tab-overrides">
-      <div class="painter-select-bar">
-        <span class="label">Painter</span>
-        <select class="filter-select" id="painter-picker" style="min-width: 260px;">
-          <option value="">Select a painter…</option>
-        </select>
-        <input type="text" class="filter-input" id="painter-search" placeholder="Search painters by name/phone…">
-        <span class="panel-sub" id="painter-meta" style="margin-left:auto"></span>
-      </div>
-
-      <div class="subtab-row" id="ov-subtabs" style="display:none">
-        <button class="subtab-btn active" data-sub="o-brand">Brand overrides</button>
-        <button class="subtab-btn"        data-sub="o-category">Category overrides</button>
-        <button class="subtab-btn"        data-sub="o-product">Product overrides</button>
-      </div>
-
-      <div id="ov-no-painter" class="panel"><div class="panel-body padded empty">Pick a painter above to manage overrides. NULL values inherit from the global defaults.</div></div>
-
-      <div class="subtab-pane" id="sub-o-brand" style="display:none">
-        <div class="panel">
-          <div class="panel-head">
-            <div>
-              <div class="panel-title">Brand overrides</div>
-              <div class="panel-sub">Override the position or hide a brand for this painter only. Empty position field = inherit.</div>
-            </div>
-            <button class="btn btn-primary" data-action="save-override-brand">Save Brand Overrides</button>
-          </div>
-          <div class="panel-body">
-            <ul class="sort-list" id="list-o-brand"><li class="empty">No painter selected.</li></ul>
-          </div>
-        </div>
-      </div>
-
-      <div class="subtab-pane" id="sub-o-category" style="display:none">
-        <div class="panel">
-          <div class="panel-head">
-            <div class="toolbar">
-              <select class="filter-select" id="filter-o-cat-brand">
-                <option value="">All brands</option>
-              </select>
-              <div>
-                <div class="panel-title">Category overrides</div>
-                <div class="panel-sub">Override or hide categories within a brand for this painter.</div>
-              </div>
-            </div>
-            <button class="btn btn-primary" data-action="save-override-category">Save Category Overrides</button>
-          </div>
-          <div class="panel-body">
-            <ul class="sort-list" id="list-o-category"><li class="empty">Select a brand.</li></ul>
-          </div>
-        </div>
-      </div>
-
-      <div class="subtab-pane" id="sub-o-product" style="display:none">
-        <div class="panel">
-          <div class="panel-head">
-            <div class="toolbar">
-              <select class="filter-select" id="filter-o-prod-brand">
-                <option value="">Select brand…</option>
-              </select>
-              <select class="filter-select" id="filter-o-prod-cat">
-                <option value="">All categories</option>
-              </select>
-              <div>
-                <div class="panel-title">Product overrides</div>
-                <div class="panel-sub">Override per-product position / hide for this painter.</div>
-              </div>
-            </div>
-            <button class="btn btn-primary" data-action="save-override-product">Save Product Overrides</button>
-          </div>
-          <div class="panel-body">
-            <ul class="sort-list" id="list-o-product"><li class="empty">Select a brand.</li></ul>
-          </div>
-        </div>
-      </div>
-    </div>
-  </main>
-
-  <div class="toast" id="toast"></div>
-
-  <script src="/js/pages/admin-painter-catalog.js"></script>
-
+    <script src="/js/pages/admin-painter-catalog.js?v=1"></script>
 </body>
 </html>
