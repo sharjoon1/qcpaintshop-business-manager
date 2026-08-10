@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>Live Location Tracker — Admin</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<style>
+  :root { --brand:#2d2a7b; --accent:#fbbf24; --ok:#16a34a; --err:#dc2626; --bg:#f1f3f9; }
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body { font-family:-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background:var(--bg); min-height:100vh; }
+  header { background:var(--brand); color:#fff; padding:14px 18px; display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:8px; }
+  header h1 { font-size:17px; font-weight:700; }
+  .status-pill { font-size:12px; font-weight:700; padding:5px 12px; border-radius:999px; background:#334155; }
+  .status-pill.live { background:var(--ok); }
+  .status-pill.off { background:var(--err); }
+  .wrap { max-width:900px; margin:18px auto; padding:0 16px; }
+  .bar { display:flex; gap:10px; flex-wrap:wrap; align-items:center; background:#fff; border-radius:14px; padding:12px; box-shadow:0 4px 14px rgba(45,42,123,.08); margin-bottom:14px; }
+  .bar input { flex:1; min-width:180px; padding:10px 12px; border:1px solid #e2e8f0; border-radius:10px; font-size:14px; }
+  .bar button { padding:10px 18px; border:none; border-radius:10px; background:var(--brand); color:#fff; font-weight:700; font-size:14px; cursor:pointer; }
+  .bar button.ghost { background:#eef2ff; color:var(--brand); }
+  #map { height:420px; border-radius:14px; box-shadow:0 4px 14px rgba(45,42,123,.08); z-index:0; }
+  .stats { display:grid; grid-template-columns:repeat(auto-fit,minmax(130px,1fr)); gap:10px; margin-top:14px; }
+  .stat { background:#fff; border-radius:12px; padding:12px; box-shadow:0 2px 8px rgba(45,42,123,.06); }
+  .stat .k { font-size:11px; text-transform:uppercase; letter-spacing:.05em; color:#94a3b8; }
+  .stat .v { font-size:15px; font-weight:700; color:#0f172a; margin-top:3px; }
+  .hint { font-size:12px; color:#94a3b8; margin-top:10px; text-align:center; }
+  .copy-link { display:flex; gap:8px; align-items:center; margin-top:10px; }
+  .copy-link input { flex:1; font-size:12px; padding:8px 10px; border:1px solid #e2e8f0; border-radius:8px; color:#475569; }
+</style>
+</head>
+<body>
+  <header>
+    <h1>📍 Live Location Tracker</h1>
+    <span class="status-pill off" id="pill">Waiting…</span>
+  </header>
+
+  <div class="wrap">
+    <div class="bar">
+      <input id="codeInput" placeholder="Enter track code…" value="" />
+      <button id="loadBtn">Track</button>
+      <button class="ghost" id="copyBtn">📋 Copy Share Link</button>
+    </div>
+
+    <div id="map"></div>
+
+    <div class="copy-link" id="linkRow" style="display:none">
+      <input id="shareLink" readonly />
+      <button class="ghost" onclick="copyShare()">Copy</button>
+    </div>
+
+    <div class="stats">
+      <div class="stat"><div class="k">First Seen</div><div class="v" id="sFirst">—</div></div>
+      <div class="stat"><div class="k">Last Update</div><div class="v" id="sLast">—</div></div>
+      <div class="stat"><div class="k">Accuracy</div><div class="v" id="sAcc">—</div></div>
+      <div class="stat"><div class="k">Points</div><div class="v" id="sPoints">0</div></div>
+    </div>
+    <p class="hint">Auto-refreshes every 4 seconds. The blue line shows the path travelled.</p>
+  </div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+  var map = null, marker = null, accCircle = null, pathLine = null, pathPts = [];
+  var timers = [], code = '';
+  var pill = document.getElementById('pill');
+
+  function initMap(lat, lng) {
+    if (!map) {
+      map = L.map('map').setView([lat, lng], 16);
+      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        maxZoom: 19,
+        attribution: '© OpenStreetMap contributors'
+      }).addTo(map);
+    }
+    if (!marker) {
+      var icon = L.divIcon({ html: '<div style="width:18px;height:18px;border-radius:50%;background:#2d2a7b;border:3px solid #fff;box-shadow:0 0 8px rgba(0,0,0,.4)"></div>', className: '', iconSize: [18, 18], iconAnchor: [9, 9] });
+      marker = L.marker([lat, lng], { icon: icon }).addTo(map);
+      accCircle = L.circle([lat, lng], { radius: 10, color: '#2d2a7b', fillColor: '#2d2a7b', fillOpacity: 0.12, weight: 1 }).addTo(map);
+      pathLine = L.polyline([], { color: '#2563eb', weight: 3, opacity: 0.8 }).addTo(map);
+    }
+  }
+
+  function setPill(text, live) {
+    pill.textContent = text;
+    pill.className = 'status-pill ' + (live ? 'live' : 'off');
+  }
+
+  function fmtTime(iso) {
+    if (!iso) return '—';
+    var d = new Date(iso);
+    return d.toLocaleString([], { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit' });
+  }
+
+  function loadLatest() {
+    if (!code) return;
+    fetch('/api/location-track/' + encodeURIComponent(code) + '/latest', { cache: 'no-store' })
+      .then(function (r) { return r.json(); })
+      .then(function (d) {
+        if (!d.success || !d.found) {
+          setPill('No signal yet', false);
+          return;
+        }
+        var p = d.point;
+        initMap(parseFloat(p.lat), parseFloat(p.lng));
+        marker.setLatLng([parseFloat(p.lat), parseFloat(p.lng)]);
+        accCircle.setLatLng([parseFloat(p.lat), parseFloat(p.lng)]);
+        accCircle.setRadius(Math.max(p.accuracy || 20, 10));
+        map.setView([parseFloat(p.lat), parseFloat(p.lng)]);
+        document.getElementById('sLast').textContent = fmtTime(p.captured_at);
+        document.getElementById('sAcc').textContent = p.accuracy ? (p.accuracy < 1 ? '<1 m' : Math.round(p.accuracy) + ' m') : '—';
+        setPill('● LIVE', true);
+      })
+      .catch(function () { setPill('Error', false); });
+  }
+
+  function loadHistory() {
+    if (!code) return;
+    fetch('/api/location-track/' + encodeURIComponent(code) + '/history?limit=300', { cache: 'no-store' })
+      .then(function (r) { return r.json(); })
+      .then(function (d) {
+        if (!d.success) return;
+        pathPts = (d.points || []).map(function (p) { return [parseFloat(p.lat), parseFloat(p.lng)]; });
+        if (pathLine) pathLine.setLatLngs(pathPts);
+        document.getElementById('sPoints').textContent = d.points ? d.points.length : 0;
+      })
+      .catch(function () {});
+  }
+
+  function loadInfo() {
+    if (!code) return;
+    fetch('/api/location-track/' + encodeURIComponent(code) + '/info', { cache: 'no-store' })
+      .then(function (r) { return r.json(); })
+      .then(function (d) {
+        if (!d.success) return;
+        document.getElementById('sFirst').textContent = fmtTime(d.first_seen);
+        if (!d.online) setPill('● OFFLINE', false);
+      })
+      .catch(function () {});
+  }
+
+  function startTracking() {
+    code = document.getElementById('codeInput').value.trim().replace(/[^A-Za-z0-9_-]/g, '').slice(0, 32);
+    if (!code) { alert('Enter a track code'); return; }
+    timers.forEach(clearInterval); timers = [];
+    loadLatest(); loadHistory(); loadInfo();
+    timers.push(setInterval(loadLatest, 4000));
+    timers.push(setInterval(loadHistory, 30000));
+    timers.push(setInterval(loadInfo, 10000));
+    var link = location.origin + '/t/' + encodeURIComponent(code);
+    document.getElementById('shareLink').value = link;
+    document.getElementById('linkRow').style.display = 'flex';
+    document.title = 'Tracker: ' + code;
+  }
+
+  function copyShare() {
+    var el = document.getElementById('shareLink');
+    el.select();
+    document.execCommand('copy');
+    navigator.clipboard && navigator.clipboard.writeText(el.value);
+  }
+
+  document.getElementById('loadBtn').addEventListener('click', startTracking);
+  document.getElementById('copyBtn').addEventListener('click', startTracking);
+
+  // Prefill from URL ?code=
+  var qCode = new URLSearchParams(location.search).get('code');
+  if (qCode) {
+    document.getElementById('codeInput').value = qCode;
+    startTracking();
+  }
+</script>
+</body>
+</html>

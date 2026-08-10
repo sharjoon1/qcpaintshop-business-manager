@@ -41,6 +41,7 @@ const notificationRoutes = require('./routes/notifications');
 const estimatePdfRoutes = require('./routes/estimate-pdf');
 const estimateRoutes = require('./routes/estimates');
 const shareRoutes = require('./routes/share');
+const locationTrackerRoutes = require('./routes/location-tracker');
 const notificationService = require('./services/notification-service');
 const autoClockout = require('./services/auto-clockout');
 const websiteRoutes = require('./routes/website');
@@ -266,6 +267,13 @@ app.get('/r/:code', (req, res) => {
     res.redirect(302, `/painter-register.html?ref=${encodeURIComponent(code)}`);
 });
 
+// Live location tracker short link: https://act.qcpaintshop.com/t/{code}
+// Opens the shareable "share my location" page for the given track code.
+app.get('/t/:code', (req, res) => {
+    const code = (req.params.code || '').replace(/[^A-Za-z0-9_-]/g, '').slice(0, 32);
+    res.redirect(302, `/track.html?code=${encodeURIComponent(code)}`);
+});
+
 // ========================================
 // DATABASE CONNECTION
 // ========================================
@@ -342,6 +350,7 @@ notificationRoutes.setPool(pool);
 estimatePdfRoutes.setPool(pool);
 estimateRoutes.setPool(pool);
 shareRoutes.setPool(pool);
+locationTrackerRoutes.setPool(pool);
 notificationService.setPool(pool);
 autoClockout.setPool(pool);
 autoClockout.setActivityTrackerService(activityTrackerService);
@@ -464,6 +473,7 @@ app.use('/api/notifications', notificationRoutes.router);
 app.use('/api/estimates', estimatePdfRoutes.router);
 app.use('/api/estimates', requireAuth, estimateRoutes.router);
 app.use('/api/share', shareRoutes.router);
+app.use('/api/location-track', locationTrackerRoutes.router);
 app.use('/api/website', websiteRoutes.router);
 app.use('/api/guides', guidesRoutes.router);
 app.use('/api/stock-check', stockCheckRoutes.router);

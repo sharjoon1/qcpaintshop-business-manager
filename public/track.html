@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<meta name="theme-color" content="#2d2a7b" />
+<title>Location Sharing</title>
+<style>
+  :root { --brand:#2d2a7b; --brand-dark:#242168; --accent:#fbbf24; --bg:#f1f3f9; --ok:#16a34a; --warn:#d97706; --err:#dc2626; }
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body { font-family:-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background:var(--bg); min-height:100vh; display:flex; flex-direction:column; align-items:center; padding:24px 16px; }
+  .card { width:100%; max-width:420px; background:#fff; border-radius:20px; box-shadow:0 10px 30px rgba(45,42,123,.12); overflow:hidden; }
+  .card-head { background:var(--brand); color:#fff; padding:20px 22px; text-align:center; }
+  .card-head h1 { font-size:20px; font-weight:700; }
+  .card-head p { font-size:13px; opacity:.8; margin-top:4px; }
+  .card-body { padding:24px 22px; text-align:center; }
+  .status-ring { width:120px; height:120px; margin:0 auto 18px; border-radius:50%; display:flex; align-items:center; justify-content:center; position:relative; }
+  .status-ring .dot { width:18px; height:18px; border-radius:50%; background:#94a3b8; }
+  .status-ring.live .dot { background:var(--ok); animation:pulse 1.6s infinite; }
+  .status-ring.waiting .dot { background:var(--accent); animation:pulse 1.2s infinite; }
+  .status-ring.error .dot { background:var(--err); }
+  .status-ring.live { box-shadow:0 0 0 10px rgba(22,163,74,.12); }
+  .status-ring.waiting { box-shadow:0 0 0 10px rgba(217,119,6,.12); }
+  .status-ring.error { box-shadow:0 0 0 10px rgba(220,38,38,.10); }
+  @keyframes pulse { 0%{box-shadow:0 0 0 0 rgba(22,163,74,.45)} 70%{box-shadow:0 0 0 16px rgba(22,163,74,0)} 100%{box-shadow:0 0 0 0 rgba(22,163,74,0)} }
+  .status-ring.waiting .dot { animation-name:pulseAmber; }
+  @keyframes pulseAmber { 0%{box-shadow:0 0 0 0 rgba(217,119,6,.45)} 70%{box-shadow:0 0 0 16px rgba(217,119,6,0)} 100%{box-shadow:0 0 0 0 rgba(217,119,6,0)} }
+  #statusText { font-size:16px; font-weight:600; color:#1e293b; }
+  #statusSub { font-size:13px; color:#64748b; margin-top:6px; line-height:1.5; }
+  .btn { display:block; width:100%; padding:14px; margin-top:20px; border:none; border-radius:14px; background:var(--brand); color:#fff; font-size:16px; font-weight:700; cursor:pointer; transition:transform .1s, background .2s; }
+  .btn:active { transform:scale(.98); }
+  .btn:disabled { background:#cbd5e1; cursor:not-allowed; }
+  .btn.green { background:var(--ok); }
+  .info-grid { display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-top:22px; }
+  .info-cell { background:#f8fafc; border:1px solid #e2e8f0; border-radius:12px; padding:10px 8px; }
+  .info-cell .k { font-size:11px; text-transform:uppercase; letter-spacing:.05em; color:#94a3b8; }
+  .info-cell .v { font-size:15px; font-weight:700; color:#0f172a; margin-top:3px; word-break:break-word; }
+  .note { font-size:12px; color:#94a3b8; margin-top:18px; line-height:1.5; }
+  .err-box { display:none; margin-top:16px; background:#fef2f2; border:1px solid #fecaca; color:var(--err); font-size:13px; padding:12px; border-radius:12px; line-height:1.5; text-align:left; }
+</style>
+</head>
+<body>
+  <div class="card">
+    <div class="card-head">
+      <h1>📍 Live Location Sharing</h1>
+      <p>Quality Colours · Ramanathapuram</p>
+    </div>
+    <div class="card-body">
+      <div class="status-ring waiting" id="ring"><div class="dot"></div></div>
+      <div id="statusText">Ready to share your location</div>
+      <div id="statusSub">Tap Start — we will keep updating your live location while this page is open.</div>
+
+      <button class="btn" id="startBtn">▶ Start Sharing</button>
+
+      <div class="info-grid">
+        <div class="info-cell"><div class="k">Last Updated</div><div class="v" id="vTime">—</div></div>
+        <div class="info-cell"><div class="k">Accuracy</div><div class="v" id="vAcc">—</div></div>
+        <div class="info-cell"><div class="k">Battery</div><div class="v" id="vBatt">—</div></div>
+        <div class="info-cell"><div class="k">Updates</div><div class="v" id="vCount">0</div></div>
+      </div>
+
+      <div class="err-box" id="errBox"></div>
+      <p class="note">Your location is shared only while this page stays open and the screen is on. You can stop anytime by closing this page.</p>
+    </div>
+  </div>
+
+<script>
+(function () {
+  var code = new URLSearchParams(location.search).get('code') || '';
+  var API = '/api/location-track/' + encodeURIComponent(code);
+  var startBtn = document.getElementById('startBtn');
+  var ring = document.getElementById('ring');
+  var statusText = document.getElementById('statusText');
+  var statusSub = document.getElementById('statusSub');
+  var errBox = document.getElementById('errBox');
+  var vTime = document.getElementById('vTime'), vAcc = document.getElementById('vAcc'),
+      vBatt = document.getElementById('vBatt'), vCount = document.getElementById('vCount');
+
+  var watchId = null, updates = 0, lastSent = null, lastPos = null;
+  var SEND_INTERVAL_MS = 10000;      // heartbeat every 10s
+  var MOVE_THRESHOLD_M = 8;          // …or sooner if moved > 8m
+
+  function setStatus(mode, text, sub) {
+    ring.className = 'status-ring ' + mode;
+    statusText.textContent = text;
+    if (sub) statusSub.textContent = sub;
+  }
+
+  function sendPoint(pos, isFinal) {
+    var body = {
+      lat: pos.coords.latitude,
+      lng: pos.coords.longitude,
+      accuracy: pos.coords.accuracy,
+      speed: pos.coords.speed,
+      heading: pos.coords.heading,
+      battery: (window.__batt !== undefined) ? window.__batt : null,
+      is_charging: (window.__charging !== undefined) ? window.__charging : null,
+      device: (navigator.userAgent || '').slice(0, 120)
+    };
+    var payload = JSON.stringify(body);
+    if (isFinal) {
+      try { navigator.sendBeacon(API, payload); } catch (e) {}
+      return;
+    }
+    fetch(API, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: payload,
+      keepalive: true
+    }).then(function (r) { return r.json(); }).then(function (d) {
+      if (d && d.success) { updates++; vCount.textContent = updates; }
+    }).catch(function () {});
+  }
+
+  function distanceM(a, b) {
+    if (!a || !b) return 0;
+    var R = 6371000, dLat = (b.lat - a.lat) * Math.PI / 180, dLng = (b.lng - a.lng) * Math.PI / 180;
+    var s = Math.sin(dLat / 2) ** 2 + Math.cos(a.lat * Math.PI / 180) * Math.cos(b.lat * Math.PI / 180) * Math.sin(dLng / 2) ** 2;
+    return 2 * R * Math.asin(Math.sqrt(s));
+  }
+
+  function onPosition(pos) {
+    lastPos = { lat: pos.coords.latitude, lng: pos.coords.longitude };
+    var now = Date.now();
+    var moved = distanceM(lastPos, lastSent ? { lat: lastSent.coords.latitude, lng: lastSent.coords.longitude } : null) > MOVE_THRESHOLD_M;
+    if (!lastSent || moved || (now - lastSent.t) >= SEND_INTERVAL_MS) {
+      sendPoint(pos, false);
+      lastSent = pos; lastSent.t = now;
+    }
+    var acc = pos.coords.accuracy ? (pos.coords.accuracy < 1 ? '<1 m' : Math.round(pos.coords.accuracy) + ' m') : '—';
+    vAcc.textContent = acc;
+    vTime.textContent = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+    setStatus('live', 'Live · sharing location', 'Updates every few seconds. Keep this page open.');
+  }
+
+  function onError(err) {
+    var msgs = {
+      1: 'Location access was blocked. Please allow location for this site in your browser settings, then tap Start again.',
+      2: 'Your device could not find your position. Check that GPS / location is turned ON, then try again.',
+      3: 'Location request timed out. Please try again.'
+    };
+    setStatus('error', 'Location not available', msgs[err.code] || 'Unknown error. Please try again.');
+    errBox.style.display = 'block';
+    errBox.innerHTML = msgs[err.code] || 'Unknown error. Please try again.';
+    startBtn.disabled = false;
+    startBtn.textContent = '↻ Try Again';
+  }
+
+  function startSharing() {
+    if (!code) {
+      setStatus('error', 'Invalid link', 'This link is missing its tracking code.');
+      return;
+    }
+    if (!('geolocation' in navigator)) {
+      setStatus('error', 'Not supported', 'This browser does not support location sharing.');
+      return;
+    }
+    startBtn.disabled = true;
+    startBtn.textContent = 'Sharing…';
+    errBox.style.display = 'none';
+    setStatus('waiting', 'Requesting your location…', 'Please tap "Allow" when the browser asks for permission.');
+
+    // Battery (optional API)
+    if (navigator.getBattery) {
+      navigator.getBattery().then(function (b) {
+        window.__batt = Math.round(b.level * 100);
+        window.__charging = b.charging;
+        vBatt.textContent = window.__batt + '%' + (b.charging ? ' ⚡' : '');
+        b.addEventListener('levelchange', function () {
+          window.__batt = Math.round(b.level * 100);
+          vBatt.textContent = window.__batt + '%' + (b.charging ? ' ⚡' : '');
+        });
+      }).catch(function () {});
+    }
+
+    watchId = navigator.geolocation.watchPosition(onPosition, onError, {
+      enableHighAccuracy: true,
+      maximumAge: 3000,
+      timeout: 15000
+    });
+
+    // Final ping when the page is hidden/closed
+    document.addEventListener('visibilitychange', function () {
+      if (document.visibilityState === 'hidden' && lastPos) {
+        navigator.sendBeacon(API, JSON.stringify({
+          lat: lastPos.lat, lng: lastPos.lng,
+          accuracy: null, speed: null, heading: null,
+          battery: (window.__batt !== undefined) ? window.__batt : null,
+          is_charging: (window.__charging !== undefined) ? window.__charging : null,
+          device: (navigator.userAgent || '').slice(0, 120)
+        }));
+      }
+    });
+    window.addEventListener('pagehide', function () {
+      if (watchId !== null) { navigator.geolocation.clearWatch(watchId); }
+    });
+  }
+
+  startBtn.addEventListener('click', startSharing);
+})();
+</script>
+</body>
+</html>
