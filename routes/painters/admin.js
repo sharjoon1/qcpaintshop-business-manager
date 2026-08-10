@@ -2934,16 +2934,22 @@ function _toNullableInt(v) {
 router.get('/admin/catalog/brands', requireAuth, requirePermission('painters', 'manage'), async (req, res) => {
     try {
         const [rows] = await pool.query(`
-            SELECT b.brand,
-                   b.sort_order,
-                   b.is_hidden,
+            SELECT b.brand, b.sort_order, b.is_hidden,
                    (SELECT COUNT(DISTINCT p.id)
                       FROM products p
                       JOIN pack_sizes ps ON ps.product_id = p.id AND ps.is_active = 1
                       JOIN zoho_items_map zim ON zim.zoho_item_id = ps.zoho_item_id
                      WHERE p.status = 'active'
                        AND TRIM(zim.zoho_brand) = b.brand) AS product_count
-              FROM painter_catalog_brand_order b
+              FROM (
+                SELECT brand, sort_order, is_hidden FROM painter_catalog_brand_order
+                UNION DISTINCT
+                SELECT DISTINCT TRIM(zim.zoho_brand) AS brand, 999 AS sort_order, 0 AS is_hidden
+                  FROM products p
+                  JOIN pack_sizes ps ON ps.product_id = p.id AND ps.is_active = 1
+                  JOIN zoho_items_map zim ON zim.zoho_item_id = ps.zoho_item_id
+                 WHERE p.status = 'active' AND TRIM(zim.zoho_brand) IS NOT NULL AND TRIM(zim.zoho_brand) != ''
+              ) b
              ORDER BY b.sort_order ASC, b.brand ASC
         `);
         res.json({ success: true, brands: rows });
@@ -3045,6 +3051,10 @@ router.get('/admin/catalog/products', requireAuth, requirePermission('painters',
             SELECT p.id AS product_id, p.name, p.product_type, p.main_base_key,
                    MAX(TRIM(zim.zoho_brand))         AS brand,
                    MAX(TRIM(zim.zoho_category_name)) AS category,
+                   (SELECT z2.image_url FROM pack_sizes ps2
+                    INNER JOIN zoho_items_map z2 ON z2.zoho_item_id = ps2.zoho_item_id
+                    WHERE ps2.product_id = p.id AND ps2.is_active = 1 AND z2.image_url IS NOT NULL
+                    LIMIT 1) AS image_url,
                    COALESCE(po.sort_order, 999) AS sort_order,
                    COALESCE(po.is_hidden, 0)    AS is_hidden,
                    COUNT(DISTINCT ps.id) AS variant_count,
@@ -3122,6 +3132,27 @@ router.put('/admin/catalog/products/main-base', requireAuth, requirePermission('
         res.json({ success: true, product_id: productId, main_base_key: mainBaseKey });
     } catch (e) {
         console.error('PUT /admin/catalog/products/main-base:', e);
+        res.status(500).json({ success: false, message: e.message });
+    }
+});
+
+// Upload a product image from the painter catalog curation page. Updates both
+// products.image_url and zoho_items_map.image_url for the product's pack sizes
+// (the painter catalog card reads the zoho mirror image).
+router.post('/admin/catalog/products/:productId/image', requireAuth, requirePermission('painters', 'manage'), uploadProductImage.single('image'), async (req, res) => {
+    try {
+        const productId = parseInt(req.params.productId, 10);
+        if (!productId) return res.status(400).json({ success: false, message: 'productId required' });
+        if (!req.file) return res.status(400).json({ success: false, message: 'Image file is required' });
+        const imageUrl = `/uploads/products/${req.file.filename}`;
+        await pool.query('UPDATE products SET image_url = ? WHERE id = ?', [imageUrl, productId]);
+        await pool.query(
+            `UPDATE zoho_items_map zim JOIN pack_sizes ps ON ps.zoho_item_id = zim.zoho_item_id
+             SET zim.image_url = ? WHERE ps.product_id = ?`, [imageUrl, productId]
+        );
+        res.json({ success: true, message: 'Product image uploaded', image_url: imageUrl });
+    } catch (e) {
+        console.error('POST /admin/catalog/products/:productId/image:', e);
         res.status(500).json({ success: false, message: e.message });
     }
 });

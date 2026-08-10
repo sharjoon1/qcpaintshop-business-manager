@@ -104,8 +104,9 @@
             const j = await api(url);
             productData = j.products || [];
             renderProducts();
+            populateCats();
         } catch (e) {
-            $('#prodBody').innerHTML = '<tr><td colspan="4" class="p-2 text-sm text-red-500">Failed: ' + esc(e.message) + '</td></tr>';
+            $('#prodBody').innerHTML = '<tr><td colspan="5" class="p-2 text-sm text-red-500">Failed: ' + esc(e.message) + '</td></tr>';
         }
     }
 
@@ -129,20 +130,53 @@
                 ? '<div class="flex flex-wrap gap-1 mt-1">' + bases.map(b =>
                     '<span class="text-[10px] px-1.5 py-0.5 rounded ' + (p.main_base_key === b ? 'bg-[#0F3A5F] text-white' : 'bg-gray-100 text-gray-500') + '">' + esc(b) + '</span>').join('') + '</div>'
                 : '';
+            const imgCell = '<div class="flex items-center gap-2">' +
+                (p.image_url
+                    ? '<img src="' + esc(p.image_url) + '" class="w-10 h-10 object-cover rounded border border-gray-200">'
+                    : '<div class="w-10 h-10 border-2 border-dashed border-gray-300 rounded flex items-center justify-center text-[9px] text-gray-400 text-center leading-tight">No<br>img</div>') +
+                '<button data-imgbtn="' + p.product_id + '" class="text-[10px] px-1.5 py-1 rounded border border-blue-200 text-blue-700 bg-blue-50 hover:bg-blue-100 font-semibold whitespace-nowrap">Upload</button>' +
+                '<input type="file" data-imgfile="' + p.product_id + '" accept="image/*" class="hidden">' +
+              '</div>';
             return '<tr class="border-t align-top">' +
                 '<td class="p-2"><input type="checkbox" data-pid="' + p.product_id + '" ' + (checked ? 'checked' : '') + ' class="w-4 h-4 accent-[#0F3A5F]"></td>' +
                 '<td class="p-2 font-medium text-gray-800">' + esc(p.name) + baseChips + mainSel + '</td>' +
                 '<td class="p-2 text-xs text-gray-500">' + esc(p.category || '—') + '</td>' +
                 '<td class="p-2 text-right text-xs text-gray-500">' + (p.variant_count || 0) + '</td>' +
+                '<td class="p-2">' + imgCell + '</td>' +
             '</tr>';
         }).join('');
         tb.querySelectorAll('select[data-mainbase]').forEach(sel => {
             sel.addEventListener('change', () => setMainBase(parseInt(sel.dataset.mainbase, 10), sel.value));
         });
+        tb.querySelectorAll('button[data-imgbtn]').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const inp = document.querySelector('input[data-imgfile="' + btn.dataset.imgbtn + '"]');
+                if (inp) inp.click();
+            });
+        });
+        tb.querySelectorAll('input[data-imgfile]').forEach(inp => {
+            inp.addEventListener('change', () => {
+                if (inp.files && inp.files[0]) uploadImage(parseInt(inp.dataset.imgfile, 10), inp.files[0]);
+                inp.value = '';
+            });
+        });
         $('#prodCount').textContent = productData.length + ' shown';
         tb.querySelectorAll('input[type=checkbox]').forEach(cb => {
             cb.addEventListener('change', () => markDirty('Product visibility changed — save to apply'));
         });
+    }
+
+    // Upload a product image (used by the curation table)
+    async function uploadImage(productId, file) {
+        if (!file) return;
+        const fd = new FormData();
+        fd.append('image', file);
+        try {
+            await api(API + '/products/' + productId + '/image', { method: 'POST', body: fd });
+            await loadProducts();
+        } catch (e) {
+            alert('Image upload failed: ' + e.message);
+        }
     }
 
     // Set the main (catalog-visible) tint base for a product; '' clears it.
