@@ -306,14 +306,16 @@ function isAreaWise(productName, categoryName) {
     const finalPacks = DRY_RUN
         ? packs.concat(newPackRows.map((np) => ({ product_id: np.product_id, zoho_item_id: np.zoho_item_id, is_active: 1 })))
         : (await pool.query('SELECT id, product_id, zoho_item_id, is_active FROM pack_sizes'))[0];
-    const activeProducts = (DRY_RUN ? products : (await pool.query(`SELECT * FROM products`))[0])
-        .filter((p) => p.status === 'active');
+    const activeProducts = (DRY_RUN
+        ? products
+        : (await pool.query(`SELECT p.*, b.name AS brand_name FROM products p LEFT JOIN brands b ON b.id = p.brand_id`))[0]
+    ).filter((p) => p.status === 'active');
     let bSet = 0, bSkip = 0;
     for (const prod of activeProducts) {
         if (prod.product_type !== 'area_wise') { bSkip++; continue; } // enamels/colours stay flat
         const allPacks = finalPacks.filter((p) => p.product_id === prod.id);
         const keys = allPacks.map((p) => (itemInfo.get(p.zoho_item_id) || {}).baseKey);
-        const main = pickMainBase(keys);
+        const main = pickMainBase(keys, prod.brand_name);
         if (!main) { bSkip++; continue; }
         if (DRY_RUN) { bSet++; continue; }
         const [r] = await pool.query(

@@ -169,7 +169,7 @@ function parseBase(itemName, sku, brand) {
     if (parts && parts.length >= 2) {
         // "AMBER - BLACK - STAINER - Generic - 100G" / "SPRAY - BLUE - SPECIALITY COATS - Generic - 450ML"
         // parts[1] must be a colour word (letters only) — "WP01 - 101 LW+ - WATER PROOFING" is an SKU+product
-        if (parts.length >= 4 && /^[A-Za-z][A-Za-z .\-]*$/.test(parts[1] || '') && /^(STAINER|ENAMEL|COLOURANT|DISTEMPER|TOOLS|ACCESSORIES|SPECIALITY(\s+COATS?)?|FLOOR(\s+COATS?)?|GENERAL|WATER(\s+PROOFING)?)$/i.test(parts[2] || '')) {
+        if (parts.length >= 4 && /^[A-Za-z][A-Za-z .-]*$/.test(parts[1] || '') && /^(STAINER|ENAMEL|COLOURANT|DISTEMPER|TOOLS|ACCESSORIES|SPECIALITY(\s+COATS?)?|FLOOR(\s+COATS?)?|GENERAL|WATER(\s+PROOFING)?)$/i.test(parts[2] || '')) {
             return { series: `${parts[0]} ${parts[1]}`.trim(), baseKey: null };
         }
         // "OXIDE - BLACK - Generic - 100G" → brand sits at parts[2]
@@ -214,7 +214,7 @@ const PRODUCT_KEYWORD = new RegExp(
     'FEVICOL|DDL|ARALDITE|POP|K2|HERO|TILE|CAP|CLOTH|CHALK|PLASTIC|MASKING|' +
     'COMBO|SPONG|ROUND|SCRAPPER|PADMASHRI|TERMINATOR|BITUCOAT|GROUT|CEM|' +
     'ANTIFOULING|FEASY|HAPPY|PPG|SUPREMA|INTERTHANE|PIDIFIN|CRIZION|BORDER|' +
-    'APTE22N|SH13|TRACTOREMUL|TESHYNE|LW\+|URP|101|301|112|SUPER POWER|' +
+    'APTE22N|SH13|TRACTOREMUL|TESHYNE|LW[+]|URP|101|301|112|SUPER POWER|' +
     'STAINER|BOARD|ENAMEL|EPOXY|PPG|SUPREMA',
     'i'
 );
@@ -256,17 +256,39 @@ function isSeriesConfident(series, brand) {
 
 /**
  * Choose the default main base for a product from its pack base keys.
- * Prefers the base with the most pack sizes, then WT / lowest-numbered base.
+ *
+ * Brand-aware defaults (owner policy, 2026-08-10):
+ *   - Berger Paints  → prefer the PO base (standard stock tint base)
+ *   - Birla Opus     → prefer the base-1 code (CS1/NS1/PB1/... — ends with "1")
+ * Fallback: the base with the most pack sizes, then WT, then lowest base number.
  * @param {Array<string|null>} baseKeys
+ * @param {string} [brand]
  * @returns {string|null}
  */
-function pickMainBase(baseKeys) {
+function pickMainBase(baseKeys, brand) {
     const counts = new Map();
     for (const k of baseKeys) {
         if (!k) continue;
         counts.set(k, (counts.get(k) || 0) + 1);
     }
     if (counts.size === 0) return null;
+    const b = String(brand || '').toUpperCase();
+
+    // Berger: PO is the main base
+    if (b.indexOf('BERGER') !== -1 && counts.has('PO')) return 'PO';
+
+    // Birla: base-1 code (ends with "1": CS1/NS1/PB1/EC1/...)
+    if (b.indexOf('BIRLA') !== -1) {
+        const baseOne = [...counts.keys()].filter((k) => /1$/.test(k));
+        if (baseOne.length === 1) return baseOne[0];
+        if (baseOne.length > 1) {
+            // prefer the base whose number is exactly 1 (CS1 over CS13)
+            const exact = baseOne.filter((k) => /(^|\D)1$/.test(k) && !/\d\d$/.test(k));
+            if (exact.length) return exact.sort((x, y) => x.length - y.length)[0];
+            return baseOne.sort((x, y) => x.length - y.length)[0];
+        }
+    }
+
     const entries = [...counts.entries()];
     entries.sort((a, b) => {
         if (b[1] !== a[1]) return b[1] - a[1];          // most packs first

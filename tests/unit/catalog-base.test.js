@@ -59,22 +59,40 @@ describe('catalog-base isSeriesConfident', () => {
 
 describe('catalog-base pickMainBase', () => {
     test('prefers the base with most pack sizes', () => {
-        expect(pickMainBase(['CS1', 'CS1', 'CS1', 'CS1', 'CS2', 'CS2', 'CS5', 'CS99'])).toBe('CS1');
+        expect(pickMainBase(['CS1', 'CS1', 'CS1', 'CS1', 'CS2', 'CS2', 'CS5', 'CS99'], 'Birla Opus')).toBe('CS1');
     });
-    test('prefers WT on equal counts', () => {
-        expect(pickMainBase(['CS2', 'CSWT', 'CS2', 'CSWT'])).toBe('CSWT');
+    test('Birla prefers base-1 code even when another base has more packs', () => {
+        expect(pickMainBase(['CS2', 'CS2', 'CS2', 'CS2', 'CS1', 'CS1'], 'Birla Opus')).toBe('CS1');
+    });
+    test('Birla base-1 exact match over CS13-style codes', () => {
+        expect(pickMainBase(['CS13', 'CS13', 'CS13', 'CS1', 'CS1'], 'Birla Opus')).toBe('CS1');
+    });
+    test('Birla without base-1 falls back to most packs', () => {
+        expect(pickMainBase(['CF13', 'CF13', 'CF13', 'CF13', 'CF99', 'CF99'], 'Birla Opus')).toBe('CF13');
+    });
+    test('Berger prefers PO over N even when N has more packs', () => {
+        expect(pickMainBase(['N', 'N', 'N', 'N', 'PO', 'PO'], 'Berger Paints')).toBe('PO');
+    });
+    test('Berger without PO falls back to most packs', () => {
+        expect(pickMainBase(['N', 'N', 'N', 'N', 'Y', 'Y'], 'Berger Paints')).toBe('N');
+    });
+    test('other brands keep most-packs behaviour', () => {
+        expect(pickMainBase(['A', 'A', 'A', 'B', 'B'], 'Addisons')).toBe('A');
+    });
+    test('prefers WT on equal counts (non-Birla)', () => {
+        expect(pickMainBase(['X2', 'XWT', 'X2', 'XWT'], 'Generic')).toBe('XWT');
     });
     test('lowest base number on equal counts (no WT)', () => {
-        expect(pickMainBase(['CS5', 'CS2', 'CS5', 'CS2'])).toBe('CS2');
+        expect(pickMainBase(['CS5', 'CS2', 'CS5', 'CS2'], 'Generic')).toBe('CS2');
     });
     test('single base returns it', () => {
-        expect(pickMainBase(['NS1', 'NS1', 'NS1', 'NS1'])).toBe('NS1');
+        expect(pickMainBase(['NS1', 'NS1', 'NS1', 'NS1'], 'Birla Opus')).toBe('NS1');
     });
     test('nulls ignored', () => {
-        expect(pickMainBase([null, null, 'N', 'N'])).toBe('N');
+        expect(pickMainBase([null, null, 'N', 'N'], 'Berger Paints')).toBe('N');
     });
     test('empty -> null', () => {
-        expect(pickMainBase([])).toBeNull();
-        expect(pickMainBase([null])).toBeNull();
+        expect(pickMainBase([], 'Birla Opus')).toBeNull();
+        expect(pickMainBase([null], 'Berger Paints')).toBeNull();
     });
 });

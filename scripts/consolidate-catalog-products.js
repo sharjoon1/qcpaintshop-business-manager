@@ -72,7 +72,7 @@ const DRY_RUN = process.argv.includes('--dry-run');
         const key = `${s.series}|||${(r.zoho_brand || '').trim().toUpperCase()}|||${r.product_type}`;
         if (!groups.has(key)) groups.set(key, []);
         const arr = groups.get(key);
-        if (!arr.find(x => x.pid === r.pid)) arr.push({ pid: r.pid, name: r.pname, packs: 0 });
+        if (!arr.find(x => x.pid === r.pid)) arr.push({ pid: r.pid, name: r.pname, brand: r.zoho_brand, packs: 0 });
         arr.find(x => x.pid === r.pid).packs++;
     }
 
@@ -132,7 +132,7 @@ const DRY_RUN = process.argv.includes('--dry-run');
                     const [packs] = await conn.query(
                         `SELECT ps.base_key FROM pack_sizes ps JOIN zoho_items_map zim ON zim.zoho_item_id = ps.zoho_item_id
                          WHERE ps.product_id = ? AND ps.is_active = 1`, [keeperId]);
-                    const main = pickMainBase(packs.map(x => x.base_key));
+                    const main = pickMainBase(packs.map(x => x.base_key), p.keeper.brand);
                     await conn.query('UPDATE products SET main_base_key = ? WHERE id = ?', [main, keeperId]);
                 }
             }
