@@ -66,9 +66,9 @@
                     '<span class="text-xs px-2 py-0.5 rounded-full ' + (hidden ? 'bg-gray-200 text-gray-600' : 'bg-emerald-100 text-emerald-700') + '">' + (hidden ? 'Hidden' : 'Visible') + '</span>' +
                 '</div>' +
                 '<span class="text-xs text-gray-500">' + (b.product_count || 0) + ' catalog products</span>' +
-                '<div class="flex gap-2 mt-1">' +
-                    '<button data-brand="' + esc(b.brand) + '" data-show="1" class="brand-act px-3 py-1.5 rounded-lg border text-xs font-semibold bg-white hover:bg-emerald-50">Show all</button>' +
-                    '<button data-brand="' + esc(b.brand) + '" data-show="0" class="brand-act px-3 py-1.5 rounded-lg border text-xs font-semibold bg-white hover:bg-red-50">Hide all</button>' +
+                '<div class="flex gap-1.5 mt-1">' +
+                    '<button data-brand="' + esc(b.brand) + '" data-show="1" class="brand-act flex-1 px-2 py-1 rounded-md border text-[11px] font-semibold bg-white hover:bg-emerald-50">Show all</button>' +
+                    '<button data-brand="' + esc(b.brand) + '" data-show="0" class="brand-act flex-1 px-2 py-1 rounded-md border text-[11px] font-semibold bg-white hover:bg-red-50">Hide all</button>' +
                 '</div>' +
             '</div>';
         }).join('');

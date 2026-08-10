@@ -3071,7 +3071,6 @@ router.get('/admin/catalog/products', requireAuth, requirePermission('painters',
              ORDER BY brand ASC, category ASC, sort_order ASC, p.name ASC
         `, params);
         res.json({ success: true, products: rows.map(r => ({ ...r, base_keys: r.base_keys ? r.base_keys.split(',') : [] })) });
-        res.json({ success: true, products: rows });
     } catch (e) {
         console.error('GET /admin/catalog/products:', e);
         res.status(500).json({ success: false, message: e.message });
