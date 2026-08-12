@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="theme-color" content="#0F3A5F">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <link rel="manifest" href="/manifest.json">
+    <link rel="icon" type="image/png" sizes="192x192" href="/icons/icon-192x192.png">
+    <link rel="apple-touch-icon" href="/icons/icon-192x192.png">
+    <title>Design Reference - Quality Colours Business Manager</title>
+    <script src="/js/auth-helper.js?v=7101c516"></script>
+    <script src="/js/pages/admin-design-reference-authguard.js"></script>
+    <link rel="stylesheet" href="/css/tailwind.css?v=849f1b5c">
+    <link rel="stylesheet" href="/css/design-system.css?v=16beaa3b">
+    <script src="/universal-nav-loader.js?v=6b4a6dbe"></script>
+    <style>
+        .dr-screen-group { background: #ffffff; border: 1px solid #e5e7eb; border-radius: 12px; margin-bottom: 0.75rem; overflow: hidden; }
+        .dr-screen-header {
+            display: flex; align-items: center; justify-content: space-between; gap: 0.75rem;
+            padding: 0.875rem 1.125rem; cursor: pointer; list-style: none;
+        }
+        .dr-screen-header::-webkit-details-marker { display: none; }
+        .dr-screen-header:hover { background: #f9fafb; }
+        .dr-screen-title { font-weight: 700; color: #1f2937; font-size: 0.9375rem; }
+        .dr-screen-meta { font-size: 0.8125rem; color: #6b7280; }
+        .dr-chevron { transition: transform 0.15s ease; color: #9ca3af; }
+        details[open] > summary .dr-chevron { transform: rotate(90deg); }
+        .dr-pending-tag {
+            display: inline-flex; align-items: center; padding: 0.125rem 0.5rem; margin-left: 0.5rem;
+            border-radius: 9999px; font-size: 0.6875rem; font-weight: 700; background: #fef3c7; color: #92400e;
+        }
+        .dr-entry-row { display: flex; align-items: flex-start; gap: 0.75rem; padding: 0.625rem 1.125rem; border-top: 1px solid #f3f4f6; }
+        .dr-entry-id {
+            font-size: 0.75rem; font-weight: 700; color: #4f46e5; background: #eef2ff;
+            border: none; border-radius: 6px; padding: 0.125rem 0.5rem; cursor: pointer; min-width: 3rem; text-align: center;
+        }
+        .dr-entry-id:hover { background: #e0e7ff; }
+        .dr-entry-id.copied { background: #d1fae5; color: #065f46; }
+        .dr-entry-body { flex: 1; min-width: 0; }
+        .dr-entry-title { font-weight: 600; color: #1f2937; font-size: 0.875rem; }
+        .dr-entry-meta { color: #6b7280; font-size: 0.8125rem; margin-top: 0.125rem; }
+        .dr-no-entries { padding: 0.75rem 1.125rem; color: #9ca3af; font-size: 0.8125rem; border-top: 1px solid #f3f4f6; }
+    </style>
+</head>
+<body class="bg-gray-50 sidebar-collapsed" data-page="design-reference">
+<div class="max-w-6xl mx-auto p-4 sm:p-6">
+
+    <div class="page-header rounded-xl mb-6">
+        <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+            <div>
+                <h1 class="page-title">Design Reference</h1>
+                <p class="page-subtitle">The 39-screen painter app design mockup, cross-referenced to Feature Index entries.</p>
+            </div>
+            <button type="button" id="openMockupBtn" class="px-5 py-2.5 rounded-lg text-sm font-semibold bg-indigo-600 text-white hover:bg-indigo-700 transition-colors whitespace-nowrap">Open Mockup</button>
+        </div>
+    </div>
+
+    <div id="pendingNotice" class="qc-alert qc-alert-warning mb-6 hidden"></div>
+
+    <div class="qc-card qc-card-sm mb-6">
+        <input type="text" id="searchInput" placeholder="Search screens…"
+               class="w-full px-4 py-2 border-2 border-gray-300 rounded-lg text-sm focus:border-indigo-500 focus:outline-none">
+    </div>
+
+    <div id="loadingState" class="loading-state">
+        <div class="spinner"></div>
+        <p class="loading-text">Loading design reference…</p>
+    </div>
+
+    <div id="emptyState" class="empty-state hidden">
+        <h3 class="empty-state-title">No matching screens</h3>
+        <p class="empty-state-description">Try a different search term.</p>
+    </div>
+
+    <div id="screensContainer" class="hidden"></div>
+
+</div>
+<script src="/js/pages/admin-design-reference.js"></script>
+</body>
+</html>

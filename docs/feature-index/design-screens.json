@@ -1,0 +1,162 @@
+{
+  "mockup_url": "/api/admin-docs/design",
+  "last_synced": null,
+  "screens": [
+    {
+      "title": "Login — OTP",
+      "pendingRefresh": false
+    },
+    {
+      "title": "Register",
+      "pendingRefresh": false
+    },
+    {
+      "title": "Awaiting Approval",
+      "pendingRefresh": false
+    },
+    {
+      "title": "Onboarding",
+      "pendingRefresh": false
+    },
+    {
+      "title": "Home",
+      "pendingRefresh": false
+    },
+    {
+      "title": "Work — Estimates & Quotations",
+      "pendingRefresh": false
+    },
+    {
+      "title": "Catalog",
+      "pendingRefresh": false
+    },
+    {
+      "title": "Product Detail",
+      "pendingRefresh": false
+    },
+    {
+      "title": "Product Quick View Sheet",
+      "pendingRefresh": false
+    },
+    {
+      "title": "Estimate Create — Billing Type",
+      "pendingRefresh": false
+    },
+    {
+      "title": "Estimate Create — Products",
+      "pendingRefresh": false
+    },
+    {
+      "title": "Estimate Create — Review (Self)",
+      "pendingRefresh": false
+    },
+    {
+      "title": "Customer Estimate — Pricing & Review",
+      "pendingRefresh": false
+    },
+    {
+      "title": "Quotation Create",
+      "pendingRefresh": false
+    },
+    {
+      "title": "Quotation Detail",
+      "pendingRefresh": false
+    },
+    {
+      "title": "Estimate Detail",
+      "pendingRefresh": false
+    },
+    {
+      "title": "Estimate PDF Preview",
+      "pendingRefresh": false
+    },
+    {
+      "title": "Payment Sheet",
+      "pendingRefresh": false
+    },
+    {
+      "title": "Check-In (Selfie Attendance)",
+      "pendingRefresh": false
+    },
+    {
+      "title": "Attendance Calendar",
+      "pendingRefresh": false
+    },
+    {
+      "title": "Attendance History",
+      "pendingRefresh": false
+    },
+    {
+      "title": "Paint Calculator",
+      "pendingRefresh": false
+    },
+    {
+      "title": "Notifications",
+      "pendingRefresh": false
+    },
+    {
+      "title": "Profile (Me)",
+      "pendingRefresh": false
+    },
+    {
+      "title": "Edit Profile",
+      "pendingRefresh": false
+    },
+    {
+      "title": "Gallery",
+      "pendingRefresh": false
+    },
+    {
+      "title": "Referrals",
+      "pendingRefresh": false
+    },
+    {
+      "title": "Leaderboard",
+      "pendingRefresh": false
+    },
+    {
+      "title": "Achievements",
+      "pendingRefresh": false
+    },
+    {
+      "title": "Training",
+      "pendingRefresh": false
+    },
+    {
+      "title": "Training Detail",
+      "pendingRefresh": false
+    },
+    {
+      "title": "Points History",
+      "pendingRefresh": false
+    },
+    {
+      "title": "Cards (Rewards)",
+      "pendingRefresh": false
+    },
+    {
+      "title": "Visualizations",
+      "pendingRefresh": false
+    },
+    {
+      "title": "Settings",
+      "pendingRefresh": false
+    },
+    {
+      "title": "Quick Actions Sheet",
+      "pendingRefresh": false
+    },
+    {
+      "title": "Cart Sheet — Self/Customer Chooser",
+      "pendingRefresh": false
+    },
+    {
+      "title": "Streak Sheet",
+      "pendingRefresh": false
+    },
+    {
+      "title": "Withdrawal Sheet",
+      "pendingRefresh": false
+    }
+  ]
+}

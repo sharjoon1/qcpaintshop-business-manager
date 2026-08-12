@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="theme-color" content="#0F3A5F">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <link rel="manifest" href="/manifest.json">
+    <link rel="icon" type="image/png" sizes="192x192" href="/icons/icon-192x192.png">
+    <link rel="apple-touch-icon" href="/icons/icon-192x192.png">
+    <title>Features Log - Quality Colours Business Manager</title>
+    <script src="/js/auth-helper.js?v=7101c516"></script>
+    <script src="/js/pages/admin-features-log-authguard.js"></script>
+    <link rel="stylesheet" href="/css/tailwind.css?v=849f1b5c">
+    <link rel="stylesheet" href="/css/design-system.css?v=16beaa3b">
+    <script src="/universal-nav-loader.js?v=6b4a6dbe"></script>
+    <style>
+        .fl-type-badge {
+            display: inline-flex; align-items: center; padding: 0.125rem 0.5rem;
+            border-radius: 9999px; font-size: 0.6875rem; font-weight: 700;
+            text-transform: uppercase; letter-spacing: 0.02em; line-height: 1.4; white-space: nowrap;
+        }
+        .fl-type-page { background: #e0e7ff; color: #3730a3; }
+        .fl-type-section { background: #dbeafe; color: #1e40af; }
+        .fl-type-feature { background: #d1fae5; color: #065f46; }
+        .fl-type-button { background: #fef3c7; color: #92400e; }
+        .fl-type-tab { background: #ede9fe; color: #5b21b6; }
+        .fl-type-field { background: #f3f4f6; color: #374151; }
+        .fl-type-state { background: #ffe4e6; color: #9f1239; }
+        .fl-type-removed { background: #f3f4f6; color: #9ca3af; text-decoration: line-through; }
+
+        .fl-date-group { background: #ffffff; border: 1px solid #e5e7eb; border-radius: 12px; margin-bottom: 1rem; overflow: hidden; }
+        .fl-date-header {
+            display: flex; align-items: center; justify-content: space-between; gap: 0.75rem;
+            padding: 0.875rem 1.125rem; background: #f9fafb; border-bottom: 1px solid #e5e7eb;
+            font-weight: 700; color: #1f2937; font-size: 0.9375rem;
+        }
+        details.fl-date-group > summary.fl-date-header { cursor: pointer; list-style: none; }
+        details.fl-date-group > summary.fl-date-header::-webkit-details-marker { display: none; }
+        .fl-date-header .fl-chevron { transition: transform 0.15s ease; color: #9ca3af; }
+        details[open].fl-date-group > summary .fl-chevron { transform: rotate(90deg); }
+
+        .fl-row { display: flex; align-items: flex-start; gap: 0.75rem; padding: 0.625rem 1.125rem; border-bottom: 1px solid #f3f4f6; }
+        .fl-row:last-child { border-bottom: none; }
+        .fl-id-chip {
+            font-size: 0.75rem; font-weight: 700; color: #4f46e5; background: #eef2ff;
+            border: none; border-radius: 6px; padding: 0.125rem 0.5rem; cursor: pointer; min-width: 3rem; text-align: center;
+        }
+        .fl-id-chip:hover { background: #e0e7ff; }
+        .fl-id-chip.copied { background: #d1fae5; color: #065f46; }
+        .fl-row-body { flex: 1; min-width: 0; }
+        .fl-row-title { font-weight: 600; color: #1f2937; font-size: 0.875rem; }
+        .fl-row-meta { color: #6b7280; font-size: 0.8125rem; margin-top: 0.125rem; }
+    </style>
+</head>
+<body class="bg-gray-50 sidebar-collapsed" data-page="features-log">
+<div class="max-w-6xl mx-auto p-4 sm:p-6">
+
+    <div class="page-header rounded-xl mb-6">
+        <h1 class="page-title">Features Log</h1>
+        <p class="page-subtitle">Chronological log of every feature-index entry, grouped by last-updated date.</p>
+    </div>
+
+    <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+        <div class="stat-card stat-card-success">
+            <div class="stat-card-number" id="statActive">—</div>
+            <div class="stat-card-label">Active</div>
+        </div>
+        <div class="stat-card stat-card-info">
+            <div class="stat-card-number" id="statRecent">—</div>
+            <div class="stat-card-label">Updated last 7 days</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-card-number" id="statPlatforms">—</div>
+            <div class="stat-card-label">Platforms</div>
+        </div>
+        <div class="stat-card stat-card-warning">
+            <div class="stat-card-number" id="statTotal">—</div>
+            <div class="stat-card-label">Total incl. removed</div>
+        </div>
+    </div>
+
+    <div id="loadingState" class="loading-state">
+        <div class="spinner"></div>
+        <p class="loading-text">Loading features log…</p>
+    </div>
+
+    <div id="emptyState" class="empty-state hidden">
+        <h3 class="empty-state-title">No entries yet</h3>
+        <p class="empty-state-description">The feature index has no entries.</p>
+    </div>
+
+    <div id="logContainer" class="hidden"></div>
+
+</div>
+<script src="/js/pages/admin-features-log.js"></script>
+</body>
+</html>

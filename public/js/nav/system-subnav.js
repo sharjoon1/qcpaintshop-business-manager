@@ -11,7 +11,10 @@
         { page: 'bug-reports', label: 'Bug Reports', href: '/admin-bug-reports.html', icon: '<path d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>' },
         { page: 'anomalies', label: 'Anomalies', href: '/admin-anomalies.html', icon: '<path d="M13 10V3L4 14h7v7l9-11h-7z"/>' },
         { page: 'monitoring', label: 'Monitor', href: '/admin-monitoring.html', icon: '<rect x="2" y="3" width="20" height="14" rx="2" ry="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/>' },
-        { page: 'photos', label: 'Photos', href: '/admin-photos.html', icon: '<rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/>' }
+        { page: 'photos', label: 'Photos', href: '/admin-photos.html', icon: '<rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/>' },
+        { page: 'feature-index', label: 'Feature Index', href: '/admin-feature-index.html', icon: '<line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/>' },
+        { page: 'features-log', label: 'Features Log', href: '/admin-features-log.html', icon: '<circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>' },
+        { page: 'design-reference', label: 'Design Reference', href: '/admin-design-reference.html', icon: '<rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/>' }
     ];
 
     var currentPage = document.body.getAttribute('data-page') || document.documentElement.getAttribute('data-page') || '';

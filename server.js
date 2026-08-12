@@ -103,6 +103,7 @@ const authInlineRoutes = require('./routes/auth');
 const paintColorsRoutes = require('./routes/paint-colors');
 const productsInlineRoutes = require('./routes/products');
 const customerPortalRoutes = require('./routes/customer-portal');
+const adminDocsRoutes = require('./routes/admin-docs');
 
 const app = express();
 app.set('trust proxy', 1); // Trust first proxy (nginx/aaPanel)
@@ -429,6 +430,7 @@ authInlineRoutes.setPool(pool);
 paintColorsRoutes.setPool(pool);
 productsInlineRoutes.setPool(pool);
 customerPortalRoutes.setPool(pool);
+adminDocsRoutes.setPool(pool);
 const invoiceLineSync = require('./services/zoho-invoice-line-sync');
 invoiceLineSync.setPool(pool);
 const reorderCompute = require('./services/reorder-compute-service');
@@ -504,6 +506,7 @@ app.use('/api/agreements', agreementsRoutes.router);
 app.use('/api/2fa', twoFARoutes);
 app.use('/api/price-list', priceListRoutes.router);
 app.use('/api/gst-reports', gstReportsRoutes.router);
+app.use('/api/admin-docs', adminDocsRoutes.router);
 
 // Share page routes (serve HTML for public share links)
 app.get('/share/estimate/:token', (req, res) => {

@@ -2028,6 +2028,35 @@ node promote-release.js internal production
 
 ## 8. RECENT UPDATES & CHANGELOG
 
+### 2026-08-12 - Painter catalog curation enforcement + Feature Index admin docs system
+
+- **Self-billing catalog leak fixed** (`992b873`): `GET /me/estimates/products` (the painter
+  app's estimate product picker) returned ALL 282 active products; admin catalog curation
+  (`painter_catalog_*_order` + per-painter `*_overrides`) was enforced only by `GET /me/catalog`.
+  New pure helper `buildCatalogVisibility(painterId, {productAlias, zimAlias})` in
+  `routes/painters/shared.js`; applied to the picker (+ its brand/category dropdowns via
+  row-survival queries), `POST /me/estimates` validation (hidden item → 400 "Product not
+  available", before any INSERT), `GET /me/catalog/:productId` (hidden → existing 404), and
+  `GET /me/offer-products`. `/me/catalog` refactored onto the helper (characterization-locked).
+  Mobile contract frozen — only row selection changed. PUT/submit routes deliberately untouched
+  so existing estimates with since-hidden items keep working. Build+Judge: judge PASS.
+  Tests: `tests/unit/painter-catalog-visibility.test.js` (17).
+- **Feature Index / Features Log / Design Reference** (bestpainters-pattern, adapted to this
+  stack): git-tracked `docs/feature-index/feature-index.json` (143 entries, stable
+  never-renumbered ids, `next_id`) + `docs/feature-index/design-screens.json` (39 painter-app
+  screen titles) + `docs/design/painter-app-mockup.html` (placeholder; full 39-frame mockup is
+  the next deliverable). Admin-gated API `routes/admin-docs.js` (`/api/admin-docs/feature-index`,
+  `/api/admin-docs/design` — requireAuth + requireRole('admin'), private no-store; mockup file
+  lives outside `public/` so it is never publicly reachable). Three strict-CSP admin pages:
+  `admin-feature-index.html`, `admin-features-log.html`, `admin-design-reference.html`
+  (+ `/js/pages/*.js` + authguards); nav wired in sidebar-complete System submenu +
+  system-subnav + sidebar-v2 group. Integrity test `tests/unit/feature-index-data.test.js` (12)
+  enforces id stability and design↔screen references.
+- Same day, curation page (`admin-painter-catalog.html`) gained: FormData upload fix
+  (`c3a1778` — getAuthHeaders' JSON content-type must be stripped for multipart), brand column,
+  client-side search, per-product ✎ rename (`PUT /api/painters/admin/catalog/products/rename`),
+  category-filter persistence, and the brand-filtered-save scope fix (`f40aad7`).
+
 ### 2026-07-12 - Painter onboarding loop closure (frontend fixes)
 
 The onboarding workflow deployed earlier today had three frontend-only gaps closing the
