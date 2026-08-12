@@ -3,69 +3,2146 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Painter App Mockup — Draft</title>
+<title>QC Painter App v5 — Screen Mockups (39)</title>
 <style>
-    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: #f5f7fa; color: #1f2937; margin: 0; padding: 2rem; }
-    .wrap { max-width: 780px; margin: 0 auto; }
-    h1 { color: #1B5E3B; font-size: 1.5rem; margin-bottom: 0.25rem; }
-    .subtitle { color: #6b7280; margin-top: 0; margin-bottom: 1.5rem; }
-    .notice { background: #fffbeb; border: 1px solid #fde68a; color: #92400e; border-radius: 8px; padding: 0.9rem 1.1rem; margin-bottom: 1.5rem; font-size: 0.9rem; }
-    ol { background: #ffffff; border: 1px solid #e5e7eb; border-radius: 10px; padding: 1.25rem 1.25rem 1.25rem 2.5rem; box-shadow: 0 1px 2px rgba(0,0,0,0.04); }
-    li { padding: 0.35rem 0; }
-    footer { margin-top: 1.5rem; color: #9ca3af; font-size: 0.8rem; }
+/* ═══════════ QC Painter v5 mockup — self-contained, light-only ═══════════ */
+:root{
+  /* app tokens (mirrors ui/theme/Color.kt) */
+  --green:#1B5E3B; --green-l:#2D8A5E; --green-d:#154D31; --green-dd:#0D3D23; --green-c:#DCFCE7;
+  --gold:#D4A24E; --gold-d:#B8891F; --gold-c:#FEF3C7;            /* gold = earnings ONLY */
+  --bg:#F1F4EF; --sv:#E8EEE9; --ink:#1A2E20; --ink2:#4A6B52; --ink3:#7A9E82;
+  --err:#DC2626; --err-c:#FEE2E2; --offer:#E65100; --offer-c:#FFEDD5;
+  --line:#DFE7DE; --white:#FFFFFF;
+  --bronze:#A9714B; --silver:#8C9BAB; --tgold:#C9A14A; --diamond:#5BA8C4;
+  /* gallery chrome (quiet, green-tinted paper) */
+  --page:#E7ECE4; --page-ink:#22301F; --page-mut:#5C6E58; --card:#FFFFFF;
+  --r:16px; --rs:10px;
+  --s1:0 1px 2px rgba(13,61,35,.07); --s2:0 4px 14px rgba(13,61,35,.10); --s3:0 14px 36px rgba(13,61,35,.18);
+  --font:'Inter','Noto Sans Tamil',system-ui,-apple-system,'Segoe UI',Roboto,sans-serif;
+}
+*{margin:0;padding:0;box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{font-family:var(--font);background:var(--page);color:var(--page-ink);
+  font-feature-settings:'tnum';-webkit-font-smoothing:antialiased}
+img{max-width:100%}
+
+/* ── page chrome ─────────────────────────────────────────────── */
+.topbar{position:sticky;top:0;z-index:50;background:linear-gradient(135deg,var(--green-dd),var(--green));
+  color:#fff;padding:14px 22px;display:flex;align-items:baseline;gap:14px;flex-wrap:wrap;box-shadow:var(--s2)}
+.topbar b{font-size:17px;letter-spacing:.2px}
+.topbar span{font-size:12px;opacity:.85}
+.jumps{position:sticky;top:53px;z-index:49;background:color-mix(in srgb,var(--page) 88%,#fff);
+  backdrop-filter:blur(6px);border-bottom:1px solid var(--line);padding:8px 22px;display:flex;gap:6px;
+  overflow-x:auto;scrollbar-width:thin}
+.jumps a{flex:none;font-size:11px;font-weight:600;color:var(--page-mut);text-decoration:none;
+  padding:4px 9px;border-radius:999px;border:1px solid var(--line);background:#fff}
+.jumps a:hover,.jumps a:focus-visible{color:var(--green);border-color:var(--green-l);outline:none}
+.jumps .grp{flex:none;align-self:center;font-size:10px;font-weight:800;letter-spacing:.12em;
+  text-transform:uppercase;color:var(--green);padding:0 4px 0 12px}
+.intro{max-width:1400px;margin:26px auto 0;padding:0 22px}
+.intro h1{font-size:26px;font-weight:800;letter-spacing:-.02em}
+.intro p{font-size:13.5px;color:var(--page-mut);margin-top:6px;max-width:760px;line-height:1.55}
+
+/* ── design-system band ──────────────────────────────────────── */
+.band{max-width:1400px;margin:22px auto 8px;padding:18px 22px;display:grid;gap:14px;
+  grid-template-columns:repeat(auto-fit,minmax(240px,1fr))}
+.swcard{background:var(--card);border:1px solid var(--line);border-radius:var(--r);padding:14px;box-shadow:var(--s1)}
+.swcard h4{font-size:10px;font-weight:800;letter-spacing:.14em;text-transform:uppercase;color:var(--page-mut);margin-bottom:10px}
+.sw{display:flex;gap:6px;flex-wrap:wrap}
+.sw i{width:34px;height:34px;border-radius:9px;display:block;border:1px solid rgba(0,0,0,.05)}
+.sw small{font-size:9px;color:var(--page-mut);display:block;margin-top:3px;text-align:center}
+.sw>div{text-align:center}
+.typerow{display:flex;flex-direction:column;gap:4px}
+.typerow .t1{font-size:20px;font-weight:800;color:var(--ink)}
+.typerow .t2{font-size:14px;font-weight:600;color:var(--ink)}
+.typerow .t3{font-size:12px;color:var(--ink2)}
+.typerow .t4{font-size:10px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--ink3)}
+
+/* ── gallery of phones ───────────────────────────────────────── */
+.gallery{max-width:1400px;margin:12px auto 90px;padding:0 22px;display:grid;
+  grid-template-columns:repeat(auto-fill,minmax(370px,1fr));gap:52px 28px;justify-items:center}
+.framewrap{width:100%;max-width:396px;scroll-margin-top:118px}
+.cap{margin:0 4px 10px}
+.cap .n{font-weight:800;font-size:16px;letter-spacing:-.01em}
+.cap .ta{font-size:12px;color:var(--page-mut);margin-top:3px;line-height:1.5}
+.cap .tag{display:inline-block;font-size:9.5px;font-weight:800;letter-spacing:.06em;padding:2px 8px;
+  border-radius:999px;margin:6px 6px 0 0;text-transform:uppercase}
+.tag.new{background:var(--green-c);color:var(--green-d)}
+.tag.pol{background:var(--sv);color:var(--ink2)}
+.tag.fix{background:var(--gold-c);color:var(--gold-d)}
+.phone{position:relative;width:100%;aspect-ratio:390/844;background:var(--bg);border-radius:40px;
+  border:1px solid var(--line);box-shadow:var(--s3),0 0 0 7px rgba(26,46,32,.05);overflow:hidden;
+  display:flex;flex-direction:column}
+.notch{position:absolute;top:0;left:50%;transform:translateX(-50%);width:120px;height:24px;
+  background:#0E1611;border-radius:0 0 14px 14px;z-index:30;opacity:.93}
+.sbar{flex:none;height:34px;display:flex;justify-content:space-between;align-items:flex-end;
+  padding:0 20px 3px;font-size:11px;font-weight:700;color:var(--ink);z-index:2}
+.sbar em{font-style:normal;letter-spacing:.04em}
+.screen{flex:1;overflow-y:auto;overflow-x:hidden;position:relative;scrollbar-width:none;display:flex;flex-direction:column}
+.screen::-webkit-scrollbar{display:none}
+
+/* ═══════════ app components (the v5 visual language) ═══════════ */
+/* top bars */
+.abar{flex:none;padding:10px 16px 12px;display:flex;align-items:center;gap:10px;background:var(--bg)}
+.abar .h{font-size:19px;font-weight:800;color:var(--ink);letter-spacing:-.02em}
+.abar .sub{font-size:11px;color:var(--ink2);margin-top:1px}
+.abar .sp{flex:1}
+.hero{flex:none;background:linear-gradient(140deg,var(--green-dd) 0%,var(--green) 62%,var(--green-l) 100%);
+  color:#fff;padding:14px 16px 18px;border-radius:0 0 22px 22px}
+.hero .hi{font-size:12px;opacity:.85}
+.hero .nm{font-size:20px;font-weight:800;letter-spacing:-.01em;margin-top:1px}
+.back{width:32px;height:32px;border-radius:50%;background:var(--white);border:1px solid var(--line);
+  display:flex;align-items:center;justify-content:center;font-size:15px;color:var(--ink);flex:none}
+.hero .back{background:rgba(255,255,255,.16);border-color:transparent;color:#fff}
+.iconb{width:34px;height:34px;border-radius:50%;background:var(--white);border:1px solid var(--line);
+  display:flex;align-items:center;justify-content:center;font-size:14px;flex:none;position:relative}
+.iconb .dot{position:absolute;top:6px;right:7px;width:7px;height:7px;border-radius:50%;background:var(--err);border:1.5px solid #fff}
+
+/* bottom nav */
+.bnav{flex:none;background:var(--white);border-top:1px solid var(--line);display:flex;align-items:flex-end;
+  padding:6px 8px 10px;position:relative}
+.bnav .it{flex:1;text-align:center;font-size:9.5px;font-weight:600;color:var(--ink3);display:flex;
+  flex-direction:column;gap:2px;align-items:center}
+.bnav .it i{font-style:normal;font-size:17px;line-height:1}
+.bnav .it.on{color:var(--green)}
+.bnav .it.on i{filter:none}
+.bnav .fab{flex:none;width:52px;height:52px;margin:0 6px;border-radius:50%;
+  background:linear-gradient(135deg,var(--green),var(--green-l));color:#fff;font-size:24px;font-weight:300;
+  display:flex;align-items:center;justify-content:center;box-shadow:var(--s2);transform:translateY(-14px)}
+
+/* cards & tiles */
+.pad{padding:12px 16px;display:flex;flex-direction:column;gap:12px}
+.card{background:var(--white);border:1px solid var(--line);border-radius:var(--r);box-shadow:var(--s1)}
+.card.pad2{padding:13px 14px}
+.sect{display:flex;align-items:baseline;justify-content:space-between;margin:2px 2px -4px}
+.sect b{font-size:13.5px;font-weight:800;color:var(--ink)}
+.sect a{font-size:11px;font-weight:700;color:var(--green);text-decoration:none}
+.tiles2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.tile{background:var(--white);border:1px solid var(--line);border-radius:var(--r);padding:12px;box-shadow:var(--s1)}
+.tile .lb{font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--ink3)}
+.tile .v{font-size:21px;font-weight:800;color:var(--ink);margin-top:3px;letter-spacing:-.02em}
+.tile .v.gold{color:var(--gold-d)}
+.tile .m{font-size:10.5px;color:var(--ink2);margin-top:2px}
+
+/* chips / badges / pills */
+.chips{display:flex;gap:7px;overflow-x:auto;scrollbar-width:none;padding:2px}
+.chips::-webkit-scrollbar{display:none}
+.chip{flex:none;font-size:11.5px;font-weight:600;color:var(--ink2);background:var(--white);
+  border:1px solid var(--line);border-radius:999px;padding:6px 12px}
+.chip.on{background:var(--green);border-color:var(--green);color:#fff}
+.pts{display:inline-flex;align-items:center;gap:3px;font-size:10px;font-weight:800;color:var(--gold-d);
+  background:var(--gold-c);border-radius:999px;padding:2.5px 8px}
+.offer{display:inline-flex;align-items:center;gap:3px;font-size:10px;font-weight:800;color:var(--offer);
+  background:var(--offer-c);border-radius:999px;padding:2.5px 8px}
+.stock{display:inline-flex;align-items:center;gap:4px;font-size:9.5px;font-weight:700;border-radius:999px;padding:2px 8px}
+.stock.in{color:var(--green-d);background:var(--green-c)}
+.stock.out{color:var(--ink3);background:var(--sv)}
+.stock i{font-style:normal;font-size:7px;line-height:1}
+.badge{font-size:9.5px;font-weight:800;letter-spacing:.05em;text-transform:uppercase;border-radius:6px;padding:2px 7px}
+.badge.dr{background:var(--sv);color:var(--ink2)}          /* draft */
+.badge.pa{background:var(--gold-c);color:var(--gold-d)}    /* pending admin */
+.badge.ap{background:var(--green-c);color:var(--green-d)}  /* approved */
+.badge.rj{background:var(--err-c);color:var(--err)}        /* rejected */
+
+/* product imagery placeholder */
+.pimg{background:linear-gradient(150deg,#E6EFE7,#F4F8F2 55%,#DFEAE0);display:flex;align-items:center;
+  justify-content:center;color:var(--green-l);font-weight:800;position:relative;overflow:hidden}
+.pimg::after{content:'';position:absolute;inset:auto -20% -55% -20%;height:80%;
+  background:radial-gradient(closest-side,rgba(27,94,59,.14),transparent 70%)}
+.pimg span{font-size:22px;letter-spacing:.04em;opacity:.55}
+
+/* ── PRICE LADDER (signature) — every variant priced, one view ── */
+.ladder{display:flex;flex-direction:column}
+.ladder .lrow{display:flex;align-items:center;gap:9px;padding:9.5px 12px;border-top:1px solid var(--line);position:relative}
+.ladder .lrow:first-child{border-top:none}
+.ladder .lrow.on{background:linear-gradient(90deg,var(--green-c) 0%,rgba(220,252,231,.25) 70%,transparent)}
+.ladder .lrow.on::before{content:'';position:absolute;left:0;top:8%;bottom:8%;width:3.5px;border-radius:4px;background:var(--green)}
+.ladder .sz{flex:none;min-width:44px;text-align:center;font-size:11.5px;font-weight:800;color:var(--ink);
+  background:var(--sv);border-radius:8px;padding:5px 7px}
+.ladder .lrow.on .sz{background:var(--green);color:#fff}
+.ladder .pr{font-size:15px;font-weight:800;color:var(--green-d);letter-spacing:-.01em}
+.ladder .mrp{font-size:10.5px;color:var(--ink3);text-decoration:line-through}
+.ladder .sp{flex:1}
+.ladder .qty{display:flex;align-items:center;gap:8px;font-size:13px;font-weight:800;color:var(--ink)}
+.ladder .qty u{text-decoration:none;width:24px;height:24px;border-radius:8px;border:1px solid var(--line);
+  background:#fff;display:flex;align-items:center;justify-content:center;font-size:13px;color:var(--green);font-weight:700}
+
+/* catalog grid card */
+.pgrid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.pcard{background:var(--white);border:1px solid var(--line);border-radius:var(--r);overflow:hidden;box-shadow:var(--s1);position:relative}
+.pcard .pimg{height:96px}
+.pcard .bd{padding:9px 10px 10px}
+.pcard .nm{font-size:12px;font-weight:700;color:var(--ink);line-height:1.3;display:-webkit-box;
+  -webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;min-height:31px}
+.pcard .br{font-size:9.5px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--ink3);margin-top:2px}
+.pcard .pr{font-size:14.5px;font-weight:800;color:var(--green-d);margin-top:5px}
+.pcard .pr small{font-size:9.5px;font-weight:600;color:var(--ink3)}
+.pcard .flo{position:absolute;top:7px;left:7px;display:flex;gap:4px}
+.pcard .flo2{position:absolute;top:7px;right:7px;display:flex;flex-direction:column;gap:4px;align-items:flex-end}
+.pcard .add{position:absolute;right:9px;bottom:9px;width:30px;height:30px;border-radius:50%;
+  background:var(--green);color:#fff;font-size:17px;display:flex;align-items:center;justify-content:center;box-shadow:var(--s1)}
+.szline{display:flex;gap:4px;flex-wrap:wrap;margin-top:6px}
+.szline b{font-size:9px;font-weight:700;color:var(--ink2);background:var(--sv);border-radius:6px;padding:2.5px 6px}
+.szline b em{font-style:normal;color:var(--green-d);font-weight:800}
+
+/* list rows */
+.lrow2{display:flex;align-items:center;gap:11px;padding:11px 13px;border-top:1px solid var(--line)}
+.lrow2:first-child{border-top:none}
+.lrow2 .ic{flex:none;width:36px;height:36px;border-radius:11px;background:var(--sv);display:flex;
+  align-items:center;justify-content:center;font-size:16px}
+.lrow2 .tx{flex:1;min-width:0}
+.lrow2 .t{font-size:12.5px;font-weight:700;color:var(--ink)}
+.lrow2 .s{font-size:10.5px;color:var(--ink2);margin-top:1px}
+.lrow2 .r{text-align:right}
+.lrow2 .amt{font-size:13px;font-weight:800;color:var(--ink)}
+.lrow2 .amt.plus{color:var(--green-d)}
+.lrow2 .chev{color:var(--ink3);font-size:14px}
+
+/* buttons / inputs / misc */
+.cta{display:flex;align-items:center;justify-content:center;gap:8px;background:var(--green);color:#fff;
+  font-size:14px;font-weight:800;border-radius:14px;padding:13px;box-shadow:var(--s1)}
+.cta.gh{background:var(--white);color:var(--green);border:1.5px solid var(--green)}
+.cta.dis{background:var(--sv);color:var(--ink3);box-shadow:none}
+.sticky{position:sticky;bottom:0;background:linear-gradient(transparent,var(--bg) 30%);padding:10px 16px 12px;margin-top:auto}
+.inp{background:var(--white);border:1.5px solid var(--line);border-radius:12px;padding:11px 13px;
+  font-size:12.5px;color:var(--ink3);display:flex;align-items:center;gap:8px}
+.inp b{color:var(--ink);font-weight:600}
+.inp.foc{border-color:var(--green-l);box-shadow:0 0 0 3px rgba(45,138,94,.12)}
+.steps{display:flex;gap:5px;justify-content:center}
+.steps i{width:22px;height:4px;border-radius:4px;background:var(--sv)}
+.steps i.on{background:var(--green)}
+.divh{font-size:10px;font-weight:800;letter-spacing:.12em;text-transform:uppercase;color:var(--ink3);margin:4px 2px -6px}
+.empty{display:flex;flex-direction:column;align-items:center;gap:8px;padding:34px 20px;text-align:center}
+.empty i{font-style:normal;font-size:34px}
+.empty b{font-size:13.5px;color:var(--ink)}
+.empty p{font-size:11px;color:var(--ink2);line-height:1.5;max-width:230px}
+.shade{display:flex;gap:7px}
+.shade i{width:26px;height:26px;border-radius:50%;border:2px solid #fff;box-shadow:0 0 0 1px var(--line)}
+.shade i.on{box-shadow:0 0 0 2px var(--green)}
+.avatar{border-radius:50%;background:linear-gradient(135deg,var(--green-l),var(--green-dd));color:#fff;
+  display:flex;align-items:center;justify-content:center;font-weight:800}
+.prog{height:7px;border-radius:99px;background:var(--sv);overflow:hidden}
+.prog i{display:block;height:100%;border-radius:99px;background:linear-gradient(90deg,var(--green-l),var(--green))}
+.prog.gold i{background:linear-gradient(90deg,var(--gold),var(--gold-d))}
+.knote{font-size:10px;color:var(--ink3);text-align:center}
+.tamil{font-family:'Noto Sans Tamil',var(--font)}
+
+/* sheet-style frames (overlay screens) */
+.sheetdim{flex:1;background:linear-gradient(rgba(14,22,17,.28),rgba(14,22,17,.45))}
+.sheet{flex:none;background:var(--white);border-radius:22px 22px 0 0;padding:8px 16px 16px;box-shadow:var(--s3);
+  display:flex;flex-direction:column;gap:11px;max-height:78%;overflow-y:auto;scrollbar-width:none}
+.sheet .grab{width:38px;height:4.5px;border-radius:99px;background:var(--line);margin:2px auto 2px}
+.sheet .sh{font-size:15.5px;font-weight:800;color:var(--ink)}
+
+/* footer */
+.foot{max-width:1400px;margin:0 auto 40px;padding:0 22px;font-size:11px;color:var(--page-mut)}
+@media (prefers-reduced-motion:no-preference){
+  .framewrap{transition:transform .18s ease}
+}
 </style>
 </head>
 <body>
-<div class="wrap">
-    <h1>Painter App Mockup — first draft in progress</h1>
-    <p class="subtitle">Design reference placeholder for the QC Painter Android app (39 screens).</p>
-    <div class="notice">
-        This is a placeholder. The real, per-screen visual mockup has not been produced yet.
-        Once it exists, this file is regenerated and <code>docs/feature-index/design-screens.json</code>'s
-        <code>last_synced</code> is updated.
-    </div>
-    <ol>
-        <li>Login — OTP</li>
-        <li>Register</li>
-        <li>Awaiting Approval</li>
-        <li>Onboarding</li>
-        <li>Home</li>
-        <li>Work — Estimates &amp; Quotations</li>
-        <li>Catalog</li>
-        <li>Product Detail</li>
-        <li>Product Quick View Sheet</li>
-        <li>Estimate Create — Billing Type</li>
-        <li>Estimate Create — Products</li>
-        <li>Estimate Create — Review (Self)</li>
-        <li>Customer Estimate — Pricing &amp; Review</li>
-        <li>Quotation Create</li>
-        <li>Quotation Detail</li>
-        <li>Estimate Detail</li>
-        <li>Estimate PDF Preview</li>
-        <li>Payment Sheet</li>
-        <li>Check-In (Selfie Attendance)</li>
-        <li>Attendance Calendar</li>
-        <li>Attendance History</li>
-        <li>Paint Calculator</li>
-        <li>Notifications</li>
-        <li>Profile (Me)</li>
-        <li>Edit Profile</li>
-        <li>Gallery</li>
-        <li>Referrals</li>
-        <li>Leaderboard</li>
-        <li>Achievements</li>
-        <li>Training</li>
-        <li>Training Detail</li>
-        <li>Points History</li>
-        <li>Cards (Rewards)</li>
-        <li>Visualizations</li>
-        <li>Settings</li>
-        <li>Quick Actions Sheet</li>
-        <li>Cart Sheet — Self/Customer Chooser</li>
-        <li>Streak Sheet</li>
-        <li>Withdrawal Sheet</li>
-    </ol>
-    <footer>Served by GET /api/admin-docs/design (admin-only, not publicly reachable). Not linked from any public page.</footer>
+
+<div class="topbar"><b>QC Painter App — v5 Screen Mockups</b><span>39 screens · light-only · QCGreen #1B5E3B · gold = earnings only · Inter + Noto Sans Tamil</span></div>
+
+<nav class="jumps" id="jumps"><!-- built by script --></nav>
+
+<div class="intro">
+  <h1>Painter app v5 — proposed design, every screen</h1>
+  <p class="tamil">ஒவ்வொரு frame-ஓட கீழே உள்ள குறிப்பு: அந்த screen-ல் என்ன மாறுது. <b>NEW</b> = புது design/feature, <b>POLISH</b> = அதே layout + v5 finish, <b>OWNER FIX</b> = நீங்க கேட்ட மாற்றம். மைய அம்சம்: <b>Price Ladder</b> — ஒவ்வொரு pack size-க்கும் விலை + MRP + points ஒரே பார்வையில் (Product Detail, Quick View, Billing picker மூன்றிலும்).</p>
 </div>
+
+<div class="band">
+  <div class="swcard"><h4>Color — QC Green ramp</h4>
+    <div class="sw">
+      <div><i style="background:#0D3D23"></i><small>dd</small></div>
+      <div><i style="background:#154D31"></i><small>dark</small></div>
+      <div><i style="background:#1B5E3B"></i><small>green</small></div>
+      <div><i style="background:#2D8A5E"></i><small>light</small></div>
+      <div><i style="background:#DCFCE7"></i><small>cont.</small></div>
+      <div><i style="background:#F1F4EF"></i><small>bg</small></div>
+    </div>
+    <h4 style="margin-top:12px">Gold — earnings only</h4>
+    <div class="sw">
+      <div><i style="background:#D4A24E"></i><small>gold</small></div>
+      <div><i style="background:#B8891F"></i><small>dark</small></div>
+      <div><i style="background:#FEF3C7"></i><small>cont.</small></div>
+      <div><i style="background:#E65100"></i><small>offer</small></div>
+      <div><i style="background:#DC2626"></i><small>error</small></div>
+    </div>
+  </div>
+  <div class="swcard"><h4>Type — Inter · tabular numerals</h4>
+    <div class="typerow">
+      <span class="t1">₹1,890 · CALISTA</span>
+      <span class="t2">Product name / card title — SemiBold 14</span>
+      <span class="t3">Body & meta — Regular 12 · line 1.5</span>
+      <span class="t4">Section label · caps 10</span>
+    </div>
+  </div>
+  <div class="swcard"><h4>Badges & states</h4>
+    <div style="display:flex;flex-wrap:wrap;gap:7px;align-items:center">
+      <span class="pts">★ 12 pts/L</span><span class="offer">% OFFER</span>
+      <span class="stock in"><i>●</i>In Stock</span><span class="stock out"><i>●</i>Out of Stock</span>
+      <span class="badge dr">Draft</span><span class="badge pa">Pending</span>
+      <span class="badge ap">Approved</span><span class="badge rj">Rejected</span>
+    </div>
+    <h4 style="margin-top:12px">Price ladder row (signature)</h4>
+    <div class="card"><div class="ladder">
+      <div class="lrow on"><span class="sz">10L</span><div><div class="pr">₹1,890 <span class="mrp">₹2,205</span></div></div><span class="sp"></span><span class="pts">★ 120</span></div>
+      <div class="lrow"><span class="sz">4L</span><div><div class="pr">₹799 <span class="mrp">₹930</span></div></div><span class="sp"></span><span class="pts">★ 48</span></div>
+    </div></div>
+  </div>
+</div>
+
+<div class="gallery">
+
+<!-- FRAME 1 -->
+<div class="framewrap" id="screen-1">
+  <div class="cap">
+    <div class="n">1 · Login — OTP</div>
+    <div class="ta tamil">Phone number type பண்ணி OTP கேட்கிறது; QC logo + brand name hero-ல்; 6-box OTP entry தெளிவா, resend timer, புது painter-க்கு register link கீழே.</div>
+    <span class="tag pol">Polish</span>
+  </div>
+  <div class="phone"><div class="notch"></div>
+    <div class="screen">
+      <div class="hero" style="padding-bottom:24px">
+        <div class="sbar" style="color:#fff"><em>9:41</em><em>5G ▮▮▮▯</em></div>
+        <div style="display:flex;flex-direction:column;align-items:center;text-align:center;margin-top:20px;gap:7px">
+          <div class="avatar" style="width:56px;height:56px;font-size:18px;background:rgba(255,255,255,.18)">QC</div>
+          <div style="font-size:16.5px;font-weight:800;margin-top:2px">Quality Colours</div>
+          <div style="font-size:11px;opacity:.85">— Painter App</div>
+        </div>
+      </div>
+      <div class="pad" style="padding-top:24px;gap:16px">
+        <div>
+          <div class="divh" style="margin-bottom:8px">Mobile number</div>
+          <div class="inp foc"><span>🇮🇳 +91</span><b>98470 12345</b></div>
+        </div>
+        <div class="cta">Send OTP</div>
+        <div class="divh" style="text-align:center;margin:8px 0 0">Enter 6-digit OTP</div>
+        <div style="display:flex;gap:7px;justify-content:center">
+          <div style="width:38px;height:44px;border-radius:11px;border:1.5px solid var(--green-l);background:var(--white);display:flex;align-items:center;justify-content:center;font-size:16px;font-weight:800;color:var(--ink)">4</div>
+          <div style="width:38px;height:44px;border-radius:11px;border:1.5px solid var(--green-l);background:var(--white);display:flex;align-items:center;justify-content:center;font-size:16px;font-weight:800;color:var(--ink)">2</div>
+          <div style="width:38px;height:44px;border-radius:11px;border:1.5px solid var(--line);background:var(--white);display:flex;align-items:center;justify-content:center;font-size:16px;font-weight:800;color:var(--ink3)">·</div>
+          <div style="width:38px;height:44px;border-radius:11px;border:1.5px solid var(--line);background:var(--white);display:flex;align-items:center;justify-content:center;font-size:16px;font-weight:800;color:var(--ink3)">·</div>
+          <div style="width:38px;height:44px;border-radius:11px;border:1.5px solid var(--line);background:var(--white);display:flex;align-items:center;justify-content:center;font-size:16px;font-weight:800;color:var(--ink3)">·</div>
+          <div style="width:38px;height:44px;border-radius:11px;border:1.5px solid var(--line);background:var(--white);display:flex;align-items:center;justify-content:center;font-size:16px;font-weight:800;color:var(--ink3)">·</div>
+        </div>
+        <div class="knote">00:42-ல் resend செய்யலாம்</div>
+      </div>
+      <div class="sticky">
+        <div class="knote" style="font-size:12px">புது painter? <span style="color:var(--green);font-weight:800">Register</span></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- FRAME 2 -->
+<div class="framewrap" id="screen-2">
+  <div class="cap">
+    <div class="n">2 · Register</div>
+    <div class="ta tamil">பெயர், phone, city dropdown, referral code chip முன்னமே fill ஆகி இருக்கும், experience chips தேர்வு, admin approval பின் வரும்-ன்ற குறிப்பு கீழே.</div>
+    <span class="tag pol">Polish</span>
+  </div>
+  <div class="phone"><div class="notch"></div>
+    <div class="screen">
+      <div class="sbar"><em>9:41</em><em>5G ▮▮▮▯</em></div>
+      <div class="abar"><div class="back">‹</div><div><div class="h">Register</div><div class="sub">New painter application</div></div><span class="sp"></span></div>
+      <div class="pad" style="gap:14px">
+        <div><div class="divh" style="margin-bottom:8px">Full name</div><div class="inp foc"><b>Syed Ibrahim</b></div></div>
+        <div><div class="divh" style="margin-bottom:8px">Mobile number</div><div class="inp"><span>🇮🇳 +91</span><b>98470 12345</b></div></div>
+        <div><div class="divh" style="margin-bottom:8px">City</div><div class="inp" style="justify-content:space-between"><b>Coimbatore</b><span style="color:var(--ink3)">▾</span></div></div>
+        <div>
+          <div class="divh" style="margin-bottom:8px">Referral code (optional)</div>
+          <div style="display:flex;gap:8px;align-items:center">
+            <span class="chip on">QC-SYED</span>
+            <span style="font-size:10.5px;color:var(--ink2)">Ravi Painter referred you</span>
+          </div>
+        </div>
+        <div>
+          <div class="divh" style="margin-bottom:8px">Painting experience</div>
+          <div class="chips">
+            <span class="chip">1–3 years</span><span class="chip on">3–5 years</span><span class="chip">5+ years</span>
+          </div>
+        </div>
+        <div class="card pad2" style="display:flex;gap:9px;align-items:flex-start;background:#FBFDF9">
+          <span style="font-size:15px">ℹ️</span>
+          <div style="font-size:11px;color:var(--ink2);line-height:1.55">Submit பண்ணதும் QC admin உங்க application-ஐ review பண்ணுவாங்க. Approve ஆனதும் SMS + app notification வரும்.</div>
+        </div>
+      </div>
+      <div class="sticky"><div class="cta">Create Account</div></div>
+    </div>
+  </div>
+</div>
+
+<!-- FRAME 3 -->
+<div class="framewrap" id="screen-3">
+  <div class="cap">
+    <div class="n">3 · Awaiting Approval</div>
+    <div class="ta tamil">Application submit ஆனதும் இந்த hold screen; admin approve பண்ணதும் SMS + notification வரும்; கீழே submit செய்த விவரம் + shop-க்கு contact பண்ண ghost CTA.</div>
+    <span class="tag pol">Polish</span>
+  </div>
+  <div class="phone"><div class="notch"></div>
+    <div class="screen">
+      <div class="sbar"><em>9:41</em><em>5G ▮▮▮▯</em></div>
+      <div class="abar"><span class="sp"></span><div class="iconb">❓</div></div>
+      <div style="flex:1;display:flex;flex-direction:column;justify-content:center">
+        <div class="empty">
+          <i>⏳</i>
+          <b>Application under review</b>
+          <p class="tamil">Admin approve பண்ணதும் SMS + app notification உடனே வரும். சராசரி 24 மணி நேரம் ஆகும்.</p>
+        </div>
+      </div>
+      <div class="pad" style="padding-top:0">
+        <div class="card pad2">
+          <div class="divh" style="margin-bottom:8px">Submitted details</div>
+          <div style="display:flex;justify-content:space-between;font-size:12px;padding:5px 0"><span style="color:var(--ink2)">Name</span><span style="font-weight:700;color:var(--ink)">Syed Ibrahim</span></div>
+          <div style="display:flex;justify-content:space-between;font-size:12px;padding:5px 0;border-top:1px solid var(--line)"><span style="color:var(--ink2)">Phone</span><span style="font-weight:700;color:var(--ink)">98470 12345</span></div>
+          <div style="display:flex;justify-content:space-between;font-size:12px;padding:5px 0;border-top:1px solid var(--line)"><span style="color:var(--ink2)">City</span><span style="font-weight:700;color:var(--ink)">Coimbatore</span></div>
+          <div style="display:flex;justify-content:space-between;font-size:12px;padding:5px 0;border-top:1px solid var(--line)"><span style="color:var(--ink2)">Referral</span><span style="font-weight:700;color:var(--ink)">QC-SYED</span></div>
+        </div>
+      </div>
+      <div class="sticky"><div class="cta gh">Contact Shop — 98422 XXXXX</div></div>
+    </div>
+  </div>
+</div>
+
+<!-- FRAME 4 -->
+<div class="framewrap" id="screen-4">
+  <div class="cap">
+    <div class="n">4 · Onboarding</div>
+    <div class="ta tamil">3-slide pager-ஓட முதல் slide; பெரிய illustration placeholder, headline, 3 bullet நன்மைகள், dots progress, கீழே Get Started + Skip.</div>
+    <span class="tag pol">Polish</span>
+  </div>
+  <div class="phone"><div class="notch"></div>
+    <div class="screen">
+      <div class="sbar"><em>9:41</em><em>5G ▮▮▮▯</em></div>
+      <div style="display:flex;justify-content:flex-end;padding:2px 16px 0"><span style="font-size:11.5px;font-weight:700;color:var(--ink3)">Skip</span></div>
+      <div class="pimg" style="height:228px;flex:none;margin:8px 16px 0;border-radius:20px"><span style="font-size:64px;opacity:.5">★</span></div>
+      <div class="pad" style="gap:12px;padding-top:18px">
+        <div class="tamil" style="font-size:19px;font-weight:800;color:var(--ink);text-align:center;letter-spacing:-.01em">பில் போடு, Points சேர்</div>
+        <div class="card pad2" style="display:flex;flex-direction:column;gap:11px">
+          <div style="display:flex;gap:10px;align-items:center"><span style="font-size:18px">🧾</span><div class="tamil" style="font-size:11.5px;color:var(--ink2)">Bill போடும்போதே ★ points automatic-ஆ சேரும்</div></div>
+          <div style="display:flex;gap:10px;align-items:center;border-top:1px solid var(--line);padding-top:11px"><span style="font-size:18px">🎁</span><div class="tamil" style="font-size:11.5px;color:var(--ink2)">சேர்த்த points-ஐ wallet-ல் redeem பண்ணலாம்</div></div>
+          <div style="display:flex;gap:10px;align-items:center;border-top:1px solid var(--line);padding-top:11px"><span style="font-size:18px">📈</span><div class="tamil" style="font-size:11.5px;color:var(--ink2)">Level, streak, earnings எல்லாம் ஒரே இடத்தில் track</div></div>
+        </div>
+      </div>
+      <div class="sticky" style="display:flex;flex-direction:column;gap:12px">
+        <div class="steps"><i class="on"></i><i></i><i></i></div>
+        <div class="cta">Get Started</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- FRAME 5 -->
+<div class="framewrap" id="screen-5">
+  <div class="cap">
+    <div class="n">5 · Home</div>
+    <div class="ta tamil">Balance tiles-ல் Points (gold) vs Wallet பிரிப்பு தெளிவு; Quick actions ஒரே வரிசை; Catalog carousel புது pcard design-ஓட. Streak + Level ஒரே panel-ல்.</div>
+    <span class="tag pol">Polish</span><span class="tag new">Level panel merge</span>
+  </div>
+  <div class="phone"><div class="notch"></div>
+    <div class="screen">
+      <div class="hero">
+        <div class="sbar" style="color:#fff"><em>9:41</em><em>5G ▮▮▮▯</em></div>
+        <div style="display:flex;align-items:center;gap:10px;margin-top:2px">
+          <div class="avatar" style="width:40px;height:40px;font-size:15px">SY</div>
+          <div style="flex:1"><div class="hi">காலை வணக்கம் ☀</div><div class="nm">Syed Painter</div></div>
+          <div class="iconb"><span>🔔</span><span class="dot"></span></div>
+        </div>
+        <div style="display:flex;gap:9px;margin-top:13px">
+          <div style="flex:1;background:rgba(255,255,255,.13);border-radius:14px;padding:10px 12px">
+            <div style="font-size:10px;opacity:.8;font-weight:700;letter-spacing:.06em">POINTS ★</div>
+            <div style="font-size:20px;font-weight:800;color:#F7DFAE;margin-top:2px">12,480</div>
+            <div style="font-size:9.5px;opacity:.75;margin-top:1px">Gold tier · 62% → Diamond</div>
+          </div>
+          <div style="flex:1;background:rgba(255,255,255,.13);border-radius:14px;padding:10px 12px">
+            <div style="font-size:10px;opacity:.8;font-weight:700;letter-spacing:.06em">WALLET ₹</div>
+            <div style="font-size:20px;font-weight:800;margin-top:2px">₹3,240</div>
+            <div style="font-size:9.5px;opacity:.75;margin-top:1px">Withdraw ≥ ₹500</div>
+          </div>
+        </div>
+      </div>
+      <div class="pad">
+        <div class="card pad2" style="display:flex;gap:8px;justify-content:space-between">
+          <div style="text-align:center;flex:1"><div style="font-size:20px">🧾</div><div style="font-size:10px;font-weight:700;color:var(--ink2);margin-top:3px">New Bill</div></div>
+          <div style="text-align:center;flex:1"><div style="font-size:20px">📐</div><div style="font-size:10px;font-weight:700;color:var(--ink2);margin-top:3px">Quotation</div></div>
+          <div style="text-align:center;flex:1"><div style="font-size:20px">🤳</div><div style="font-size:10px;font-weight:700;color:var(--ink2);margin-top:3px">Check-In</div></div>
+          <div style="text-align:center;flex:1"><div style="font-size:20px">🧮</div><div style="font-size:10px;font-weight:700;color:var(--ink2);margin-top:3px">Calculator</div></div>
+        </div>
+        <div class="card pad2" style="display:flex;align-items:center;gap:11px">
+          <div style="font-size:22px">🔥</div>
+          <div style="flex:1"><div style="font-size:12.5px;font-weight:800;color:var(--ink)">6-day check-in streak</div>
+            <div class="prog" style="margin-top:6px"><i style="width:86%"></i></div></div>
+          <span class="pts">★ +50 @7</span>
+        </div>
+        <div class="sect"><b>Today's offers</b><a href="#">All ›</a></div>
+        <div class="card" style="overflow:hidden">
+          <div style="background:linear-gradient(120deg,var(--offer-c),#FFF7ED);padding:12px 14px;display:flex;gap:10px;align-items:center">
+            <span class="offer">%</span>
+            <div style="flex:1"><div style="font-size:12.5px;font-weight:800;color:var(--ink)">STYLE emulsions — 2× points</div>
+            <div style="font-size:10.5px;color:var(--ink2)">Aug 10–20 · Birla Opus</div></div>
+            <span style="color:var(--ink3)">›</span>
+          </div>
+        </div>
+        <div class="sect"><b>Catalog picks</b><a href="#" data-jump="7">Catalog ›</a></div>
+        <div class="pgrid">
+          <div class="pcard"><div class="pimg"><span>SPF</span><div class="flo"><span class="stock in"><i>●</i>In Stock</span></div><div class="flo2"><span class="pts">★ 8/L</span></div></div>
+            <div class="bd"><div class="nm">STYLE PRO FRESH PRIMER</div><div class="br">BIRLA OPUS</div>
+            <div class="pr">₹185 <small>1L · 4 sizes</small></div></div><div class="add">+</div></div>
+          <div class="pcard"><div class="pimg"><span>CPW</span><div class="flo"><span class="stock in"><i>●</i>In Stock</span></div></div>
+            <div class="bd"><div class="nm">CALISTA PRO WHITE IN PRIMER</div><div class="br">BIRLA OPUS</div>
+            <div class="pr">₹240 <small>1L · 4 sizes</small></div></div><div class="add">+</div></div>
+        </div>
+        <div class="sect"><b>Recent activity</b><a href="#" data-jump="32">History ›</a></div>
+        <div class="card">
+          <div class="lrow2"><div class="ic">🧾</div><div class="tx"><div class="t">EST-2418 · Self billing</div><div class="s">Yesterday · 3 items</div></div><div class="r"><span class="badge pa">Pending</span></div></div>
+          <div class="lrow2"><div class="ic">★</div><div class="tx"><div class="t">Points credited</div><div class="s">EST-2402 approved</div></div><div class="r"><div class="amt plus">+340 ★</div></div></div>
+        </div>
+      </div>
+      <div class="bnav">
+        <div class="it on"><i>⌂</i>Home</div><div class="it"><i>🗂</i>Work</div>
+        <div class="fab">+</div>
+        <div class="it"><i>🛍</i>Catalog</div><div class="it"><i>👤</i>Me</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- FRAME 6 -->
+<div class="framewrap" id="screen-6">
+  <div class="cap">
+    <div class="n">6 · Work — Estimates &amp; Quotations</div>
+    <div class="ta tamil">Status badge system ஒன்றுபடுத்தல் (Draft/Pending/Approved/Rejected); ஒவ்வொரு row-லயும் items count + மொத்த தொகை tnum-ல்; filter chips மேலே.</div>
+    <span class="tag pol">Polish</span>
+  </div>
+  <div class="phone"><div class="notch"></div>
+    <div class="screen">
+      <div class="sbar"><em>9:41</em><em>5G ▮▮▮▯</em></div>
+      <div class="abar"><div><div class="h">My Work</div><div class="sub">Estimates &amp; quotations</div></div><span class="sp"></span><div class="iconb">🔎</div></div>
+      <div class="pad" style="padding-top:4px">
+        <div style="display:flex;background:var(--sv);border-radius:12px;padding:3px">
+          <div style="flex:1;text-align:center;font-size:12px;font-weight:800;color:var(--green-d);background:#fff;border-radius:10px;padding:7px">Estimates · 14</div>
+          <div style="flex:1;text-align:center;font-size:12px;font-weight:700;color:var(--ink2);padding:7px">Quotations · 3</div>
+        </div>
+        <div class="chips">
+          <span class="chip on">All</span><span class="chip">Draft</span><span class="chip">Pending</span><span class="chip">Approved</span><span class="chip">Paid</span>
+        </div>
+        <div class="card">
+          <div class="lrow2"><div class="ic">🧾</div>
+            <div class="tx"><div class="t">EST-2418 · Self billing</div><div class="s">3 items · 12 Aug · Syed</div></div>
+            <div class="r"><div class="amt">₹6,840</div><span class="badge pa">Pending</span></div></div>
+          <div class="lrow2"><div class="ic">🧾</div>
+            <div class="tx"><div class="t">EST-2415 · Customer billing</div><div class="s">7 items · 11 Aug · Ravi (Anna Nagar)</div></div>
+            <div class="r"><div class="amt">₹28,350</div><span class="badge ap">Approved</span></div></div>
+          <div class="lrow2"><div class="ic">🧾</div>
+            <div class="tx"><div class="t">EST-2409 · Customer billing</div><div class="s">4 items · 09 Aug · Kumar</div></div>
+            <div class="r"><div class="amt">₹11,120</div><span class="badge dr">Draft</span></div></div>
+          <div class="lrow2"><div class="ic">🧾</div>
+            <div class="tx"><div class="t">EST-2402 · Self billing</div><div class="s">2 items · 06 Aug</div></div>
+            <div class="r"><div class="amt">₹4,510</div><span class="badge ap">Paid ★</span></div></div>
+        </div>
+        <div class="knote">Pull to refresh · older items load as you scroll</div>
+      </div>
+      <div class="bnav">
+        <div class="it"><i>⌂</i>Home</div><div class="it on"><i>🗂</i>Work</div>
+        <div class="fab">+</div>
+        <div class="it"><i>🛍</i>Catalog</div><div class="it"><i>👤</i>Me</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- FRAME 7 -->
+<div class="framewrap" id="screen-7">
+  <div class="cap">
+    <div class="n">7 · Catalog</div>
+    <div class="ta tamil">OWNER FIX: புது product card — பெரிய image, stock pill, points badge, விலை "from ₹—" + sizes count, size×price micro-chips (1L ₹185 · 4L ₹690…). Admin curation-படி மட்டும் products.</div>
+    <span class="tag fix">Owner fix</span><span class="tag new">New card</span>
+  </div>
+  <div class="phone"><div class="notch"></div>
+    <div class="screen">
+      <div class="sbar"><em>9:41</em><em>5G ▮▮▮▯</em></div>
+      <div class="abar"><div><div class="h">Catalog</div><div class="sub">128 products · curated for you</div></div><span class="sp"></span><div class="iconb">🎤</div><div class="iconb" style="position:relative">🛒<span class="dot" style="background:var(--green)"></span></div></div>
+      <div class="pad" style="padding-top:4px">
+        <div class="inp"><span>🔎</span>Search products, brands…</div>
+        <div class="chips">
+          <span class="chip on">All brands</span><span class="chip">Birla Opus</span><span class="chip">Berger</span><span class="chip">Shalimar</span><span class="chip">★ Points</span><span class="chip">In stock</span>
+        </div>
+        <div class="pgrid">
+          <div class="pcard"><div class="pimg" style="height:104px"><span>SCS</span>
+              <div class="flo"><span class="stock in"><i>●</i>In Stock</span></div>
+              <div class="flo2"><span class="pts">★ 12/L</span><span class="offer">2×</span></div></div>
+            <div class="bd"><div class="nm">STYLE COLOR SMART INT EMULSION</div><div class="br">BIRLA OPUS</div>
+              <div class="szline"><b>1L <em>₹210</em></b><b>4L <em>₹799</em></b><b>10L <em>₹1,890</em></b><b>20L <em>₹3,590</em></b></div>
+              <div class="pr">from ₹210 <small>MRP ₹245</small></div></div>
+            <div class="add">+</div></div>
+          <div class="pcard"><div class="pimg" style="height:104px"><span>SPF</span>
+              <div class="flo"><span class="stock in"><i>●</i>In Stock</span></div>
+              <div class="flo2"><span class="pts">★ 8/L</span></div></div>
+            <div class="bd"><div class="nm">STYLE PRO FRESH PRIMER</div><div class="br">BIRLA OPUS</div>
+              <div class="szline"><b>1L <em>₹185</em></b><b>4L <em>₹690</em></b><b>10L <em>₹1,620</em></b><b>20L <em>₹3,050</em></b></div>
+              <div class="pr">from ₹185 <small>MRP ₹215</small></div></div>
+            <div class="add">+</div></div>
+          <div class="pcard"><div class="pimg" style="height:104px"><span>CPW</span>
+              <div class="flo"><span class="stock in"><i>●</i>In Stock</span></div>
+              <div class="flo2"><span class="pts">★ 10/L</span></div></div>
+            <div class="bd"><div class="nm">CALISTA PRO WHITE IN PRIMER</div><div class="br">BIRLA OPUS</div>
+              <div class="szline"><b>1L <em>₹240</em></b><b>4L <em>₹920</em></b><b>10L <em>₹2,150</em></b><b>20L <em>₹4,080</em></b></div>
+              <div class="pr">from ₹240 <small>MRP ₹280</small></div></div>
+            <div class="add">+</div></div>
+          <div class="pcard"><div class="pimg" style="height:104px"><span>WM</span>
+              <div class="flo"><span class="stock out"><i>●</i>Out of Stock</span></div></div>
+            <div class="bd"><div class="nm">WALMASTA EXT EMULSION</div><div class="br">BERGER PAINTS</div>
+              <div class="szline"><b>1L <em>₹195</em></b><b>10L <em>₹1,740</em></b><b>20L <em>₹3,320</em></b></div>
+              <div class="pr">from ₹195 <small>MRP ₹230</small></div></div>
+            <div class="add" style="background:var(--sv);color:var(--ink3)">+</div></div>
+        </div>
+      </div>
+      <div class="bnav">
+        <div class="it"><i>⌂</i>Home</div><div class="it"><i>🗂</i>Work</div>
+        <div class="fab">+</div>
+        <div class="it on"><i>🛍</i>Catalog</div><div class="it"><i>👤</i>Me</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- FRAME 8 -->
+<div class="framewrap" id="screen-8">
+  <div class="cap">
+    <div class="n">8 · Product Detail</div>
+    <div class="ta tamil">OWNER FIX (மைய மாற்றம்): <b>Price Ladder</b> — எல்லா pack size-க்கும் விலை + MRP + points + stock ஒரே table-ல்; தேர்ந்த row-ல் qty stepper. கீழே "Your Earnings" self vs customer billing per-variant. Sticky CTA-ல் தொகை + ★.</div>
+    <span class="tag fix">Owner fix</span><span class="tag new">Price ladder</span>
+  </div>
+  <div class="phone"><div class="notch"></div>
+    <div class="screen">
+      <div class="sbar"><em>9:41</em><em>5G ▮▮▮▯</em></div>
+      <div class="abar"><div class="back">‹</div><span class="sp"></span><div class="iconb">🛒</div></div>
+      <div class="pimg" style="height:150px;flex:none"><span style="font-size:34px">SCS</span>
+        <div class="flo" style="position:absolute;top:10px;left:12px"><span class="stock in"><i>●</i>In Stock</span></div>
+        <div class="flo2" style="position:absolute;top:10px;right:12px"><span class="offer">2× points · Aug 20 வரை</span></div>
+      </div>
+      <div class="pad">
+        <div>
+          <div style="font-size:10px;font-weight:800;letter-spacing:.09em;color:var(--ink3)">BIRLA OPUS · INTERIOR EMULSION</div>
+          <div style="font-size:17.5px;font-weight:800;color:var(--ink);letter-spacing:-.01em;margin-top:2px">STYLE COLOR SMART INT EMULSION</div>
+          <div style="display:flex;gap:6px;margin-top:6px;align-items:center">
+            <span class="pts">★ 12 pts/L</span><span class="chip" style="padding:3px 9px;font-size:10px">Base: CS1</span>
+          </div>
+        </div>
+        <div>
+          <div class="divh">Shades</div>
+          <div class="card pad2"><div class="shade">
+            <i class="on" style="background:#F5F2E8"></i><i style="background:#EFE1C6"></i><i style="background:#DCE8DA"></i><i style="background:#CBD9EA"></i><i style="background:#E9D2CF"></i><i style="background:#D9D4EA"></i>
+          </div></div>
+        </div>
+        <div>
+          <div class="divh">All sizes &amp; prices</div>
+          <div class="card"><div class="ladder">
+            <div class="lrow"><span class="sz">1L</span><div><div class="pr">₹210 <span class="mrp">₹245</span></div><div style="font-size:9.5px;color:var(--ink2)">★ 12 pts</div></div><span class="sp"></span><span class="stock in"><i>●</i></span></div>
+            <div class="lrow"><span class="sz">4L</span><div><div class="pr">₹799 <span class="mrp">₹930</span></div><div style="font-size:9.5px;color:var(--ink2)">★ 48 pts</div></div><span class="sp"></span><span class="stock in"><i>●</i></span></div>
+            <div class="lrow on"><span class="sz">10L</span><div><div class="pr">₹1,890 <span class="mrp">₹2,205</span></div><div style="font-size:9.5px;color:var(--ink2)">★ 120 pts</div></div><span class="sp"></span>
+              <div class="qty"><u>−</u>2<u>+</u></div></div>
+            <div class="lrow"><span class="sz">20L</span><div><div class="pr">₹3,590 <span class="mrp">₹4,180</span></div><div style="font-size:9.5px;color:var(--ink2)">★ 240 pts</div></div><span class="sp"></span><span class="stock out"><i>●</i></span></div>
+          </div></div>
+        </div>
+        <div>
+          <div class="divh">Your earnings — 10L × 2</div>
+          <div class="card pad2" style="display:flex;gap:10px">
+            <div style="flex:1;border-right:1px solid var(--line)">
+              <div style="font-size:10px;font-weight:700;color:var(--ink3)">CUSTOMER BILLING</div>
+              <div style="font-size:14px;font-weight:800;color:var(--gold-d);margin-top:3px">★ 240 <span style="font-size:10px;color:var(--ink2);font-weight:600">+ annual 0.5%</span></div>
+            </div>
+            <div style="flex:1">
+              <div style="font-size:10px;font-weight:700;color:var(--ink3)">SELF BILLING</div>
+              <div style="font-size:14px;font-weight:800;color:var(--gold-d);margin-top:3px">★ 0 <span style="font-size:10px;color:var(--ink2);font-weight:600">annual 0.5% = ₹18.9</span></div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="sticky"><div class="cta">Add to Cart — ₹3,780 · earn ★ 240</div></div>
+    </div>
+  </div>
+</div>
+
+<!-- FRAME 9 -->
+<div class="framewrap" id="screen-9">
+  <div class="cap">
+    <div class="n">9 · Product Quick View Sheet</div>
+    <div class="ta tamil">Catalog card-ஐ tap பண்ணா முழு page போகாம இதே sheet-ல் அதே Price Ladder — வேகமா ஒப்பிட்டு cart-ல் சேர்க்க. "Full details" link மட்டும் page-க்கு.</div>
+    <span class="tag new">New</span><span class="tag fix">Owner fix</span>
+  </div>
+  <div class="phone"><div class="notch"></div>
+    <div class="screen" style="background:var(--bg)">
+      <div class="sheetdim"></div>
+      <div class="sheet">
+        <div class="grab"></div>
+        <div style="display:flex;gap:11px;align-items:center">
+          <div class="pimg" style="width:56px;height:56px;border-radius:14px;flex:none"><span style="font-size:14px">SPF</span></div>
+          <div style="flex:1;min-width:0">
+            <div style="font-size:10px;font-weight:800;letter-spacing:.08em;color:var(--ink3)">BIRLA OPUS</div>
+            <div class="sh" style="font-size:14px">STYLE PRO FRESH PRIMER</div>
+            <div style="display:flex;gap:5px;margin-top:3px"><span class="stock in"><i>●</i>In Stock</span><span class="pts">★ 8/L</span></div>
+          </div>
+        </div>
+        <div class="card"><div class="ladder">
+          <div class="lrow"><span class="sz">1L</span><div><div class="pr">₹185 <span class="mrp">₹215</span></div></div><span class="sp"></span><span class="pts">★ 8</span></div>
+          <div class="lrow on"><span class="sz">4L</span><div><div class="pr">₹690 <span class="mrp">₹805</span></div></div><span class="sp"></span><div class="qty"><u>−</u>1<u>+</u></div></div>
+          <div class="lrow"><span class="sz">10L</span><div><div class="pr">₹1,620 <span class="mrp">₹1,890</span></div></div><span class="sp"></span><span class="pts">★ 80</span></div>
+          <div class="lrow"><span class="sz">20L</span><div><div class="pr">₹3,050 <span class="mrp">₹3,560</span></div></div><span class="sp"></span><span class="pts">★ 160</span></div>
+        </div></div>
+        <div class="cta">Add 4L — ₹690 · earn ★ 32</div>
+        <div class="knote" style="color:var(--green);font-weight:700">Full details ›</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- FRAME 10 -->
+<div class="framewrap" id="screen-10">
+  <div class="cap">
+    <div class="n">10 · Estimate Create — Billing Type</div>
+    <div class="ta tamil">இரு card-களும் என்ன கிடைக்கும்-ன்னு தெளிவா சொல்லுது: Self = dealer price + annual ★ மட்டும்; Customer = உங்க markup + முழு ★. Step dots மேலே.</div>
+    <span class="tag pol">Polish</span>
+  </div>
+  <div class="phone"><div class="notch"></div>
+    <div class="screen">
+      <div class="sbar"><em>9:41</em><em>5G ▮▮▮▯</em></div>
+      <div class="abar"><div class="back">‹</div><div><div class="h">New Bill</div><div class="sub">Step 1 of 3</div></div><span class="sp"></span></div>
+      <div style="padding:0 16px"><div class="steps"><i class="on"></i><i></i><i></i></div></div>
+      <div class="pad" style="gap:14px;padding-top:18px">
+        <div style="font-size:15px;font-weight:800;color:var(--ink);text-align:center">யாருக்கான bill?</div>
+        <div class="card" style="padding:16px;border:2px solid var(--green);position:relative">
+          <div style="position:absolute;top:12px;right:12px;width:20px;height:20px;border-radius:50%;background:var(--green);color:#fff;font-size:12px;display:flex;align-items:center;justify-content:center">✓</div>
+          <div style="font-size:26px">🧑‍🎨</div>
+          <div style="font-size:15px;font-weight:800;color:var(--ink);margin-top:7px">Self Billing</div>
+          <div style="font-size:11.5px;color:var(--ink2);margin-top:4px;line-height:1.5">எனக்காக நானே வாங்குறேன் — dealer விலை தெரியும், annual points (0.5%) கிடைக்கும். Admin approve பண்ணதும் கடையில் pay பண்ணலாம்.</div>
+          <div style="display:flex;gap:6px;margin-top:9px"><span class="chip" style="font-size:10px;padding:3px 9px">Dealer price ✓</span><span class="pts">★ annual only</span></div>
+        </div>
+        <div class="card" style="padding:16px">
+          <div style="font-size:26px">🏠</div>
+          <div style="font-size:15px;font-weight:800;color:var(--ink);margin-top:7px">Customer Billing</div>
+          <div style="font-size:11.5px;color:var(--ink2);margin-top:4px;line-height:1.5">Customer-க்கு bill — நீங்க markup சேர்க்கலாம், regular + annual points இரண்டும் கிடைக்கும். விலை admin அமைப்பார்.</div>
+          <div style="display:flex;gap:6px;margin-top:9px"><span class="chip" style="font-size:10px;padding:3px 9px">Markup %</span><span class="pts">★ regular + annual</span></div>
+        </div>
+      </div>
+      <div class="sticky"><div class="cta">Continue — Self Billing</div></div>
+    </div>
+  </div>
+</div>
+
+<!-- FRAME 11 -->
+<div class="framewrap" id="screen-11">
+  <div class="cap">
+    <div class="n">11 · Estimate Create — Products</div>
+    <div class="ta tamil">OWNER FIX: Catalog-ல் admin enable பண்ண items மட்டும் இங்கயும் (backend fix live). Expand பண்ணா அதே Price Ladder + qty; கீழே cart bar எப்பவும் தெரியும்.</div>
+    <span class="tag fix">Owner fix</span><span class="tag new">Ladder picker</span>
+  </div>
+  <div class="phone"><div class="notch"></div>
+    <div class="screen">
+      <div class="sbar"><em>9:41</em><em>5G ▮▮▮▯</em></div>
+      <div class="abar"><div class="back">‹</div><div><div class="h">Add Products</div><div class="sub">Step 2 of 3 · Self billing</div></div><span class="sp"></span></div>
+      <div style="padding:0 16px"><div class="steps"><i class="on"></i><i class="on"></i><i></i></div></div>
+      <div class="pad" style="padding-top:10px">
+        <div class="inp"><span>🔎</span><b>primer</b></div>
+        <div class="chips">
+          <span class="chip on">Birla Opus</span><span class="chip">Berger</span><span class="chip">All categories</span><span class="chip">★ Points</span>
+        </div>
+        <div class="knote" style="text-align:left">Showing your curated catalog · 12 results</div>
+        <div class="card">
+          <div class="lrow2" style="border-top:none"><div class="pimg" style="width:42px;height:42px;border-radius:11px"><span style="font-size:11px">SPF</span></div>
+            <div class="tx"><div class="t">STYLE PRO FRESH PRIMER</div><div class="s">Birla Opus · 4 sizes · ★ 8/L</div></div>
+            <div class="r"><span style="color:var(--green);font-size:16px">▾</span></div></div>
+          <div class="ladder" style="border-top:1px solid var(--line);background:linear-gradient(#FBFDF9,#fff)">
+            <div class="lrow"><span class="sz">1L</span><div><div class="pr">₹185 <span class="mrp">₹215</span></div></div><span class="sp"></span><div class="qty"><u>−</u>0<u>+</u></div></div>
+            <div class="lrow on"><span class="sz">4L</span><div><div class="pr">₹690 <span class="mrp">₹805</span></div></div><span class="sp"></span><div class="qty"><u>−</u>2<u>+</u></div></div>
+            <div class="lrow"><span class="sz">10L</span><div><div class="pr">₹1,620 <span class="mrp">₹1,890</span></div></div><span class="sp"></span><div class="qty"><u>−</u>0<u>+</u></div></div>
+          </div>
+        </div>
+        <div class="card">
+          <div class="lrow2" style="border-top:none"><div class="pimg" style="width:42px;height:42px;border-radius:11px"><span style="font-size:11px">CPW</span></div>
+            <div class="tx"><div class="t">CALISTA PRO WHITE IN PRIMER</div><div class="s">Birla Opus · 4 sizes · ★ 10/L</div></div>
+            <div class="r"><span style="color:var(--ink3);font-size:16px">▸</span></div></div>
+        </div>
+        <div class="card">
+          <div class="lrow2" style="border-top:none"><div class="pimg" style="width:42px;height:42px;border-radius:11px"><span style="font-size:11px">PSP</span></div>
+            <div class="tx"><div class="t">STYLE PERFECT START PRIMER</div><div class="s">Birla Opus · 4 sizes</div></div>
+            <div class="r"><span style="color:var(--ink3);font-size:16px">▸</span></div></div>
+        </div>
+      </div>
+      <div class="sticky">
+        <div class="cta" style="justify-content:space-between;padding:13px 16px"><span>2 items · ₹1,380</span><span>Review ›</span></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- FRAME 12 -->
+<div class="framewrap" id="screen-12">
+  <div class="cap">
+    <div class="n">12 · Estimate Create — Review (Self)</div>
+    <div class="ta tamil">Line items தெளிவான table-ஆ; GST note (price-inclusive); annual points estimate; submit பண்ணதும் admin-க்கு போகும்-ன்ற flow note.</div>
+    <span class="tag pol">Polish</span>
+  </div>
+  <div class="phone"><div class="notch"></div>
+    <div class="screen">
+      <div class="sbar"><em>9:41</em><em>5G ▮▮▮▯</em></div>
+      <div class="abar"><div class="back">‹</div><div><div class="h">Review Bill</div><div class="sub">Step 3 of 3 · Self billing</div></div><span class="sp"></span></div>
+      <div style="padding:0 16px"><div class="steps"><i class="on"></i><i class="on"></i><i class="on"></i></div></div>
+      <div class="pad" style="padding-top:12px">
+        <div class="card">
+          <div class="lrow2" style="border-top:none">
+            <div class="tx"><div class="t">STYLE PRO FRESH PRIMER · 4L</div><div class="s">₹690 × 2</div></div>
+            <div class="r"><div class="amt">₹1,380</div></div></div>
+          <div class="lrow2">
+            <div class="tx"><div class="t">STYLE COLOR SMART · 10L (CS1)</div><div class="s">₹1,890 × 1</div></div>
+            <div class="r"><div class="amt">₹1,890</div></div></div>
+        </div>
+        <div class="card pad2">
+          <div style="display:flex;justify-content:space-between;font-size:12px;color:var(--ink2)"><span>Items (3)</span><span style="font-weight:700;color:var(--ink)">₹3,270</span></div>
+          <div style="display:flex;justify-content:space-between;font-size:12px;color:var(--ink2);margin-top:6px"><span>GST</span><span>included in price</span></div>
+          <div style="border-top:1px dashed var(--line);margin:9px 0"></div>
+          <div style="display:flex;justify-content:space-between;font-size:15px;font-weight:800;color:var(--ink)"><span>Total</span><span>₹3,270</span></div>
+          <div style="display:flex;justify-content:space-between;font-size:11px;color:var(--gold-d);font-weight:700;margin-top:6px"><span>★ Annual points (0.5%)</span><span>≈ ₹16.35</span></div>
+        </div>
+        <div class="card pad2" style="display:flex;gap:9px;align-items:flex-start;background:#FBFDF9">
+          <span style="font-size:15px">ℹ️</span>
+          <div style="font-size:11px;color:var(--ink2);line-height:1.55">Submit பண்ணதும் admin பரிசீலிப்பார். Approve ஆனதும் notification வரும்; அதன் பிறகு payment submit பண்ணலாம்.</div>
+        </div>
+      </div>
+      <div class="sticky"><div class="cta">Submit to Admin — ₹3,270</div></div>
+    </div>
+  </div>
+</div>
+
+<!-- FRAME 13 -->
+<div class="framewrap" id="screen-13">
+  <div class="cap">
+    <div class="n">13 · Customer Estimate — Pricing &amp; Review</div>
+    <div class="ta tamil">Markup slider + labour charge + "hide QC branding" toggle ஒரே அட்டையில்; customer preview தொகை பெரிசா; per-item markup override expandable.</div>
+    <span class="tag pol">Polish</span>
+  </div>
+  <div class="phone"><div class="notch"></div>
+    <div class="screen">
+      <div class="sbar"><em>9:41</em><em>5G ▮▮▮▯</em></div>
+      <div class="abar"><div class="back">‹</div><div><div class="h">Customer Pricing</div><div class="sub">Step 4 of 4 · Ravi — Anna Nagar</div></div><span class="sp"></span></div>
+      <div class="pad">
+        <div class="card pad2">
+          <div style="display:flex;justify-content:space-between;align-items:baseline">
+            <span style="font-size:11px;font-weight:800;letter-spacing:.07em;color:var(--ink3)">MARKUP</span>
+            <span style="font-size:14px;font-weight:800;color:var(--green-d)">+12%</span>
+          </div>
+          <div class="prog" style="margin-top:9px"><i style="width:40%"></i></div>
+          <div style="display:flex;justify-content:space-between;font-size:9.5px;color:var(--ink3);margin-top:4px"><span>0%</span><span>30%</span></div>
+        </div>
+        <div class="tiles2">
+          <div class="tile"><div class="lb">Labour charge</div><div class="v">₹4,500</div><div class="m">optional</div></div>
+          <div class="tile"><div class="lb">QC branding</div><div class="v" style="font-size:14px;display:flex;align-items:center;gap:7px">Hidden
+            <span style="width:34px;height:19px;border-radius:99px;background:var(--green);position:relative;display:inline-block"><i style="position:absolute;right:2.5px;top:2.5px;width:14px;height:14px;border-radius:50%;background:#fff"></i></span></div>
+          <div class="m">PDF-ல் உங்க பெயர் மட்டும்</div></div>
+        </div>
+        <div class="card">
+          <div class="lrow2" style="border-top:none">
+            <div class="tx"><div class="t">WALMASTA EXT EMULSION · 20L</div><div class="s">cost ₹3,320 → customer ₹3,720</div></div>
+            <div class="r"><span style="font-size:10px;color:var(--green);font-weight:700">+12% ▾</span></div></div>
+          <div class="lrow2">
+            <div class="tx"><div class="t">STYLE PRO FRESH PRIMER · 10L</div><div class="s">cost ₹1,620 → customer ₹1,815</div></div>
+            <div class="r"><span style="font-size:10px;color:var(--green);font-weight:700">+12% ▾</span></div></div>
+        </div>
+        <div class="card pad2" style="background:linear-gradient(135deg,var(--green-dd),var(--green));color:#fff">
+          <div style="font-size:10.5px;opacity:.8;font-weight:700;letter-spacing:.06em">CUSTOMER TOTAL</div>
+          <div style="font-size:24px;font-weight:800;margin-top:3px">₹32,850</div>
+          <div style="display:flex;justify-content:space-between;font-size:10.5px;opacity:.85;margin-top:5px">
+            <span>Items ₹28,350 · Labour ₹4,500</span><span style="color:#F7DFAE">உங்க margin ₹3,395</span>
+          </div>
+        </div>
+      </div>
+      <div class="sticky"><div class="cta">Save &amp; Preview PDF</div></div>
+    </div>
+  </div>
+</div>
+
+<!-- FRAME 14 -->
+<div class="framewrap" id="screen-14">
+  <div class="cap">
+    <div class="n">14 · Quotation Create</div>
+    <div class="ta tamil">Customer பெயர்+phone, site address, work type chips (Interior/Exterior/Both), area sqft, notes card — எல்லாம் ஒரே scroll-ல்; கீழே Save CTA.</div>
+    <span class="tag pol">Polish</span>
+  </div>
+  <div class="phone"><div class="notch"></div>
+    <div class="screen">
+      <div class="sbar"><em>9:41</em><em>5G ▮▮▮▯</em></div>
+      <div class="abar"><div class="back">‹</div><div><div class="h">New Quotation</div><div class="sub">Site visit estimate</div></div><span class="sp"></span></div>
+      <div class="pad" style="gap:13px">
+        <div><div class="divh" style="margin-bottom:8px">Customer name</div><div class="inp foc"><b>Ravi Kumar</b></div></div>
+        <div><div class="divh" style="margin-bottom:8px">Mobile number</div><div class="inp"><span>🇮🇳 +91</span><b>90031 44210</b></div></div>
+        <div><div class="divh" style="margin-bottom:8px">Site address</div><div class="inp"><b>12, Thirumalai Nagar, Anna Nagar, Coimbatore</b></div></div>
+        <div>
+          <div class="divh" style="margin-bottom:8px">Work type</div>
+          <div class="chips"><span class="chip">Interior</span><span class="chip">Exterior</span><span class="chip on">Both</span></div>
+        </div>
+        <div><div class="divh" style="margin-bottom:8px">Approx. area</div><div class="inp"><b>1,200</b><span>sqft</span></div></div>
+        <div>
+          <div class="divh" style="margin-bottom:8px">Notes for admin</div>
+          <div class="card pad2" style="min-height:64px">
+            <span style="font-size:11.5px;color:var(--ink3);line-height:1.5">2 bedroom + hall, ceiling repaint வேணும், balcony crack repair சொல்லிட்டாங்க…</span>
+          </div>
+        </div>
+      </div>
+      <div class="sticky"><div class="cta">Save Quotation</div></div>
+    </div>
+  </div>
+</div>
+
+<!-- FRAME 15 -->
+<div class="framewrap" id="screen-15">
+  <div class="cap">
+    <div class="n">15 · Quotation Detail</div>
+    <div class="ta tamil">QTN-118, status pending; customer card-ல் site + area; paint qty suggestion table (Putty/Primer/Emulsion); கீழே Edit / Share PDF buttons இரண்டும்.</div>
+    <span class="tag pol">Polish</span>
+  </div>
+  <div class="phone"><div class="notch"></div>
+    <div class="screen">
+      <div class="sbar"><em>9:41</em><em>5G ▮▮▮▯</em></div>
+      <div class="abar"><div class="back">‹</div><div><div class="h">QTN-118</div><div class="sub">Created 10 Aug · Syed</div></div><span class="sp"></span><span class="badge pa">Pending</span></div>
+      <div class="pad">
+        <div class="card pad2">
+          <div style="display:flex;gap:11px;align-items:center">
+            <div class="avatar" style="width:38px;height:38px;font-size:13px">RK</div>
+            <div style="flex:1"><div style="font-size:13.5px;font-weight:800;color:var(--ink)">Ravi Kumar</div><div style="font-size:10.5px;color:var(--ink2)">Anna Nagar, Coimbatore</div></div>
+          </div>
+          <div style="display:flex;gap:7px;margin-top:10px"><span class="chip" style="font-size:10px;padding:3px 9px">1,200 sqft</span><span class="chip" style="font-size:10px;padding:3px 9px">Interior</span></div>
+        </div>
+        <div class="sect"><b>Suggested material qty</b></div>
+        <div class="card">
+          <div class="lrow2" style="border-top:none"><div class="ic">🪣</div><div class="tx"><div class="t">Wall Putty</div><div class="s">2 coats · 1,200 sqft</div></div><div class="r"><div class="amt">25 kg</div></div></div>
+          <div class="lrow2"><div class="ic">🧴</div><div class="tx"><div class="t">Primer</div><div class="s">1 coat · Style Pro Fresh</div></div><div class="r"><div class="amt">10 L</div></div></div>
+          <div class="lrow2"><div class="ic">🎨</div><div class="tx"><div class="t">Emulsion</div><div class="s">2 coats · Style Color Smart</div></div><div class="r"><div class="amt">20 L</div></div></div>
+        </div>
+        <div class="card pad2" style="display:flex;justify-content:space-between;align-items:center">
+          <div><div style="font-size:10px;font-weight:700;color:var(--ink3)">ESTIMATED VALUE</div><div style="font-size:17px;font-weight:800;color:var(--green-d);margin-top:2px">₹42,600</div></div>
+          <span class="pts">★ ≈ 2,556</span>
+        </div>
+      </div>
+      <div class="sticky" style="display:flex;gap:10px">
+        <div class="cta gh" style="flex:1">Edit</div>
+        <div class="cta" style="flex:1">Share PDF</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- FRAME 16 -->
+<div class="framewrap" id="screen-16">
+  <div class="cap">
+    <div class="n">16 · Estimate Detail</div>
+    <div class="ta tamil">Status timeline மேலே (draft → pending → approved → paid); items table + payment section ஒரே flow-ல்; approved நிலையில் "Submit Payment" CTA.</div>
+    <span class="tag pol">Polish</span><span class="tag new">Timeline</span>
+  </div>
+  <div class="phone"><div class="notch"></div>
+    <div class="screen">
+      <div class="sbar"><em>9:41</em><em>5G ▮▮▮▯</em></div>
+      <div class="abar"><div class="back">‹</div><div><div class="h">EST-2418</div><div class="sub">Self billing · 12 Aug 2026</div></div><span class="sp"></span><div class="iconb">⇪</div></div>
+      <div class="pad">
+        <div class="card pad2">
+          <div style="display:flex;align-items:center;gap:0">
+            <div style="flex:1;text-align:center"><div style="width:22px;height:22px;border-radius:50%;background:var(--green);color:#fff;font-size:11px;display:flex;align-items:center;justify-content:center;margin:0 auto">✓</div><div style="font-size:8.5px;font-weight:700;color:var(--green-d);margin-top:3px">Draft</div></div>
+            <div style="flex:1;height:2.5px;background:var(--green);margin-bottom:14px"></div>
+            <div style="flex:1;text-align:center"><div style="width:22px;height:22px;border-radius:50%;background:var(--gold);color:#fff;font-size:11px;display:flex;align-items:center;justify-content:center;margin:0 auto">●</div><div style="font-size:8.5px;font-weight:700;color:var(--gold-d);margin-top:3px">Pending</div></div>
+            <div style="flex:1;height:2.5px;background:var(--sv);margin-bottom:14px"></div>
+            <div style="flex:1;text-align:center"><div style="width:22px;height:22px;border-radius:50%;background:var(--sv);color:var(--ink3);font-size:11px;display:flex;align-items:center;justify-content:center;margin:0 auto">3</div><div style="font-size:8.5px;font-weight:700;color:var(--ink3);margin-top:3px">Approved</div></div>
+            <div style="flex:1;height:2.5px;background:var(--sv);margin-bottom:14px"></div>
+            <div style="flex:1;text-align:center"><div style="width:22px;height:22px;border-radius:50%;background:var(--sv);color:var(--ink3);font-size:11px;display:flex;align-items:center;justify-content:center;margin:0 auto">₹</div><div style="font-size:8.5px;font-weight:700;color:var(--ink3);margin-top:3px">Paid</div></div>
+          </div>
+        </div>
+        <div class="card">
+          <div class="lrow2" style="border-top:none">
+            <div class="tx"><div class="t">STYLE PRO FRESH PRIMER · 4L</div><div class="s">₹690 × 2</div></div>
+            <div class="r"><div class="amt">₹1,380</div></div></div>
+          <div class="lrow2">
+            <div class="tx"><div class="t">STYLE COLOR SMART · 10L (CS1)</div><div class="s">₹1,890 × 1</div></div>
+            <div class="r"><div class="amt">₹1,890</div></div></div>
+          <div class="lrow2" style="background:#FBFDF9">
+            <div class="tx"><div class="t" style="font-size:13.5px">Total</div><div class="s">GST included</div></div>
+            <div class="r"><div class="amt" style="font-size:16px">₹3,270</div></div></div>
+        </div>
+        <div class="card pad2" style="display:flex;gap:9px;align-items:center">
+          <span style="font-size:17px">⏳</span>
+          <div style="flex:1;font-size:11.5px;color:var(--ink2);line-height:1.5">Admin பரிசீலனையில் இருக்கு. Approve ஆனதும் இங்கயே payment submit பண்ணலாம்.</div>
+        </div>
+        <div style="display:flex;gap:9px">
+          <div class="cta gh" style="flex:1">Edit Draft</div>
+          <div class="cta dis" style="flex:1">Submit Payment</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- FRAME 17 -->
+<div class="framewrap" id="screen-17">
+  <div class="cap">
+    <div class="n">17 · Estimate PDF Preview</div>
+    <div class="ta tamil">A4 letterhead look preview — QC green header bar, customer block, 3-row items table, total; கீழே Share WhatsApp (green) / Download buttons.</div>
+    <span class="tag pol">Polish</span>
+  </div>
+  <div class="phone"><div class="notch"></div>
+    <div class="screen">
+      <div class="sbar"><em>9:41</em><em>5G ▮▮▮▯</em></div>
+      <div class="abar"><div class="back">‹</div><div><div class="h">Preview</div><div class="sub">EST-2415 · PDF</div></div><span class="sp"></span></div>
+      <div class="pad">
+        <div class="card" style="padding:0;overflow:hidden">
+          <div style="background:linear-gradient(135deg,var(--green-dd),var(--green));color:#fff;padding:14px 15px">
+            <div style="font-size:14px;font-weight:800;letter-spacing:-.01em">Quality Colours</div>
+            <div style="font-size:9.5px;opacity:.85;margin-top:1px">Ramanathapuram Rd, Coimbatore · GSTIN 33XXXXX1234Z</div>
+          </div>
+          <div style="padding:12px 15px 6px;display:flex;justify-content:space-between">
+            <div><div style="font-size:9px;font-weight:800;color:var(--ink3);letter-spacing:.06em">BILL TO</div>
+              <div style="font-size:12px;font-weight:700;color:var(--ink);margin-top:2px">Ravi Kumar</div>
+              <div style="font-size:10px;color:var(--ink2)">Anna Nagar, Coimbatore</div></div>
+            <div style="text-align:right"><div style="font-size:9px;font-weight:800;color:var(--ink3);letter-spacing:.06em">EST-2415</div>
+              <div style="font-size:10.5px;color:var(--ink2);margin-top:2px">11 Aug 2026</div></div>
+          </div>
+          <div style="padding:8px 15px 4px">
+            <div style="display:flex;font-size:9px;font-weight:800;color:var(--ink3);border-bottom:1px solid var(--line);padding-bottom:5px"><span style="flex:1">ITEM</span><span style="width:30px;text-align:center">QTY</span><span style="width:56px;text-align:right">AMOUNT</span></div>
+            <div style="display:flex;font-size:10.5px;color:var(--ink);padding:7px 0;border-bottom:1px solid var(--line)"><span style="flex:1">Walmasta Ext Emulsion 20L</span><span style="width:30px;text-align:center">1</span><span style="width:56px;text-align:right;font-weight:700">₹3,720</span></div>
+            <div style="display:flex;font-size:10.5px;color:var(--ink);padding:7px 0;border-bottom:1px solid var(--line)"><span style="flex:1">Style Pro Fresh Primer 10L</span><span style="width:30px;text-align:center">1</span><span style="width:56px;text-align:right;font-weight:700">₹1,815</span></div>
+            <div style="display:flex;font-size:10.5px;color:var(--ink);padding:7px 0;border-bottom:1px solid var(--line)"><span style="flex:1">Labour charge</span><span style="width:30px;text-align:center">—</span><span style="width:56px;text-align:right;font-weight:700">₹4,500</span></div>
+          </div>
+          <div style="padding:8px 15px 14px;display:flex;justify-content:flex-end">
+            <div style="text-align:right"><div style="font-size:9.5px;color:var(--ink2)">Total (GST incl.)</div>
+              <div style="font-size:16px;font-weight:800;color:var(--green-d)">₹32,850</div></div>
+          </div>
+        </div>
+      </div>
+      <div class="sticky" style="display:flex;gap:10px">
+        <div class="cta" style="flex:1">Share WhatsApp</div>
+        <div class="cta gh" style="flex:1">Download</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- FRAME 18 -->
+<div class="framewrap" id="screen-18">
+  <div class="cap">
+    <div class="n">18 · Payment Sheet</div>
+    <div class="ta tamil">UPI QR + reference number entry ஒரே sheet-ல்; paid amount pre-filled; screenshot attach optional. Approve ஆன பிறகே இந்த sheet திறக்கும்.</div>
+    <span class="tag pol">Polish</span>
+  </div>
+  <div class="phone"><div class="notch"></div>
+    <div class="screen" style="background:var(--bg)">
+      <div class="sheetdim"></div>
+      <div class="sheet">
+        <div class="grab"></div>
+        <div class="sh">Pay ₹3,270 — EST-2418</div>
+        <div class="card pad2" style="display:flex;gap:12px;align-items:center">
+          <div style="width:86px;height:86px;border-radius:12px;background:
+            repeating-linear-gradient(0deg,var(--ink) 0 3px,transparent 3px 7px),
+            repeating-linear-gradient(90deg,var(--ink) 0 3px,#fff 3px 7px);opacity:.85;flex:none"></div>
+          <div style="flex:1">
+            <div style="font-size:11px;font-weight:800;letter-spacing:.06em;color:var(--ink3)">UPI — SCAN &amp; PAY</div>
+            <div style="font-size:13px;font-weight:800;color:var(--ink);margin-top:3px">qualitycolours@upi</div>
+            <div style="font-size:10.5px;color:var(--ink2);margin-top:2px">Google Pay · PhonePe · Paytm</div>
+          </div>
+        </div>
+        <div class="inp"><span>#</span><b>UPI reference / UTR number</b></div>
+        <div class="inp"><span>📎</span>Attach payment screenshot <span style="color:var(--ink3)">(optional)</span></div>
+        <div class="cta">Submit Payment Proof</div>
+        <div class="knote">Admin confirm பண்ணதும் ★ annual points credit ஆகும்</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- FRAME 19 -->
+<div class="framewrap" id="screen-19">
+  <div class="cap">
+    <div class="n">19 · Check-In (Selfie Attendance)</div>
+    <div class="ta tamil">Dark camera viewfinder, face-guide dashed circle நடுவே; கீழே site name + GPS ok chips; பெரிய round capture button; daily points குறிப்பு.</div>
+    <span class="tag pol">Polish</span>
+  </div>
+  <div class="phone"><div class="notch"></div>
+    <div class="screen" style="background:#0E1611">
+      <div class="sbar" style="color:#fff"><em>9:41</em><em>5G ▮▮▮▯</em></div>
+      <div class="abar" style="background:#0E1611"><div class="back">‹</div><div><div class="h" style="color:#fff">Check-In</div><div class="sub" style="color:rgba(255,255,255,.6)">Selfie attendance</div></div><span class="sp"></span></div>
+      <div style="flex:1;display:flex;align-items:center;justify-content:center;position:relative">
+        <div style="width:190px;height:190px;border-radius:50%;border:2.5px dashed rgba(255,255,255,.55);display:flex;align-items:center;justify-content:center">
+          <span style="font-size:52px;opacity:.35">🙂</span>
+        </div>
+        <div style="position:absolute;top:6px;left:16px;right:16px;display:flex;gap:7px;flex-wrap:wrap">
+          <span class="chip" style="background:rgba(255,255,255,.14);border-color:rgba(255,255,255,.2);color:#fff">📍 Anna Nagar site</span>
+          <span class="chip" style="background:rgba(255,255,255,.14);border-color:rgba(255,255,255,.2);color:#fff">GPS ✓</span>
+        </div>
+        <div style="position:absolute;bottom:10px;left:0;right:0;text-align:center"><span style="font-size:11px;color:rgba(255,255,255,.7)">முகத்தை circle-க்குள் வையுங்க</span></div>
+      </div>
+      <div class="pad" style="padding-top:6px;padding-bottom:22px;align-items:center">
+        <div style="width:70px;height:70px;border-radius:50%;background:#fff;border:4px solid rgba(255,255,255,.35);display:flex;align-items:center;justify-content:center;font-size:26px">📸</div>
+        <div class="knote" style="color:rgba(255,255,255,.6)">Check-in பண்ணா இன்றைக்கு ★ 10 points</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- FRAME 20 -->
+<div class="framewrap" id="screen-20">
+  <div class="cap">
+    <div class="n">20 · Attendance Calendar</div>
+    <div class="ta tamil">Month view — present (பச்சை fill), streak bonus (gold ring), absent (முடங்கிய நிறம்), today (outline) நான்கு states தெளிவா; கீழே legend + summary tiles.</div>
+    <span class="tag pol">Polish</span>
+  </div>
+  <div class="phone"><div class="notch"></div>
+    <div class="screen">
+      <div class="sbar"><em>9:41</em><em>5G ▮▮▮▯</em></div>
+      <div class="abar"><div class="back">‹</div><div><div class="h">Attendance</div><div class="sub">Calendar view</div></div><span class="sp"></span></div>
+      <div class="pad" style="padding-top:2px">
+        <div class="card pad2">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+            <span style="font-size:15px;color:var(--ink3)">‹</span>
+            <span style="font-size:13.5px;font-weight:800;color:var(--ink)">August 2026</span>
+            <span style="font-size:15px;color:var(--ink3)">›</span>
+          </div>
+          <div style="display:grid;grid-template-columns:repeat(7,1fr);gap:5px;font-size:9.5px;font-weight:800;color:var(--ink3);text-align:center;margin-bottom:6px">
+            <span>M</span><span>T</span><span>W</span><span>T</span><span>F</span><span>S</span><span>S</span>
+          </div>
+          <div style="display:grid;grid-template-columns:repeat(7,1fr);gap:5px">
+            <span></span><span></span>
+            <span style="aspect-ratio:1;border-radius:9px;background:var(--green);color:#fff;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700">1</span>
+            <span style="aspect-ratio:1;border-radius:9px;background:var(--sv);color:var(--ink3);display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700">2</span>
+            <span style="aspect-ratio:1;border-radius:9px;background:var(--green);color:#fff;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700">3</span>
+            <span style="aspect-ratio:1;border-radius:9px;background:var(--green);color:#fff;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700">4</span>
+            <span style="aspect-ratio:1;border-radius:9px;background:var(--green);color:#fff;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700">5</span>
+            <span style="aspect-ratio:1;border-radius:9px;background:var(--green);color:#fff;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700">6</span>
+            <span style="aspect-ratio:1;border-radius:9px;background:var(--green);color:#fff;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700">7</span>
+            <span style="aspect-ratio:1;border-radius:9px;background:var(--white);border:2px solid var(--gold);color:var(--ink);display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700">8</span>
+            <span style="aspect-ratio:1;border-radius:9px;background:var(--green);color:#fff;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700">9</span>
+            <span style="aspect-ratio:1;border-radius:9px;background:var(--green);color:#fff;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700">10</span>
+            <span style="aspect-ratio:1;border-radius:9px;background:var(--green);color:#fff;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700">11</span>
+            <span style="aspect-ratio:1;border-radius:9px;background:var(--sv);color:var(--ink3);display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700">12</span>
+            <span style="aspect-ratio:1;border-radius:9px;background:var(--green);color:#fff;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700">13</span>
+            <span style="aspect-ratio:1;border-radius:9px;background:var(--green);color:#fff;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700">14</span>
+            <span style="aspect-ratio:1;border-radius:9px;background:var(--green);color:#fff;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700">15</span>
+            <span style="aspect-ratio:1;border-radius:9px;background:var(--white);border:2px solid var(--gold);color:var(--ink);display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700">16</span>
+            <span style="aspect-ratio:1;border-radius:9px;background:var(--green);color:#fff;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700">17</span>
+            <span style="aspect-ratio:1;border-radius:9px;background:var(--green);color:#fff;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700">18</span>
+            <span style="aspect-ratio:1;border-radius:9px;background:var(--green);color:#fff;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700">19</span>
+            <span style="aspect-ratio:1;border-radius:9px;background:var(--white);border:2px solid var(--green);color:var(--ink);display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:800">20</span>
+            <span style="aspect-ratio:1;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:600;color:var(--ink3);opacity:.55">21</span>
+            <span style="aspect-ratio:1;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:600;color:var(--ink3);opacity:.55">22</span>
+            <span style="aspect-ratio:1;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:600;color:var(--ink3);opacity:.55">23</span>
+            <span style="aspect-ratio:1;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:600;color:var(--ink3);opacity:.55">24</span>
+            <span style="aspect-ratio:1;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:600;color:var(--ink3);opacity:.55">25</span>
+            <span style="aspect-ratio:1;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:600;color:var(--ink3);opacity:.55">26</span>
+            <span style="aspect-ratio:1;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:600;color:var(--ink3);opacity:.55">27</span>
+            <span style="aspect-ratio:1;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:600;color:var(--ink3);opacity:.55">28</span>
+            <span style="aspect-ratio:1;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:600;color:var(--ink3);opacity:.55">29</span>
+            <span style="aspect-ratio:1;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:600;color:var(--ink3);opacity:.55">30</span>
+            <span style="aspect-ratio:1;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:600;color:var(--ink3);opacity:.55">31</span>
+          </div>
+        </div>
+        <div style="display:flex;gap:12px;flex-wrap:wrap;padding:2px 4px">
+          <div style="display:flex;align-items:center;gap:5px"><span style="width:11px;height:11px;border-radius:4px;background:var(--green);display:inline-block"></span><span style="font-size:10px;color:var(--ink2)">Present</span></div>
+          <div style="display:flex;align-items:center;gap:5px"><span style="width:11px;height:11px;border-radius:4px;background:#fff;border:2px solid var(--gold);display:inline-block"></span><span style="font-size:10px;color:var(--ink2)">Streak bonus</span></div>
+          <div style="display:flex;align-items:center;gap:5px"><span style="width:11px;height:11px;border-radius:4px;background:var(--sv);display:inline-block"></span><span style="font-size:10px;color:var(--ink2)">Absent</span></div>
+          <div style="display:flex;align-items:center;gap:5px"><span style="width:11px;height:11px;border-radius:4px;background:#fff;border:2px solid var(--green);display:inline-block"></span><span style="font-size:10px;color:var(--ink2)">Today</span></div>
+        </div>
+        <div class="tiles2">
+          <div class="tile"><div class="lb">Present</div><div class="v">22</div><div class="m">of 22 working days</div></div>
+          <div class="tile"><div class="lb">Streak</div><div class="v gold">6 🔥</div><div class="m">bonus days this month</div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- FRAME 21 -->
+<div class="framewrap" id="screen-21">
+  <div class="cap">
+    <div class="n">21 · Attendance History</div>
+    <div class="ta tamil">ஒவ்வொரு நாளும் row-ஆ: date, site, time-in, selfie thumb, Verified/Pending review badge; scroll ஆகும் list.</div>
+    <span class="tag pol">Polish</span>
+  </div>
+  <div class="phone"><div class="notch"></div>
+    <div class="screen">
+      <div class="sbar"><em>9:41</em><em>5G ▮▮▮▯</em></div>
+      <div class="abar"><div class="back">‹</div><div><div class="h">History</div><div class="sub">Check-in records</div></div><span class="sp"></span></div>
+      <div class="pad" style="padding-top:4px">
+        <div class="chips">
+          <span class="chip on">August</span><span class="chip">July</span><span class="chip">June</span>
+        </div>
+        <div class="card">
+          <div class="lrow2" style="border-top:none">
+            <div class="avatar" style="width:36px;height:36px;font-size:12px">SY</div>
+            <div class="tx"><div class="t">12 Aug · Anna Nagar site</div><div class="s">Check-in 9:04 AM</div></div>
+            <div class="r"><span class="badge ap">✓ Verified</span></div></div>
+          <div class="lrow2">
+            <div class="avatar" style="width:36px;height:36px;font-size:12px">SY</div>
+            <div class="tx"><div class="t">11 Aug · Anna Nagar site</div><div class="s">Check-in 8:51 AM</div></div>
+            <div class="r"><span class="badge ap">✓ Verified</span></div></div>
+          <div class="lrow2">
+            <div class="avatar" style="width:36px;height:36px;font-size:12px">SY</div>
+            <div class="tx"><div class="t">10 Aug · RS Puram site</div><div class="s">Check-in 9:22 AM</div></div>
+            <div class="r"><span class="badge pa">Pending review</span></div></div>
+          <div class="lrow2">
+            <div class="avatar" style="width:36px;height:36px;font-size:12px">SY</div>
+            <div class="tx"><div class="t">9 Aug · Anna Nagar site</div><div class="s">Check-in 8:47 AM</div></div>
+            <div class="r"><span class="badge ap">✓ Verified</span></div></div>
+          <div class="lrow2">
+            <div class="avatar" style="width:36px;height:36px;font-size:12px">SY</div>
+            <div class="tx"><div class="t">8 Aug · Saibaba Colony site</div><div class="s">Check-in 9:15 AM</div></div>
+            <div class="r"><span class="badge ap">✓ Verified</span></div></div>
+        </div>
+        <div class="knote">Pull to refresh · older records load as you scroll</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- FRAME 22 -->
+<div class="framewrap" id="screen-22">
+  <div class="cap">
+    <div class="n">22 · Paint Calculator</div>
+    <div class="ta tamil">Room L×W×H மூன்று சிறிய inputs ஒரே வரிசையில்; coats + surface chips; கீழே material result card, "Add all to cart" புது link Catalog cart-க்கு நேரடி.</div>
+    <span class="tag new">Cart link new</span>
+  </div>
+  <div class="phone"><div class="notch"></div>
+    <div class="screen">
+      <div class="sbar"><em>9:41</em><em>5G ▮▮▮▯</em></div>
+      <div class="abar"><div class="back">‹</div><div><div class="h">Paint Calculator</div><div class="sub">Estimate material qty</div></div><span class="sp"></span></div>
+      <div class="pad">
+        <div>
+          <div class="divh" style="margin-bottom:8px">Room dimensions (ft)</div>
+          <div style="display:flex;gap:8px">
+            <div class="inp foc" style="flex:1;justify-content:center"><b>12</b><span>L</span></div>
+            <div class="inp" style="flex:1;justify-content:center"><b>10</b><span>W</span></div>
+            <div class="inp" style="flex:1;justify-content:center"><b>9</b><span>H</span></div>
+          </div>
+        </div>
+        <div>
+          <div class="divh" style="margin-bottom:8px">Coats</div>
+          <div class="chips"><span class="chip">1 coat</span><span class="chip on">2 coats</span></div>
+        </div>
+        <div>
+          <div class="divh" style="margin-bottom:8px">Surface</div>
+          <div class="chips"><span class="chip">New surface</span><span class="chip on">Repaint</span></div>
+        </div>
+        <div class="cta gh">Calculate</div>
+        <div>
+          <div class="divh" style="margin-bottom:8px">Required material</div>
+          <div class="card">
+            <div class="lrow2" style="border-top:none"><div class="ic">🪣</div><div class="tx"><div class="t">Wall Putty</div><div class="s">2 coats · ~418 sqft</div></div><div class="r"><div class="amt">25 kg</div></div></div>
+            <div class="lrow2"><div class="ic">🧴</div><div class="tx"><div class="t">Primer</div><div class="s">1 coat · Style Pro Fresh</div></div><div class="r"><div class="amt">10 L</div></div></div>
+            <div class="lrow2"><div class="ic">🎨</div><div class="tx"><div class="t">Emulsion</div><div class="s">2 coats · Style Color Smart</div></div><div class="r"><div class="amt">20 L</div></div></div>
+          </div>
+        </div>
+      </div>
+      <div class="sticky"><div class="cta">Add all to Cart — ₹4,285</div></div>
+    </div>
+  </div>
+</div>
+
+<!-- FRAME 23 -->
+<div class="framewrap" id="screen-23">
+  <div class="cap">
+    <div class="n">23 · Notifications</div>
+    <div class="ta tamil">Today/Earlier grouping; estimate approved (✓ green + gold ★), payment confirmed, புது offer (% orange), training added; படிக்காத rows-க்கு இடது பச்சை dot.</div>
+    <span class="tag pol">Polish</span>
+  </div>
+  <div class="phone"><div class="notch"></div>
+    <div class="screen">
+      <div class="sbar"><em>9:41</em><em>5G ▮▮▮▯</em></div>
+      <div class="abar"><div class="back">‹</div><div><div class="h">Notifications</div><div class="sub">4 new</div></div><span class="sp"></span></div>
+      <div class="pad" style="padding-top:4px">
+        <div class="divh">Today</div>
+        <div class="card">
+          <div class="lrow2" style="border-top:none">
+            <span style="width:7px;height:7px;border-radius:50%;background:var(--green);flex:none"></span>
+            <div class="ic" style="background:var(--green-c);color:var(--green-d)">✓</div>
+            <div class="tx"><div class="t">Estimate EST-2415 approved</div><div class="s">Ravi Kumar · Anna Nagar · 2 min ago</div></div>
+            <div class="r"><div class="amt plus">+340 ★</div></div></div>
+          <div class="lrow2">
+            <span style="width:7px;height:7px;border-radius:50%;background:var(--green);flex:none"></span>
+            <div class="ic">💰</div>
+            <div class="tx"><div class="t">Payment confirmed</div><div class="s">EST-2402 · ₹4,510 received</div></div>
+            <div class="r"><span class="chev">›</span></div></div>
+          <div class="lrow2">
+            <span style="width:7px;height:7px;border-radius:50%;background:var(--green);flex:none"></span>
+            <div class="ic" style="background:var(--offer-c);color:var(--offer)">%</div>
+            <div class="tx"><div class="t">New offer — 2× points</div><div class="s">STYLE emulsions · Aug 10–20</div></div>
+            <div class="r"><span class="chev">›</span></div></div>
+        </div>
+        <div class="divh">Earlier</div>
+        <div class="card">
+          <div class="lrow2" style="border-top:none">
+            <span style="width:7px;height:7px;flex:none"></span>
+            <div class="ic">🎓</div>
+            <div class="tx"><div class="t">New training added</div><div class="s">Interior wall prep · 8 min video</div></div>
+            <div class="r"><span class="chev">›</span></div></div>
+          <div class="lrow2">
+            <span style="width:7px;height:7px;flex:none"></span>
+            <div class="ic">🔥</div>
+            <div class="tx"><div class="t">6-day streak reached</div><div class="s">Yesterday · bonus unlocked</div></div>
+            <div class="r"><div class="amt plus">+50 ★</div></div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- FRAME 24 -->
+<div class="framewrap" id="screen-24">
+  <div class="cap">
+    <div class="n">24 · Profile (Me)</div>
+    <div class="ta tamil">Tier ring-ஓட header (Gold → Diamond progress); wallet + points tiles; menu grouped: Earnings / Work / App. Logout கடைசியில் தனியா.</div>
+    <span class="tag pol">Polish</span>
+  </div>
+  <div class="phone"><div class="notch"></div>
+    <div class="screen">
+      <div class="hero" style="border-radius:0 0 26px 26px">
+        <div class="sbar" style="color:#fff"><em>9:41</em><em>5G ▮▮▮▯</em></div>
+        <div style="display:flex;align-items:center;gap:13px;margin-top:4px">
+          <div style="position:relative;width:64px;height:64px;flex:none">
+            <svg viewBox="0 0 64 64" style="position:absolute;inset:0">
+              <circle cx="32" cy="32" r="29" fill="none" stroke="rgba(255,255,255,.22)" stroke-width="4"/>
+              <circle cx="32" cy="32" r="29" fill="none" stroke="#F7DFAE" stroke-width="4" stroke-linecap="round"
+                stroke-dasharray="113 182" transform="rotate(-90 32 32)"/>
+            </svg>
+            <div class="avatar" style="position:absolute;inset:7px;font-size:18px">SY</div>
+          </div>
+          <div style="flex:1">
+            <div class="nm">Syed Painter</div>
+            <div style="font-size:11px;opacity:.85;margin-top:1px">98470 12345 · Coimbatore</div>
+            <div style="display:flex;gap:6px;margin-top:6px">
+              <span class="pts" style="background:rgba(255,255,255,.16);color:#F7DFAE">★ GOLD TIER</span>
+              <span style="font-size:10px;opacity:.85;align-self:center">12,480 / 25,000 → Diamond</span>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="pad">
+        <div class="tiles2">
+          <div class="tile"><div class="lb">Points ★</div><div class="v gold">12,480</div><div class="m">+340 this week</div></div>
+          <div class="tile"><div class="lb">Wallet</div><div class="v">₹3,240</div><div class="m">Withdraw ›</div></div>
+        </div>
+        <div class="divh">Earnings</div>
+        <div class="card">
+          <div class="lrow2" style="border-top:none"><div class="ic">★</div><div class="tx"><div class="t">Points History</div></div><span class="chev">›</span></div>
+          <div class="lrow2"><div class="ic">🎁</div><div class="tx"><div class="t">Reward Cards</div><div class="s">2 unscratched</div></div><span class="chev">›</span></div>
+          <div class="lrow2"><div class="ic">🏆</div><div class="tx"><div class="t">Leaderboard &amp; Achievements</div></div><span class="chev">›</span></div>
+          <div class="lrow2"><div class="ic">🤝</div><div class="tx"><div class="t">Referrals</div><div class="s">code QC-SYED · 4 joined</div></div><span class="chev">›</span></div>
+        </div>
+        <div class="divh">Work</div>
+        <div class="card">
+          <div class="lrow2" style="border-top:none"><div class="ic">📅</div><div class="tx"><div class="t">Attendance</div><div class="s">22 days this month</div></div><span class="chev">›</span></div>
+          <div class="lrow2"><div class="ic">🖼</div><div class="tx"><div class="t">My Work Gallery</div></div><span class="chev">›</span></div>
+          <div class="lrow2"><div class="ic">🎓</div><div class="tx"><div class="t">Training</div><div class="s">1 new video</div></div><span class="chev">›</span></div>
+          <div class="lrow2"><div class="ic">🎨</div><div class="tx"><div class="t">Color Visualizations</div></div><span class="chev">›</span></div>
+        </div>
+        <div class="divh">App</div>
+        <div class="card">
+          <div class="lrow2" style="border-top:none"><div class="ic">👤</div><div class="tx"><div class="t">Edit Profile</div></div><span class="chev">›</span></div>
+          <div class="lrow2"><div class="ic">⚙️</div><div class="tx"><div class="t">Settings</div></div><span class="chev">›</span></div>
+        </div>
+      </div>
+      <div class="bnav">
+        <div class="it"><i>⌂</i>Home</div><div class="it"><i>🗂</i>Work</div>
+        <div class="fab">+</div>
+        <div class="it"><i>🛍</i>Catalog</div><div class="it on"><i>👤</i>Me</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- FRAME 25 -->
+<div class="framewrap" id="screen-25">
+  <div class="cap">
+    <div class="n">25 · Edit Profile</div>
+    <div class="ta tamil">பேர், ஊர், அனுபவம், withdrawal UPI id மாத்தலாம் — phone number மட்டும் locked, மாத்த support-ஐ தொடர்பு கொள்ளணும்.</div>
+    <span class="tag pol">Polish</span>
+  </div>
+  <div class="phone"><div class="notch"></div>
+    <div class="screen">
+      <div class="sbar"><em>9:41</em><em>5G ▮▮▮▯</em></div>
+      <div class="abar"><div class="back">‹</div><div><div class="h">Edit Profile</div></div><span class="sp"></span></div>
+      <div class="pad">
+        <div style="display:flex;justify-content:center;padding:4px 0 2px">
+          <div style="position:relative;width:84px;height:84px">
+            <div class="avatar" style="width:84px;height:84px;font-size:26px">SY</div>
+            <div class="iconb" style="position:absolute;right:-3px;bottom:-3px;width:28px;height:28px;background:var(--green);color:#fff;border-color:#fff;font-size:12px">📷</div>
+          </div>
+        </div>
+        <div class="knote">Tap the camera to change your photo</div>
+        <div class="divh">Basic details</div>
+        <div class="card pad2" style="gap:11px;display:flex;flex-direction:column">
+          <div>
+            <div style="font-size:10px;font-weight:700;letter-spacing:.06em;color:var(--ink3);margin-bottom:4px">FULL NAME</div>
+            <div class="inp foc"><span>👤</span><b>Syed Painter</b></div>
+          </div>
+          <div>
+            <div style="font-size:10px;font-weight:700;letter-spacing:.06em;color:var(--ink3);margin-bottom:4px">PHONE NUMBER</div>
+            <div class="inp" style="color:var(--ink3)"><span>📱</span><b style="color:var(--ink3);font-weight:600">98470 12345</b><span class="sp"></span><span style="font-size:9.5px">🔒 locked</span></div>
+          </div>
+          <div>
+            <div style="font-size:10px;font-weight:700;letter-spacing:.06em;color:var(--ink3);margin-bottom:4px">CITY</div>
+            <div class="inp"><span>📍</span><b>Coimbatore</b></div>
+          </div>
+          <div>
+            <div style="font-size:10px;font-weight:700;letter-spacing:.06em;color:var(--ink3);margin-bottom:4px">EXPERIENCE</div>
+            <div class="inp"><span>🛠</span><b>6 years</b></div>
+          </div>
+        </div>
+        <div class="divh">Withdrawals</div>
+        <div class="card pad2" style="gap:11px;display:flex;flex-direction:column">
+          <div>
+            <div style="font-size:10px;font-weight:700;letter-spacing:.06em;color:var(--ink3);margin-bottom:4px">UPI ID FOR WITHDRAWALS</div>
+            <div class="inp"><span>💳</span><b>syed@upi</b></div>
+          </div>
+          <div class="knote" style="text-align:left">Wallet withdrawal-கள் இந்த UPI id-க்கே அனுப்பப்படும்</div>
+        </div>
+      </div>
+      <div class="sticky"><div class="cta">Save Changes</div></div>
+    </div>
+  </div>
+</div>
+
+<!-- FRAME 26 -->
+<div class="framewrap" id="screen-26">
+  <div class="cap">
+    <div class="n">26 · Gallery</div>
+    <div class="ta tamil">உங்க வேலை photos சேர்க்கலாம் — shop admin இதை பார்வையிடுவார், quality track பண்ணவும் portfolio-க்கும் பயன்படும்.</div>
+    <span class="tag pol">Polish</span>
+  </div>
+  <div class="phone"><div class="notch"></div>
+    <div class="screen">
+      <div class="sbar"><em>9:41</em><em>5G ▮▮▮▯</em></div>
+      <div class="abar"><div class="back">‹</div><div><div class="h">My Work Gallery</div><div class="sub">18 photos</div></div><span class="sp"></span></div>
+      <div class="pad">
+        <div class="chips">
+          <span class="chip on">All sites</span><span class="chip">This month</span><span class="chip">Exteriors</span>
+        </div>
+        <div class="pgrid">
+          <div class="pcard" style="border:1.5px dashed var(--line);box-shadow:none"><div class="pimg" style="height:104px;background:var(--sv)"><span style="font-size:24px;opacity:.7">+</span></div>
+            <div class="bd"><div class="nm" style="color:var(--ink2)">Add photo</div></div></div>
+          <div class="pcard"><div class="pimg" style="height:104px"><span>SITE</span></div>
+            <div class="bd"><div class="nm">Anna Nagar — Hall</div><div class="br">4 Aug 2026</div></div></div>
+          <div class="pcard"><div class="pimg" style="height:104px"><span>SITE</span></div>
+            <div class="bd"><div class="nm">RS Puram — Exterior</div><div class="br">29 Jul 2026</div></div></div>
+          <div class="pcard"><div class="pimg" style="height:104px"><span>SITE</span></div>
+            <div class="bd"><div class="nm">Peelamedu — Bedroom</div><div class="br">22 Jul 2026</div></div></div>
+          <div class="pcard"><div class="pimg" style="height:104px"><span>SITE</span></div>
+            <div class="bd"><div class="nm">Saibaba Colony</div><div class="br">15 Jul 2026</div></div></div>
+          <div class="pcard"><div class="pimg" style="height:104px"><span>SITE</span></div>
+            <div class="bd"><div class="nm">Gandhipuram — Shop</div><div class="br">9 Jul 2026</div></div></div>
+          <div class="pcard"><div class="pimg" style="height:104px"><span>SITE</span></div>
+            <div class="bd"><div class="nm">Ram Nagar — Hall</div><div class="br">2 Jul 2026</div></div></div>
+          <div class="pcard"><div class="pimg" style="height:104px"><span>SITE</span></div>
+            <div class="bd"><div class="nm">Singanallur — Gate</div><div class="br">26 Jun 2026</div></div></div>
+          <div class="pcard"><div class="pimg" style="height:104px"><span>SITE</span></div>
+            <div class="bd"><div class="nm">Vadavalli — Exterior</div><div class="br">18 Jun 2026</div></div></div>
+          <div class="pcard"><div class="pimg" style="height:104px"><span>SITE</span></div>
+            <div class="bd"><div class="nm">Ganapathy — Compound wall</div><div class="br">10 Jun 2026</div></div></div>
+          <div class="pcard"><div class="pimg" style="height:104px"><span>SITE</span></div>
+            <div class="bd"><div class="nm">Kovaipudur — Exterior</div><div class="br">2 Jun 2026</div></div></div>
+          <div class="pcard"><div class="pimg" style="height:104px"><span>SITE</span></div>
+            <div class="bd"><div class="nm">Race Course — Hall</div><div class="br">27 May 2026</div></div></div>
+        </div>
+        <div class="card pad2" style="display:flex;gap:9px;align-items:center;background:#FBFDF9">
+          <span style="font-size:15px">👀</span>
+          <div style="font-size:11px;color:var(--ink2);line-height:1.55" class="tamil">இந்த photos shop admin-க்கு தெரியும் — quality review-க்கும், உங்க portfolio-க்கும் பயன்படும்.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- FRAME 27 -->
+<div class="framewrap" id="screen-27">
+  <div class="cap">
+    <div class="n">27 · Referrals</div>
+    <div class="ta tamil">உங்க referral code share பண்ணுங்க — நண்பர் join ஆகி முதல் bill approve ஆனா உங்களுக்கு ★500 கிடைக்கும்.</div>
+    <span class="tag pol">Polish</span>
+  </div>
+  <div class="phone"><div class="notch"></div>
+    <div class="screen">
+      <div class="sbar"><em>9:41</em><em>5G ▮▮▮▯</em></div>
+      <div class="abar"><div class="back">‹</div><div><div class="h">Referrals</div></div><span class="sp"></span></div>
+      <div class="pad">
+        <div class="card pad2" style="background:linear-gradient(135deg,var(--green-dd),var(--green));color:#fff;text-align:center">
+          <div style="font-size:10px;font-weight:700;letter-spacing:.1em;opacity:.8">YOUR REFERRAL CODE</div>
+          <div style="font-size:26px;font-weight:800;letter-spacing:.08em;margin-top:6px">QC-SYED</div>
+          <div style="display:flex;gap:9px;margin-top:12px">
+            <div class="cta gh" style="flex:1;background:rgba(255,255,255,.14);border-color:rgba(255,255,255,.4);color:#fff">Copy</div>
+            <div class="cta" style="flex:1;background:var(--gold);color:var(--green-dd)">Share</div>
+          </div>
+        </div>
+        <div class="card pad2" style="display:flex;gap:9px;align-items:center">
+          <span style="font-size:17px">🎁</span>
+          <div style="font-size:11.5px;color:var(--ink2);line-height:1.5" class="tamil">நண்பர் இந்த code-ஓட join ஆகி முதல் bill approve ஆனா உங்களுக்கு <b style="color:var(--gold-d)">★500</b> bonus credit ஆகும்.</div>
+        </div>
+        <div class="tiles2">
+          <div class="tile">
+            <div class="lb">Total Referred</div>
+            <div class="v">4</div>
+            <div class="m">3 joined · 1 pending</div>
+          </div>
+          <div class="tile">
+            <div class="lb">Earned from referrals</div>
+            <div class="v gold">★1,500</div>
+            <div class="m">lifetime total</div>
+          </div>
+        </div>
+        <div class="sect"><b>Referred by you</b><span style="font-size:11px;font-weight:700;color:var(--ink3)">4 total</span></div>
+        <div class="card">
+          <div class="lrow2" style="border-top:none"><div class="ic">👤</div>
+            <div class="tx"><div class="t">Ravi — Anna Nagar</div><div class="s">Joined 2 Aug 2026</div></div>
+            <div class="r"><span class="badge ap">Joined</span><div class="amt plus" style="margin-top:4px">+★500</div></div></div>
+          <div class="lrow2"><div class="ic">👤</div>
+            <div class="tx"><div class="t">Kumar — Peelamedu</div><div class="s">Joined 20 Jul 2026</div></div>
+            <div class="r"><span class="badge ap">Joined</span><div class="amt plus" style="margin-top:4px">+★500</div></div></div>
+          <div class="lrow2"><div class="ic">👤</div>
+            <div class="tx"><div class="t">Selvam — Ram Nagar</div><div class="s">Joined 8 Jul 2026</div></div>
+            <div class="r"><span class="badge ap">Joined</span><div class="amt plus" style="margin-top:4px">+★500</div></div></div>
+          <div class="lrow2"><div class="ic">👤</div>
+            <div class="tx"><div class="t">Mani — Saibaba Colony</div><div class="s">Invited 6 Aug 2026</div></div>
+            <div class="r"><span class="badge pa">Pending</span></div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- FRAME 28 -->
+<div class="framewrap" id="screen-28">
+  <div class="cap">
+    <div class="n">28 · Leaderboard</div>
+    <div class="ta tamil">இந்த மாதம் top painters — ★ points அடிப்படையில் rank; உங்க position கீழே green highlight-ஆ தெரியும் (#7).</div>
+    <span class="tag pol">Polish</span>
+  </div>
+  <div class="phone"><div class="notch"></div>
+    <div class="screen">
+      <div class="sbar"><em>9:41</em><em>5G ▮▮▮▯</em></div>
+      <div class="abar"><div class="back">‹</div><div><div class="h">Leaderboard</div></div><span class="sp"></span></div>
+      <div class="pad">
+        <div class="chips">
+          <span class="chip on">This Month</span><span class="chip">All Time</span>
+        </div>
+        <div class="card pad2" style="display:flex;align-items:flex-end;justify-content:center;gap:14px;padding-top:24px">
+          <div style="text-align:center">
+            <div class="avatar" style="width:52px;height:52px;font-size:15px;margin:0 auto;box-shadow:0 0 0 3px var(--silver)">RA</div>
+            <div style="font-size:10.5px;font-weight:700;color:var(--ink);margin-top:6px">Ravi</div>
+            <div class="pts" style="margin-top:3px">★ 18,220</div>
+            <div style="font-size:9px;font-weight:800;color:var(--silver);margin-top:3px">#2</div>
+          </div>
+          <div style="text-align:center">
+            <div class="avatar" style="width:68px;height:68px;font-size:19px;margin:0 auto;box-shadow:0 0 0 3.5px var(--tgold)">RA</div>
+            <div style="font-size:11.5px;font-weight:800;color:var(--ink);margin-top:6px">Ravi K.</div>
+            <div class="pts" style="margin-top:3px">★ 24,860</div>
+            <div style="font-size:10px;font-weight:800;color:var(--tgold);margin-top:3px">#1 👑</div>
+          </div>
+          <div style="text-align:center">
+            <div class="avatar" style="width:52px;height:52px;font-size:15px;margin:0 auto;box-shadow:0 0 0 3px var(--bronze)">MA</div>
+            <div style="font-size:10.5px;font-weight:700;color:var(--ink);margin-top:6px">Mani</div>
+            <div class="pts" style="margin-top:3px">★ 15,920</div>
+            <div style="font-size:9px;font-weight:800;color:var(--bronze);margin-top:3px">#3</div>
+          </div>
+        </div>
+        <div class="card">
+          <div class="lrow2" style="border-top:none"><span style="font-size:12px;font-weight:800;color:var(--ink3);width:20px">4</span>
+            <div class="tx"><div class="t">Kumar</div></div><div class="r"><span class="pts">★ 14,200</span></div></div>
+          <div class="lrow2"><span style="font-size:12px;font-weight:800;color:var(--ink3);width:20px">5</span>
+            <div class="tx"><div class="t">Arun</div></div><div class="r"><span class="pts">★ 13,650</span></div></div>
+          <div class="lrow2"><span style="font-size:12px;font-weight:800;color:var(--ink3);width:20px">6</span>
+            <div class="tx"><div class="t">Bala</div></div><div class="r"><span class="pts">★ 12,990</span></div></div>
+          <div class="lrow2" style="background:var(--green-c)"><span style="font-size:12px;font-weight:800;color:var(--green-d);width:20px">7</span>
+            <div class="tx"><div class="t">Syed Painter (You)</div></div><div class="r"><span class="pts">★ 12,480</span></div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- FRAME 29 -->
+<div class="framewrap" id="screen-29">
+  <div class="cap">
+    <div class="n">29 · Achievements</div>
+    <div class="ta tamil">Badges earn பண்ணுங்க — சில already unlock ஆகிடுச்சு, சில progress-ல் இருக்கு, lock ஆனது 🔒 icon-ஓட தெரியும்.</div>
+    <span class="tag pol">Polish</span>
+  </div>
+  <div class="phone"><div class="notch"></div>
+    <div class="screen">
+      <div class="sbar"><em>9:41</em><em>5G ▮▮▮▯</em></div>
+      <div class="abar"><div class="back">‹</div><div><div class="h">Achievements</div><div class="sub">6 of 12 unlocked</div></div><span class="sp"></span></div>
+      <div class="pad">
+        <div class="tiles2">
+          <div class="tile" style="text-align:center">
+            <div style="font-size:26px">🎯</div>
+            <div style="font-size:12px;font-weight:800;color:var(--ink);margin-top:6px">First Bill</div>
+            <div class="m" style="margin-top:2px">Earned 2 Feb 2026</div>
+          </div>
+          <div class="tile" style="text-align:center">
+            <div style="font-size:26px">🔟</div>
+            <div style="font-size:12px;font-weight:800;color:var(--ink);margin-top:6px">10 Bills</div>
+            <div class="m" style="margin-top:2px">Earned 19 Apr 2026</div>
+          </div>
+          <div class="tile" style="text-align:center">
+            <div style="font-size:26px">🏅</div>
+            <div style="font-size:12px;font-weight:800;color:var(--ink);margin-top:6px">Top Referrer</div>
+            <div class="m" style="margin-top:2px">Earned 30 Jul 2026</div>
+          </div>
+          <div class="tile" style="text-align:center;opacity:.75">
+            <div style="font-size:26px">💰</div>
+            <div style="font-size:12px;font-weight:800;color:var(--ink2);margin-top:6px">₹1L Sales</div>
+            <div class="prog gold" style="margin-top:7px"><i style="width:60%"></i></div>
+            <div class="m" style="margin-top:4px">₹60,200 / ₹1,00,000</div>
+          </div>
+          <div class="tile" style="text-align:center;opacity:.65">
+            <div style="font-size:24px">🔒</div>
+            <div style="font-size:12px;font-weight:800;color:var(--ink2);margin-top:6px">30-Day Streak</div>
+            <div class="prog" style="margin-top:7px"><i style="width:20%"></i></div>
+            <div class="m" style="margin-top:4px">Day 6 of 30</div>
+          </div>
+          <div class="tile" style="text-align:center;opacity:.65">
+            <div style="font-size:24px">🔒</div>
+            <div style="font-size:12px;font-weight:800;color:var(--ink2);margin-top:6px">50 Bills</div>
+            <div class="prog" style="margin-top:7px"><i style="width:44%"></i></div>
+            <div class="m" style="margin-top:4px">22 of 50</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- FRAME 30 -->
+<div class="framewrap" id="screen-30">
+  <div class="cap">
+    <div class="n">30 · Training</div>
+    <div class="ta tamil">புது techniques, product knowledge videos — சில complete ஆகிடுச்சு, ஒண்ணு paused-ல் இருக்கு, ஒண்ணு புதுசா வந்திருக்கு.</div>
+    <span class="tag pol">Polish</span>
+  </div>
+  <div class="phone"><div class="notch"></div>
+    <div class="screen">
+      <div class="sbar"><em>9:41</em><em>5G ▮▮▮▯</em></div>
+      <div class="abar"><div class="back">‹</div><div><div class="h">Training</div><div class="sub">8 courses · 1 new</div></div><span class="sp"></span></div>
+      <div class="pad">
+        <div class="card pad2" style="display:flex;gap:10px">
+          <div class="pimg" style="width:96px;height:54px;border-radius:10px;flex:none"><span style="font-size:11px">▶</span></div>
+          <div style="flex:1;min-width:0">
+            <span class="badge ap">New</span>
+            <div style="font-size:12.5px;font-weight:700;color:var(--ink);margin-top:5px;line-height:1.3">Cutting-in Technique for Ceiling Edges</div>
+            <div class="m" style="margin-top:2px">6 min · Birla Opus academy</div>
+          </div>
+        </div>
+        <div class="card pad2" style="display:flex;gap:10px">
+          <div class="pimg" style="width:96px;height:54px;border-radius:10px;flex:none"><span style="font-size:11px">▶</span></div>
+          <div style="flex:1;min-width:0">
+            <div style="font-size:12.5px;font-weight:700;color:var(--ink);line-height:1.3">Waterproofing Basics — WP+ Range</div>
+            <div class="m" style="margin-top:2px">9 min · Product knowledge</div>
+            <div class="prog" style="margin-top:7px"><i style="width:45%"></i></div>
+            <div class="m" style="margin-top:3px">45% watched — resume</div>
+          </div>
+        </div>
+        <div class="card pad2" style="display:flex;gap:10px">
+          <div class="pimg" style="width:96px;height:54px;border-radius:10px;flex:none"><span style="font-size:11px">▶</span></div>
+          <div style="flex:1;min-width:0">
+            <div style="display:flex;align-items:center;justify-content:space-between;gap:6px">
+              <div style="font-size:12.5px;font-weight:700;color:var(--ink);line-height:1.3">Surface Prep — Putty &amp; Sanding</div>
+              <span style="color:var(--green-d);font-size:14px;flex:none">✓</span>
+            </div>
+            <div class="m" style="margin-top:2px">7 min · Completed 12 Jul 2026</div>
+          </div>
+        </div>
+        <div class="card pad2" style="display:flex;gap:10px">
+          <div class="pimg" style="width:96px;height:54px;border-radius:10px;flex:none"><span style="font-size:11px">▶</span></div>
+          <div style="flex:1;min-width:0">
+            <div style="font-size:12.5px;font-weight:700;color:var(--ink);line-height:1.3">Exterior Emulsion — Application Tips</div>
+            <div class="m" style="margin-top:2px">11 min · Not started</div>
+          </div>
+        </div>
+        <div class="card pad2" style="display:flex;gap:10px">
+          <div class="pimg" style="width:96px;height:54px;border-radius:10px;flex:none"><span style="font-size:11px">▶</span></div>
+          <div style="flex:1;min-width:0">
+            <div style="font-size:12.5px;font-weight:700;color:var(--ink);line-height:1.3">Customer Handling &amp; Billing App Basics</div>
+            <div class="m" style="margin-top:2px">5 min · Not started</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- FRAME 31 -->
+<div class="framewrap" id="screen-31">
+  <div class="cap">
+    <div class="n">31 · Training Detail</div>
+    <div class="ta tamil">Video + chapters + description ஒரே பக்கம்; பார்த்து முடிச்சதும் "Mark Complete" பண்ணா ★50 கிடைக்கும்.</div>
+    <span class="tag pol">Polish</span>
+  </div>
+  <div class="phone"><div class="notch"></div>
+    <div class="screen">
+      <div class="sbar"><em>9:41</em><em>5G ▮▮▮▯</em></div>
+      <div class="abar"><div class="back">‹</div><div><div class="h">Course</div><div class="sub">Product knowledge</div></div><span class="sp"></span></div>
+      <div class="pad">
+        <div class="pimg" style="width:100%;height:184px;border-radius:var(--r)">
+          <div style="width:52px;height:52px;border-radius:50%;background:rgba(255,255,255,.9);display:flex;align-items:center;justify-content:center;font-size:20px;color:var(--green)">▶</div>
+        </div>
+        <div>
+          <div style="font-size:15px;font-weight:800;color:var(--ink);line-height:1.3">Waterproofing Basics — WP+ Range</div>
+          <div class="m" style="margin-top:3px">9 min · Product knowledge · Birla Opus academy</div>
+        </div>
+        <div class="chips">
+          <span class="chip on">Waterproofing</span><span class="chip">WP+ Range</span><span class="chip">Exterior</span>
+        </div>
+        <div style="font-size:11.5px;color:var(--ink2);line-height:1.6" class="tamil">WP+ range எப்படி apply பண்றது, எந்த surface-க்கு எது சரி, எத்தனை coats தேவை-ன்னு step-by-step சொல்லுது. நேரடியா site-ல் use பண்ணக்கூடிய tips.</div>
+        <div style="font-size:11.5px;color:var(--ink2);line-height:1.6" class="tamil">முடிச்ச பிறகு quiz கிடையாது — "Mark Complete" press பண்ணா போதும், நேரடியா ★ points profile-ல் சேரும்.</div>
+        <div class="divh">Chapters</div>
+        <div class="card">
+          <div class="lrow2" style="border-top:none"><div class="ic" style="background:var(--green-c);color:var(--green-d)">✓</div>
+            <div class="tx"><div class="t">1. Surface check &amp; priming</div><div class="s">2 min</div></div></div>
+          <div class="lrow2"><div class="ic">▶</div>
+            <div class="tx"><div class="t">2. Mixing &amp; first coat</div><div class="s">4 min</div></div></div>
+          <div class="lrow2"><div class="ic">▶</div>
+            <div class="tx"><div class="t">3. Second coat &amp; finishing</div><div class="s">3 min</div></div></div>
+          <div class="lrow2"><div class="ic">▶</div>
+            <div class="tx"><div class="t">4. Cleanup &amp; tool care</div><div class="s">1 min</div></div></div>
+          <div class="lrow2"><div class="ic">▶</div>
+            <div class="tx"><div class="t">5. Common mistakes to avoid</div><div class="s">2 min</div></div></div>
+        </div>
+        <div class="card pad2" style="display:flex;gap:9px;align-items:center;background:#FBFDF9">
+          <span style="font-size:15px">🎓</span>
+          <div style="font-size:11px;color:var(--ink2);line-height:1.55" class="tamil">முழு course-ஐயும் பார்த்து "Mark Complete" பண்ணா ★50 உங்க points balance-ல் உடனே சேரும்.</div>
+        </div>
+        <div class="divh">Related courses</div>
+        <div class="chips">
+          <span class="chip">Exterior Emulsion Tips</span><span class="chip">Surface Prep</span>
+        </div>
+      </div>
+      <div class="sticky"><div class="cta">Mark Complete · earn ★50</div></div>
+    </div>
+  </div>
+</div>
+
+<!-- FRAME 32 -->
+<div class="framewrap" id="screen-32">
+  <div class="cap">
+    <div class="n">32 · Points History</div>
+    <div class="ta tamil">★ points எப்போ, எதுக்கு credit/debit ஆச்சு-ன்னு முழு history; ஒவ்வொரு entry கீழேயும் running balance தெரியும்.</div>
+    <span class="tag pol">Polish</span>
+  </div>
+  <div class="phone"><div class="notch"></div>
+    <div class="screen">
+      <div class="sbar"><em>9:41</em><em>5G ▮▮▮▯</em></div>
+      <div class="abar"><div class="back">‹</div><div><div class="h">Points History</div><div class="sub">Balance ★ 12,480</div></div><span class="sp"></span></div>
+      <div class="pad">
+        <div class="chips">
+          <span class="chip on">All</span><span class="chip">Earned</span><span class="chip">Redeemed</span><span class="chip">Clawback</span>
+        </div>
+        <div class="divh">August 2026</div>
+        <div class="card">
+          <div class="lrow2" style="border-top:none"><div class="ic" style="background:var(--green-c);color:var(--green-d)">★</div>
+            <div class="tx"><div class="t">EST-2402 approved</div><div class="s">6 Aug 2026 · regular + annual</div></div>
+            <div class="r"><div class="amt plus">+★340</div><div style="font-size:9px;color:var(--ink3);margin-top:2px">Bal 12,480</div></div></div>
+          <div class="lrow2"><div class="ic" style="background:var(--gold-c);color:var(--gold-d)">🔥</div>
+            <div class="tx"><div class="t">7-day streak bonus</div><div class="s">3 Aug 2026</div></div>
+            <div class="r"><div class="amt plus">+★50</div><div style="font-size:9px;color:var(--ink3);margin-top:2px">Bal 12,140</div></div></div>
+          <div class="lrow2"><div class="ic" style="background:var(--sv);color:var(--ink2)">₹</div>
+            <div class="tx"><div class="t">Wallet withdrawal</div><div class="s">1 Aug 2026 · redeemed</div></div>
+            <div class="r"><div class="amt">−★2,000</div><div style="font-size:9px;color:var(--ink3);margin-top:2px">Bal 12,090</div></div></div>
+        </div>
+        <div class="divh">July 2026</div>
+        <div class="card">
+          <div class="lrow2" style="border-top:none"><div class="ic" style="background:var(--err-c);color:var(--err)">↩</div>
+            <div class="tx"><div class="t">Clawback — returned item</div><div class="s">28 Jul 2026 · EST-2360</div></div>
+            <div class="r"><div class="amt" style="color:var(--err)">−★120</div><div style="font-size:9px;color:var(--ink3);margin-top:2px">Bal 14,090</div></div></div>
+          <div class="lrow2"><div class="ic" style="background:var(--green-c);color:var(--green-d)">★</div>
+            <div class="tx"><div class="t">EST-2355 approved</div><div class="s">22 Jul 2026 · regular + annual</div></div>
+            <div class="r"><div class="amt plus">+★410</div><div style="font-size:9px;color:var(--ink3);margin-top:2px">Bal 14,210</div></div></div>
+        </div>
+        <div class="divh">June 2026</div>
+        <div class="card">
+          <div class="lrow2" style="border-top:none"><div class="ic" style="background:var(--gold-c);color:var(--gold-d)">🎁</div>
+            <div class="tx"><div class="t">Scratch card — bonus points</div><div class="s">18 Jun 2026 · EST-2318</div></div>
+            <div class="r"><div class="amt plus">+★100</div><div style="font-size:9px;color:var(--ink3);margin-top:2px">Bal 13,800</div></div></div>
+          <div class="lrow2"><div class="ic" style="background:var(--green-c);color:var(--green-d)">★</div>
+            <div class="tx"><div class="t">EST-2301 approved</div><div class="s">5 Jun 2026 · regular + annual</div></div>
+            <div class="r"><div class="amt plus">+★285</div><div style="font-size:9px;color:var(--ink3);margin-top:2px">Bal 13,700</div></div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- FRAME 33 -->
+<div class="framewrap" id="screen-33">
+  <div class="cap">
+    <div class="n">33 · Cards (Rewards)</div>
+    <div class="ta tamil">₹5,000 &amp; அதற்கு மேல் approve ஆன ஒவ்வொரு bill-க்கும் ஒரு scratch card — ₹ wallet cash, ★ bonus points, அல்லது "Better luck".</div>
+    <span class="tag pol">Polish</span>
+  </div>
+  <div class="phone"><div class="notch"></div>
+    <div class="screen">
+      <div class="sbar"><em>9:41</em><em>5G ▮▮▮▯</em></div>
+      <div class="abar"><div class="back">‹</div><div><div class="h">Reward Cards</div><div class="sub">2 unscratched</div></div><span class="sp"></span></div>
+      <div class="pad">
+        <div class="tiles2">
+          <div class="tile" style="text-align:center;background:linear-gradient(150deg,var(--gold),var(--gold-d));border:none;box-shadow:var(--s2);padding:20px 10px">
+            <div style="font-size:24px">✨</div>
+            <div style="font-size:11.5px;font-weight:800;color:#fff;margin-top:8px">Scratch to reveal</div>
+            <div style="font-size:9.5px;color:rgba(255,255,255,.85);margin-top:3px">from EST-2402</div>
+          </div>
+          <div class="tile" style="text-align:center;background:linear-gradient(150deg,var(--gold),var(--gold-d));border:none;box-shadow:var(--s2);padding:20px 10px">
+            <div style="font-size:24px">✨</div>
+            <div style="font-size:11.5px;font-weight:800;color:#fff;margin-top:8px">Scratch to reveal</div>
+            <div style="font-size:9.5px;color:rgba(255,255,255,.85);margin-top:3px">from EST-2390</div>
+          </div>
+        </div>
+        <div class="card pad2" style="display:flex;gap:9px;align-items:center;background:#FBFDF9">
+          <span style="font-size:15px">ℹ️</span>
+          <div style="font-size:11px;color:var(--ink2);line-height:1.55" class="tamil">₹5,000 &amp; அதற்கு மேல் approved bill ஒவ்வொன்றுக்கும் ஒரு scratch card கிடைக்கும்.</div>
+        </div>
+        <div class="tiles2">
+          <div class="tile"><div class="lb">Cards won</div><div class="v">6</div><div class="m">since Jan 2026</div></div>
+          <div class="tile"><div class="lb">Total value</div><div class="v gold">₹340 + ★450</div><div class="m">lifetime</div></div>
+        </div>
+        <div class="divh">Revealed</div>
+        <div class="card">
+          <div class="lrow2" style="border-top:none"><div class="ic" style="background:var(--gold-c);color:var(--gold-d)">₹</div>
+            <div class="tx"><div class="t">Wallet cash</div><div class="s">EST-2375 · 18 Jul 2026</div></div>
+            <div class="r"><div class="amt plus">+₹50</div></div></div>
+          <div class="lrow2"><div class="ic" style="background:var(--gold-c);color:var(--gold-d)">★</div>
+            <div class="tx"><div class="t">Bonus points</div><div class="s">EST-2361 · 9 Jul 2026</div></div>
+            <div class="r"><div class="amt plus">+★100</div></div></div>
+          <div class="lrow2"><div class="ic" style="background:var(--gold-c);color:var(--gold-d)">₹</div>
+            <div class="tx"><div class="t">Wallet cash</div><div class="s">EST-2348 · 3 Jul 2026</div></div>
+            <div class="r"><div class="amt plus">+₹100</div></div></div>
+          <div class="lrow2"><div class="ic">🙂</div>
+            <div class="tx"><div class="t">Better luck next time</div><div class="s">EST-2340 · 28 Jun 2026</div></div>
+            <div class="r"><span style="font-size:10px;color:var(--ink3)">No prize</span></div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- FRAME 34 -->
+<div class="framewrap" id="screen-34">
+  <div class="cap">
+    <div class="n">34 · Visualizations</div>
+    <div class="ta tamil">Customer வீட்டு wall photo upload பண்ணா, color apply பண்ணி before/after preview தருவோம் — sales-க்கு உதவும்.</div>
+    <span class="tag pol">Polish</span>
+  </div>
+  <div class="phone"><div class="notch"></div>
+    <div class="screen">
+      <div class="sbar"><em>9:41</em><em>5G ▮▮▮▯</em></div>
+      <div class="abar"><div class="back">‹</div><div><div class="h">Color Visualizations</div></div><span class="sp"></span></div>
+      <div class="pad">
+        <div class="card pad2" style="background:linear-gradient(135deg,var(--green-dd),var(--green));color:#fff">
+          <div style="font-size:20px">🎨</div>
+          <div style="font-size:12.5px;font-weight:700;margin-top:7px;line-height:1.5" class="tamil">உங்க வீட்டு wall photo அனுப்புங்க — color preview பண்ணி தருவோம்.</div>
+        </div>
+        <div class="cta gh">📤 Upload Wall Photo</div>
+        <div class="card pad2" style="display:flex;gap:9px;align-items:center;background:#FBFDF9">
+          <span style="font-size:15px">⏱</span>
+          <div style="font-size:11px;color:var(--ink2);line-height:1.55" class="tamil">Preview ready ஆக usually 2-4 மணி நேரம் ஆகும் — ready ஆனதும் notification வரும்.</div>
+        </div>
+        <div class="chips">
+          <span class="chip on">All</span><span class="chip">Processing</span><span class="chip">Ready</span>
+        </div>
+        <div class="divh">Your requests</div>
+        <div class="card">
+          <div class="lrow2" style="border-top:none">
+            <div class="tx"><div class="t">Ravi — Anna Nagar hall</div><div class="s">Sent 11 Aug 2026</div></div>
+            <div class="r"><span class="badge pa">Processing</span></div></div>
+          <div class="lrow2" style="flex-direction:column;align-items:stretch;gap:8px">
+            <div style="display:flex;align-items:center;justify-content:space-between">
+              <div class="tx"><div class="t">Kumar — RS Puram exterior</div><div class="s">Sent 6 Aug 2026</div></div>
+              <span class="badge ap">Ready</span>
+            </div>
+            <div style="display:flex;gap:8px">
+              <div class="pimg" style="flex:1;height:64px;border-radius:10px"><span style="font-size:9px">BEFORE</span></div>
+              <div class="pimg" style="flex:1;height:64px;border-radius:10px"><span style="font-size:9px">AFTER</span></div>
+            </div>
+          </div>
+          <div class="lrow2">
+            <div class="tx"><div class="t">Mani — Peelamedu bedroom</div><div class="s">Sent 2 Aug 2026</div></div>
+            <div class="r"><span class="badge ap">Ready</span></div></div>
+          <div class="lrow2">
+            <div class="tx"><div class="t">Selvam — Ganapathy kitchen</div><div class="s">Sent 30 Jul 2026</div></div>
+            <div class="r"><span class="badge ap">Ready</span></div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- FRAME 35 -->
+<div class="framewrap" id="screen-35">
+  <div class="cap">
+    <div class="n">35 · Settings</div>
+    <div class="ta tamil">Language, notifications, app info எல்லாம் ஒரே பக்கம்; Logout சிவப்பு நிறத்தில் தனியா, Delete account கீழே சின்னதா.</div>
+    <span class="tag pol">Polish</span>
+  </div>
+  <div class="phone"><div class="notch"></div>
+    <div class="screen">
+      <div class="sbar"><em>9:41</em><em>5G ▮▮▮▯</em></div>
+      <div class="abar"><div class="back">‹</div><div><div class="h">Settings</div></div><span class="sp"></span></div>
+      <div class="pad">
+        <div class="divh">General</div>
+        <div class="card">
+          <div class="lrow2" style="border-top:none"><div class="ic">🌐</div>
+            <div class="tx"><div class="t">Language</div></div>
+            <div class="r"><span class="chip on" style="padding:4px 10px">தமிழ்</span></div></div>
+        </div>
+        <div class="divh">Notifications</div>
+        <div class="card">
+          <div class="lrow2" style="border-top:none"><div class="ic">🔔</div>
+            <div class="tx"><div class="t">Bill status updates</div><div class="s">Approved, rejected, paid</div></div>
+            <div class="r"><span style="width:34px;height:19px;border-radius:99px;background:var(--green);position:relative;display:inline-block"><i style="position:absolute;right:2.5px;top:2.5px;width:14px;height:14px;border-radius:50%;background:#fff"></i></span></div></div>
+          <div class="lrow2"><div class="ic">🎉</div>
+            <div class="tx"><div class="t">Offers &amp; announcements</div><div class="s">New products, campaigns</div></div>
+            <div class="r"><span style="width:34px;height:19px;border-radius:99px;background:var(--sv);position:relative;display:inline-block"><i style="position:absolute;left:2.5px;top:2.5px;width:14px;height:14px;border-radius:50%;background:#fff"></i></span></div></div>
+        </div>
+        <div class="divh">Help &amp; Support</div>
+        <div class="card">
+          <div class="lrow2" style="border-top:none"><div class="ic">💬</div>
+            <div class="tx"><div class="t">Chat with Admin</div><div class="s">Reply usually within a day</div></div><span class="chev">›</span></div>
+          <div class="lrow2"><div class="ic">📞</div>
+            <div class="tx"><div class="t">Call Shop</div><div class="s">98420 00110</div></div><span class="chev">›</span></div>
+        </div>
+        <div class="divh">About</div>
+        <div class="card">
+          <div class="lrow2" style="border-top:none"><div class="ic">📱</div>
+            <div class="tx"><div class="t">App version</div><div class="s">v5.0.0 · build vc44</div></div></div>
+          <div class="lrow2"><div class="ic">📄</div>
+            <div class="tx"><div class="t">Privacy Policy</div></div><span class="chev">›</span></div>
+        </div>
+        <div class="card">
+          <div class="lrow2" style="border-top:none"><div class="ic" style="background:var(--err-c);color:var(--err)">⏻</div>
+            <div class="tx"><div class="t" style="color:var(--err);font-weight:700">Logout</div></div></div>
+        </div>
+        <div style="text-align:center;font-size:10.5px;color:var(--ink3);margin-top:2px">Delete account</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- FRAME 36 -->
+<div class="framewrap" id="screen-36">
+  <div class="cap">
+    <div class="n">36 · Quick Actions Sheet</div>
+    <div class="ta tamil">FAB tap பண்ணா வரும் sheet — New Bill / Quotation / Check-In / Calculator நான்கு பெரிய action rows, ஒவ்வொன்றுக்கும் Tamil subtitle; கீழே Cancel.</div>
+    <span class="tag pol">Polish</span>
+  </div>
+  <div class="phone"><div class="notch"></div>
+    <div class="screen" style="background:var(--bg)">
+      <div class="sheetdim"></div>
+      <div class="sheet">
+        <div class="grab"></div>
+        <div class="sh">Quick Actions</div>
+        <div class="card">
+          <div class="lrow2" style="border-top:none;padding:13px">
+            <div class="ic" style="width:42px;height:42px;font-size:19px;background:var(--green-c)">🧾</div>
+            <div class="tx"><div class="t" style="font-size:13.5px">New Bill</div><div class="s tamil">Self அல்லது customer-க்கு உடனே bill போடு</div></div>
+            <span class="chev">›</span></div>
+          <div class="lrow2" style="padding:13px">
+            <div class="ic" style="width:42px;height:42px;font-size:19px;background:var(--green-c)">📐</div>
+            <div class="tx"><div class="t" style="font-size:13.5px">Quotation</div><div class="s tamil">Site visit மதிப்பீடு தயார் செய்</div></div>
+            <span class="chev">›</span></div>
+          <div class="lrow2" style="padding:13px">
+            <div class="ic" style="width:42px;height:42px;font-size:19px;background:var(--green-c)">🤳</div>
+            <div class="tx"><div class="t" style="font-size:13.5px">Check-In</div><div class="s tamil">Selfie-ஓட இன்றைய attendance போடு</div></div>
+            <span class="chev">›</span></div>
+          <div class="lrow2" style="padding:13px">
+            <div class="ic" style="width:42px;height:42px;font-size:19px;background:var(--green-c)">🧮</div>
+            <div class="tx"><div class="t" style="font-size:13.5px">Calculator</div><div class="s tamil">Room அளவு வச்சு material கணக்கு பாரு</div></div>
+            <span class="chev">›</span></div>
+        </div>
+        <div class="cta gh">Cancel</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- FRAME 37 -->
+<div class="framewrap" id="screen-37">
+  <div class="cap">
+    <div class="n">37 · Cart Sheet — Self/Customer Chooser</div>
+    <div class="ta tamil">Catalog cart-ல் இருந்து நேரடியா billing flow-க்கு: items summary + இரு பெரிய buttons. ஒவ்வொன்றுக்கும் என்ன ★ கிடைக்கும்-ன்ற micro-note.</div>
+    <span class="tag pol">Polish</span>
+  </div>
+  <div class="phone"><div class="notch"></div>
+    <div class="screen" style="background:var(--bg)">
+      <div class="sheetdim"></div>
+      <div class="sheet">
+        <div class="grab"></div>
+        <div class="sh">Cart — 3 items · ₹4,470</div>
+        <div class="card">
+          <div class="lrow2" style="border-top:none">
+            <div class="tx"><div class="t">STYLE PRO FRESH PRIMER · 4L × 2</div></div>
+            <div class="r"><div class="amt">₹1,380</div></div></div>
+          <div class="lrow2">
+            <div class="tx"><div class="t">STYLE COLOR SMART · 10L × 1</div></div>
+            <div class="r"><div class="amt">₹1,890</div></div></div>
+          <div class="lrow2">
+            <div class="tx"><div class="t">CALISTA PRO WHITE PRIMER · 4L × 1</div></div>
+            <div class="r"><div class="amt">₹920</div></div></div>
+        </div>
+        <div style="font-size:11.5px;font-weight:800;color:var(--ink);text-align:center;margin-top:2px">இந்த bill யாருக்கு?</div>
+        <div style="display:flex;gap:9px">
+          <div style="flex:1" class="cta">Self<br><span style="font-size:9.5px;font-weight:600;opacity:.85">dealer price · ★ annual</span></div>
+          <div style="flex:1" class="cta gh">Customer<br><span style="font-size:9.5px;font-weight:600;opacity:.8">markup · ★ full points</span></div>
+        </div>
+        <div class="knote">Items carry over — flow-ல் மேலும் சேர்க்கலாம்</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- FRAME 38 -->
+<div class="framewrap" id="screen-38">
+  <div class="cap">
+    <div class="n">38 · Streak Sheet</div>
+    <div class="ta tamil">தினமும் app open பண்ணி check-in பண்ணா streak build ஆகும்; 7-வது நாள் ★50 bonus. ஒரு நாள் miss பண்ணா streak மறுபடி 1-ல் ஆரம்பிக்கும்.</div>
+    <span class="tag pol">Polish</span>
+  </div>
+  <div class="phone"><div class="notch"></div>
+    <div class="screen" style="background:var(--bg)">
+      <div class="sheetdim"></div>
+      <div class="sheet" style="align-items:center;text-align:center">
+        <div class="grab"></div>
+        <div style="font-size:44px">🔥</div>
+        <div class="sh">6-day streak!</div>
+        <div style="font-size:11.5px;color:var(--ink2);line-height:1.5" class="tamil">தொடர்ந்து இன்னொரு நாள் check-in பண்ணா 7-day bonus கிடைக்கும்</div>
+        <div class="tiles2" style="width:100%">
+          <div class="tile"><div class="lb">Current streak</div><div class="v">6 days</div><div class="m">since 7 Aug</div></div>
+          <div class="tile"><div class="lb">Best streak</div><div class="v gold">14 days</div><div class="m">Mar 2026</div></div>
+        </div>
+        <div style="display:flex;gap:8px;justify-content:center">
+          <div style="text-align:center"><div style="width:28px;height:28px;border-radius:50%;background:var(--green);color:#fff;font-size:12px;display:flex;align-items:center;justify-content:center;margin:0 auto">✓</div><div style="font-size:8.5px;color:var(--ink3);margin-top:3px">Mon</div></div>
+          <div style="text-align:center"><div style="width:28px;height:28px;border-radius:50%;background:var(--green);color:#fff;font-size:12px;display:flex;align-items:center;justify-content:center;margin:0 auto">✓</div><div style="font-size:8.5px;color:var(--ink3);margin-top:3px">Tue</div></div>
+          <div style="text-align:center"><div style="width:28px;height:28px;border-radius:50%;background:var(--green);color:#fff;font-size:12px;display:flex;align-items:center;justify-content:center;margin:0 auto">✓</div><div style="font-size:8.5px;color:var(--ink3);margin-top:3px">Wed</div></div>
+          <div style="text-align:center"><div style="width:28px;height:28px;border-radius:50%;background:var(--green);color:#fff;font-size:12px;display:flex;align-items:center;justify-content:center;margin:0 auto">✓</div><div style="font-size:8.5px;color:var(--ink3);margin-top:3px">Thu</div></div>
+          <div style="text-align:center"><div style="width:28px;height:28px;border-radius:50%;background:var(--green);color:#fff;font-size:12px;display:flex;align-items:center;justify-content:center;margin:0 auto">✓</div><div style="font-size:8.5px;color:var(--ink3);margin-top:3px">Fri</div></div>
+          <div style="text-align:center"><div style="width:28px;height:28px;border-radius:50%;background:var(--green);color:#fff;font-size:12px;display:flex;align-items:center;justify-content:center;margin:0 auto">✓</div><div style="font-size:8.5px;color:var(--ink3);margin-top:3px">Sat</div></div>
+          <div style="text-align:center"><div style="width:28px;height:28px;border-radius:50%;background:var(--gold-c);color:var(--gold-d);font-size:9px;font-weight:800;display:flex;align-items:center;justify-content:center;margin:0 auto;box-shadow:0 0 0 2.5px var(--gold)">★50</div><div style="font-size:8.5px;color:var(--gold-d);font-weight:700;margin-top:3px">Sun</div></div>
+        </div>
+        <div class="chips" style="justify-content:center">
+          <span class="pts">7d · ★50</span><span class="pts">14d · ★150</span><span class="pts">30d · ★500</span>
+        </div>
+        <div class="divh">Streak rewards</div>
+        <div class="card" style="width:100%;text-align:left">
+          <div class="lrow2" style="border-top:none"><div class="ic" style="background:var(--gold-c);color:var(--gold-d)">7</div>
+            <div class="tx"><div class="t">7-day streak</div></div><div class="r"><span class="pts">★50</span></div></div>
+          <div class="lrow2"><div class="ic" style="background:var(--gold-c);color:var(--gold-d)">14</div>
+            <div class="tx"><div class="t">14-day streak</div></div><div class="r"><span class="pts">★150</span></div></div>
+          <div class="lrow2"><div class="ic" style="background:var(--gold-c);color:var(--gold-d)">30</div>
+            <div class="tx"><div class="t">30-day streak</div></div><div class="r"><span class="pts">★500</span></div></div>
+          <div class="lrow2"><div class="ic" style="background:var(--gold-c);color:var(--gold-d)">60</div>
+            <div class="tx"><div class="t">60-day streak</div></div><div class="r"><span class="pts">★1,000</span></div></div>
+        </div>
+        <div class="knote">தினமும் ஒரு முறை check-in — miss பண்ணா streak reset ஆகிடும்</div>
+        <div class="cta" style="width:100%">Check In Now</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- FRAME 39 -->
+<div class="framewrap" id="screen-39">
+  <div class="cap">
+    <div class="n">39 · Withdrawal Sheet</div>
+    <div class="ta tamil">Wallet balance-ல் இருந்து UPI-க்கு withdraw பண்ணலாம்; குறைந்தபட்சம் ₹500, admin approve ஆன பிறகு 24 மணி நேரத்தில் வரும்.</div>
+    <span class="tag pol">Polish</span>
+  </div>
+  <div class="phone"><div class="notch"></div>
+    <div class="screen" style="background:var(--bg)">
+      <div class="sheetdim"></div>
+      <div class="sheet">
+        <div class="grab"></div>
+        <div class="sh" style="text-align:center">Withdraw to UPI</div>
+        <div style="text-align:center">
+          <div style="font-size:10px;font-weight:700;letter-spacing:.08em;color:var(--ink3)">WALLET BALANCE</div>
+          <div style="font-size:30px;font-weight:800;color:var(--ink);margin-top:3px">₹3,240</div>
+        </div>
+        <div class="inp foc"><span>₹</span><b>500</b></div>
+        <div class="chips" style="justify-content:center">
+          <span class="chip on">₹500</span><span class="chip">₹1,000</span><span class="chip">Max</span>
+        </div>
+        <div class="card pad2" style="display:flex;align-items:center;gap:9px">
+          <div class="ic" style="background:var(--green-c);color:var(--green-d)">✓</div>
+          <div class="tx"><div class="t">UPI ID</div><div class="s">syed@upi · verified</div></div>
+        </div>
+        <div class="tiles2">
+          <div class="tile"><div class="lb">Available</div><div class="v">₹3,240</div><div class="m">withdrawable now</div></div>
+          <div class="tile"><div class="lb">Pending</div><div class="v" style="color:var(--ink3)">₹450</div><div class="m">last request</div></div>
+        </div>
+        <div class="card pad2" style="display:flex;gap:9px;align-items:center;background:#FBFDF9">
+          <span style="font-size:15px">ℹ️</span>
+          <div style="font-size:11px;color:var(--ink2);line-height:1.55" class="tamil">குறைந்தபட்சம் ₹500 · withdrawal fee இல்லை · admin approve ஆன பிறகு 24 மணி நேரத்தில் account-க்கு வரும்</div>
+        </div>
+        <div class="divh">Recent withdrawals</div>
+        <div class="card">
+          <div class="lrow2" style="border-top:none"><div class="ic" style="background:var(--gold-c);color:var(--gold-d)">₹</div>
+            <div class="tx"><div class="t">Withdrawal request</div><div class="s">4 Aug 2026</div></div>
+            <div class="r"><span class="badge pa">Processing</span></div></div>
+          <div class="lrow2"><div class="ic" style="background:var(--green-c);color:var(--green-d)">✓</div>
+            <div class="tx"><div class="t">₹1,200 credited</div><div class="s">22 Jul 2026</div></div>
+            <div class="r"><span class="badge ap">Done</span></div></div>
+          <div class="lrow2"><div class="ic" style="background:var(--green-c);color:var(--green-d)">✓</div>
+            <div class="tx"><div class="t">₹800 credited</div><div class="s">5 Jul 2026</div></div>
+            <div class="r"><span class="badge ap">Done</span></div></div>
+        </div>
+        <div class="cta">Request Withdrawal</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+</div><!-- /gallery -->
+
+<div class="foot">
+  QC Painter App v5 mockups · generated 2026-08-12 · tokens mirror <code>ui/theme/Color.kt</code> / <code>Type.kt</code> ·
+  gold is reserved for points/earnings · light-only (app has no dark scheme) ·
+  <span class="tamil">Feedback: screen number சொல்லி சொல்லுங்க (உதா: "8-ல் MRP வேணாம்").</span>
+</div>
+
+<script>
+(function () {
+  'use strict';
+  // Build the jump nav from the frames on the page, grouped by flow.
+  var groups = [
+    ['Auth', [1, 2, 3, 4]],
+    ['Home', [5, 36, 38, 39]],
+    ['Catalog', [7, 8, 9, 37]],
+    ['Billing', [10, 11, 12, 13, 16, 17, 18]],
+    ['Work', [6, 14, 15]],
+    ['Site', [19, 20, 21, 22]],
+    ['Profile', [23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35]]
+  ];
+  var nav = document.getElementById('jumps');
+  var html = '';
+  groups.forEach(function (g) {
+    html += '<span class="grp">' + g[0] + '</span>';
+    g[1].forEach(function (n) {
+      var f = document.getElementById('screen-' + n);
+      if (!f) return;
+      var t = f.querySelector('.cap .n');
+      var title = t ? t.textContent.replace(/^\d+\s*·\s*/, '') : ('Screen ' + n);
+      html += '<a href="#screen-' + n + '" title="' + title.replace(/"/g, '&quot;') + '">' + n + '</a>';
+    });
+  });
+  nav.innerHTML = html;
+  // data-jump flow links inside frames
+  document.addEventListener('click', function (e) {
+    var j = e.target.closest('[data-jump]');
+    if (!j) return;
+    e.preventDefault();
+    var el = document.getElementById('screen-' + j.getAttribute('data-jump'));
+    if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  });
+})();
+</script>
 </body>
 </html>
