@@ -16,7 +16,7 @@ const { generatePainterEstimatePDF } = require('../painter-estimate-pdf-generato
 const attendanceService = require('../../services/painter-attendance-service');
 const { idempotent } = require('../../middleware/idempotency');
 const { requirePainterAuth, requirePainterSession } = require('./middleware');
-const { logEstimateStatusChange } = require('./shared');
+const { logEstimateStatusChange, buildCatalogVisibility } = require('./shared');
 
 let pool;
 let io;
@@ -833,8 +833,12 @@ router.get('/me/estimates/products', requirePainterAuth, async (req, res) => {
 
         const filterHasPoints = hasPoints === 'true' || hasPoints === '1';
 
-        let where = "WHERE p.status = 'active' AND ps.is_active = 1 AND ps.zoho_item_id IS NOT NULL";
-        const params = [];
+        // Admin catalog curation (hidden brands/categories/products) applies to the
+        // estimate builder picker too — both billing types. zim stays LEFT-joined:
+        // unmapped packs fail open at brand/category level (product level still applies).
+        const vis = buildCatalogVisibility(req.painter && req.painter.id);
+        let where = "WHERE p.status = 'active' AND ps.is_active = 1 AND ps.zoho_item_id IS NOT NULL" + vis.where;
+        const params = [...vis.params];
 
         if (search) {
             where += ' AND (p.name LIKE ? OR b.name LIKE ?)';
@@ -884,6 +888,7 @@ router.get('/me/estimates/products', requirePainterAuth, async (req, res) => {
             INNER JOIN pack_sizes ps ON ps.product_id = p.id
             LEFT JOIN zoho_items_map zim ON zim.zoho_item_id = ps.zoho_item_id
             LEFT JOIN painter_product_point_rates pprs ON pprs.item_id = ps.zoho_item_id COLLATE utf8mb4_unicode_ci
+            ${vis.joins}
             ${hasPointsJoin}
             ${where}
             ORDER BY b.name, p.name, CAST(ps.size AS DECIMAL(10,2))
@@ -958,18 +963,26 @@ router.get('/me/estimates/products', requirePainterAuth, async (req, res) => {
             ? productsWithOffers.filter(p => p.offer !== null)
             : productsWithOffers;
 
+        // Dropdowns only list brands/categories that still have at least one
+        // visible product for this painter (same curation filter as the picker).
         const [brands] = await pool.query(`
             SELECT DISTINCT b.id, b.name FROM brands b
             INNER JOIN products p ON p.brand_id = b.id AND p.status = 'active'
             INNER JOIN pack_sizes ps ON ps.product_id = p.id AND ps.is_active = 1 AND ps.zoho_item_id IS NOT NULL
+            LEFT JOIN zoho_items_map zim ON zim.zoho_item_id = ps.zoho_item_id
+            ${vis.joins}
+            WHERE 1=1${vis.where}
             ORDER BY b.name
-        `);
+        `, vis.params);
         const [categories] = await pool.query(`
             SELECT DISTINCT c.id, c.name FROM categories c
             INNER JOIN products p ON p.category_id = c.id AND p.status = 'active'
             INNER JOIN pack_sizes ps ON ps.product_id = p.id AND ps.is_active = 1 AND ps.zoho_item_id IS NOT NULL
+            LEFT JOIN zoho_items_map zim ON zim.zoho_item_id = ps.zoho_item_id
+            ${vis.joins}
+            WHERE 1=1${vis.where}
             ORDER BY c.name
-        `);
+        `, vis.params);
 
         res.json({
             success: true,
@@ -1024,17 +1037,22 @@ router.post('/me/estimates', requirePainterAuth, idempotent('painter.estimate.cr
         const labourCharge = (billing_type === 'customer') ? Math.max(0, parseFloat(labour_charge) || 0) : 0;
         const hideBranding = (billing_type === 'customer' && (hide_qc_branding === 1 || hide_qc_branding === '1' || hide_qc_branding === true)) ? 1 : 0;
 
-        // Validate items — each has pack_size_id + quantity
+        // Validate items — each has pack_size_id + quantity.
+        // is_visible enforces admin catalog curation server-side so a hidden
+        // product can't be billed by replaying a stale pack_size_id.
+        const vis = buildCatalogVisibility(req.painter && req.painter.id);
         const packSizeIds = items.map(i => i.pack_size_id || i.item_id);
         const [packSizeRows] = await pool.query(`
             SELECT ps.id as pack_size_id, ps.zoho_item_id, ps.size, ps.unit, ps.base_price, ps.product_id,
                    p.name as product_name, p.product_type,
-                   zim.zoho_item_name, zim.zoho_brand, zim.zoho_category_name, zim.zoho_rate, zim.zoho_label_rate
+                   zim.zoho_item_name, zim.zoho_brand, zim.zoho_category_name, zim.zoho_rate, zim.zoho_label_rate,
+                   ${vis.visibleExpr} AS is_visible
             FROM pack_sizes ps
             INNER JOIN products p ON p.id = ps.product_id
             LEFT JOIN zoho_items_map zim ON zim.zoho_item_id = ps.zoho_item_id
+            ${vis.joins}
             WHERE ps.id IN (?) AND ps.is_active = 1
-        `, [packSizeIds]);
+        `, [...vis.params, packSizeIds]);
 
         const packSizeMap = {};
         packSizeRows.forEach(r => { packSizeMap[r.pack_size_id] = r; });
@@ -1064,6 +1082,9 @@ router.post('/me/estimates', requirePainterAuth, idempotent('painter.estimate.cr
             const psRow = packSizeMap[psId];
             if (!psRow || !psRow.zoho_item_id) {
                 return res.status(400).json({ success: false, message: `Product not found or not mapped: ${psId}` });
+            }
+            if (!psRow.is_visible) {
+                return res.status(400).json({ success: false, message: `Product not available: ${psRow.product_name || ''} ${psRow.size || ''}${psRow.unit || ''}`.trim() });
             }
             const qty = parseFloat(item.quantity) || 1;
             const unitPrice = parseFloat(psRow.zoho_rate || psRow.base_price || 0);
@@ -1420,26 +1441,15 @@ router.get('/me/catalog', requirePainterAuth, async (req, res) => {
         const filterHasOffer = hasOffer === 'true' || hasOffer === '1';
 
         // ---- catalog admin ordering + visibility -----------------------
-        // Six LEFT JOINs (3 global + 3 painter override). Hidden filters
-        // are added to WHERE via COALESCE(override, global, 0)=0. Ordering
-        // is applied in the products query via MAX() over the same COALESCE.
-        // TRIM both sides on string keys: seed data is TRIMMED but the raw
-        // zoho_brand / zoho_category_name columns can contain trailing space.
-        const painterId = (req.painter && req.painter.id) || 0;
-        const catalogJoins = `
-            LEFT JOIN painter_catalog_brand_order        gb ON TRIM(gb.brand) = TRIM(zim.zoho_brand)
-            LEFT JOIN painter_catalog_brand_overrides    bo ON bo.painter_id = ? AND TRIM(bo.brand) = TRIM(zim.zoho_brand)
-            LEFT JOIN painter_catalog_category_order     gc ON TRIM(gc.brand) = TRIM(zim.zoho_brand) AND TRIM(gc.category) = TRIM(zim.zoho_category_name)
-            LEFT JOIN painter_catalog_category_overrides co ON co.painter_id = ? AND TRIM(co.brand) = TRIM(zim.zoho_brand) AND TRIM(co.category) = TRIM(zim.zoho_category_name)
-            LEFT JOIN painter_catalog_product_order      gp ON gp.product_id = p.id
-            LEFT JOIN painter_catalog_product_overrides  ppo ON ppo.painter_id = ? AND ppo.product_id = p.id
-        `;
-        const catalogJoinParams = [painterId, painterId, painterId];
-        const catalogHiddenWhere = `
-            AND COALESCE(bo.is_hidden,  gb.is_hidden, 0) = 0
-            AND COALESCE(co.is_hidden,  gc.is_hidden, 0) = 0
-            AND COALESCE(ppo.is_hidden, gp.is_hidden, 0) = 0
-        `;
+        // Six LEFT JOINs (3 global + 3 painter override) via the shared
+        // buildCatalogVisibility helper (routes/painters/shared.js). Hidden
+        // filters are added to WHERE via COALESCE(override, global, 0)=0.
+        // Ordering is applied in the products query via MAX() over the same
+        // COALESCE — the helper's fixed aliases gb/bo/gc/co/gp/ppo keep the
+        // sort expressions below working. TRIM both sides on string keys:
+        // seed data is TRIMMED but the raw zoho_brand / zoho_category_name
+        // columns can contain trailing space.
+        const vis = buildCatalogVisibility(req.painter && req.painter.id);
 
         const joins = `
             FROM products p
@@ -1447,10 +1457,10 @@ router.get('/me/catalog', requirePainterAuth, async (req, res) => {
                 AND (p.main_base_key IS NULL OR ps.base_key = p.main_base_key OR ps.base_key IS NULL)
             INNER JOIN zoho_items_map zim ON zim.zoho_item_id = ps.zoho_item_id
                 AND (zim.zoho_status = 'active' OR zim.zoho_status IS NULL)
-            ${catalogJoins}
+            ${vis.joins}
         `;
-        let where = "WHERE p.status = 'active' " + catalogHiddenWhere;
-        const params = [...catalogJoinParams];
+        let where = "WHERE p.status = 'active'" + vis.where;
+        const params = [...vis.params];
 
         // Pre-fetch active offers so we can add SQL filter when hasOffer=true
         const now = new Date();
@@ -1723,6 +1733,9 @@ router.get('/me/catalog/:productId', requirePainterAuth, async (req, res) => {
 
         // Get all variants (pack sizes) for this product
         // Stock from zoho_location_stock (sum across all branches)
+        // Admin catalog curation: hidden variants are excluded; a fully-hidden
+        // product falls into the existing 404 'No variants found' branch below.
+        const vis = buildCatalogVisibility(req.painter && req.painter.id, { productAlias: 'pv' });
         const [variants] = await pool.query(`
             SELECT zim.zoho_item_id as item_id, zim.zoho_item_name as name,
                    ps.id as pack_size_id,
@@ -1740,10 +1753,11 @@ router.get('/me/catalog/:productId', requirePainterAuth, async (req, res) => {
                 AND (zim.zoho_status = 'active' OR zim.zoho_status IS NULL)
             LEFT JOIN painter_product_point_rates ppr
                 ON ppr.item_id = zim.zoho_item_id COLLATE utf8mb4_unicode_ci
+            ${vis.joins}
             WHERE ps.product_id = ? AND ps.is_active = 1
-              AND (pv.main_base_key IS NULL OR ps.base_key = pv.main_base_key OR ps.base_key IS NULL)
+              AND (pv.main_base_key IS NULL OR ps.base_key = pv.main_base_key OR ps.base_key IS NULL)${vis.where}
             ORDER BY CAST(ps.size AS DECIMAL(10,2)) ASC
-        `, [productId]);
+        `, [...vis.params, productId]);
 
         if (!variants.length) {
             return res.status(404).json({ success: false, message: 'No variants found' });
@@ -1894,6 +1908,10 @@ router.get('/me/offer-products', requirePainterAuth, async (req, res) => {
             if (conditions.length) extraWhere = ` AND (${conditions.join(' OR ')})`;
         }
 
+        // Admin catalog curation — same visibility filter as /me/catalog.
+        // Correlated subqueries stay unfiltered (parity with /me/catalog).
+        const vis = buildCatalogVisibility(req.painter && req.painter.id);
+
         const [products] = await pool.query(`
             SELECT p.id as product_id, p.name, p.product_type,
                    MIN(CAST(zim.zoho_rate AS DECIMAL(10,2))) as min_rate,
@@ -1937,11 +1955,12 @@ router.get('/me/offer-products', requirePainterAuth, async (req, res) => {
                 AND (zim.zoho_status = 'active' OR zim.zoho_status IS NULL)
             LEFT JOIN painter_product_point_rates ppr
                 ON ppr.item_id = zim.zoho_item_id COLLATE utf8mb4_unicode_ci
-            WHERE p.status = 'active'${extraWhere}
+            ${vis.joins}
+            WHERE p.status = 'active'${vis.where}${extraWhere}
             GROUP BY p.id, p.name, p.product_type
             ORDER BY p.name
             LIMIT 100
-        `, extraParams);
+        `, [...vis.params, ...extraParams]);
 
         // Unique brands, ordered by admin-configured list (fallback alphabetical for unknowns)
         const uniqueBrands = [...new Set(products.map(p => p.brand).filter(Boolean))];
