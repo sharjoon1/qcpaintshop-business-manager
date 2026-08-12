@@ -28,7 +28,11 @@
 
     async function api(url, opts = {}) {
         const h = Object.assign({}, getAuthHeaders(), opts.headers || {});
-        if (opts.body && !(opts.body instanceof FormData) && !h['Content-Type']) h['Content-Type'] = 'application/json';
+        // getAuthHeaders() always includes Content-Type: application/json — for
+        // FormData bodies it must be removed so the browser sets the multipart
+        // boundary (otherwise express.json() rejects the body with a 400).
+        if (opts.body instanceof FormData) delete h['Content-Type'];
+        else if (opts.body && !h['Content-Type']) h['Content-Type'] = 'application/json';
         const r = await fetch(url, Object.assign({}, opts, { headers: h }));
         if (r.status === 401) { window.location.href = '/login.html'; throw new Error('Auth'); }
         if (!r.ok) throw new Error((await r.text()).slice(0, 300));
