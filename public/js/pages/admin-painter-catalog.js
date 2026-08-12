@@ -5,6 +5,8 @@
 //   PUT /api/painters/admin/catalog/brands/order    { items:[{brand,sort_order,is_hidden}] }
 //   PUT /api/painters/admin/catalog/products/order  { items:[{product_id,sort_order,is_hidden}] }
 //   PUT /api/painters/admin/catalog/products/main-base { product_id, main_base_key|null }
+//   PUT /api/painters/admin/catalog/products/rename    { product_id, name }
+//   POST /api/painters/admin/catalog/products/:id/image (multipart "image")
 // Everything starts hidden; the owner un-hides products per brand. Products with
 // multiple tint bases (emulsions) show a "Main base" picker — the painter catalog
 // then displays only that base's pack sizes.
@@ -86,10 +88,10 @@
             const items = (j.products || []).map(p => ({ product_id: p.product_id, sort_order: p.sort_order || 999, is_hidden: show ? 0 : 1 }));
             if (!items.length) { alert('No products found for ' + brand); return; }
             await api(API + '/products/order', { method: 'PUT', body: JSON.stringify({ items }) });
-            // also flip the brand flag for consistency
-            await api(API + '/brands/order', { method: 'PUT', body: JSON.stringify({ items: [{ brand, sort_order: 999, is_hidden: show ? 0 : 1 }] }) });
+            // also flip the brand flag for consistency (keep its curated sort_order)
+            const cur = brandData.find(b => b.brand === brand);
+            await api(API + '/brands/order', { method: 'PUT', body: JSON.stringify({ items: [{ brand, sort_order: (cur && cur.sort_order) || 999, is_hidden: show ? 0 : 1 }] }) });
             await Promise.all([loadBrands(), loadProducts()]);
-            if ($('#brandFilter').value === brand || !$('#brandFilter').value) { /* keep view */ }
         } catch (e) {
             alert('Failed: ' + e.message);
         }
@@ -108,14 +110,22 @@
             renderProducts();
             populateCats();
         } catch (e) {
-            $('#prodBody').innerHTML = '<tr><td colspan="5" class="p-2 text-sm text-red-500">Failed: ' + esc(e.message) + '</td></tr>';
+            $('#prodBody').innerHTML = '<tr><td colspan="6" class="p-2 text-sm text-red-500">Failed: ' + esc(e.message) + '</td></tr>';
         }
+    }
+
+    // Rows shown = productData narrowed by the client-side search box.
+    function visibleProducts() {
+        const term = ($('#searchBox') && $('#searchBox').value || '').trim().toUpperCase();
+        if (!term) return productData;
+        return productData.filter(p => ((p.name || '') + ' ' + (p.brand || '') + ' ' + (p.category || '')).toUpperCase().includes(term));
     }
 
     function renderProducts() {
         const tb = $('#prodBody');
-        $('#prodEmpty').classList.toggle('hidden', productData.length > 0);
-        tb.innerHTML = productData.map(p => {
+        const rows = visibleProducts();
+        $('#prodEmpty').classList.toggle('hidden', rows.length > 0);
+        tb.innerHTML = rows.map(p => {
             const checked = !p.is_hidden;
             const bases = p.product_type === 'area_wise' ? (p.base_keys || []).filter(Boolean) : [];
             const multiBase = bases.length > 1;
@@ -134,15 +144,20 @@
                 : '';
             const imgCell = '<div class="flex items-center gap-2">' +
                 (p.image_url
-                    ? '<img src="' + esc(p.image_url) + '" class="w-10 h-10 object-cover rounded border border-gray-200">'
-                    : '<div class="w-10 h-10 border-2 border-dashed border-gray-300 rounded flex items-center justify-center text-[9px] text-gray-400 text-center leading-tight">No<br>img</div>') +
+                    ? '<img src="' + esc(p.image_url) + '" class="w-12 h-12 object-cover rounded-lg border border-gray-200">'
+                    : '<div class="w-12 h-12 border-2 border-dashed border-gray-300 rounded-lg flex items-center justify-center text-[9px] text-gray-400 text-center leading-tight">No<br>img</div>') +
                 '<button data-imgbtn="' + p.product_id + '" class="text-[10px] px-1.5 py-1 rounded border border-blue-200 text-blue-700 bg-blue-50 hover:bg-blue-100 font-semibold whitespace-nowrap">Upload</button>' +
                 '<input type="file" data-imgfile="' + p.product_id + '" accept="image/*" class="hidden">' +
               '</div>';
-            return '<tr class="border-t align-top">' +
+            const nameCell = '<div class="flex items-start gap-1.5">' +
+                '<span class="font-medium text-gray-800">' + esc(p.name) + '</span>' +
+                '<button data-rename="' + p.product_id + '" title="Rename product" class="shrink-0 text-gray-300 hover:text-[#0F3A5F] text-xs leading-5">&#9998;</button>' +
+              '</div>' + baseChips + mainSel;
+            return '<tr class="border-t align-top hover:bg-gray-50/60">' +
                 '<td class="p-2"><input type="checkbox" data-pid="' + p.product_id + '" ' + (checked ? 'checked' : '') + ' class="w-4 h-4 accent-[#0F3A5F]"></td>' +
-                '<td class="p-2 font-medium text-gray-800">' + esc(p.name) + baseChips + mainSel + '</td>' +
-                '<td class="p-2 text-xs text-gray-500">' + esc(p.category || '—') + '</td>' +
+                '<td class="p-2">' + nameCell + '</td>' +
+                '<td class="p-2"><span class="text-[10px] px-1.5 py-0.5 rounded bg-slate-100 text-slate-600 font-semibold whitespace-nowrap">' + esc(p.brand || '—') + '</span></td>' +
+                '<td class="p-2 text-xs text-gray-500 whitespace-nowrap">' + esc(p.category || '—') + '</td>' +
                 '<td class="p-2 text-right text-xs text-gray-500">' + (p.variant_count || 0) + '</td>' +
                 '<td class="p-2">' + imgCell + '</td>' +
             '</tr>';
@@ -162,9 +177,18 @@
                 inp.value = '';
             });
         });
-        $('#prodCount').textContent = productData.length + ' shown';
-        tb.querySelectorAll('input[type=checkbox]').forEach(cb => {
-            cb.addEventListener('change', () => markDirty('Product visibility changed — save to apply'));
+        tb.querySelectorAll('button[data-rename]').forEach(btn => {
+            btn.addEventListener('click', () => renameProduct(parseInt(btn.dataset.rename, 10)));
+        });
+        $('#prodCount').textContent = rows.length + (rows.length === productData.length ? ' shown' : ' of ' + productData.length + ' shown');
+        // Keep is_hidden in productData in sync so save works even when the row
+        // is later hidden by the search box (checkbox no longer in the DOM).
+        tb.querySelectorAll('input[type=checkbox][data-pid]').forEach(cb => {
+            cb.addEventListener('change', () => {
+                const p = productData.find(x => x.product_id === parseInt(cb.dataset.pid, 10));
+                if (p) p.is_hidden = cb.checked ? 0 : 1;
+                markDirty('Product visibility changed — save to apply');
+            });
         });
     }
 
@@ -178,6 +202,25 @@
             await loadProducts();
         } catch (e) {
             alert('Image upload failed: ' + e.message);
+        }
+    }
+
+    // Rename the grouped product (display name in curation + painter catalog)
+    async function renameProduct(productId) {
+        const p = productData.find(x => x.product_id === productId);
+        if (!p) return;
+        const name = prompt('Product name:', p.name || '');
+        if (name == null) return;                     // cancelled
+        const clean = name.replace(/\s+/g, ' ').trim();
+        if (!clean || clean === p.name) return;
+        try {
+            const j = await api(API + '/products/rename', {
+                method: 'PUT',
+                body: JSON.stringify({ product_id: productId, name: clean })
+            });
+            if (j.success) { p.name = j.name; renderProducts(); }
+        } catch (e) {
+            alert('Rename failed: ' + e.message);
         }
     }
 
@@ -199,15 +242,13 @@
     }
 
     function collectProducts() {
-        const items = productData.map(p => {
-            const cb = document.querySelector('input[data-pid="' + p.product_id + '"]');
-            return {
-                product_id: p.product_id,
-                sort_order: p.sort_order || 999,
-                is_hidden: cb && !cb.checked ? 1 : 0
-            };
-        });
-        return items;
+        // productData.is_hidden is kept current by the checkbox handler, so this
+        // is correct even for rows filtered out of the DOM by the search box.
+        return productData.map(p => ({
+            product_id: p.product_id,
+            sort_order: p.sort_order || 999,
+            is_hidden: p.is_hidden ? 1 : 0
+        }));
     }
 
     async function saveProducts() {
@@ -217,14 +258,19 @@
         btn.disabled = true; btn.textContent = 'Saving…';
         try {
             await api(API + '/products/order', { method: 'PUT', body: JSON.stringify({ items }) });
-            // Recompute brand visibility: a brand with zero visible products becomes hidden
-            const visibleBrands = {};
+            // Recompute visibility ONLY for brands present in the current view —
+            // a brand-filtered save must not hide every other brand.
+            const inView = {};
             productData.forEach(p => {
-                const cb = document.querySelector('input[data-pid="' + p.product_id + '"]');
-                if (cb && cb.checked) visibleBrands[p.brand] = true;
+                if (!(p.brand in inView)) inView[p.brand] = false;
+                if (!p.is_hidden) inView[p.brand] = true;
             });
-            const brandItems = brandData.map(b => ({ brand: b.brand, sort_order: 999, is_hidden: visibleBrands[b.brand] ? 0 : 1 }));
-            await api(API + '/brands/order', { method: 'PUT', body: JSON.stringify({ items: brandItems }) });
+            const brandItems = brandData
+                .filter(b => b.brand in inView)
+                .map(b => ({ brand: b.brand, sort_order: b.sort_order || 999, is_hidden: inView[b.brand] ? 0 : 1 }));
+            if (brandItems.length) {
+                await api(API + '/brands/order', { method: 'PUT', body: JSON.stringify({ items: brandItems }) });
+            }
             dirty = false;
             $('#saveBar').classList.add('hidden');
             await Promise.all([loadBrands(), loadProducts()]);
@@ -244,7 +290,7 @@
             const j = await api(API + '/products?limit=1000');
             const items = (j.products || []).map(p => ({ product_id: p.product_id, sort_order: p.sort_order || 999, is_hidden: 1 }));
             await api(API + '/products/order', { method: 'PUT', body: JSON.stringify({ items }) });
-            const brandItems = brandData.map(b => ({ brand: b.brand, sort_order: 999, is_hidden: 1 }));
+            const brandItems = brandData.map(b => ({ brand: b.brand, sort_order: b.sort_order || 999, is_hidden: 1 }));
             await api(API + '/brands/order', { method: 'PUT', body: JSON.stringify({ items: brandItems }) });
             await Promise.all([loadBrands(), loadProducts()]);
         } catch (e) {
@@ -252,6 +298,16 @@
         } finally {
             btn.disabled = false; btn.textContent = 'Hide All Products';
         }
+    }
+
+    // ---------- Category filter ----------
+    // Rebuild the dropdown only from a category-UNFILTERED load; while a
+    // category is selected the option list (and the selection) must survive.
+    function populateCats() {
+        const sel = $('#catFilter');
+        if (sel.value) return;
+        const cats = [...new Set(productData.map(p => p.category).filter(Boolean))].sort();
+        sel.innerHTML = '<option value="">All categories</option>' + cats.map(c => '<option value="' + esc(c) + '">' + esc(c) + '</option>').join('');
     }
 
     // ---------- init ----------
@@ -266,17 +322,13 @@
             .then(() => loadBrands())
             .catch(e => alert('Failed: ' + e.message));
     });
-    $('#brandFilter').addEventListener('change', async () => { await loadProducts(); populateCats(); });
+    $('#brandFilter').addEventListener('change', () => {
+        $('#catFilter').value = '';       // categories belong to the new brand
+        loadProducts();
+    });
     $('#catFilter').addEventListener('change', loadProducts);
+    $('#searchBox').addEventListener('input', renderProducts);
     window.addEventListener('beforeunload', (e) => { if (dirty) { e.preventDefault(); e.returnValue = ''; } });
-
-    async function populateCats() {
-        const sel = $('#catFilter');
-        const brand = $('#brandFilter').value;
-        const cats = [...new Set(productData.map(p => p.category).filter(Boolean))].sort();
-        sel.innerHTML = '<option value="">All categories</option>' + cats.map(c => '<option value="' + esc(c) + '">' + esc(c) + '</option>').join('');
-        if (brand) { /* loaded with brand */ }
-    }
 
     async function init() {
         await loadBrands();

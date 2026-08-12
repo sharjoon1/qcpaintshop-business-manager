@@ -3136,6 +3136,28 @@ router.put('/admin/catalog/products/main-base', requireAuth, requirePermission('
     }
 });
 
+// Rename a grouped product from the curation page. This is the display name in
+// both the curation table and the painter app catalog (p.name). Zoho item names
+// are NOT touched, and catalog imports match existing products via their packs'
+// zoho series (not products.name), so a curated name here is stable.
+router.put('/admin/catalog/products/rename', requireAuth, requirePermission('painters', 'manage'), async (req, res) => {
+    try {
+        const productId = parseInt(req.body && req.body.product_id, 10);
+        const name = String((req.body && req.body.name) || '').replace(/\s+/g, ' ').trim();
+        if (!productId) return res.status(400).json({ success: false, message: 'product_id required' });
+        if (!name || name.length > 200) {
+            return res.status(400).json({ success: false, message: 'name required (max 200 chars)' });
+        }
+        const [r] = await pool.query(
+            "UPDATE products SET name = ? WHERE id = ? AND status = 'active'", [name, productId]);
+        if (!r.affectedRows) return res.status(404).json({ success: false, message: 'product not found' });
+        res.json({ success: true, product_id: productId, name });
+    } catch (e) {
+        console.error('PUT /admin/catalog/products/rename:', e);
+        res.status(500).json({ success: false, message: e.message });
+    }
+});
+
 // Upload a product image from the painter catalog curation page. Updates both
 // products.image_url and zoho_items_map.image_url for the product's pack sizes
 // (the painter catalog card reads the zoho mirror image).
