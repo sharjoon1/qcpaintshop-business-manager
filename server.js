@@ -64,6 +64,7 @@ const engineersRoutes = require('./routes/engineers');
 const painterMarketingRoutes = require('./routes/painter-marketing');
 const adminNotificationsRoutes = require('./routes/admin-notifications');
 const billingRoutes = require('./routes/billing');
+const billingPdfRoutes = require('./routes/billing-pdf');
 const vendorRoutes = require('./routes/vendors');
 const painterScheduler = require('./services/painter-scheduler');
 const dataRetentionService = require('./services/data-retention-service');
@@ -390,6 +391,7 @@ engineersRoutes.setSessionManager(whatsappSessionManager);
 adminNotificationsRoutes.setPool(pool);
 billingRoutes.setPool(pool);
 billingRoutes.setPointsEngine(require('./services/painter-points-engine'));
+billingPdfRoutes.setPool(pool);
 vendorRoutes.setPool(pool);
 require('./services/vendor-zoho-service').setPool(pool); // SP-1 C5: AP payment → Zoho
 painterScheduler.setPool(pool);
@@ -491,6 +493,7 @@ app.use('/api/painter-leads', painterLeadRoutes.router);
 app.use('/api/engineers', engineersRoutes.router);
 app.use('/api/painter-marketing', painterMarketingRoutes.router);
 app.use('/api/admin-notifications', adminNotificationsRoutes.router);
+app.use('/api/billing', billingPdfRoutes.router); // PDF endpoints (own ?token= auth) — mount before billingRoutes (precedent: /api/estimates)
 app.use('/api/billing', billingRoutes.router);
 app.use('/api/vendors', vendorRoutes.router);
 app.use('/api/system', systemRoutes.router);

@@ -21,6 +21,7 @@ const rateLimiter = require('./zoho-rate-limiter');
 const invoiceLineSync = require('./zoho-invoice-line-sync');
 const reorderCompute = require('./reorder-compute-service');
 const reorderReport = require('./reorder-report-service');
+const billingZohoService = require('./billing-zoho-service');
 
 const { isClusterPrimary } = require('./cluster-guard');
 let pool;
@@ -31,6 +32,7 @@ let bulkJobProcessor = null;  // Bulk job processor cron task
 let invoiceLineSyncJob = null; // Invoice line items sync cron task (02:00 IST)
 let reorderComputeJob = null;  // Reorder level compute cron task (02:30 IST)
 let reorderReportJob = null;   // Daily reorder report cron task (07:00 IST)
+let billingPushRetryJob = null; // B1a failed billing-push retry cron task (*/15)
 let configCache = {};         // Cached config values
 let isRunning = false;
 let lastSyncAttempt = null;
@@ -291,6 +293,44 @@ async function executeBulkJobProcessor() {
 }
 
 /**
+ * B1a: retry billing invoices whose auto/manual Zoho push failed (stamped
+ * zoho_push_error, still zoho_status 'pending'). Guarded by the ai_config flag
+ * 'billing_auto_push_on_save' ('1' = on), the daily API quota and the circuit
+ * breaker; small batch (5) per run — the service enforces the 15-min per-row
+ * cool-down itself.
+ */
+async function executeBillingPushRetry() {
+    if (!pool) return;
+
+    try {
+        const [rows] = await pool.query(
+            "SELECT config_value FROM ai_config WHERE config_key = 'billing_auto_push_on_save' LIMIT 1"
+        );
+        const autoPushOn = rows.length > 0 && String(rows[0].config_value || '').trim() === '1';
+        if (!autoPushOn) return; // feature flag off — silently skip
+
+        const quotaCheck = rateLimiter.canStartHeavyOperation(40);
+        if (!quotaCheck.safe) {
+            console.log(`[Scheduler] Billing push retry paused: ${quotaCheck.reason}`);
+            return;
+        }
+        if (rateLimiter.isCircuitOpen()) {
+            return; // preserve API quota — don't log every 15 min
+        }
+
+        if (registry) registry.markRunning('billing-push-retry');
+        const result = await billingZohoService.retryUnpushedInvoices({ limit: 5 });
+        if (result && result.attempted > 0) {
+            console.log(`[Scheduler] Billing push retry: ${result.pushed}/${result.attempted} pushed, ${result.failed} failed`);
+        }
+        if (registry) registry.markCompleted('billing-push-retry', { details: `${result.pushed}/${result.attempted} pushed` });
+    } catch (error) {
+        console.error('[Scheduler] Billing push retry failed:', error.message);
+        if (registry) registry.markFailed('billing-push-retry', { error: error.message });
+    }
+}
+
+/**
  * Local-calendar date string (YYYY-MM-DD). The server clock is IST;
  * toISOString() is UTC and rolls back to the previous day between
  * 00:00–05:30 IST, shifting report ranges off by one (M8).
@@ -466,6 +506,7 @@ async function start() {
             registry.register('invoice-line-sync', { name: 'Invoice line items sync', service: 'sync-scheduler', schedule: '0 2 * * *', description: 'Pulls line items from Zoho invoices into branch_item_sales (for reorder intelligence)' });
             registry.register('reorder-compute', { name: 'Reorder level compute', service: 'sync-scheduler', schedule: '30 2 * * *', description: 'Computes auto reorder levels from 60-day sales velocity' });
             registry.register('reorder-report', { name: 'Daily reorder report', service: 'sync-scheduler', schedule: '0 7 * * *', description: 'Generates & delivers daily reorder report per branch + consolidated' });
+            registry.register('billing-push-retry', { name: 'Billing failed-push retry', service: 'sync-scheduler', schedule: '*/15 * * * *', description: 'Retries billing invoices whose Zoho push failed (flag-gated, batch of 5)' });
         }
 
         // Auto-sync cron job
@@ -534,6 +575,13 @@ async function start() {
         });
         console.log('[Scheduler] Bulk job processor scheduled: every 5 min');
 
+        // B1a: failed billing-push retry (every 15 minutes, flag + quota gated)
+        billingPushRetryJob = cron.schedule('*/15 * * * *', executeBillingPushRetry, {
+            scheduled: true,
+            timezone: 'Asia/Kolkata'
+        });
+        console.log('[Scheduler] Billing push retry scheduled: every 15 min');
+
         // Invoice line items sync — 02:00 IST (runs before reorder compute)
         invoiceLineSyncJob = cron.schedule('0 2 * * *', executeInvoiceLineSync, {
             scheduled: true,
@@ -594,6 +642,10 @@ function stop() {
     if (reorderReportJob) {
         reorderReportJob.stop();
         reorderReportJob = null;
+    }
+    if (billingPushRetryJob) {
+        billingPushRetryJob.stop();
+        billingPushRetryJob = null;
     }
     isRunning = false;
     nextSyncTime = null;
@@ -685,6 +737,7 @@ module.exports = {
     getStatus,
     executeSyncCycle,
     executeStockSync,
+    executeBillingPushRetry,
     loadConfig,
     localDateStr
 };

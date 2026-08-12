@@ -9,7 +9,7 @@
 const express = require('express');
 const router = express.Router();
 const { z } = require('zod');
-const { requirePermission, isFullAdmin } = require('../middleware/permissionMiddleware');
+const { requirePermission, isFullAdmin, hasRolePermission } = require('../middleware/permissionMiddleware');
 const { validate, validateQuery, validateParams } = require('../middleware/validate');
 const billingZohoService = require('../services/billing-zoho-service');
 const zohoAPI = require('../services/zoho-api');
@@ -317,6 +317,34 @@ const recordPaymentSchema = z.object({
     payment_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'payment_date must be YYYY-MM-DD').optional()
 });
 
+// B1a quick-sale: invoice + items + up to 4 split payments in one call.
+// NO 'credit' method here — a quick sale records money actually received; a
+// credit sale goes through the normal invoice + credit-limit flow.
+const quickSalePaymentSchema = z.object({
+    amount: z.number().positive(),
+    payment_method: z.enum(['cash', 'upi', 'bank_transfer', 'cheque']),
+    payment_reference: z.string().optional().default(''),
+    // Optional back-date (yyyy-mm-dd); defaults to today in IST at the handler.
+    payment_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'payment_date must be YYYY-MM-DD').optional()
+});
+
+const quickSaleSchema = z.object({
+    customer_type: z.enum(['customer', 'painter']),
+    customer_id: z.number().optional().nullable(),
+    painter_id: z.number().optional().nullable(),
+    customer_name: z.string().min(1),
+    customer_phone: z.string().optional().default(''),
+    customer_address: z.string().optional().default(''),
+    items: z.array(estimateItemSchema).min(1),
+    discount_amount: z.number().min(0).optional().default(0),
+    notes: z.string().optional().default(''),
+    payments: z.array(quickSalePaymentSchema).max(4).optional().default([]),
+    // Optional Zoho overrides stamped onto the invoice for the auto-push;
+    // when absent the push resolves its own defaults (user/config/branch).
+    salesperson_id: z.string().optional().nullable(),
+    zoho_location_id: z.string().optional().nullable()
+});
+
 // ═══════════════════════════════════════════
 // PRODUCT SEARCH
 // ═══════════════════════════════════════════
@@ -353,8 +381,33 @@ router.get('/products',
             const search = req.query.search || '';
             const brand = req.query.brand || '';
 
+            // B1a: resolve the caller's stock location so the product picker can
+            // show live branch stock. Staff → own branch; admin may pass
+            // ?branch_id. branches.zoho_location_id first, else the active
+            // zoho_locations_map row for that branch. '' sentinel when
+            // unresolvable — it matches no zoho_location_id, so the stock
+            // columns read NULL and the response stays backward compatible.
+            // Lookup failures never break the search.
+            let stockLocationId = '';
+            try {
+                const branchId = getBranchFilter(req);
+                if (branchId) {
+                    const [br] = await pool.query('SELECT zoho_location_id FROM branches WHERE id = ? LIMIT 1', [branchId]);
+                    if (br.length && br[0].zoho_location_id) stockLocationId = br[0].zoho_location_id;
+                    if (!stockLocationId) {
+                        const [lm] = await pool.query(
+                            'SELECT zoho_location_id FROM zoho_locations_map WHERE local_branch_id = ? AND is_active = 1 LIMIT 1',
+                            [branchId]
+                        );
+                        if (lm.length && lm[0].zoho_location_id) stockLocationId = lm[0].zoho_location_id;
+                    }
+                }
+            } catch { stockLocationId = ''; }
+
             let where = "WHERE zim.zoho_status = 'active'";
-            const params = [];
+            // The zoho_location_stock JOIN's ? appears BEFORE the WHERE ?s in
+            // SQL order — its param must come FIRST.
+            const params = [stockLocationId];
 
             if (search) {
                 where += ' AND (zim.zoho_item_name LIKE ? OR zim.zoho_sku LIKE ?)';
@@ -369,8 +422,19 @@ router.get('/products',
             const [rows] = await pool.query(
                 `SELECT zim.id, zim.zoho_item_id, zim.zoho_item_name AS item_name,
                         zim.zoho_sku AS sku, zim.zoho_rate AS rate, zim.zoho_brand AS brand,
-                        zim.zoho_category_name AS category, zim.zoho_unit AS unit
+                        zim.zoho_category_name AS category, zim.zoho_unit AS unit,
+                        ps.pack_size,
+                        zls.stock_on_hand, zls.available_for_sale AS stock,
+                        zls.last_synced_at AS stock_as_of
                  FROM zoho_items_map zim
+                 LEFT JOIN (
+                     SELECT zoho_item_id, MAX(TRIM(CONCAT(size, ' ', COALESCE(unit, '')))) AS pack_size
+                     FROM pack_sizes
+                     WHERE is_active = 1 AND zoho_item_id IS NOT NULL
+                     GROUP BY zoho_item_id
+                 ) ps ON ps.zoho_item_id = zim.zoho_item_id
+                 LEFT JOIN zoho_location_stock zls
+                        ON zls.zoho_item_id = zim.zoho_item_id AND zls.zoho_location_id = ?
                  ${where}
                  ORDER BY zim.zoho_item_name
                  LIMIT 50`,
@@ -857,6 +921,17 @@ router.post('/estimates/:id/convert',
 
             await connection.commit();
 
+            // Invoice birth audit (B1a) — best-effort, never fails the response.
+            await auditLog.record(req, {
+                action: 'billing.invoice.create',
+                entity_type: 'billing_invoice', entity_id: invoiceId,
+                before: null,
+                after: {
+                    invoice_number: invoiceNumber, source: 'estimate', estimate_id: id,
+                    customer_type: est.customer_type, grand_total: est.grand_total
+                }
+            });
+
             res.json({
                 success: true,
                 message: 'Estimate converted to invoice',
@@ -936,6 +1011,17 @@ router.post('/invoices',
 
             await connection.commit();
 
+            // Invoice birth audit (B1a) — best-effort, never fails the response.
+            await auditLog.record(req, {
+                action: 'billing.invoice.create',
+                entity_type: 'billing_invoice', entity_id: invoiceId,
+                before: null,
+                after: {
+                    invoice_number: invoiceNumber, source: 'direct',
+                    customer_type: data.customer_type, grand_total: grandTotal
+                }
+            });
+
             res.json({
                 success: true,
                 id: invoiceId,
@@ -949,6 +1035,201 @@ router.post('/invoices',
         } finally {
             connection.release();
         }
+    }
+);
+
+// ═══════════════════════════════════════════
+// QUICK SALE (B1a)
+// One-screen counter sale: invoice + items + up to 4 split payments in ONE
+// local transaction (phase 1), then — after commit, never changing the 200 —
+// a best-effort auto-push to Zoho behind the ai_config flag
+// 'billing_auto_push_on_save' (phase 2). A push failure stamps
+// zoho_push_error/zoho_push_attempted_at so the 15-min retry cron picks it up.
+// ═══════════════════════════════════════════
+
+router.post('/quick-sale',
+    // Auth BEFORE idempotency: a replayed Idempotency-Key must never be served
+    // to an unauthenticated caller (judge finding, mirrors push-zoho's order).
+    requirePermission('billing', 'invoice'),
+    idempotent('billing.quicksale.create'),
+    validate(quickSaleSchema),
+    async (req, res) => {
+        const data = req.body;
+        const admin = isFullAdmin(req.user && req.user.role);
+
+        // Recording money needs the payment permission too (mirrors
+        // POST /invoices/:id/payment) — checked in-handler because the route
+        // itself only demands billing.invoice for a zero-payment sale.
+        if ((data.payments || []).length > 0 && !admin) {
+            let allowed = false;
+            try { allowed = await hasRolePermission(req.user.role, 'billing', 'payment'); }
+            catch { allowed = false; }
+            if (!allowed) {
+                return res.status(403).json({
+                    success: false, code: 'PERMISSION_DENIED',
+                    message: 'Recording a payment requires the billing.payment permission.'
+                });
+            }
+        }
+
+        // billing_invoices.branch_id is NOT NULL — fail fast with a clear
+        // message instead of an opaque 500 from the INSERT (same guard as
+        // POST /invoices).
+        if (!req.user.branch_id) {
+            return res.status(400).json({ success: false, message: 'Your account has no branch assigned. Ask an admin to set your branch before billing.' });
+        }
+
+        const { subtotal, grandTotal } = calculateTotals(data.items, data.discount_amount);
+
+        // Pre-transaction overpay guard (same 1-paisa tolerance as
+        // paymentExceedsBalance) — refuse before touching the DB.
+        const paymentsTotal = (data.payments || []).reduce((sum, p) => sum + Number(p.amount), 0);
+        if (paymentsTotal > grandTotal + 0.01) {
+            return res.status(400).json({
+                success: false, code: 'PAYMENT_EXCEEDS_TOTAL',
+                message: `Payments (${paymentsTotal.toFixed(2)}) exceed the invoice total (${grandTotal.toFixed(2)})`
+            });
+        }
+
+        // ── Phase 1: the local money record — ONE transaction ──
+        let invoiceId, invoiceNumber, settled;
+        const insertedPayments = [];
+        const connection = await pool.getConnection();
+        try {
+            invoiceNumber = await generateNumber('BI', 'billing_invoices', 'invoice_number');
+
+            await connection.beginTransaction();
+
+            const [result] = await connection.execute(
+                `INSERT INTO billing_invoices
+                 (invoice_number, source, customer_type, customer_id, painter_id,
+                  customer_name, customer_phone, customer_address,
+                  subtotal, discount_amount, grand_total, amount_paid, balance_due,
+                  payment_status, notes, branch_id, created_by,
+                  zoho_salesperson_id, zoho_location_id)
+                 VALUES (?, 'direct', ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, 'unpaid', ?, ?, ?, ?, ?)`,
+                [
+                    invoiceNumber,
+                    data.customer_type,
+                    data.customer_id || null,
+                    data.painter_id || null,
+                    data.customer_name,
+                    data.customer_phone,
+                    data.customer_address,
+                    subtotal,
+                    data.discount_amount,
+                    grandTotal,
+                    grandTotal, // balance_due before the payment rows land
+                    data.notes,
+                    req.user.branch_id,
+                    req.user.id,
+                    data.salesperson_id || null,
+                    data.zoho_location_id || null
+                ]
+            );
+            invoiceId = result.insertId;
+
+            for (const item of data.items) {
+                const lineTotal = item.quantity * item.unit_price;
+                await connection.execute(
+                    `INSERT INTO billing_invoice_items
+                     (invoice_id, zoho_item_id, item_name, pack_size, quantity, unit_price, line_total)
+                     VALUES (?, ?, ?, ?, ?, ?, ?)`,
+                    [invoiceId, item.zoho_item_id, item.item_name, item.pack_size, item.quantity, item.unit_price, lineTotal]
+                );
+            }
+
+            for (const pay of (data.payments || [])) {
+                // yyyy-mm-dd; default today in IST (server clock IST, DB session UTC).
+                const payDate = pay.payment_date || istDateString(new Date());
+                const [ins] = await connection.execute(
+                    `INSERT INTO billing_payments
+                     (invoice_id, amount, payment_method, payment_reference, payment_date, notes, received_by)
+                     VALUES (?, ?, ?, ?, ?, '', ?)`,
+                    [invoiceId, pay.amount, pay.payment_method, pay.payment_reference, payDate, req.user.id]
+                );
+                insertedPayments.push({ id: ins.insertId, amount: pay.amount, payment_method: pay.payment_method });
+            }
+
+            // One shared settlement path (same math as record-payment/reversal).
+            settled = await recalcInvoicePaymentTotals(connection, invoiceId);
+
+            await connection.commit();
+        } catch (error) {
+            try { await connection.rollback(); } catch { /* already rolled back */ }
+            console.error('Quick sale error:', error);
+            return res.status(500).json({ success: false, message: 'Failed to create quick sale' });
+        } finally {
+            connection.release();
+        }
+
+        // ── Phase 2: after commit — best-effort, NEVER changes the 200 ──
+        await auditLog.record(req, {
+            action: 'billing.quicksale.create',
+            entity_type: 'billing_invoice', entity_id: invoiceId,
+            before: null,
+            after: {
+                invoice_number: invoiceNumber, grand_total: grandTotal,
+                amount_paid: settled.totalPaid, payment_status: settled.paymentStatus,
+                payments: insertedPayments.length
+            }
+        });
+
+        const zoho = { attempted: false, pushed: false, code: null, error: null };
+        try {
+            if (await billingZohoService.flagOn('billing_auto_push_on_save')) {
+                zoho.attempted = true;
+                const result = await billingZohoService.pushInvoiceToZoho(invoiceId, req.user.id, { isAdmin: admin });
+                zoho.pushed = true;
+                zoho.zoho_invoice_id = result.zohoInvoiceId;
+                zoho.zoho_invoice_number = result.zohoInvoiceNumber;
+                zoho.zoho_state = result.zohoState || null;
+                zoho.salesperson_name = result.salespersonName || null;
+                zoho.location_name = result.locationName || null;
+                zoho.payment_sync = result.paymentSync ? deriveZohoSync(result.paymentSync) : null;
+                await auditLog.record(req, {
+                    action: 'billing.invoice.zohoPush',
+                    entity_type: 'billing_invoice', entity_id: invoiceId,
+                    before: null,
+                    after: { zoho_invoice_id: result.zohoInvoiceId, zoho_state: result.zohoState || null, auto: true }
+                });
+            }
+        } catch (err) {
+            zoho.pushed = false;
+            zoho.code = err.code || 'PUSH_FAILED';
+            zoho.error = String(err.message || err).slice(0, 255);
+            // Stamp the failure so the 15-min retry cron can pick it up.
+            try {
+                await pool.query(
+                    'UPDATE billing_invoices SET zoho_push_error = ?, zoho_push_attempted_at = NOW() WHERE id = ?',
+                    [zoho.error, invoiceId]
+                );
+            } catch { /* stamp is best-effort */ }
+            if (err.code === 'PUSH_GATE' || err.code === 'SALESPERSON_REQUIRED') {
+                await auditLog.record(req, {
+                    action: 'billing.invoice.zohoPush.refused',
+                    entity_type: 'billing_invoice', entity_id: invoiceId,
+                    before: null, after: { code: err.code, error: zoho.error, auto: true }
+                });
+            }
+        }
+
+        res.json({
+            success: true,
+            invoice: {
+                id: invoiceId,
+                invoice_number: invoiceNumber,
+                subtotal,
+                discount_amount: data.discount_amount,
+                grand_total: grandTotal,
+                amount_paid: settled.totalPaid,
+                balance_due: settled.balanceDue,
+                payment_status: settled.paymentStatus
+            },
+            payments: insertedPayments,
+            zoho,
+            print_url: `/billing-receipt.html?id=${invoiceId}`
+        });
     }
 );
 
@@ -1521,6 +1802,55 @@ router.get('/zoho-locations',
     }
 );
 
+// B1a: the caller's own push defaults, resolved EXACTLY like the push would —
+// salesperson: users.zoho_salesperson_id → ai_config
+// 'billing_default_salesperson_id'; location: req.user.branch_id →
+// branches.zoho_location_id → active zoho_locations_map row. Names come from
+// the local masters. The quick-sale UI shows these before saving.
+router.get('/my-defaults',
+    requirePermission('billing', 'invoice'),
+    async (req, res) => {
+        try {
+            let salesperson = null;
+            const [ur] = await pool.query('SELECT zoho_salesperson_id FROM users WHERE id = ? LIMIT 1', [req.user.id]);
+            let spId = (ur.length && ur[0].zoho_salesperson_id) || null;
+            if (!spId) {
+                spId = (await billingZohoService.readConfigValue('billing_default_salesperson_id')) || null;
+            }
+            if (spId) {
+                let name = null;
+                const [sp] = await pool.query('SELECT salesperson_name FROM zoho_salespersons WHERE zoho_salesperson_id = ? LIMIT 1', [spId]);
+                if (sp.length) name = sp[0].salesperson_name;
+                salesperson = { id: spId, name };
+            }
+
+            let location = null;
+            if (req.user.branch_id) {
+                const [br] = await pool.query('SELECT zoho_location_id FROM branches WHERE id = ? LIMIT 1', [req.user.branch_id]);
+                let locId = (br.length && br[0].zoho_location_id) || null;
+                if (!locId) {
+                    const [lm] = await pool.query(
+                        'SELECT zoho_location_id FROM zoho_locations_map WHERE local_branch_id = ? AND is_active = 1 LIMIT 1',
+                        [req.user.branch_id]
+                    );
+                    locId = (lm.length && lm[0].zoho_location_id) || null;
+                }
+                if (locId) {
+                    let name = null;
+                    const [loc] = await pool.query('SELECT zoho_location_name FROM zoho_locations_map WHERE zoho_location_id = ? LIMIT 1', [locId]);
+                    if (loc.length) name = loc[0].zoho_location_name;
+                    location = { id: locId, name };
+                }
+            }
+
+            res.json({ success: true, salesperson, location });
+        } catch (error) {
+            console.error('Billing my-defaults error:', error);
+            res.status(500).json({ success: false, message: 'Failed to load billing defaults' });
+        }
+    }
+);
+
 router.post('/invoices/:id/push-zoho',
     requirePermission('billing', 'zoho_push'),
     idempotent('billing.invoice.zohoPush'),
@@ -1545,6 +1875,17 @@ router.post('/invoices/:id/push-zoho',
                 : state === 'sent' ? 'created in Zoho'
                 : state === 'draft' ? 'created as a DRAFT in Zoho (not finalized)'
                 : 'pushed to Zoho';
+            // Push audit (B1a) — best-effort, never fails the response.
+            await auditLog.record(req, {
+                action: 'billing.invoice.zohoPush',
+                entity_type: 'billing_invoice', entity_id: id,
+                before: null,
+                after: {
+                    zoho_invoice_id: result.zohoInvoiceId, zoho_invoice_number: result.zohoInvoiceNumber,
+                    zoho_state: state || null, salesperson_id: result.salespersonId || null,
+                    location_id: result.locationId || null, draft_only: !!options.draftOnly
+                }
+            });
             res.json({
                 success: true,
                 message: `Invoice ${stateMsg}`,
@@ -1558,9 +1899,24 @@ router.post('/invoices/:id/push-zoho',
             });
         } catch (error) {
             console.error('Push to Zoho error:', error);
+            // B1a: stamp the failure so the 15-min retry cron can pick it up
+            // (the retry SELECT only matches zoho_status='pending', so stamping
+            // an already-pushed invoice's error is inert). Best-effort.
+            try {
+                await pool.query(
+                    'UPDATE billing_invoices SET zoho_push_error = ?, zoho_push_attempted_at = NOW() WHERE id = ?',
+                    [String(error.message || error).slice(0, 255), req.params.id]
+                );
+            } catch { /* stamp is best-effort */ }
             // Surface the actionable gates (missing salesperson / push eligibility)
             // as 400s with a code so the UI can react instead of a generic 500.
             if (error.code === 'SALESPERSON_REQUIRED' || error.code === 'PUSH_GATE') {
+                await auditLog.record(req, {
+                    action: 'billing.invoice.zohoPush.refused',
+                    entity_type: 'billing_invoice', entity_id: req.params.id,
+                    before: null,
+                    after: { code: error.code, error: String(error.message || '').slice(0, 255) }
+                });
                 return res.status(400).json({ success: false, code: error.code, message: error.message });
             }
             res.status(500).json({ success: false, message: error.message || 'Failed to push to Zoho' });
@@ -1596,5 +1952,5 @@ module.exports = {
     router, setPool, setPointsEngine,
     calculateTotals, paymentExceedsBalance, computePaymentSettlement, deriveZohoSync,
     recalcInvoicePaymentTotals, countLiveInvoicePayments, reverseInvoicePayment,
-    createEstimateSchema, recordPaymentSchema, listQuerySchema
+    createEstimateSchema, recordPaymentSchema, listQuerySchema, quickSaleSchema
 };

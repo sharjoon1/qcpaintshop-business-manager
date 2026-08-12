@@ -1,0 +1,374 @@
+/**
+ * B1a POST /api/billing/quick-sale — routes/billing.js.
+ *
+ * Money path. Locks:
+ *   - quickSaleSchema: NO 'credit' payment method, max 4 payments, defaults;
+ *   - Σpayments > grandTotal + 0.01 refused 400 PAYMENT_EXCEEDS_TOTAL BEFORE
+ *     any transaction (no connection checkout);
+ *   - phase-1 transaction: invoice + items + payment rows + shared recalc in
+ *     ONE txn; an item-insert throw rolls back, releases, 500s, and writes NO
+ *     audit row and NO push;
+ *   - phase-2 never changes the 200: Zoho-down ⇒ 200 with zoho.pushed=false and
+ *     the failure stamped onto billing_invoices (zoho_push_error /
+ *     zoho_push_attempted_at); PUSH_GATE surfaces as zoho.code + a
+ *     billing.invoice.zohoPush.refused audit; flag off ⇒ push never called;
+ *   - split payments produce N billing_payments INSERTs + the shared recalc;
+ *   - totals in the response match calculateTotals exactly;
+ *   - payments without billing.payment permission (non-admin) ⇒ 403.
+ *
+ * Handler invoked directly via router stack walk (item-master-search pattern);
+ * middleware (idempotent/requirePermission/validate) is bypassed — the body is
+ * pre-parsed through the exported quickSaleSchema exactly as validate() would.
+ */
+
+const mockHasRolePermission = jest.fn(async () => true);
+jest.mock('../../middleware/permissionMiddleware', () => ({
+    requirePermission: () => (req, res, next) => next(),
+    isFullAdmin: (role) => ['admin', 'administrator', 'super_admin'].includes(String(role || '').toLowerCase()),
+    hasRolePermission: (...a) => mockHasRolePermission(...a),
+}));
+
+const mockPush = jest.fn();
+const mockFlagOn = jest.fn(async () => false);
+jest.mock('../../services/billing-zoho-service', () => ({
+    setPool: jest.fn(),
+    setPointsEngine: jest.fn(),
+    pushInvoiceToZoho: (...a) => mockPush(...a),
+    flagOn: (...a) => mockFlagOn(...a),
+    readConfigValue: jest.fn(async () => ''),
+    resolveZohoContact: jest.fn(),
+    forwardInvoicePayments: jest.fn(),
+    syncInvoicePaymentsToZoho: jest.fn(),
+    syncInvoiceApprovalState: jest.fn(),
+    retryUnpushedInvoices: jest.fn(),
+}));
+
+const billing = require('../../routes/billing');
+const { quickSaleSchema, calculateTotals } = billing;
+
+const findRoute = (method, path) => billing.router.stack
+    .map(l => l.route)
+    .find(rt => rt && rt.path === path && rt.methods[method]);
+const lastHandler = (route) => route.stack[route.stack.length - 1].handle;
+
+function mockRes() {
+    const res = { statusCode: 200, body: null };
+    res.status = (c) => { res.statusCode = c; return res; };
+    res.json = (b) => { res.body = b; return res; };
+    return res;
+}
+
+/**
+ * Fake pool + transaction connection for the quick-sale flow.
+ * `failItemInsert` makes the billing_invoice_items INSERT throw (rollback path).
+ */
+function makeQuickSalePool({ failItemInsert = false } = {}) {
+    const calls = [];    // pool-level queries (generateNumber, audit, error stamp)
+    const txCalls = [];  // connection-level queries inside the transaction
+    const counters = { begins: 0, commits: 0, rollbacks: 0, releases: 0, connections: 0 };
+    let invoiceInsertParams = null;
+    let paymentInsertSeq = 0;
+    const paymentAmounts = [];
+
+    const connection = {
+        beginTransaction: async () => { counters.begins++; },
+        commit: async () => { counters.commits++; },
+        rollback: async () => { counters.rollbacks++; },
+        release: () => { counters.releases++; },
+        execute: async (sql, params) => {
+            const s = String(sql);
+            txCalls.push({ sql: s, params });
+            if (/INSERT INTO billing_invoices/.test(s)) {
+                invoiceInsertParams = params;
+                return [{ insertId: 501 }];
+            }
+            if (/INSERT INTO billing_invoice_items/.test(s)) {
+                if (failItemInsert) throw new Error('item insert boom');
+                return [{ insertId: 1 }];
+            }
+            if (/INSERT INTO billing_payments/.test(s)) {
+                paymentAmounts.push(Number(params[1]));
+                return [{ insertId: 900 + (++paymentInsertSeq) }];
+            }
+            return [{ affectedRows: 1 }];
+        },
+        query: async (sql, params) => {
+            const s = String(sql);
+            txCalls.push({ sql: s, params });
+            if (/SUM\(amount\)/.test(s)) {
+                return [[{ total_paid: paymentAmounts.reduce((a, b) => a + b, 0) }]];
+            }
+            if (/SELECT grand_total FROM billing_invoices/.test(s)) {
+                // grand_total as stored by the invoice INSERT (param index 9)
+                return [[{ grand_total: invoiceInsertParams ? invoiceInsertParams[9] : 0 }]];
+            }
+            if (/^\s*UPDATE billing_invoices/i.test(s)) return [{ affectedRows: 1 }];
+            return [[]];
+        },
+    };
+
+    return {
+        calls, txCalls, counters,
+        getConnection: async () => { counters.connections++; return connection; },
+        query: async (sql, params) => {
+            const s = String(sql);
+            calls.push({ sql: s, params });
+            if (/SELECT invoice_number FROM billing_invoices/.test(s)) return [[]]; // generateNumber
+            if (/INSERT INTO audit_records/i.test(s)) return [{ insertId: 1 }];
+            if (/UPDATE billing_invoices SET zoho_push_error/.test(s)) return [{ affectedRows: 1 }];
+            return [[]];
+        },
+    };
+}
+
+const baseBody = {
+    customer_type: 'customer',
+    customer_name: 'Walk-in',
+    items: [
+        { zoho_item_id: 'Z1', item_name: 'Apex 1L', quantity: 2, unit_price: 400 },
+        { zoho_item_id: 'Z2', item_name: 'Tractor 4L', quantity: 1, unit_price: 200 },
+    ],
+    discount_amount: 0, // grand total 1000
+};
+
+async function runQuickSale(body, { role = 'staff', branchId = 4, poolOpts = {} } = {}) {
+    const pool = makeQuickSalePool(poolOpts);
+    billing.setPool(pool);
+    const route = findRoute('post', '/quick-sale');
+    expect(route).toBeTruthy();
+    const res = mockRes();
+    const req = {
+        user: { id: 42, role, branch_id: branchId },
+        body: quickSaleSchema.parse(body), // exactly what validate() would hand over
+        params: {}, query: {},
+        ip: '127.0.0.1',
+        get: () => 'jest',
+        originalUrl: '/api/billing/quick-sale',
+    };
+    await lastHandler(route)(req, res);
+    return { pool, res };
+}
+
+beforeEach(() => {
+    mockPush.mockReset();
+    mockFlagOn.mockReset().mockResolvedValue(false);
+    mockHasRolePermission.mockReset().mockResolvedValue(true);
+    jest.spyOn(console, 'error').mockImplementation(() => {});
+});
+afterEach(() => jest.restoreAllMocks());
+
+describe('quickSaleSchema', () => {
+    it("rejects the 'credit' payment method (quick sale records money actually received)", () => {
+        const r = quickSaleSchema.safeParse({
+            ...baseBody,
+            payments: [{ amount: 100, payment_method: 'credit' }],
+        });
+        expect(r.success).toBe(false);
+    });
+
+    it('rejects more than 4 split payments', () => {
+        const r = quickSaleSchema.safeParse({
+            ...baseBody,
+            payments: Array.from({ length: 5 }, () => ({ amount: 10, payment_method: 'cash' })),
+        });
+        expect(r.success).toBe(false);
+    });
+
+    it('applies defaults: payments [], discount 0, reference/date optional, ids nullable', () => {
+        const r = quickSaleSchema.safeParse({
+            customer_type: 'customer', customer_name: 'X',
+            items: [{ zoho_item_id: 'Z1', item_name: 'A', quantity: 1, unit_price: 10 }],
+        });
+        expect(r.success).toBe(true);
+        expect(r.data.payments).toEqual([]);
+        expect(r.data.discount_amount).toBe(0);
+        expect(r.data.customer_id === undefined || r.data.customer_id === null).toBe(true);
+    });
+
+    it('rejects a malformed payment_date and a zero amount', () => {
+        expect(quickSaleSchema.safeParse({
+            ...baseBody, payments: [{ amount: 100, payment_method: 'cash', payment_date: '12-08-2026' }],
+        }).success).toBe(false);
+        expect(quickSaleSchema.safeParse({
+            ...baseBody, payments: [{ amount: 0, payment_method: 'cash' }],
+        }).success).toBe(false);
+    });
+});
+
+describe('POST /quick-sale — guards (pre-transaction)', () => {
+    it('Σpayments > grandTotal + 0.01 ⇒ 400 PAYMENT_EXCEEDS_TOTAL, no connection checked out', async () => {
+        const { pool, res } = await runQuickSale({
+            ...baseBody,
+            payments: [{ amount: 600, payment_method: 'cash' }, { amount: 500, payment_method: 'upi' }],
+        });
+        expect(res.statusCode).toBe(400);
+        expect(res.body.code).toBe('PAYMENT_EXCEEDS_TOTAL');
+        expect(pool.counters.connections).toBe(0);
+        expect(pool.txCalls.length).toBe(0);
+    });
+
+    it('payments without the billing.payment permission (non-admin) ⇒ 403', async () => {
+        mockHasRolePermission.mockResolvedValue(false);
+        const { pool, res } = await runQuickSale({
+            ...baseBody, payments: [{ amount: 100, payment_method: 'cash' }],
+        }, { role: 'staff' });
+        expect(res.statusCode).toBe(403);
+        expect(mockHasRolePermission).toHaveBeenCalledWith('staff', 'billing', 'payment');
+        expect(pool.counters.connections).toBe(0);
+    });
+
+    it('a full admin never hits the role-permission lookup', async () => {
+        const { res } = await runQuickSale({
+            ...baseBody, payments: [{ amount: 100, payment_method: 'cash' }],
+        }, { role: 'admin' });
+        expect(res.statusCode).toBe(200);
+        expect(mockHasRolePermission).not.toHaveBeenCalled();
+    });
+
+    it('no branch on the user ⇒ 400 (same guard as POST /invoices)', async () => {
+        const { res } = await runQuickSale(baseBody, { branchId: null });
+        expect(res.statusCode).toBe(400);
+        expect(res.body.message).toMatch(/no branch assigned/i);
+    });
+});
+
+describe('POST /quick-sale — phase 1 (one transaction)', () => {
+    it('an item-insert throw rolls back, releases, 500s — NO audit row, NO push', async () => {
+        const { pool, res } = await runQuickSale(baseBody, { poolOpts: { failItemInsert: true } });
+        expect(res.statusCode).toBe(500);
+        expect(pool.counters.rollbacks).toBe(1);
+        expect(pool.counters.commits).toBe(0);
+        expect(pool.counters.releases).toBe(1);
+        expect(pool.calls.some(c => /INSERT INTO audit_records/i.test(c.sql))).toBe(false);
+        expect(mockPush).not.toHaveBeenCalled();
+    });
+
+    it('split payments: N billing_payments INSERTs (IST-default date, received_by=user) + shared recalc', async () => {
+        const { pool, res } = await runQuickSale({
+            ...baseBody,
+            payments: [
+                { amount: 300, payment_method: 'cash' },
+                { amount: 200, payment_method: 'upi', payment_reference: 'UPI9', payment_date: '2026-08-10' },
+            ],
+        });
+        expect(res.statusCode).toBe(200);
+
+        const payIns = pool.txCalls.filter(c => /INSERT INTO billing_payments/.test(c.sql));
+        expect(payIns.length).toBe(2);
+        // [invoice_id, amount, method, reference, date, received_by] (notes literal '')
+        expect(payIns[0].params[0]).toBe(501);
+        expect(payIns[0].params[1]).toBe(300);
+        expect(payIns[0].params[2]).toBe('cash');
+        expect(String(payIns[0].params[4])).toMatch(/^\d{4}-\d{2}-\d{2}$/); // IST today default
+        expect(payIns[0].params[5]).toBe(42); // received_by
+        expect(payIns[1].params[2]).toBe('upi');
+        expect(payIns[1].params[3]).toBe('UPI9');
+        expect(payIns[1].params[4]).toBe('2026-08-10'); // explicit back-date honored
+
+        // shared recalc rewrote the header from the live SUM
+        const recalc = pool.txCalls.find(c => /UPDATE billing_invoices SET\s+amount_paid/i.test(c.sql));
+        expect(recalc).toBeTruthy();
+        expect(recalc.params).toEqual([500, 500, 'partial', 501]);
+
+        expect(res.body.payments).toEqual([
+            { id: 901, amount: 300, payment_method: 'cash' },
+            { id: 902, amount: 200, payment_method: 'upi' },
+        ]);
+        expect(res.body.invoice.amount_paid).toBe(500);
+        expect(res.body.invoice.balance_due).toBe(500);
+        expect(res.body.invoice.payment_status).toBe('partial');
+        expect(res.body.print_url).toBe('/billing-receipt.html?id=501');
+    });
+
+    it('response totals match calculateTotals exactly (discount applied)', async () => {
+        const body = { ...baseBody, discount_amount: 50 };
+        const expected = calculateTotals(body.items, 50);
+        const { pool, res } = await runQuickSale(body);
+        expect(res.body.invoice.subtotal).toBe(expected.subtotal);
+        expect(res.body.invoice.grand_total).toBe(expected.grandTotal);
+        // and the same numbers were stored (INSERT params 7=subtotal, 9=grand_total)
+        const inv = pool.txCalls.find(c => /INSERT INTO billing_invoices/.test(c.sql));
+        expect(inv.params[7]).toBe(expected.subtotal);
+        expect(inv.params[9]).toBe(expected.grandTotal);
+        // source='direct' is literal SQL; branch + creator stamped from req.user
+        expect(inv.sql).toContain("'direct'");
+        expect(inv.params[12]).toBe(4);  // branch_id
+        expect(inv.params[13]).toBe(42); // created_by
+    });
+
+    it('stamps salesperson_id / zoho_location_id from the body onto the invoice row', async () => {
+        const { pool } = await runQuickSale({
+            ...baseBody, salesperson_id: 'SP-9', zoho_location_id: 'LOC-9',
+        });
+        const inv = pool.txCalls.find(c => /INSERT INTO billing_invoices/.test(c.sql));
+        expect(inv.params[14]).toBe('SP-9');
+        expect(inv.params[15]).toBe('LOC-9');
+    });
+});
+
+describe('POST /quick-sale — phase 2 (after commit, never changes the 200)', () => {
+    it('flag off ⇒ push never called, zoho.attempted=false, audit quicksale.create still lands', async () => {
+        mockFlagOn.mockResolvedValue(false);
+        const { pool, res } = await runQuickSale(baseBody);
+        expect(res.statusCode).toBe(200);
+        expect(mockPush).not.toHaveBeenCalled();
+        expect(res.body.zoho).toEqual({ attempted: false, pushed: false, code: null, error: null });
+        const audits = pool.calls.filter(c => /INSERT INTO audit_records/i.test(c.sql));
+        expect(audits.length).toBe(1);
+        expect(audits[0].params[2]).toBe('billing.quicksale.create');
+    });
+
+    it('flag on + push OK ⇒ zoho.pushed with ids/state/names + zohoPush audit', async () => {
+        mockFlagOn.mockResolvedValue(true);
+        mockPush.mockResolvedValue({
+            zohoInvoiceId: 'ZINV1', zohoInvoiceNumber: 'INV-0001', zohoState: 'approved',
+            salespersonName: 'Ravi', locationName: 'Main', paymentSync: null, pointsResult: null,
+        });
+        const { pool, res } = await runQuickSale(baseBody, { role: 'admin' });
+        expect(res.statusCode).toBe(200);
+        expect(mockPush).toHaveBeenCalledWith(501, 42, { isAdmin: true });
+        expect(res.body.zoho).toMatchObject({
+            attempted: true, pushed: true, code: null, error: null,
+            zoho_invoice_id: 'ZINV1', zoho_invoice_number: 'INV-0001',
+            zoho_state: 'approved', salesperson_name: 'Ravi', location_name: 'Main',
+        });
+        const actions = pool.calls.filter(c => /INSERT INTO audit_records/i.test(c.sql)).map(c => c.params[2]);
+        expect(actions).toEqual(['billing.quicksale.create', 'billing.invoice.zohoPush']);
+    });
+
+    it('staff quick-sale pushes with isAdmin:false', async () => {
+        mockFlagOn.mockResolvedValue(true);
+        mockPush.mockResolvedValue({ zohoInvoiceId: 'Z', zohoInvoiceNumber: 'N', zohoState: 'submitted' });
+        await runQuickSale(baseBody, { role: 'staff' });
+        expect(mockPush).toHaveBeenCalledWith(501, 42, { isAdmin: false });
+    });
+
+    it('Zoho down ⇒ STILL 200; zoho.pushed=false and the failure is stamped for the retry cron', async () => {
+        mockFlagOn.mockResolvedValue(true);
+        mockPush.mockRejectedValue(new Error('Zoho 500'));
+        const { pool, res } = await runQuickSale(baseBody);
+        expect(res.statusCode).toBe(200);
+        expect(res.body.success).toBe(true);
+        expect(res.body.zoho.attempted).toBe(true);
+        expect(res.body.zoho.pushed).toBe(false);
+        expect(res.body.zoho.code).toBe('PUSH_FAILED');
+        expect(res.body.zoho.error).toBe('Zoho 500');
+        const stamp = pool.calls.find(c => /UPDATE billing_invoices SET zoho_push_error = \?, zoho_push_attempted_at = NOW\(\)/.test(c.sql));
+        expect(stamp).toBeTruthy();
+        expect(stamp.params).toEqual(['Zoho 500', 501]);
+    });
+
+    it('PUSH_GATE ⇒ 200 + zoho.code PUSH_GATE + a zohoPush.refused audit', async () => {
+        mockFlagOn.mockResolvedValue(true);
+        const gateErr = new Error('unpaid, no credit');
+        gateErr.code = 'PUSH_GATE';
+        mockPush.mockRejectedValue(gateErr);
+        const { pool, res } = await runQuickSale(baseBody);
+        expect(res.statusCode).toBe(200);
+        expect(res.body.zoho.code).toBe('PUSH_GATE');
+        const actions = pool.calls.filter(c => /INSERT INTO audit_records/i.test(c.sql)).map(c => c.params[2]);
+        expect(actions).toContain('billing.invoice.zohoPush.refused');
+        // the stamp lands too — the retry cron will pick this invoice up
+        expect(pool.calls.some(c => /UPDATE billing_invoices SET zoho_push_error/.test(c.sql))).toBe(true);
+    });
+});

@@ -1,0 +1,276 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sale Bill - Quality Colours</title>
+    <link rel="stylesheet" href="/css/tailwind.css?v=849f1b5c">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&family=DM+Serif+Display&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --primary: #0F3A5F;
+            --primary-dark: #0C2E4D;
+            --accent: #1A4A6E;
+            --text-dark: #1a202c;
+            --text-mid: #4a5568;
+            --text-light: #718096;
+            --border: #e2e8f0;
+            --bg-stripe: #f7fafc;
+            --gold: #d69e2e;
+            --green: #38a169;
+            --green-light: #f0fff4;
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            font-family: 'DM Sans', Arial, sans-serif;
+            color: var(--text-dark);
+            background: #f0f2f5;
+            -webkit-print-color-adjust: exact;
+            print-color-adjust: exact;
+        }
+
+        @media print {
+            @page { size: A4; margin: 8mm 10mm; }
+            body { background: white; margin: 0; padding: 0; }
+            .no-print { display: none !important; }
+            #printContent {
+                margin: 0 !important;
+                padding: 0 !important;
+                max-width: 100% !important;
+            }
+            .bill-card { box-shadow: none !important; border-radius: 0 !important; }
+            .bill-header { padding: 12px 20px !important; }
+            .section-pad { padding: 10px 20px !important; }
+            table { font-size: 10px !important; }
+            table th { padding: 6px 8px !important; font-size: 8px !important; }
+            table td { padding: 5px 8px !important; }
+            .company-logo { max-height: 40px !important; }
+            h1.bill-title { font-size: 28px !important; }
+            thead { display: table-header-group; }
+            tr { page-break-inside: avoid; }
+        }
+
+        .company-logo { max-height: 56px; max-width: 180px; object-fit: contain; }
+
+        .bill-card {
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 4px 24px rgba(0,0,0,0.08);
+            overflow: hidden;
+        }
+
+        .bill-header {
+            background: linear-gradient(135deg, var(--primary) 0%, var(--accent) 100%);
+            padding: 24px 32px;
+            position: relative;
+            overflow: hidden;
+        }
+        .bill-header::before {
+            content: '';
+            position: absolute; top: -50%; right: -10%;
+            width: 300px; height: 300px; border-radius: 50%;
+            background: rgba(255,255,255,0.06); pointer-events: none;
+        }
+
+        h1.bill-title {
+            font-family: 'DM Serif Display', Georgia, serif;
+            font-size: 36px;
+            letter-spacing: 2px;
+            color: white;
+            text-shadow: 0 2px 8px rgba(0,0,0,0.15);
+        }
+
+        .meta-label { font-size: 10px; text-transform: uppercase; letter-spacing: 1.2px; color: rgba(255,255,255,0.7); font-weight: 600; }
+        .meta-value { font-size: 13px; color: white; font-weight: 600; }
+
+        .divider-bar { height: 3px; background: linear-gradient(90deg, var(--primary), var(--accent), var(--gold)); }
+
+        .bill-to-label { font-size: 10px; text-transform: uppercase; letter-spacing: 1.5px; color: var(--text-light); font-weight: 700; }
+        .bill-to-name { font-size: 18px; font-weight: 700; color: var(--text-dark); }
+
+        .items-table { width: 100%; border-collapse: collapse; }
+        .items-table thead th {
+            background: var(--primary); color: white;
+            font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.8px;
+            padding: 10px 12px; white-space: nowrap;
+        }
+        .items-table thead th:first-child { border-radius: 6px 0 0 0; }
+        .items-table thead th:last-child { border-radius: 0 6px 0 0; }
+        .items-table tbody td { padding: 8px 12px; font-size: 12px; border-bottom: 1px solid #edf2f7; }
+        .items-table tbody tr:nth-child(even) { background: var(--bg-stripe); }
+
+        .grand-total { font-family: 'DM Serif Display', Georgia, serif; font-size: 28px; color: var(--primary); }
+
+        .paid-badge {
+            display: inline-flex; align-items: center; gap: 4px;
+            background: var(--green-light); color: var(--green);
+            font-size: 13px; font-weight: 700; padding: 4px 12px;
+            border-radius: 20px; border: 1.5px solid var(--green);
+        }
+        .balance-badge {
+            display: inline-flex; align-items: center; gap: 4px;
+            background: #fff5f5; color: #e53e3e;
+            font-size: 13px; font-weight: 700; padding: 4px 12px;
+            border-radius: 20px; border: 1.5px solid #e53e3e;
+        }
+
+        .pay-table { width: 100%; border-collapse: collapse; }
+        .pay-table th {
+            text-align: left; font-size: 9px; text-transform: uppercase; letter-spacing: 0.8px;
+            color: var(--text-light); padding: 6px 12px; border-bottom: 1.5px solid var(--border);
+        }
+        .pay-table td { padding: 6px 12px; font-size: 12px; border-bottom: 1px solid #edf2f7; }
+    </style>
+</head>
+<body>
+    <!-- Action Bar (hidden in PDF mode and print) -->
+    <div id="actionBar" class="no-print fixed top-0 left-0 right-0 bg-white/95 backdrop-blur-sm shadow-md z-50 border-b border-gray-200">
+        <div class="max-w-5xl mx-auto px-4 py-3 flex items-center justify-between gap-3 flex-wrap">
+            <button data-action="go-back" class="flex items-center text-gray-600 hover:text-gray-900 text-sm font-medium">
+                <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"/></svg>
+                Back
+            </button>
+            <div class="flex flex-wrap gap-2">
+                <button data-action="print" class="px-4 py-2 text-sm font-semibold rounded-lg text-white" style="background: var(--primary);">Print</button>
+                <button data-action="download-pdf" class="px-4 py-2 text-sm font-semibold rounded-lg bg-red-600 text-white hover:bg-red-700">PDF</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Loading -->
+    <div id="loadingState" class="flex items-center justify-center min-h-screen">
+        <div class="text-center">
+            <svg class="inline w-10 h-10 animate-spin" style="color: var(--primary);" fill="none" viewBox="0 0 24 24">
+                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+            </svg>
+            <p class="mt-3 text-gray-500 text-sm">Loading bill...</p>
+        </div>
+    </div>
+
+    <!-- Bill Document -->
+    <div id="printContent" class="hidden max-w-4xl mx-auto mt-20 mb-8 p-4">
+        <div class="bill-card">
+            <!-- Header -->
+            <div class="bill-header">
+                <div class="flex items-start justify-between relative z-10">
+                    <div class="flex items-start gap-4">
+                        <img id="headerLogo" src="/logo.png" alt="QC" class="company-logo" style="filter: brightness(0) invert(1); opacity: 0.9;">
+                        <div>
+                            <div class="text-white font-bold text-xl" style="font-family: 'DM Serif Display', Georgia, serif;" id="companyName">Quality Colours</div>
+                            <div class="text-white/60 text-xs mt-1 leading-relaxed" id="companyDetails">
+                                Ramanathapuram<br>
+                                Phone: +91 7418831122 | Email: info@qcpaintshop.com<br>
+                                GST: 33EMXPS2411G1ZT
+                            </div>
+                        </div>
+                    </div>
+                    <div class="text-right flex-shrink-0">
+                        <h1 class="bill-title">SALE BILL</h1>
+                        <div class="mt-2 space-y-1">
+                            <div><span class="meta-label">Bill #</span> <span class="meta-value" id="biNumber"></span></div>
+                            <div><span class="meta-label">Date</span> <span class="meta-value" id="biDate"></span></div>
+                            <div id="branchRow" class="hidden"><span class="meta-label">Branch</span> <span class="meta-value" id="biBranch"></span></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="divider-bar"></div>
+
+            <!-- Bill To -->
+            <div class="section-pad" style="padding: 20px 32px;">
+                <div class="bill-to-label mb-1">Bill To</div>
+                <div class="bill-to-name" id="custName"></div>
+                <div class="text-sm text-gray-500 mt-1" id="custPhone"></div>
+                <div class="text-sm text-gray-500" id="custAddress"></div>
+            </div>
+
+            <!-- Items Table -->
+            <div style="padding: 0 32px 16px;">
+                <div class="overflow-x-auto">
+                    <table class="items-table">
+                        <thead>
+                            <tr>
+                                <th style="text-align:left; width: 30px;">#</th>
+                                <th style="text-align:left;">Item</th>
+                                <th style="text-align:right; width: 70px;">Qty</th>
+                                <th style="text-align:right; width: 100px;">Rate</th>
+                                <th style="text-align:right; width: 110px;">Total</th>
+                            </tr>
+                        </thead>
+                        <tbody id="itemsBody">
+                            <tr><td colspan="5" class="text-center py-8 text-gray-400">Loading items...</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- Summary -->
+            <div class="section-pad" style="padding: 16px 32px; background: var(--bg-stripe);">
+                <div class="flex justify-end">
+                    <div class="w-full" style="max-width: 340px;">
+                        <div class="flex justify-between py-1.5 text-sm">
+                            <span class="text-gray-500">Subtotal</span>
+                            <span class="font-medium" id="subtotalVal"></span>
+                        </div>
+                        <div class="flex justify-between py-1.5 text-sm hidden" id="discountRow">
+                            <span class="text-gray-500">Discount</span>
+                            <span class="font-medium" style="color:#e53e3e;" id="discountVal"></span>
+                        </div>
+                        <div class="border-t border-gray-300 my-1"></div>
+                        <div class="flex justify-between items-center py-2">
+                            <span class="text-sm font-bold text-gray-700 uppercase tracking-wide">Grand Total</span>
+                            <span class="grand-total" id="grandTotalVal"></span>
+                        </div>
+                        <div class="flex justify-between items-center py-1.5">
+                            <span class="text-sm font-semibold" style="color: var(--green);">Amount Paid</span>
+                            <span class="font-bold" style="color: var(--green);" id="amountPaidVal"></span>
+                        </div>
+                        <div class="flex justify-between items-center py-1.5">
+                            <span class="text-sm font-semibold text-gray-700">Status</span>
+                            <span>
+                                <span id="paidBadge" class="paid-badge hidden">PAID</span>
+                                <span id="balanceBadge" class="balance-badge hidden"></span>
+                            </span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Payments -->
+            <div class="section-pad hidden" id="paymentsSection" style="padding: 12px 32px; border-top: 1px solid var(--border);">
+                <div class="text-xs font-bold uppercase tracking-wider text-gray-400 mb-2">Payments</div>
+                <table class="pay-table">
+                    <thead>
+                        <tr>
+                            <th>Method</th>
+                            <th>Reference</th>
+                            <th>Date</th>
+                            <th style="text-align:right;">Amount</th>
+                        </tr>
+                    </thead>
+                    <tbody id="paymentsBody"></tbody>
+                </table>
+            </div>
+
+            <!-- Footer (owner-locked GST wording — fixed text, do not edit) -->
+            <div class="section-pad" style="padding: 12px 32px; border-top: 1px solid var(--border); background: #fafbfc;">
+                <div class="text-xs text-gray-500 leading-relaxed text-center">
+                    All prices are inclusive of GST. This is not a GST tax invoice &mdash; the official GST invoice is issued in Zoho Books.
+                </div>
+            </div>
+            <div style="padding: 12px 32px; background: linear-gradient(135deg, var(--primary) 0%, var(--accent) 100%);">
+                <div class="flex justify-between items-center">
+                    <div class="text-white/70 text-xs">Thank you for choosing Quality Colours!</div>
+                    <div class="text-white/50 text-xs">Generated by QC Business Manager</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="/js/pages/billing-invoice-print.js"></script>
+</body>
+</html>

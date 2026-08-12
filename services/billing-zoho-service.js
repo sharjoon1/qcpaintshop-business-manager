@@ -2,10 +2,13 @@
  * Billing Zoho Service
  * Shared service for Zoho contact resolution and invoice push from the billing module.
  *
- * Exports: { setPool, setPointsEngine, resolveZohoContact, pushInvoiceToZoho }
+ * Exports: { setPool, setPointsEngine, resolveZohoContact, pushInvoiceToZoho,
+ *   syncInvoiceApprovalState, forwardInvoicePayments, syncInvoicePaymentsToZoho,
+ *   readConfigValue, flagOn, retryUnpushedInvoices }
  */
 
 const zohoAPI = require('./zoho-api');
+const audit = require('./audit-log');
 const { logCreditViolation } = require('./credit-violation-log');
 const { buildCustomerPaymentPayload, loadModeOverrides } = require('./zoho-payment-mapper');
 
@@ -15,20 +18,34 @@ let pointsEngine;
 function setPool(p) { pool = p; }
 function setPointsEngine(pe) { pointsEngine = pe; }
 
+// Read one ai_config value (trimmed string; '' when the row is absent).
+// Best-effort: any read error reads as '' so a flag fails safe to OFF.
+// The key is always an internal code constant (never user input) and is kept
+// inline in the SQL — the exact literal-key form the pre-B1a discount helper
+// used, which the SQL-substring-dispatching test pools key on.
+async function readConfigValue(key) {
+    try {
+        const [rows] = await pool.query(
+            `SELECT config_value FROM ai_config WHERE config_key = '${key}' LIMIT 1`
+        );
+        return rows.length ? String(rows[0].config_value || '').trim() : '';
+    } catch { return ''; }
+}
+
+// A flag is ON only for the literal '1' (after trim) — anything else is OFF.
+async function flagOn(key) {
+    return (await readConfigValue(key)) === '1';
+}
+
 // Invoice-level discount push is behind an ai_config flag
 // ('billing_invoice_discount_push_enabled', default '0') so it can only be
 // switched on after the D1 draft verification passes on the real Zoho org —
 // flag-off keeps the createInvoice payload byte-identical to today. Best-effort:
 // any read error is treated as disabled. Mirrors resolveDefaultGstTaxId in
-// routes/vendors.js.
+// routes/vendors.js. (B1a: generalized into readConfigValue/flagOn — behavior
+// for this flag is identical.)
 async function isInvoiceDiscountPushEnabled() {
-    try {
-        const [rows] = await pool.query(
-            "SELECT config_value FROM ai_config WHERE config_key = 'billing_invoice_discount_push_enabled' LIMIT 1"
-        );
-        const v = rows.length ? String(rows[0].config_value || '').trim() : '';
-        return v === '1';
-    } catch { return false; }
+    return flagOn('billing_invoice_discount_push_enabled');
 }
 
 // ═══════════════════════════════════════════
@@ -106,6 +123,22 @@ async function resolveZohoContact(customerType, { customerId, painterId, custome
 
     const contactId = result && result.contact && result.contact.contact_id;
     if (!contactId) throw new Error('Failed to create Zoho contact');
+
+    // B1a contact-dup hardening: remember the just-created contact in the local
+    // map so the NEXT quick-sale for the same walk-in customer resolves to it
+    // instead of creating another duplicate Zoho contact. Best-effort INSERT
+    // IGNORE (column set matches the existing map INSERTs in routes/estimates.js
+    // and services/painter-zoho-sync-service.js — no-DDL table, additive only).
+    if (customerType === 'customer') {
+        try {
+            await pool.query(
+                'INSERT IGNORE INTO zoho_customers_map (zoho_contact_id, zoho_contact_name, zoho_phone, last_synced_at) VALUES (?, ?, ?, NOW())',
+                [contactId, customerName, customerPhone || null]
+            );
+        } catch (mapErr) {
+            console.warn('[billing-zoho] customer map backfill skipped:', mapErr.message);
+        }
+    }
     return contactId;
 }
 
@@ -136,12 +169,24 @@ async function pushInvoiceToZoho(invoiceId, userId, options = {}) {
     // Zoho's org makes the field required). Priority: the explicitly chosen one,
     // else the value already on the invoice, else — for painter invoices — the
     // painter's mapped Zoho salesperson (the painter-program concept reused
-    // here). Resolve the display name from the local salesperson master.
+    // here), else (B1a) the pushing user's own mapped salesperson
+    // (users.zoho_salesperson_id — counter staff push their own quick sales),
+    // else the org-wide ai_config default ('billing_default_salesperson_id').
+    // Resolve the display name from the local salesperson master.
     let salespersonId = options.salespersonId || invoice.zoho_salesperson_id || null;
     let salespersonName = null;
     if (!salespersonId && invoice.customer_type === 'painter' && invoice.painter_id) {
         const [pr] = await pool.query('SELECT zoho_salesperson_id FROM painters WHERE id = ?', [invoice.painter_id]);
         if (pr.length && pr[0].zoho_salesperson_id) salespersonId = pr[0].zoho_salesperson_id;
+    }
+    if (!salespersonId && userId) {
+        try {
+            const [ur] = await pool.query('SELECT zoho_salesperson_id FROM users WHERE id = ? LIMIT 1', [userId]);
+            if (ur.length && ur[0].zoho_salesperson_id) salespersonId = ur[0].zoho_salesperson_id;
+        } catch { /* best-effort — fall through to the config default */ }
+    }
+    if (!salespersonId) {
+        salespersonId = (await readConfigValue('billing_default_salesperson_id')) || null;
     }
     if (!salespersonId) {
         const err = new Error('A salesperson is required to push this invoice to Zoho. Pick one and try again.');
@@ -158,8 +203,26 @@ async function pushInvoiceToZoho(invoiceId, userId, options = {}) {
     } catch { /* name is best-effort */ }
 
     // Location/branch to post the invoice to (owner request 2026-06-12).
+    // B1a default chain: explicit option → invoice column → the invoice's own
+    // branch (branches.zoho_location_id, else the active zoho_locations_map row
+    // pointing at that branch) → null (key omitted from the payload). The
+    // branch lookups are best-effort — any error falls back to null and never
+    // blocks the push.
     let locationId = options.locationId || invoice.zoho_location_id || null;
     let locationName = null;
+    if (!locationId && invoice.branch_id) {
+        try {
+            const [br] = await pool.query('SELECT zoho_location_id FROM branches WHERE id = ? LIMIT 1', [invoice.branch_id]);
+            if (br.length && br[0].zoho_location_id) locationId = br[0].zoho_location_id;
+            if (!locationId) {
+                const [lm] = await pool.query(
+                    'SELECT zoho_location_id FROM zoho_locations_map WHERE local_branch_id = ? AND is_active = 1 LIMIT 1',
+                    [invoice.branch_id]
+                );
+                if (lm.length && lm[0].zoho_location_id) locationId = lm[0].zoho_location_id;
+            }
+        } catch { /* branch default is best-effort — locationId stays null */ }
+    }
     if (locationId) {
         try {
             const [loc] = await pool.query('SELECT zoho_location_name FROM zoho_locations_map WHERE zoho_location_id = ? LIMIT 1', [locationId]);
@@ -279,9 +342,15 @@ async function pushInvoiceToZoho(invoiceId, userId, options = {}) {
     // draftOnly (admin-only, for the D1 discount draft check): leave the invoice
     // as a Zoho draft — skip finalize AND the push-time payment forwarding. A
     // draft has zero GST impact and is hard-deletable in Zoho.
+    // B1a staff-final: when the ai_config flag 'billing_staff_push_finalizes'
+    // is ON ('1'), a staff push finalizes (approves) directly instead of only
+    // submitting for admin approval; flag OFF/absent keeps the pre-B1a
+    // submitted state. Admin pushes always finalize (short-circuits the flag
+    // read). draft_only stays admin-only at the route (real role), untouched.
     let finalizeState = 'draft';
     if (!options.draftOnly) {
-        finalizeState = (await zohoAPI.finalizeDocument('invoice', zohoInvoiceId, !!options.isAdmin)).state;
+        finalizeState = (await zohoAPI.finalizeDocument('invoice', zohoInvoiceId,
+            !!options.isAdmin || await flagOn('billing_staff_push_finalizes'))).state;
     }
 
     // 6. Award painter points if applicable
@@ -329,12 +398,14 @@ async function pushInvoiceToZoho(invoiceId, userId, options = {}) {
         }
     }
 
-    // 8. Update billing_invoices (also stamp the salesperson + location used)
+    // 8. Update billing_invoices (also stamp the salesperson + location used,
+    // and clear any earlier failed-push error so the retry loop stands down).
     await pool.query(
         `UPDATE billing_invoices
          SET zoho_status = ?, zoho_invoice_id = ?, zoho_invoice_number = ?,
              zoho_salesperson_id = ?, zoho_salesperson_name = ?,
-             zoho_location_id = ?, zoho_location_name = ?, zoho_approval_state = ?
+             zoho_location_id = ?, zoho_location_name = ?, zoho_approval_state = ?,
+             zoho_push_error = NULL
          WHERE id = ?`,
         ['pushed', zohoInvoiceId, zohoInvoiceNumber, salespersonId, salespersonName, locationId, locationName, finalizeState, invoiceId]
     );
@@ -592,6 +663,59 @@ async function syncInvoicePaymentsToZoho(invoiceId) {
 }
 
 /**
+ * B1a failed-push retry loop (called by the 15-min sync-scheduler cron).
+ * Re-attempts invoices whose auto/manual push failed — still zoho_status
+ * 'pending' with a recorded zoho_push_error — oldest attempt first, after a
+ * ≥15-minute cool-down, in a small batch. Each retry pushes as staff
+ * (isAdmin:false) under the invoice's original creator. A per-row failure
+ * re-stamps zoho_push_error/zoho_push_attempted_at and never throws; every
+ * attempt leaves a system audit row (req=null → actor_type 'system').
+ * @param {Object} [args]
+ * @param {number} [args.limit=5] max invoices to retry this run
+ * @returns {Promise<{attempted:number, pushed:number, failed:number}>}
+ */
+async function retryUnpushedInvoices({ limit = 5 } = {}) {
+    const summary = { attempted: 0, pushed: 0, failed: 0 };
+    const [rows] = await pool.query(
+        `SELECT id, created_by FROM billing_invoices
+          WHERE deleted_at IS NULL AND zoho_status = 'pending'
+            AND zoho_push_error IS NOT NULL
+            AND zoho_push_attempted_at < NOW() - INTERVAL 15 MINUTE
+          ORDER BY zoho_push_attempted_at ASC
+          LIMIT ?`,
+        [limit]
+    );
+    for (const row of rows) {
+        summary.attempted++;
+        try {
+            const result = await pushInvoiceToZoho(row.id, row.created_by, { isAdmin: false });
+            summary.pushed++;
+            await audit.record(null, {
+                action: 'billing.invoice.zohoPush.retry',
+                entity_type: 'billing_invoice', entity_id: row.id,
+                before: null,
+                after: { ok: true, zoho_invoice_id: result.zohoInvoiceId, zoho_state: result.zohoState || null },
+            });
+        } catch (err) {
+            summary.failed++;
+            try {
+                await pool.query(
+                    'UPDATE billing_invoices SET zoho_push_error = ?, zoho_push_attempted_at = NOW() WHERE id = ?',
+                    [truncate255((err && err.message) || String(err)), row.id]
+                );
+            } catch { /* re-stamp is best-effort */ }
+            await audit.record(null, {
+                action: 'billing.invoice.zohoPush.retry',
+                entity_type: 'billing_invoice', entity_id: row.id,
+                before: null,
+                after: { ok: false, code: (err && err.code) || null, error: truncate255((err && err.message) || String(err)) },
+            });
+        }
+    }
+    return summary;
+}
+
+/**
  * Approval sync-back: pull a pushed invoice's CURRENT Zoho lifecycle status and
  * store it locally, so an admin approving a staff-submitted invoice in Zoho's own
  * UI is reflected here. No-op (returns null) for invoices not yet pushed to Zoho.
@@ -625,4 +749,5 @@ async function syncInvoiceApprovalState(invoiceId) {
 module.exports = {
     setPool, setPointsEngine, resolveZohoContact, pushInvoiceToZoho,
     syncInvoiceApprovalState, forwardInvoicePayments, syncInvoicePaymentsToZoho,
+    readConfigValue, flagOn, retryUnpushedInvoices,
 };

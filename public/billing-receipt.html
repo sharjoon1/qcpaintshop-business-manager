@@ -1,0 +1,229 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sale Receipt - Quality Colours</title>
+    <link rel="stylesheet" href="/css/tailwind.css?v=849f1b5c">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&family=DM+Serif+Display&display=swap" rel="stylesheet">
+    <!-- @page rule lives in its own style tag so JS can swap A4 <-> 80mm thermal -->
+    <style id="pageRule">@page { size: A4; margin: 8mm 10mm; }</style>
+    <style>
+        :root {
+            --primary: #0F3A5F;
+            --accent: #1A4A6E;
+            --text-dark: #1a202c;
+            --text-light: #718096;
+            --border: #e2e8f0;
+            --bg-stripe: #f7fafc;
+            --gold: #d69e2e;
+            --green: #38a169;
+            --green-light: #f0fff4;
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            font-family: 'DM Sans', Arial, sans-serif;
+            color: var(--text-dark);
+            background: #f0f2f5;
+            -webkit-print-color-adjust: exact;
+            print-color-adjust: exact;
+        }
+
+        @media print {
+            body { background: white; margin: 0; padding: 0; }
+            .no-print { display: none !important; }
+            #receiptContent {
+                margin: 0 !important;
+                padding: 0 !important;
+                max-width: 100% !important;
+            }
+            .receipt-card { box-shadow: none !important; border-radius: 0 !important; }
+            tr { page-break-inside: avoid; }
+        }
+
+        .receipt-card {
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 4px 24px rgba(0,0,0,0.08);
+            overflow: hidden;
+        }
+
+        .receipt-header {
+            background: linear-gradient(135deg, var(--primary) 0%, var(--accent) 100%);
+            padding: 16px 20px;
+            color: white;
+        }
+        h1.receipt-title {
+            font-family: 'DM Serif Display', Georgia, serif;
+            font-size: 22px;
+            letter-spacing: 1.5px;
+        }
+        .divider-bar { height: 3px; background: linear-gradient(90deg, var(--primary), var(--accent), var(--gold)); }
+
+        .meta-label { font-size: 9px; text-transform: uppercase; letter-spacing: 1px; color: var(--text-light); font-weight: 700; }
+        .meta-value { font-size: 12px; font-weight: 600; }
+
+        .items-table { width: 100%; border-collapse: collapse; }
+        .items-table th {
+            text-align: left; font-size: 9px; text-transform: uppercase; letter-spacing: 0.6px;
+            color: var(--text-light); padding: 5px 6px; border-bottom: 1.5px solid var(--border);
+        }
+        .items-table td { padding: 5px 6px; font-size: 12px; border-bottom: 1px dashed #edf2f7; vertical-align: top; }
+        .items-table .num { text-align: right; white-space: nowrap; }
+
+        .pay-row { display: flex; justify-content: space-between; gap: 8px; font-size: 11px; padding: 3px 0; }
+
+        .total-line { display: flex; justify-content: space-between; padding: 3px 0; font-size: 12px; }
+        .grand-line { font-weight: 700; font-size: 15px; border-top: 1.5px solid var(--text-dark); margin-top: 4px; padding-top: 5px; }
+
+        .paid-badge {
+            display: inline-flex; align-items: center; gap: 4px;
+            background: var(--green-light); color: var(--green);
+            font-size: 11px; font-weight: 700; padding: 2px 10px;
+            border-radius: 20px; border: 1.5px solid var(--green);
+        }
+        .balance-badge {
+            display: inline-flex; align-items: center; gap: 4px;
+            background: #fff5f5; color: #e53e3e;
+            font-size: 11px; font-weight: 700; padding: 2px 10px;
+            border-radius: 20px; border: 1.5px solid #e53e3e;
+        }
+
+        .gst-footer { font-size: 9px; color: var(--text-light); text-align: center; line-height: 1.5; }
+
+        /* ── 80mm thermal mode (body.thermal; @page swapped by JS) ── */
+        body.thermal { background: white; }
+        body.thermal #receiptContent {
+            max-width: 76mm; margin: 0 auto; padding: 0;
+            font-size: 11px;
+        }
+        body.thermal .receipt-card { box-shadow: none; border-radius: 0; }
+        body.thermal .receipt-header {
+            background: white; color: var(--text-dark);
+            padding: 6px 2mm; text-align: center; border-bottom: 1.5px dashed var(--text-dark);
+        }
+        body.thermal h1.receipt-title { font-size: 15px; letter-spacing: 1px; }
+        body.thermal .divider-bar { display: none; }
+        body.thermal .section-pad { padding: 4px 2mm !important; }
+        body.thermal .items-table th { font-size: 8px; padding: 3px 2px; }
+        body.thermal .items-table td { font-size: 11px; padding: 3px 2px; }
+        body.thermal .total-line { font-size: 11px; }
+        body.thermal .grand-line { font-size: 13px; }
+        body.thermal .gst-footer { font-size: 8px; }
+
+        /* Action bar buttons */
+        .bar-btn {
+            padding: 8px 14px; font-size: 13px; font-weight: 600; border-radius: 8px;
+            border: 1px solid #cbd5e0; background: white; color: #374151; cursor: pointer;
+        }
+        .bar-btn.primary { background: var(--primary); border-color: var(--primary); color: white; }
+        .bar-btn.active { background: #1B5E3B; border-color: #1B5E3B; color: white; }
+    </style>
+</head>
+<body>
+    <!-- Action Bar (hidden in PDF mode and print) -->
+    <div id="actionBar" class="no-print sticky top-0 bg-white/95 shadow-md z-50 border-b border-gray-200">
+        <div class="max-w-2xl mx-auto px-4 py-3 flex items-center justify-between gap-2 flex-wrap">
+            <button data-action="go-back" class="bar-btn" style="border:none;background:none;">&larr; Back</button>
+            <div class="flex gap-2">
+                <button id="thermalToggle" data-action="toggle-thermal" class="bar-btn" title="80mm thermal printer layout">80mm</button>
+                <button data-action="print" class="bar-btn primary">Print</button>
+                <button data-action="download-pdf" class="bar-btn">PDF</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Loading -->
+    <div id="loadingState" class="flex items-center justify-center min-h-screen">
+        <div class="text-center">
+            <svg class="inline w-10 h-10 animate-spin" style="color: var(--primary);" fill="none" viewBox="0 0 24 24">
+                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+            </svg>
+            <p class="mt-3 text-gray-500 text-sm">Loading receipt...</p>
+        </div>
+    </div>
+
+    <!-- Receipt Document -->
+    <div id="receiptContent" class="hidden max-w-sm mx-auto my-6 p-3">
+        <div class="receipt-card">
+            <!-- Header -->
+            <div class="receipt-header">
+                <div class="flex items-center justify-between gap-3">
+                    <div>
+                        <div class="font-bold text-base" style="font-family: 'DM Serif Display', Georgia, serif;" id="companyName">Quality Colours</div>
+                        <div class="text-xs opacity-70 leading-snug" id="companyDetails">
+                            Ramanathapuram &middot; Phone: +91 7418831122<br>
+                            GST: 33EMXPS2411G1ZT
+                        </div>
+                    </div>
+                    <h1 class="receipt-title">SALE<br>RECEIPT</h1>
+                </div>
+            </div>
+            <div class="divider-bar"></div>
+
+            <!-- Meta -->
+            <div class="section-pad" style="padding: 10px 20px;">
+                <div class="flex justify-between gap-3 flex-wrap">
+                    <div><div class="meta-label">Bill No</div><div class="meta-value" id="biNumber"></div></div>
+                    <div><div class="meta-label">Date</div><div class="meta-value" id="biDate"></div></div>
+                </div>
+                <div id="zohoInvoiceRow" class="hidden mt-1 text-xs" style="color: var(--text-light);">Zoho Invoice: <span id="zohoInvoiceNumber" class="font-semibold" style="color: var(--text-dark);"></span></div>
+                <div class="mt-2">
+                    <div class="meta-label">Customer</div>
+                    <div class="meta-value" id="custName"></div>
+                    <div class="text-xs" style="color: var(--text-light);" id="custPhone"></div>
+                </div>
+            </div>
+
+            <!-- Items (condensed) -->
+            <div class="section-pad" style="padding: 4px 20px 8px;">
+                <table class="items-table">
+                    <thead>
+                        <tr>
+                            <th>Item</th>
+                            <th class="num">Qty &times; Rate</th>
+                            <th class="num">Total</th>
+                        </tr>
+                    </thead>
+                    <tbody id="itemsBody">
+                        <tr><td colspan="3" style="text-align:center; color: var(--text-light); padding: 12px;">Loading...</td></tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- Totals -->
+            <div class="section-pad" style="padding: 6px 20px 10px; background: var(--bg-stripe);">
+                <div class="total-line"><span style="color: var(--text-light);">Subtotal</span><span id="subtotalVal"></span></div>
+                <div class="total-line hidden" id="discountRow"><span style="color: var(--text-light);">Discount</span><span id="discountVal" style="color:#e53e3e;"></span></div>
+                <div class="total-line grand-line"><span>TOTAL</span><span id="grandTotalVal"></span></div>
+                <div class="total-line"><span style="color: var(--green); font-weight:600;">Paid</span><span id="amountPaidVal" style="color: var(--green); font-weight:600;"></span></div>
+                <div class="flex justify-between items-center py-1" id="statusRow">
+                    <span class="text-xs" style="color: var(--text-light);">Status</span>
+                    <span id="paidBadge" class="paid-badge hidden">PAID</span>
+                    <span id="balanceBadge" class="balance-badge hidden"></span>
+                </div>
+            </div>
+
+            <!-- Payments -->
+            <div class="section-pad hidden" id="paymentsSection" style="padding: 8px 20px;">
+                <div class="meta-label" style="margin-bottom: 3px;">Payments</div>
+                <div id="paymentsList"></div>
+            </div>
+
+            <!-- Footer (owner-locked GST wording — fixed text, do not edit) -->
+            <div class="section-pad" style="padding: 10px 20px 14px; border-top: 1px solid var(--border);">
+                <div class="gst-footer">
+                    All prices are inclusive of GST. This is not a GST tax invoice &mdash; the official GST invoice is issued in Zoho Books.<br>
+                    Thank you for your business!
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="/js/pages/billing-receipt.js"></script>
+</body>
+</html>

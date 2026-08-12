@@ -180,11 +180,130 @@
         <!-- Tab Bar -->
         <div class="qc-tabs-wrap mb-4">
         <div class="qc-tabs scroll-hide">
+            <button onclick="switchTab('quicksale')" id="tabQuicksale" class="tab-inactive px-4 py-3 text-sm whitespace-nowrap transition-all">⚡ New Sale</button>
             <button onclick="switchTab('customers')" id="tabCustomers" class="tab-active px-4 py-3 text-sm whitespace-nowrap transition-all">Customers</button>
             <button onclick="switchTab('estimates')" id="tabEstimates" class="tab-inactive px-4 py-3 text-sm whitespace-nowrap transition-all">Estimates</button>
             <button onclick="switchTab('invoices')" id="tabInvoices" class="tab-inactive px-4 py-3 text-sm whitespace-nowrap transition-all">Invoices</button>
             <button onclick="switchTab('payments')" id="tabPayments" class="tab-inactive px-4 py-3 text-sm whitespace-nowrap transition-all">Payments</button>
         </div>
+        </div>
+
+        <!-- ==================== NEW SALE TAB (B1b — counter quick sale) ==================== -->
+        <div id="panelQuicksale" class="hidden">
+            <!-- Billing-as header (from GET /my-defaults) -->
+            <div id="qsBillingAs" class="text-xs text-gray-500 mb-3"></div>
+            <div id="qsSalespersonWarn" class="hidden mb-3">
+                <div class="text-sm bg-amber-50 border border-amber-300 text-amber-800 rounded-lg p-3 mb-2">Salesperson set பண்ணல — bill Zoho-க்கு போகாது</div>
+                <select id="qsSalespersonSel" class="qc-input w-full">
+                    <option value="">Select salesperson...</option>
+                </select>
+            </div>
+
+            <!-- 1. Items -->
+            <div class="bg-white rounded-xl border border-gray-100 shadow-sm p-4 mb-3">
+                <label class="qc-label block mb-1">Add Products</label>
+                <div class="relative">
+                    <input type="text" id="qsItemSearch" class="qc-input w-full" placeholder="Search products..." oninput="debounceQsItemSearch()" autocomplete="off">
+                    <div id="qsItemSuggestions" class="suggestion-list hidden"></div>
+                </div>
+                <div id="qsItemsList" class="space-y-2 mt-3">
+                    <div class="text-center py-6 text-gray-400 text-sm border border-dashed border-gray-200 rounded-lg">No items — search products above</div>
+                </div>
+            </div>
+
+            <!-- 2. Customer -->
+            <div class="bg-white rounded-xl border border-gray-100 shadow-sm p-4 mb-3">
+                <div class="flex gap-4 mb-2 flex-wrap">
+                    <label class="flex items-center gap-2 cursor-pointer">
+                        <input type="radio" name="qs_customer_type" value="customer" checked onchange="qsToggleCustomerType()">
+                        <span class="text-sm">Regular Customer</span>
+                    </label>
+                    <label class="flex items-center gap-2 cursor-pointer">
+                        <input type="radio" name="qs_customer_type" value="painter" onchange="qsToggleCustomerType()">
+                        <span class="text-sm">Loyalty Painter (earns points)</span>
+                    </label>
+                </div>
+                <div id="qsCustomerBlock">
+                    <div class="relative">
+                        <input type="text" id="qsCustSearch" class="qc-input w-full" placeholder="Search customer name or phone..." oninput="debounceQsCustSearch()" autocomplete="off">
+                        <div id="qsCustSuggestions" class="suggestion-list hidden"></div>
+                    </div>
+                    <div id="qsSelectedCustomer" class="hidden mt-2 px-3 py-2 bg-green-50 border border-green-200 rounded-lg text-sm flex items-center justify-between">
+                        <div>
+                            <span id="qsSelectedCustName" class="font-medium"></span>
+                            <span id="qsSelectedCustPhone" class="text-gray-500 ml-2 text-xs"></span>
+                        </div>
+                        <button type="button" onclick="qsClearCustomer()" class="text-red-500 hover:text-red-700 text-xs font-medium">Change</button>
+                    </div>
+                    <div id="qsNewCustFields" class="hidden mt-2">
+                        <div class="text-xs text-green-700 font-medium mb-2">＋ New customer</div>
+                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                            <div>
+                                <label class="qc-label block mb-1">Name *</label>
+                                <input type="text" id="qsNewCustName" class="qc-input w-full">
+                            </div>
+                            <div>
+                                <label class="qc-label block mb-1">Phone</label>
+                                <input type="text" id="qsNewCustPhone" class="qc-input w-full">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div id="qsPainterBlock" class="hidden">
+                    <div class="relative">
+                        <input type="text" id="qsPainterSearch" class="qc-input w-full" placeholder="Type painter name..." oninput="debounceQsPainterSearch()" autocomplete="off">
+                        <div id="qsPainterSuggestions" class="suggestion-list hidden"></div>
+                    </div>
+                    <div id="qsSelectedPainter" class="hidden mt-2 px-3 py-2 bg-green-50 border border-green-200 rounded-lg text-sm flex items-center justify-between">
+                        <span id="qsSelectedPainterName"></span>
+                        <button type="button" onclick="qsClearPainter()" class="text-red-500 hover:text-red-700 text-xs font-medium">Remove</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 3. Payment + running totals -->
+            <div class="bg-white rounded-xl border border-gray-100 shadow-sm p-4 mb-3">
+                <label class="qc-label block mb-2">Payment</label>
+                <div id="qsPayChips" class="flex gap-2 overflow-x-auto scroll-hide pb-1 mb-3">
+                    <button type="button" class="filter-pill active" data-mode="cash" onclick="qsSetPayMode('cash', this)">Cash</button>
+                    <button type="button" class="filter-pill" data-mode="upi" onclick="qsSetPayMode('upi', this)">UPI</button>
+                    <button type="button" class="filter-pill" data-mode="split" onclick="qsSetPayMode('split', this)">Split</button>
+                    <button type="button" class="filter-pill" data-mode="credit" onclick="qsSetPayMode('credit', this)">Credit</button>
+                </div>
+                <div id="qsPaySingle" class="flex items-center gap-2 mb-2">
+                    <label class="text-sm text-gray-500 w-28" id="qsPaySingleLabel" for="qsPayAmount">Cash amount</label>
+                    <input type="number" id="qsPayAmount" class="qc-input w-32 text-right" min="0" step="0.01" oninput="qsPayManual()">
+                </div>
+                <div id="qsPaySplit" class="hidden space-y-2 mb-2">
+                    <div class="flex items-center gap-2">
+                        <label class="text-sm text-gray-500 w-28" for="qsSplitCash">Cash</label>
+                        <input type="number" id="qsSplitCash" class="qc-input w-32 text-right" min="0" step="0.01" oninput="qsRecalc()">
+                    </div>
+                    <div class="flex items-center gap-2">
+                        <label class="text-sm text-gray-500 w-28" for="qsSplitUpi">UPI</label>
+                        <input type="number" id="qsSplitUpi" class="qc-input w-32 text-right" min="0" step="0.01" oninput="qsRecalc()">
+                    </div>
+                </div>
+                <div id="qsCreditNote" class="hidden text-sm bg-amber-50 border border-amber-300 text-amber-800 rounded-lg p-3 mb-2">முழு தொகை கடன் — customer credit limit-படி Zoho-க்கு போகும்</div>
+                <div id="qsPayError" class="hidden text-xs text-red-600 mb-2"></div>
+
+                <div class="border-t pt-3 space-y-1 text-sm">
+                    <div class="flex justify-between"><span class="text-gray-500">Subtotal</span><span id="qsSubtotal" class="font-medium">₹0</span></div>
+                    <div class="flex justify-between items-center">
+                        <label class="text-gray-500" for="qsDiscount">Discount</label>
+                        <input type="number" id="qsDiscount" class="qc-input w-24 text-right" value="0" min="0" step="0.01" oninput="qsRecalc()">
+                    </div>
+                    <div class="flex justify-between text-base font-bold border-t pt-2"><span>Grand Total</span><span id="qsGrandTotal">₹0</span></div>
+                    <div class="flex justify-between text-green-700"><span>Paid</span><span id="qsPaid">₹0</span></div>
+                    <div class="flex justify-between text-red-700 font-semibold"><span>Balance</span><span id="qsBalance">₹0</span></div>
+                </div>
+            </div>
+
+            <!-- Notes + save -->
+            <div class="mb-3">
+                <input type="text" id="qsNotes" class="qc-input w-full" placeholder="Notes (optional)...">
+            </div>
+            <button type="button" id="qsSaveBtn" onclick="qsSaveSale()" class="btn-green w-full py-3 rounded-lg text-sm font-bold">SAVE &amp; PRINT</button>
         </div>
 
         <!-- ==================== CUSTOMERS TAB (credit limits) ==================== -->
@@ -575,6 +694,8 @@ function confirmDialog(opts) {
 // ═══════════════════════════════════════════
 document.addEventListener('DOMContentLoaded', () => {
     loadStats();
+    // B1b: cashiers (non-admin) land on New Sale; admins keep Customers.
+    if (!creditCanManage()) { switchTab('quicksale'); return; }
     loadCreditCustomers(1);   // Customers is the first/landing tab
 });
 
@@ -583,7 +704,7 @@ document.addEventListener('DOMContentLoaded', () => {
 // ═══════════════════════════════════════════
 function switchTab(tab) {
     currentTab = tab;
-    ['customers', 'estimates', 'invoices', 'payments'].forEach(t => {
+    ['quicksale', 'customers', 'estimates', 'invoices', 'payments'].forEach(t => {
         document.getElementById('tab' + t.charAt(0).toUpperCase() + t.slice(1)).className =
             t === tab ? 'tab-active px-4 py-3 text-sm whitespace-nowrap transition-all' : 'tab-inactive px-4 py-3 text-sm whitespace-nowrap transition-all';
         document.getElementById('panel' + t.charAt(0).toUpperCase() + t.slice(1)).classList.toggle('hidden', t !== tab);
@@ -593,6 +714,7 @@ function switchTab(tab) {
     else if (tab === 'estimates') loadEstimates(estimatePage);
     else if (tab === 'invoices') loadInvoices(invoicePage);
     else if (tab === 'payments') loadPayments(paymentPage);
+    else if (tab === 'quicksale') qsEnsureInit();
 }
 
 // ═══════════════════════════════════════════
@@ -1227,6 +1349,10 @@ async function viewInvoice(id) {
             const pushed = inv.zoho_status === 'pushed';
             actions.innerHTML += `<button onclick="deleteInvoice(${inv.id}, ${pushed})" class="btn-danger px-4 py-2 rounded-lg text-sm font-medium">${pushed ? 'Void' : 'Delete'}</button>`;
         }
+        // B1b print pipeline: receipt page + server-rendered PDF. The PDF link
+        // carries the token in the query (mirrors the estimates PDF pattern).
+        actions.innerHTML += `<button onclick="window.open('/billing-receipt.html?id=${inv.id}', '_blank')" class="btn-green-outline px-4 py-2 rounded-lg text-sm font-medium">Print Receipt</button>`;
+        actions.innerHTML += `<button onclick="window.open('/api/billing/invoices/${inv.id}/pdf?receipt=1&token=' + encodeURIComponent(token), '_blank')" class="btn-green-outline px-4 py-2 rounded-lg text-sm font-medium">PDF</button>`;
         actions.classList.toggle('hidden', !actions.innerHTML);
 
         document.getElementById('detailModal').classList.add('active');
@@ -2093,6 +2219,518 @@ function showToast(msg, type = 'success') {
     document.body.appendChild(el);
     setTimeout(() => el.remove(), 3000);
 }
+
+// ═══════════════════════════════════════════
+// NEW SALE TAB (B1b — counter quick sale)
+// One POST /api/billing/quick-sale creates invoice + payments + Zoho push in
+// a single round trip. Credit sale = payments:[] (never a 'credit' payment row).
+// ═══════════════════════════════════════════
+let qsItems = [];
+let qsCustomer = { id: null, name: '', phone: '' };
+let qsPainter = { id: null, name: '' };
+let qsPayMode = 'cash';
+let qsPayPristine = true;      // single-amount field auto-tracks grand total until edited
+let qsDefaults = null;
+let qsDefaultsLoaded = false;
+let qsIdemKey = null;          // per attempt-session: kept across retries, cleared on success/reset
+let qsItemSearchTimer = null;
+let qsCustSearchTimer = null;
+let qsPainterSearchTimer = null;
+
+function qsEnsureInit() {
+    if (qsDefaultsLoaded) return;
+    qsDefaultsLoaded = true;
+    qsLoadDefaults();
+}
+
+async function qsLoadDefaults() {
+    const el = document.getElementById('qsBillingAs');
+    try {
+        const res = await fetch(`${API}/my-defaults`, { headers });
+        const data = await res.json();
+        if (!data.success) throw new Error(data.message || 'Failed to load defaults');
+        qsDefaults = data;
+        if (data.salesperson) {
+            el.innerHTML = `Billing as: <b class="text-gray-700">${esc(data.salesperson.name)}</b>${data.location ? ' @ <b class="text-gray-700">' + esc(data.location.name) + '</b>' : ''}`;
+            return;
+        }
+    } catch { qsDefaults = null; }
+    // No mapped salesperson (or defaults failed) — warn + manual pick.
+    el.textContent = '';
+    document.getElementById('qsSalespersonWarn').classList.remove('hidden');
+    loadSalespersonsInto(document.getElementById('qsSalespersonSel'));
+}
+
+// ── Item search + stock badge ──
+function debounceQsItemSearch() {
+    clearTimeout(qsItemSearchTimer);
+    qsItemSearchTimer = setTimeout(qsSearchItems, 300);
+}
+
+// Stock badge: green in-stock / amber low (≤2) / red out (0) / grey "—" when
+// stock is NULL (unknown must never render as 0).
+function qsStockBadge(p) {
+    const raw = p.stock;
+    if (raw === null || raw === undefined || raw === '') {
+        return '<span class="text-xs px-2 py-0.5 rounded-full bg-gray-100 text-gray-400">—</span>';
+    }
+    const n = Number(raw);
+    if (!isFinite(n)) return '<span class="text-xs px-2 py-0.5 rounded-full bg-gray-100 text-gray-400">—</span>';
+    if (n <= 0) return '<span class="text-xs px-2 py-0.5 rounded-full bg-red-100 text-red-700">Out of stock</span>';
+    const d = Number.isInteger(n) ? n : n.toFixed(2);
+    if (n <= 2) return `<span class="text-xs px-2 py-0.5 rounded-full bg-amber-100 text-amber-700">Low: ${d}</span>`;
+    return `<span class="text-xs px-2 py-0.5 rounded-full bg-green-100 text-green-700">In stock: ${d}</span>`;
+}
+
+async function qsSearchItems() {
+    const term = document.getElementById('qsItemSearch').value.trim();
+    const el = document.getElementById('qsItemSuggestions');
+    if (term.length < 2) { el.classList.add('hidden'); return; }
+    try {
+        const res = await fetch(`${API}/products?search=${encodeURIComponent(term)}`, { headers });
+        const data = await res.json();
+        if (!data.success || !data.products.length) { el.classList.add('hidden'); return; }
+        // Results kept on the element, referenced by index (no JSON in onclick attrs).
+        el._results = data.products;
+        el.innerHTML = data.products.map((p, i) => `
+            <div class="suggestion-item" data-idx="${i}">
+                <div class="flex items-center justify-between gap-2">
+                    <div class="min-w-0">
+                        <div class="font-medium text-gray-800 truncate">${esc(p.item_name)}</div>
+                        <div class="text-xs text-gray-400">${p.pack_size ? esc(p.pack_size) + ' &middot; ' : ''}${formatCurrency(p.rate)}</div>
+                    </div>
+                    <div class="flex-shrink-0">${qsStockBadge(p)}</div>
+                </div>
+            </div>
+        `).join('');
+        if (!el._wired) {
+            el._wired = true;
+            el.addEventListener('click', function (e) {
+                const item = e.target.closest('.suggestion-item[data-idx]');
+                if (item && el._results) qsAddItem(el._results[Number(item.dataset.idx)]);
+            });
+        }
+        el.classList.remove('hidden');
+    } catch {
+        el.classList.add('hidden');
+    }
+}
+
+function qsAddItem(product) {
+    qsItems.push({
+        zoho_item_id: product.zoho_item_id,
+        item_name: product.item_name,
+        pack_size: product.pack_size || '',
+        quantity: 1,
+        unit_price: Number(product.rate) || 0
+    });
+    document.getElementById('qsItemSearch').value = '';
+    document.getElementById('qsItemSuggestions').classList.add('hidden');
+    qsRenderItems();
+    qsRecalc();
+    document.getElementById('qsItemSearch').focus();
+}
+
+function qsRemoveItem(idx) {
+    qsItems.splice(idx, 1);
+    qsRenderItems();
+    qsRecalc();
+}
+
+function qsChangeQty(idx, delta) {
+    const cur = Number(qsItems[idx].quantity) || 1;
+    qsItems[idx].quantity = Math.max(1, cur + delta);
+    qsRenderItems();
+    qsRecalc();
+}
+
+function qsUpdateItem(idx, field, value) {
+    let v = Number(value) || 0;
+    if (field === 'quantity' && v <= 0) v = 1;
+    if (field === 'unit_price' && v < 0) v = 0;
+    qsItems[idx][field] = v;
+    qsRenderItems();
+    qsRecalc();
+}
+
+function qsRenderItems() {
+    const list = document.getElementById('qsItemsList');
+    if (!qsItems.length) {
+        list.innerHTML = '<div class="text-center py-6 text-gray-400 text-sm border border-dashed border-gray-200 rounded-lg">No items — search products above</div>';
+        return;
+    }
+    list.innerHTML = qsItems.map((item, idx) => `
+        <div class="bg-gray-50 rounded-lg p-3">
+            <div class="flex items-start justify-between gap-2 mb-2">
+                <div class="text-sm font-medium text-gray-800 flex-1 min-w-0">${esc(item.item_name)}
+                    ${item.pack_size ? `<span class="text-xs text-gray-400 font-normal">(${esc(item.pack_size)})</span>` : ''}
+                </div>
+                <button type="button" onclick="qsRemoveItem(${idx})" class="text-red-400 hover:text-red-600 p-2 -m-2" aria-label="Remove item">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+                </button>
+            </div>
+            <div class="flex items-center gap-3 flex-wrap">
+                <div class="qty-stepper">
+                    <button type="button" class="qty-btn" onclick="qsChangeQty(${idx},-1)" aria-label="Decrease quantity">&minus;</button>
+                    <input type="number" value="${Number(item.quantity) || 1}" min="0.01" step="any" class="qty-input" onchange="qsUpdateItem(${idx},'quantity',this.value)" aria-label="Quantity">
+                    <button type="button" class="qty-btn" onclick="qsChangeQty(${idx},1)" aria-label="Increase quantity">+</button>
+                </div>
+                <div class="flex items-center gap-1 text-sm">
+                    <span class="text-gray-400">&#8377;</span>
+                    <input type="number" value="${Number(item.unit_price) || 0}" min="0" step="0.01" class="qc-input w-24 text-right text-sm" onchange="qsUpdateItem(${idx},'unit_price',this.value)" aria-label="Unit price">
+                </div>
+                <div class="text-sm font-semibold text-gray-800 ml-auto">${formatCurrency((Number(item.quantity) || 0) * (Number(item.unit_price) || 0))}</div>
+            </div>
+        </div>
+    `).join('');
+}
+
+// ── Customer / painter selection ──
+function qsToggleCustomerType() {
+    const type = document.querySelector('input[name="qs_customer_type"]:checked').value;
+    document.getElementById('qsCustomerBlock').classList.toggle('hidden', type === 'painter');
+    document.getElementById('qsPainterBlock').classList.toggle('hidden', type === 'customer');
+}
+
+function debounceQsCustSearch() {
+    clearTimeout(qsCustSearchTimer);
+    qsCustSearchTimer = setTimeout(qsSearchCustomers, 300);
+}
+
+async function qsSearchCustomers() {
+    const term = document.getElementById('qsCustSearch').value.trim();
+    const el = document.getElementById('qsCustSuggestions');
+    if (term.length < 2) { el.classList.add('hidden'); return; }
+    try {
+        const res = await fetch(`${API}/customers?search=${encodeURIComponent(term)}`, { headers });
+        const data = await res.json();
+        const customers = data.customers || [];
+        el._results = customers;
+        let html = customers.map((c, i) => `
+            <div class="suggestion-item" data-idx="${i}">
+                <span class="font-medium">${esc(c.zoho_contact_name)}</span>
+                <span class="text-xs text-gray-400 ml-2">${esc(c.zoho_phone || '')}</span>
+            </div>
+        `).join('');
+        html += `<div class="suggestion-item border-t border-gray-100 text-green-700 font-medium" data-new="1">＋ New customer: "${esc(term)}"</div>`;
+        el.innerHTML = html;
+        if (!el._wired) {
+            el._wired = true;
+            el.addEventListener('click', function (e) {
+                if (e.target.closest('.suggestion-item[data-new]')) { qsNewCustomer(); return; }
+                const item = e.target.closest('.suggestion-item[data-idx]');
+                if (item && el._results) {
+                    const c = el._results[Number(item.dataset.idx)];
+                    qsSelectCustomer(c.id, c.zoho_contact_name, c.zoho_phone || '');
+                }
+            });
+        }
+        el.classList.remove('hidden');
+    } catch {
+        el.classList.add('hidden');
+    }
+}
+
+function qsSelectCustomer(id, name, phone) {
+    qsCustomer = { id, name, phone };
+    document.getElementById('qsSelectedCustName').textContent = name;
+    document.getElementById('qsSelectedCustPhone').textContent = phone;
+    document.getElementById('qsSelectedCustomer').classList.remove('hidden');
+    document.getElementById('qsNewCustFields').classList.add('hidden');
+    document.getElementById('qsCustSearch').classList.add('hidden');
+    document.getElementById('qsCustSuggestions').classList.add('hidden');
+}
+
+function qsNewCustomer() {
+    const term = document.getElementById('qsCustSearch').value.trim();
+    qsCustomer = { id: null, name: '', phone: '' };
+    document.getElementById('qsSelectedCustomer').classList.add('hidden');
+    document.getElementById('qsNewCustFields').classList.remove('hidden');
+    document.getElementById('qsNewCustName').value = term;
+    document.getElementById('qsCustSuggestions').classList.add('hidden');
+    document.getElementById('qsNewCustName').focus();
+}
+
+function qsClearCustomer() {
+    qsCustomer = { id: null, name: '', phone: '' };
+    document.getElementById('qsSelectedCustomer').classList.add('hidden');
+    document.getElementById('qsNewCustFields').classList.add('hidden');
+    document.getElementById('qsNewCustName').value = '';
+    document.getElementById('qsNewCustPhone').value = '';
+    document.getElementById('qsCustSearch').value = '';
+    document.getElementById('qsCustSearch').classList.remove('hidden');
+}
+
+function debounceQsPainterSearch() {
+    clearTimeout(qsPainterSearchTimer);
+    qsPainterSearchTimer = setTimeout(qsSearchPainters, 300);
+}
+
+async function qsSearchPainters() {
+    const term = document.getElementById('qsPainterSearch').value.trim();
+    const el = document.getElementById('qsPainterSuggestions');
+    if (term.length < 2) { el.classList.add('hidden'); return; }
+    try {
+        const res = await fetch(`/api/painters?search=${encodeURIComponent(term)}&status=approved&limit=20`, { headers });
+        const data = await res.json();
+        const painters = data.painters || data.data || [];
+        if (!painters.length) { el.classList.add('hidden'); return; }
+        el._results = painters;
+        el.innerHTML = painters.map((p, i) => `
+            <div class="suggestion-item" data-idx="${i}">
+                <span class="font-medium">${esc(p.full_name || p.name)}</span>
+                <span class="text-xs text-gray-400 ml-2">${esc(p.phone || '')}</span>
+            </div>
+        `).join('');
+        if (!el._wired) {
+            el._wired = true;
+            el.addEventListener('click', function (e) {
+                const item = e.target.closest('.suggestion-item[data-idx]');
+                if (item && el._results) {
+                    const p = el._results[Number(item.dataset.idx)];
+                    qsSelectPainter(p.id, p.full_name || p.name);
+                }
+            });
+        }
+        el.classList.remove('hidden');
+    } catch {
+        el.classList.add('hidden');
+    }
+}
+
+function qsSelectPainter(id, name) {
+    qsPainter = { id, name };
+    document.getElementById('qsSelectedPainterName').textContent = name;
+    document.getElementById('qsSelectedPainter').classList.remove('hidden');
+    document.getElementById('qsPainterSearch').value = '';
+    document.getElementById('qsPainterSuggestions').classList.add('hidden');
+}
+
+function qsClearPainter() {
+    qsPainter = { id: null, name: '' };
+    document.getElementById('qsSelectedPainter').classList.add('hidden');
+    document.getElementById('qsPainterSearch').value = '';
+}
+
+// ── Payment chips + totals ──
+function qsSetPayMode(mode, btn) {
+    qsPayMode = mode;
+    document.querySelectorAll('#qsPayChips .filter-pill').forEach(p => p.classList.toggle('active', p === btn));
+    const single = mode === 'cash' || mode === 'upi';
+    document.getElementById('qsPaySingle').classList.toggle('hidden', !single);
+    document.getElementById('qsPaySplit').classList.toggle('hidden', mode !== 'split');
+    document.getElementById('qsCreditNote').classList.toggle('hidden', mode !== 'credit');
+    if (single) {
+        document.getElementById('qsPaySingleLabel').textContent = mode === 'cash' ? 'Cash amount' : 'UPI amount';
+        qsPayPristine = true;   // re-prefill with the grand total
+    }
+    qsRecalc();
+}
+
+function qsPayManual() {
+    qsPayPristine = false;   // cashier edited the amount (partial payment)
+    qsRecalc();
+}
+
+function qsRecalc() {
+    const subtotal = qsItems.reduce((s, i) => s + (Number(i.quantity) || 0) * (Number(i.unit_price) || 0), 0);
+    const discount = Number(document.getElementById('qsDiscount').value) || 0;
+    const grand = Math.max(0, Math.round((subtotal - discount) * 100) / 100);
+
+    document.getElementById('qsSubtotal').textContent = formatCurrency(subtotal);
+    document.getElementById('qsGrandTotal').textContent = formatCurrency(grand);
+
+    const single = qsPayMode === 'cash' || qsPayMode === 'upi';
+    if (single && qsPayPristine) {
+        document.getElementById('qsPayAmount').value = grand > 0 ? grand : '';
+    }
+
+    let paid = 0;
+    if (single) {
+        paid = Number(document.getElementById('qsPayAmount').value) || 0;
+    } else if (qsPayMode === 'split') {
+        paid = (Number(document.getElementById('qsSplitCash').value) || 0)
+             + (Number(document.getElementById('qsSplitUpi').value) || 0);
+    } // credit → 0
+
+    const payError = document.getElementById('qsPayError');
+    if (paid > grand + 0.01) {   // 1-paisa tolerance
+        payError.textContent = 'Paid amount grand total-ஐ விட அதிகமா இருக்கு';
+        payError.classList.remove('hidden');
+    } else {
+        payError.classList.add('hidden');
+    }
+
+    document.getElementById('qsPaid').textContent = formatCurrency(paid);
+    document.getElementById('qsBalance').textContent = formatCurrency(Math.max(0, Math.round((grand - paid) * 100) / 100));
+    return { subtotal, discount, grand, paid };
+}
+
+// Build the payments array for the request body. Throws a user-facing error.
+// Credit sale → [] (the server treats an empty array as a full-credit sale;
+// 'credit' payment rows are never sent).
+function qsBuildPayments(grand) {
+    if (qsPayMode === 'credit') return [];
+    if (qsPayMode === 'split') {
+        const cash = Number(document.getElementById('qsSplitCash').value) || 0;
+        const upi = Number(document.getElementById('qsSplitUpi').value) || 0;
+        if (cash < 0 || upi < 0) throw new Error('Split amount negative-ஆ இருக்கக்கூடாது');
+        if (cash + upi <= 0) throw new Error('Split amounts enter பண்ணுங்க — முழு கடன்-ஆ இருந்தா Credit-ஐ select பண்ணுங்க');
+        if (cash + upi > grand + 0.01) throw new Error('Split total grand total-ஐ தாண்டக்கூடாது');
+        const rows = [];
+        if (cash > 0) rows.push({ amount: cash, payment_method: 'cash' });
+        if (upi > 0) rows.push({ amount: upi, payment_method: 'upi' });
+        return rows;
+    }
+    const amt = Number(document.getElementById('qsPayAmount').value) || 0;
+    if (amt <= 0) throw new Error('Amount enter பண்ணுங்க — முழு கடன்-ஆ இருந்தா Credit-ஐ select பண்ணுங்க');
+    if (amt > grand + 0.01) throw new Error('Paid amount grand total-ஐ விட அதிகமா இருக்கு');
+    return [{ amount: amt, payment_method: qsPayMode }];
+}
+
+// ── Save & print ──
+async function qsSaveSale() {
+    if (!qsItems.length) { showToast('Add at least one product', 'error'); return; }
+
+    const type = document.querySelector('input[name="qs_customer_type"]:checked').value;
+    let customerName = '';
+    let customerPhone = '';
+    if (type === 'customer') {
+        if (qsCustomer.id) {
+            customerName = qsCustomer.name;
+            customerPhone = qsCustomer.phone || '';
+        } else {
+            const newVisible = !document.getElementById('qsNewCustFields').classList.contains('hidden');
+            customerName = newVisible ? document.getElementById('qsNewCustName').value.trim() : '';
+            customerPhone = newVisible ? document.getElementById('qsNewCustPhone').value.trim() : '';
+            if (!customerName) { showToast('Customer-ஐ select பண்ணுங்க அல்லது ＋ New customer-ல name கொடுங்க', 'error'); return; }
+        }
+    } else {
+        if (!qsPainter.id) { showToast('Painter-ஐ select பண்ணுங்க', 'error'); return; }
+        customerName = qsPainter.name;
+    }
+
+    const totals = qsRecalc();
+    if (totals.grand <= 0) { showToast('Grand total 0-க்கு மேல இருக்கணும்', 'error'); return; }
+
+    let payments;
+    try {
+        payments = qsBuildPayments(totals.grand);
+    } catch (e) {
+        showToast(e.message, 'error');
+        return;
+    }
+
+    const body = {
+        customer_type: type,
+        customer_name: customerName,
+        customer_phone: customerPhone,
+        items: qsItems.map(i => ({
+            zoho_item_id: i.zoho_item_id,
+            item_name: i.item_name,
+            pack_size: i.pack_size || '',
+            quantity: Number(i.quantity),
+            unit_price: Number(i.unit_price)
+        })),
+        discount_amount: totals.discount,
+        notes: document.getElementById('qsNotes').value.trim(),
+        payments
+    };
+    if (type === 'customer' && qsCustomer.id) body.customer_id = Number(qsCustomer.id);
+    if (type === 'painter') body.painter_id = Number(qsPainter.id);
+    // Defaults carry the salesperson server-side; only send an explicit pick
+    // when the cashier has no mapped default.
+    if (!(qsDefaults && qsDefaults.salesperson)) {
+        const sp = document.getElementById('qsSalespersonSel').value;
+        if (sp) body.salesperson_id = sp;
+    }
+
+    const btn = document.getElementById('qsSaveBtn');
+    btn.disabled = true;
+    const prevLabel = btn.textContent;
+    btn.textContent = 'Saving…';   // 3-8s Zoho round trip
+    if (!qsIdemKey) qsIdemKey = newIdemKey();   // reused on retry so a double-save can't duplicate
+
+    try {
+        const res = await fetch(`${API}/quick-sale`, {
+            method: 'POST',
+            headers: { ...headers, 'Idempotency-Key': qsIdemKey },
+            body: JSON.stringify(body)
+        });
+        const data = await res.json();
+        if (!res.ok || !data.success) throw new Error(extractApiError(data));
+
+        qsZohoToast(data);
+        if (data.print_url) {
+            window.open(data.print_url + (data.print_url.includes('?') ? '&' : '?') + 'autoprint=1', '_blank');
+        }
+        qsIdemKey = null;
+        qsResetPanel();
+        loadStats();   // refresh KPI counts (invoices/outstanding/today collection)
+        if (currentTab === 'invoices') loadInvoices(invoicePage);
+    } catch (e) {
+        showToast(e.message || 'Save failed', 'error');
+    } finally {
+        btn.disabled = false;
+        btn.textContent = prevLabel;
+    }
+}
+
+// Toast reflecting the Zoho outcome of the quick sale.
+function qsZohoToast(data) {
+    const z = data.zoho || {};
+    const inv = data.invoice || {};
+    const reason = [z.code, z.error].filter(Boolean).join(': ');
+    if (z.pushed) {
+        qsToast(`Bill ${inv.invoice_number || ''} saved — Zoho: ${z.zoho_invoice_number || ''} approved`, 'success');
+    } else if (z.attempted) {
+        qsToast(`Saved. Zoho pending — auto retry${reason ? ' (' + reason + ')' : ''}`, 'warning');
+    } else if (z.code) {
+        // e.g. credit-gate: not attempted, code carries the reason
+        qsToast(`Saved. Zoho push skip ஆச்சு — ${reason}`, 'warning');
+    } else {
+        qsToast(`Bill ${inv.invoice_number || ''} saved`, 'success');
+    }
+}
+
+// qcToast supports a 'warning' (amber) variant; the page-local showToast only
+// knows success/error, so route through qcToast when available.
+function qsToast(msg, variant) {
+    if (window.qcToast) { qcToast(msg, { variant }); return; }
+    showToast(msg, variant === 'success' ? 'success' : 'error');
+}
+
+function qsResetPanel() {
+    qsItems = [];
+    qsClearCustomer();
+    qsClearPainter();
+    document.querySelector('input[name="qs_customer_type"][value="customer"]').checked = true;
+    qsToggleCustomerType();
+    document.getElementById('qsDiscount').value = '0';
+    document.getElementById('qsNotes').value = '';
+    document.getElementById('qsItemSearch').value = '';
+    document.getElementById('qsItemSuggestions').classList.add('hidden');
+    document.getElementById('qsSplitCash').value = '';
+    document.getElementById('qsSplitUpi').value = '';
+    qsIdemKey = null;
+    qsSetPayMode('cash', document.querySelector('#qsPayChips .filter-pill[data-mode="cash"]'));
+    qsRenderItems();
+    qsRecalc();
+}
+
+// Close New Sale suggestion dropdowns on outside click (own listener — the
+// existing one below stays untouched).
+document.addEventListener('click', (e) => {
+    if (!e.target.closest('#qsItemSearch') && !e.target.closest('#qsItemSuggestions')) {
+        document.getElementById('qsItemSuggestions')?.classList.add('hidden');
+    }
+    if (!e.target.closest('#qsCustSearch') && !e.target.closest('#qsCustSuggestions')) {
+        document.getElementById('qsCustSuggestions')?.classList.add('hidden');
+    }
+    if (!e.target.closest('#qsPainterSearch') && !e.target.closest('#qsPainterSuggestions')) {
+        document.getElementById('qsPainterSuggestions')?.classList.add('hidden');
+    }
+});
 
 // Close suggestions on outside click
 document.addEventListener('click', (e) => {

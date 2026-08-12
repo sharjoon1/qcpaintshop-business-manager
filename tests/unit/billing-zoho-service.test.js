@@ -49,6 +49,11 @@ function makePool(invoice, { painterSp = null, discountFlag = null, payments = [
             if (/SELECT zoho_salesperson_id FROM painters/.test(s)) return [painterSp ? [{ zoho_salesperson_id: painterSp }] : []];
             if (/FROM zoho_salespersons/.test(s)) return [[{ salesperson_name: 'Ravi Kumar' }]];
             if (/FROM painter_zoho_salesperson_map/.test(s)) return [[]];
+            // B1a probes: no branch→location default row, no user salesperson
+            // mapping, no local_branch_id map row — all empty by default.
+            if (/FROM branches/.test(s)) return [[]];
+            if (/FROM users WHERE id/.test(s)) return [[]];
+            if (/FROM zoho_locations_map WHERE local_branch_id/.test(s)) return [[]];
             if (/FROM zoho_locations_map/.test(s)) return [[{ zoho_location_name: 'Main Branch' }]];
             if (/FROM billing_invoice_items/.test(s)) return [[{ zoho_item_id: 'Z1', quantity: 1, unit_price: 1000, line_total: 1000 }]];
             // SP-1 C4: per-row payment-forwarding candidate SELECT.
@@ -111,6 +116,47 @@ describe('pushInvoiceToZoho — mandatory salesperson', () => {
         svc.setPool(makePool({ ...baseInvoice }));
         const res = await svc.pushInvoiceToZoho(1, 99, { salespersonId: 'SP', isAdmin: false });
         expect(res.zohoState).toBe('submitted');
+    });
+});
+
+// ── B1a step-0 characterization (verified green on pre-B1a code, kept green
+// after) ──
+// (a) a staff push reaches Zoho's finalizeDocument with the literal third
+// argument FALSE when the ai_config flag 'billing_staff_push_finalizes' is
+// ABSENT — pre-B1a this was unconditional; post-B1a the absent/'0' flag keeps
+// the identical call shape (flag '1' is locked by
+// tests/unit/billing-staff-final-flag.test.js).
+// (b) with no explicit location and none on the invoice column, an invoice
+// that carries a branch_id yields a payload WITHOUT location_id when the
+// branch has no location mapping — pre-B1a the `FROM branches` probe was never
+// consulted; post-B1a it IS consulted but answers empty here, so the payload
+// stays identical (mapped branches are locked by
+// tests/unit/billing-push-location-default.test.js).
+// (c) the SALESPERSON_REQUIRED terminal error is locked by the first describe
+// above and stayed green throughout B1a (the new FROM users / ai_config
+// default probes answer empty in makePool).
+describe('pushInvoiceToZoho — B1a step-0 characterization', () => {
+    beforeEach(() => {
+        mockCreateInvoice.mockClear();
+        mockFinalizeDocument.mockClear();
+        svc.setPointsEngine(null);
+    });
+
+    it('staff push calls finalizeDocument with third argument false (flag absent)', async () => {
+        svc.setPool(makePool({ ...baseInvoice }));
+        await svc.pushInvoiceToZoho(1, 99, { salespersonId: 'SP', isAdmin: false });
+        expect(mockFinalizeDocument).toHaveBeenCalledTimes(1);
+        expect(mockFinalizeDocument.mock.calls[0]).toEqual(['invoice', 'ZINV1', false]);
+    });
+
+    it('no options/column location + branch_id set ⇒ payload has NO location_id (unmapped branch)', async () => {
+        // options.locationId null, invoice.zoho_location_id null, branch_id 3;
+        // makePool answers `FROM branches` + the local_branch_id map probe with
+        // [] — an unmapped branch must never invent a location_id.
+        svc.setPool(makePool({ ...baseInvoice, branch_id: 3 }));
+        await svc.pushInvoiceToZoho(1, 99, { salespersonId: 'SP' });
+        expect(mockCreateInvoice).toHaveBeenCalledTimes(1);
+        expect(mockCreateInvoice.mock.calls[0][0]).not.toHaveProperty('location_id');
     });
 });
 
