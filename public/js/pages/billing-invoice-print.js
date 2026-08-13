@@ -122,7 +122,9 @@ function renderItems(items) {
         return;
     }
     tbody.innerHTML = items.map((item, i) => {
-        const name = escapeHtml(item.item_name || 'Item');
+        // B1.1 #6: print the line DESCRIPTION when present, else the item
+        // name — never both.
+        const name = escapeHtml(item.description || item.item_name || 'Item');
         const pack = item.pack_size ? ` <span class="text-gray-400 text-xs">(${escapeHtml(item.pack_size)})</span>` : '';
         const qty = parseFloat(item.quantity) || 0;
         const qtyDisp = Number.isInteger(qty) ? qty : qty.toFixed(2);

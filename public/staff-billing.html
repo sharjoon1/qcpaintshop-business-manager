@@ -18,10 +18,38 @@
     <script src="/js/ui-skeletons.js?v=791a52e1"></script>
     <script>checkAuthOrRedirect();</script>
     <style>
-        /* Tab styles */
-        .tab-active { color: #1B5E3B; border-bottom: 3px solid #1B5E3B; font-weight: 600; }
-        .tab-inactive { color: #6b7280; border-bottom: 3px solid transparent; }
-        .tab-inactive:hover { color: #374151; border-bottom-color: #d1d5db; }
+        /* Tab styles — B1.1 owner feedback #2: distinct segmented buttons
+           (icon + label, clear active state) instead of subtle underline tabs.
+           Selectors are deliberately more specific than qc-corporate.css
+           (which loads last) so these win. QC green, no purple. */
+        .qc-tabs-wrap .qc-tabs {
+            display: flex; gap: 6px; overflow-x: auto; position: relative;
+            padding: 6px; background: #fff; border: 1px solid #e5e7eb;
+            border-bottom: 1px solid #e5e7eb; border-radius: 14px;
+            box-shadow: 0 1px 2px rgba(16, 24, 40, 0.05);
+        }
+        .qc-tabs .qc-tab-btn {
+            display: inline-flex; align-items: center; gap: 7px;
+            padding: 10px 14px !important; border-radius: 10px !important;
+            font-size: 0.875rem; white-space: nowrap; cursor: pointer;
+            min-height: 44px; flex: 0 0 auto;
+            transition: background 0.15s ease, color 0.15s ease;
+        }
+        .qc-tabs .qc-tab-btn svg { width: 18px; height: 18px; flex: 0 0 auto; }
+        .qc-tabs .qc-tab-btn.tab-inactive {
+            color: #374151; font-weight: 600;
+            background: transparent; border: 1px solid transparent;
+        }
+        .qc-tabs .qc-tab-btn.tab-inactive:hover {
+            color: #1B5E3B; background: #f0fdf4; border-color: #d1e7dc;
+        }
+        .qc-tabs .qc-tab-btn.tab-active {
+            color: #fff !important; font-weight: 700;
+            background: #1B5E3B !important; border: 1px solid #1B5E3B;
+            box-shadow: 0 2px 6px rgba(27, 94, 59, 0.35);
+        }
+        .qc-tabs .qc-tab-btn.tab-active::after { display: none; } /* no corporate gold underline */
+        #mainContent .qc-tabs-wrap::after { display: none; } /* no scroll-fade over the card */
 
         /* Status pills */
         .status-pill { padding: 2px 10px; border-radius: 9999px; font-size: 0.75rem; font-weight: 600; display: inline-block; }
@@ -117,6 +145,7 @@
         /* Brand overrides */
         .btn-green { background: #1B5E3B; color: #fff; }
         .btn-green:hover { background: #154D31; }
+        #qsSaveBtn:disabled { opacity: 0.5; cursor: not-allowed; }
         .btn-green-outline { border: 1px solid #1B5E3B; color: #1B5E3B; }
         .btn-green-outline:hover { background: #f0fdf4; }
 
@@ -177,14 +206,29 @@
             </div>
         </div>
 
-        <!-- Tab Bar -->
+        <!-- Tab Bar — B1.1: distinct segmented buttons, icon + label per tab -->
         <div class="qc-tabs-wrap mb-4">
         <div class="qc-tabs scroll-hide">
-            <button onclick="switchTab('quicksale')" id="tabQuicksale" class="tab-inactive px-4 py-3 text-sm whitespace-nowrap transition-all">⚡ New Sale</button>
-            <button onclick="switchTab('customers')" id="tabCustomers" class="tab-active px-4 py-3 text-sm whitespace-nowrap transition-all">Customers</button>
-            <button onclick="switchTab('estimates')" id="tabEstimates" class="tab-inactive px-4 py-3 text-sm whitespace-nowrap transition-all">Estimates</button>
-            <button onclick="switchTab('invoices')" id="tabInvoices" class="tab-inactive px-4 py-3 text-sm whitespace-nowrap transition-all">Invoices</button>
-            <button onclick="switchTab('payments')" id="tabPayments" class="tab-inactive px-4 py-3 text-sm whitespace-nowrap transition-all">Payments</button>
+            <button onclick="switchTab('quicksale')" id="tabQuicksale" class="qc-tab-btn tab-inactive">
+                <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
+                <span>New Sale</span>
+            </button>
+            <button onclick="switchTab('customers')" id="tabCustomers" class="qc-tab-btn tab-active">
+                <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+                <span>Customers</span>
+            </button>
+            <button onclick="switchTab('estimates')" id="tabEstimates" class="qc-tab-btn tab-inactive">
+                <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/></svg>
+                <span>Estimates</span>
+            </button>
+            <button onclick="switchTab('invoices')" id="tabInvoices" class="qc-tab-btn tab-inactive">
+                <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+                <span>Invoices</span>
+            </button>
+            <button onclick="switchTab('payments')" id="tabPayments" class="qc-tab-btn tab-inactive">
+                <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z"/></svg>
+                <span>Payments</span>
+            </button>
         </div>
         </div>
 
@@ -192,26 +236,25 @@
         <div id="panelQuicksale" class="hidden">
             <!-- Billing-as header (from GET /my-defaults) -->
             <div id="qsBillingAs" class="text-xs text-gray-500 mb-3"></div>
-            <div id="qsSalespersonWarn" class="hidden mb-3">
-                <div class="text-sm bg-amber-50 border border-amber-300 text-amber-800 rounded-lg p-3 mb-2">Salesperson set பண்ணல — bill Zoho-க்கு போகாது</div>
-                <select id="qsSalespersonSel" class="qc-input w-full">
-                    <option value="">Select salesperson...</option>
-                </select>
+            <div id="qsSalespersonWarn" class="hidden mb-2">
+                <div class="text-sm bg-amber-50 border border-amber-300 text-amber-800 rounded-lg p-3">Salesperson set பண்ணல — bill Zoho-க்கு போகாது</div>
             </div>
-
-            <!-- 1. Items -->
-            <div class="bg-white rounded-xl border border-gray-100 shadow-sm p-4 mb-3">
-                <label class="qc-label block mb-1">Add Products</label>
+            <!-- B1.1 #4: salesperson auto-set from the selected painter (override allowed) -->
+            <div id="qsSalespersonAuto" class="hidden mb-2 px-3 py-2 bg-green-50 border border-green-200 rounded-lg text-sm flex items-center justify-between">
+                <span>Salesperson: <b id="qsSalespersonAutoName"></b> <span id="qsSalespersonAutoTag" class="text-xs text-gray-500">(auto)</span></span>
+                <button type="button" onclick="qsShowSalespersonPick()" class="text-green-700 hover:text-green-900 text-xs font-medium">Change</button>
+            </div>
+            <!-- B1.1 #3: searchable salesperson combo (suggestion-list pattern);
+                 the hidden input keeps the qsSalespersonSel id/value contract -->
+            <div id="qsSalespersonPick" class="hidden mb-3">
                 <div class="relative">
-                    <input type="text" id="qsItemSearch" class="qc-input w-full" placeholder="Search products..." oninput="debounceQsItemSearch()" autocomplete="off">
-                    <div id="qsItemSuggestions" class="suggestion-list hidden"></div>
-                </div>
-                <div id="qsItemsList" class="space-y-2 mt-3">
-                    <div class="text-center py-6 text-gray-400 text-sm border border-dashed border-gray-200 rounded-lg">No items — search products above</div>
+                    <input type="text" id="qsSalespersonSearch" class="qc-input w-full" placeholder="Type salesperson name..." oninput="qsFilterSalespersons()" onfocus="qsFilterSalespersons()" autocomplete="off">
+                    <div id="qsSalespersonSuggestions" class="suggestion-list hidden"></div>
                 </div>
             </div>
+            <input type="hidden" id="qsSalespersonSel">
 
-            <!-- 2. Customer -->
+            <!-- 1. Customer (B1.1 #1: customer section comes FIRST, products below) -->
             <div class="bg-white rounded-xl border border-gray-100 shadow-sm p-4 mb-3">
                 <div class="flex gap-4 mb-2 flex-wrap">
                     <label class="flex items-center gap-2 cursor-pointer">
@@ -261,6 +304,18 @@
                 </div>
             </div>
 
+            <!-- 2. Products -->
+            <div class="bg-white rounded-xl border border-gray-100 shadow-sm p-4 mb-3">
+                <label class="qc-label block mb-1">Add Products</label>
+                <div class="relative">
+                    <input type="text" id="qsItemSearch" class="qc-input w-full" placeholder="Search products..." oninput="debounceQsItemSearch()" autocomplete="off">
+                    <div id="qsItemSuggestions" class="suggestion-list hidden"></div>
+                </div>
+                <div id="qsItemsList" class="space-y-2 mt-3">
+                    <div class="text-center py-6 text-gray-400 text-sm border border-dashed border-gray-200 rounded-lg">No items — search products above</div>
+                </div>
+            </div>
+
             <!-- 3. Payment + running totals -->
             <div class="bg-white rounded-xl border border-gray-100 shadow-sm p-4 mb-3">
                 <label class="qc-label block mb-2">Payment</label>
@@ -285,6 +340,8 @@
                     </div>
                 </div>
                 <div id="qsCreditNote" class="hidden text-sm bg-amber-50 border border-amber-300 text-amber-800 rounded-lg p-3 mb-2">முழு தொகை கடன் — customer credit limit-படி Zoho-க்கு போகும்</div>
+                <!-- B1.1 #5: live credit pre-check (GET /credit-check) for credit/partial sales -->
+                <div id="qsCreditCheck" class="hidden text-sm rounded-lg p-3 mb-2 border"></div>
                 <div id="qsPayError" class="hidden text-xs text-red-600 mb-2"></div>
 
                 <div class="border-t pt-3 space-y-1 text-sm">
@@ -706,7 +763,7 @@ function switchTab(tab) {
     currentTab = tab;
     ['quicksale', 'customers', 'estimates', 'invoices', 'payments'].forEach(t => {
         document.getElementById('tab' + t.charAt(0).toUpperCase() + t.slice(1)).className =
-            t === tab ? 'tab-active px-4 py-3 text-sm whitespace-nowrap transition-all' : 'tab-inactive px-4 py-3 text-sm whitespace-nowrap transition-all';
+            t === tab ? 'qc-tab-btn tab-active' : 'qc-tab-btn tab-inactive';
         document.getElementById('panel' + t.charAt(0).toUpperCase() + t.slice(1)).classList.toggle('hidden', t !== tab);
     });
 
@@ -1461,11 +1518,7 @@ async function syncInvoiceZohoStatus(invoiceId) {
 
 async function loadSalespersonsInto(sel) {
     try {
-        if (!zohoSalespersonsCache) {
-            const res = await fetch(`${API}/salespersons`, { headers });
-            const data = await res.json();
-            zohoSalespersonsCache = (data.success && Array.isArray(data.salespersons)) ? data.salespersons : [];
-        }
+        await qsEnsureSalespersonCache();   // B1.1: shared cache with the New Sale combo
         sel.innerHTML = '<option value="">Select salesperson...</option>';
         for (const s of zohoSalespersonsCache) {
             sel.appendChild(new Option(s.salesperson_name || s.zoho_salesperson_id, s.zoho_salesperson_id));
@@ -1645,7 +1698,10 @@ function openCreateModal(mode, editData = null, editItems = null) {
             item_name: i.item_name,
             pack_size: i.pack_size || '',
             quantity: i.quantity,
-            unit_price: i.unit_price
+            unit_price: i.unit_price,
+            // B1.1 #6: keep the stored description through edits (old rows
+            // without one fall back to the item name).
+            description: i.description || i.item_name || ''
         }));
     }
 
@@ -1718,7 +1774,8 @@ function submitForm(action) {
             item_name: i.item_name,
             pack_size: i.pack_size || '',
             quantity: Number(i.quantity),
-            unit_price: Number(i.unit_price)
+            unit_price: Number(i.unit_price),
+            description: i.description ? String(i.description) : null
         })),
         discount_amount: Number(document.getElementById('formDiscount').value) || 0,
         notes: document.getElementById('formNotes').value.trim()
@@ -1910,10 +1967,12 @@ async function searchProducts() {
         // serializing each product into an onclick attribute (avoids HTML/JS-context injection).
         // NOTE: /api/billing/products does not return pack_size (zoho_items_map
         // has no such column — size lives inside the item name). Show SKU instead.
+        // B1.1 #6: description leads when present; raw name drops to small text.
         el._results = data.products;
         el.innerHTML = data.products.map((p, i) => `
             <div class="suggestion-item" data-idx="${i}">
-                <div class="font-medium text-gray-800">${esc(p.item_name)}</div>
+                <div class="font-medium text-gray-800">${esc(p.description || p.item_name)}</div>
+                ${p.description ? `<div class="text-xs text-gray-500">${esc(p.item_name)}</div>` : ''}
                 <div class="text-xs text-gray-400">${p.sku ? esc(p.sku) + ' &middot; ' : ''}${formatCurrency(p.rate)}</div>
             </div>
         `).join('');
@@ -1936,7 +1995,9 @@ function addProduct(product) {
         item_name: product.item_name,
         pack_size: product.pack_size || '',
         quantity: 1,
-        unit_price: product.rate || 0
+        unit_price: product.rate || 0,
+        // B1.1 #6: printable line description — zoho_description, fallback name.
+        description: product.description || product.item_name || ''
     });
     renderItems();
     recalcTotals();
@@ -1967,6 +2028,11 @@ function updateItemField(idx, field, value) {
     recalcTotals();
 }
 
+// B1.1 #6: string fields (description) — no Number coercion, no re-render.
+function updateItemFieldText(idx, field, value) {
+    if (currentItems[idx]) currentItems[idx][field] = String(value || '').trim();
+}
+
 function renderItems() {
     const list = document.getElementById('itemsList');
     if (!currentItems.length) {
@@ -1983,6 +2049,7 @@ function renderItems() {
                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
                 </button>
             </div>
+            <input type="text" value="${escAttr(item.description || '')}" maxlength="500" class="qc-input w-full text-xs mb-2" placeholder="Description (print-ல வரும்)" onchange="updateItemFieldText(${idx},'description',this.value)" aria-label="Item description">
             <div class="flex items-center gap-3 flex-wrap">
                 <div class="qty-stepper">
                     <button type="button" class="qty-btn" onclick="changeQty(${idx},-1)" aria-label="Decrease quantity">&minus;</button>
@@ -2204,6 +2271,12 @@ function esc(str) {
     return d.innerHTML;
 }
 
+// For text inside double-quoted HTML attributes (value="..."): esc() covers
+// & < > but not quotes (textContent→innerHTML doesn't escape them).
+function escAttr(str) {
+    return esc(str).replace(/"/g, '&quot;');
+}
+
 function showToast(msg, type = 'success') {
     if (window.qcToast) {
         qcToast(msg, { variant: type === 'error' ? 'error' : 'success' });
@@ -2236,6 +2309,12 @@ let qsIdemKey = null;          // per attempt-session: kept across retries, clea
 let qsItemSearchTimer = null;
 let qsCustSearchTimer = null;
 let qsPainterSearchTimer = null;
+let qsSpAuto = false;          // B1.1 #4: salesperson auto-set from the selected painter
+let qsLastTotals = null;       // B1.1 #5: last qsRecalc numbers for the credit pre-check
+let qsCreditEligible = null;   // null = unknown/not needed, true/false = last pre-check verdict
+let qsCreditTimer = null;
+let qsCreditSeq = 0;           // ignore stale pre-check responses
+let qsSaving = false;          // save in flight — the async pre-check must not re-enable SAVE
 
 function qsEnsureInit() {
     if (qsDefaultsLoaded) return;
@@ -2255,10 +2334,92 @@ async function qsLoadDefaults() {
             return;
         }
     } catch { qsDefaults = null; }
-    // No mapped salesperson (or defaults failed) — warn + manual pick.
+    // No mapped salesperson (or defaults failed) — warn + searchable combo (B1.1 #3).
     el.textContent = '';
     document.getElementById('qsSalespersonWarn').classList.remove('hidden');
-    loadSalespersonsInto(document.getElementById('qsSalespersonSel'));
+    document.getElementById('qsSalespersonPick').classList.remove('hidden');
+    qsEnsureSalespersonCache();   // prefetch for the combo
+}
+
+// ── Salesperson combo (B1.1 #3/#4) ──
+// Cache-only fetch of the local zoho_salespersons master (shared with the
+// push modal's loadSalespersonsInto).
+async function qsEnsureSalespersonCache() {
+    if (zohoSalespersonsCache) return zohoSalespersonsCache;
+    try {
+        const res = await fetch(`${API}/salespersons`, { headers });
+        const data = await res.json();
+        zohoSalespersonsCache = (data.success && Array.isArray(data.salespersons)) ? data.salespersons : [];
+    } catch { zohoSalespersonsCache = zohoSalespersonsCache || []; }
+    return zohoSalespersonsCache;
+}
+
+// Searchable combo: client-side filter over the cached master (≤ dozens of
+// rows) rendered through the page's existing suggestion-list pattern.
+async function qsFilterSalespersons() {
+    const el = document.getElementById('qsSalespersonSuggestions');
+    const list = await qsEnsureSalespersonCache();
+    const term = document.getElementById('qsSalespersonSearch').value.trim().toLowerCase();
+    const matches = list.filter(s => !term || String(s.salesperson_name || '').toLowerCase().includes(term)).slice(0, 20);
+    if (!matches.length) {
+        el.innerHTML = '<div class="suggestion-item text-gray-400">No salespersons — Sync from Zoho first</div>';
+        el.classList.remove('hidden');
+        return;
+    }
+    el._results = matches;
+    el.innerHTML = matches.map((s, i) => `
+        <div class="suggestion-item" data-idx="${i}">
+            <span class="font-medium">${esc(s.salesperson_name || s.zoho_salesperson_id)}</span>
+            ${s.salesperson_email ? `<span class="text-xs text-gray-400 ml-2">${esc(s.salesperson_email)}</span>` : ''}
+        </div>`).join('');
+    if (!el._wired) {
+        el._wired = true;
+        el.addEventListener('click', function (e) {
+            const item = e.target.closest('.suggestion-item[data-idx]');
+            if (item && el._results) {
+                const s = el._results[Number(item.dataset.idx)];
+                qsSetSalesperson(s.zoho_salesperson_id, s.salesperson_name || s.zoho_salesperson_id, false);
+            }
+        });
+    }
+    el.classList.remove('hidden');
+}
+
+// Stamp the chosen salesperson (id into the hidden qsSalespersonSel — the
+// exact value POST /quick-sale sends as salesperson_id). auto=true when it
+// came from the selected painter; the cashier can always override (Change).
+function qsSetSalesperson(id, displayName, auto) {
+    qsSpAuto = !!(auto && id);
+    document.getElementById('qsSalespersonSel').value = id || '';
+    document.getElementById('qsSalespersonAutoName').textContent = displayName || '';
+    document.getElementById('qsSalespersonAutoTag').textContent = auto ? '(auto)' : '(manual)';
+    document.getElementById('qsSalespersonAuto').classList.toggle('hidden', !id);
+    document.getElementById('qsSalespersonSearch').value = '';
+    document.getElementById('qsSalespersonSuggestions').classList.add('hidden');
+    if (id) {
+        document.getElementById('qsSalespersonPick').classList.add('hidden');
+        document.getElementById('qsSalespersonWarn').classList.add('hidden');
+    }
+}
+
+function qsShowSalespersonPick() {
+    document.getElementById('qsSalespersonPick').classList.remove('hidden');
+    const input = document.getElementById('qsSalespersonSearch');
+    input.focus();
+    qsFilterSalespersons();
+}
+
+// Drop an AUTO-set salesperson (painter cleared / type switched back). A
+// manual pick survives; without a pick the my-defaults chain applies again.
+function qsClearAutoSalesperson() {
+    if (!qsSpAuto) return;
+    qsSpAuto = false;
+    document.getElementById('qsSalespersonSel').value = '';
+    document.getElementById('qsSalespersonAuto').classList.add('hidden');
+    if (!(qsDefaults && qsDefaults.salesperson)) {
+        document.getElementById('qsSalespersonWarn').classList.remove('hidden');
+        document.getElementById('qsSalespersonPick').classList.remove('hidden');
+    }
 }
 
 // ── Item search + stock badge ──
@@ -2291,12 +2452,14 @@ async function qsSearchItems() {
         const data = await res.json();
         if (!data.success || !data.products.length) { el.classList.add('hidden'); return; }
         // Results kept on the element, referenced by index (no JSON in onclick attrs).
+        // B1.1 #6: description leads when present; raw name drops to small text.
         el._results = data.products;
         el.innerHTML = data.products.map((p, i) => `
             <div class="suggestion-item" data-idx="${i}">
                 <div class="flex items-center justify-between gap-2">
                     <div class="min-w-0">
-                        <div class="font-medium text-gray-800 truncate">${esc(p.item_name)}</div>
+                        <div class="font-medium text-gray-800 truncate">${esc(p.description || p.item_name)}</div>
+                        ${p.description ? `<div class="text-xs text-gray-500 truncate">${esc(p.item_name)}</div>` : ''}
                         <div class="text-xs text-gray-400">${p.pack_size ? esc(p.pack_size) + ' &middot; ' : ''}${formatCurrency(p.rate)}</div>
                     </div>
                     <div class="flex-shrink-0">${qsStockBadge(p)}</div>
@@ -2322,7 +2485,9 @@ function qsAddItem(product) {
         item_name: product.item_name,
         pack_size: product.pack_size || '',
         quantity: 1,
-        unit_price: Number(product.rate) || 0
+        unit_price: Number(product.rate) || 0,
+        // B1.1 #6: printable line description — zoho_description, fallback name.
+        description: product.description || product.item_name || ''
     });
     document.getElementById('qsItemSearch').value = '';
     document.getElementById('qsItemSuggestions').classList.add('hidden');
@@ -2353,6 +2518,12 @@ function qsUpdateItem(idx, field, value) {
     qsRecalc();
 }
 
+// B1.1 #6: string fields (description) — no Number coercion, no re-render
+// (totals unaffected; avoids cursor churn while editing).
+function qsUpdateItemText(idx, field, value) {
+    if (qsItems[idx]) qsItems[idx][field] = String(value || '').trim();
+}
+
 function qsRenderItems() {
     const list = document.getElementById('qsItemsList');
     if (!qsItems.length) {
@@ -2369,6 +2540,7 @@ function qsRenderItems() {
                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
                 </button>
             </div>
+            <input type="text" value="${escAttr(item.description || '')}" maxlength="500" class="qc-input w-full text-xs mb-2" placeholder="Description (print-ல வரும்)" onchange="qsUpdateItemText(${idx},'description',this.value)" aria-label="Item description">
             <div class="flex items-center gap-3 flex-wrap">
                 <div class="qty-stepper">
                     <button type="button" class="qty-btn" onclick="qsChangeQty(${idx},-1)" aria-label="Decrease quantity">&minus;</button>
@@ -2390,6 +2562,10 @@ function qsToggleCustomerType() {
     const type = document.querySelector('input[name="qs_customer_type"]:checked').value;
     document.getElementById('qsCustomerBlock').classList.toggle('hidden', type === 'painter');
     document.getElementById('qsPainterBlock').classList.toggle('hidden', type === 'customer');
+    // Switching back to a regular customer drops a painter-auto salesperson.
+    if (type === 'customer') qsClearAutoSalesperson();
+    else if (qsPainter.id && qsPainter.zoho_salesperson_id) qsSetSalesperson(qsPainter.zoho_salesperson_id, qsPainter.name, true);
+    qsCreditRecheck();
 }
 
 function debounceQsCustSearch() {
@@ -2439,6 +2615,7 @@ function qsSelectCustomer(id, name, phone) {
     document.getElementById('qsNewCustFields').classList.add('hidden');
     document.getElementById('qsCustSearch').classList.add('hidden');
     document.getElementById('qsCustSuggestions').classList.add('hidden');
+    qsCreditRecheck();
 }
 
 function qsNewCustomer() {
@@ -2449,6 +2626,7 @@ function qsNewCustomer() {
     document.getElementById('qsNewCustName').value = term;
     document.getElementById('qsCustSuggestions').classList.add('hidden');
     document.getElementById('qsNewCustName').focus();
+    qsCreditRecheck();
 }
 
 function qsClearCustomer() {
@@ -2459,6 +2637,7 @@ function qsClearCustomer() {
     document.getElementById('qsNewCustPhone').value = '';
     document.getElementById('qsCustSearch').value = '';
     document.getElementById('qsCustSearch').classList.remove('hidden');
+    qsCreditRecheck();
 }
 
 function debounceQsPainterSearch() {
@@ -2487,8 +2666,9 @@ async function qsSearchPainters() {
             el.addEventListener('click', function (e) {
                 const item = e.target.closest('.suggestion-item[data-idx]');
                 if (item && el._results) {
-                    const p = el._results[Number(item.dataset.idx)];
-                    qsSelectPainter(p.id, p.full_name || p.name);
+                    // B1.1 #4: pass the whole painter row — /api/painters is a
+                    // SELECT * so it carries zoho_salesperson_id.
+                    qsSelectPainter(el._results[Number(item.dataset.idx)]);
                 }
             });
         }
@@ -2498,18 +2678,29 @@ async function qsSearchPainters() {
     }
 }
 
-function qsSelectPainter(id, name) {
-    qsPainter = { id, name };
+function qsSelectPainter(p) {
+    const name = p.full_name || p.name || '';
+    qsPainter = { id: p.id, name, zoho_salesperson_id: p.zoho_salesperson_id || null };
     document.getElementById('qsSelectedPainterName').textContent = name;
     document.getElementById('qsSelectedPainter').classList.remove('hidden');
     document.getElementById('qsPainterSearch').value = '';
     document.getElementById('qsPainterSuggestions').classList.add('hidden');
+    // B1.1 #4: painter picked as customer ⇒ salesperson auto-set from the
+    // painter's own Zoho salesperson mapping (cashier can still override).
+    if (qsPainter.zoho_salesperson_id) {
+        qsSetSalesperson(qsPainter.zoho_salesperson_id, name, true);
+    } else {
+        qsClearAutoSalesperson();
+    }
+    qsCreditRecheck();
 }
 
 function qsClearPainter() {
     qsPainter = { id: null, name: '' };
     document.getElementById('qsSelectedPainter').classList.add('hidden');
     document.getElementById('qsPainterSearch').value = '';
+    qsClearAutoSalesperson();
+    qsCreditRecheck();
 }
 
 // ── Payment chips + totals ──
@@ -2563,7 +2754,85 @@ function qsRecalc() {
 
     document.getElementById('qsPaid').textContent = formatCurrency(paid);
     document.getElementById('qsBalance').textContent = formatCurrency(Math.max(0, Math.round((grand - paid) * 100) / 100));
+    qsLastTotals = { subtotal, discount, grand, paid };
+    qsCreditRecheck();   // B1.1 #5: any total/paid change re-evaluates the credit note
     return { subtotal, discount, grand, paid };
+}
+
+// ── Credit pre-check (B1.1 #5) ──
+// Debounced GET /credit-check whenever the sale would leave an unpaid balance
+// (Credit chip or partial payment). Shows available credit or a red note and
+// disables SAVE when ineligible. Advisory only — POST /quick-sale re-runs the
+// same evaluation server-side (and the Zoho push gate remains the second net).
+function qsCreditRecheck() {
+    clearTimeout(qsCreditTimer);
+    qsCreditTimer = setTimeout(qsCreditPrecheck, 350);
+}
+
+function qsCreditNoteShow(kind, text) {
+    const box = document.getElementById('qsCreditCheck');
+    box.className = 'text-sm rounded-lg p-3 mb-2 border ' + (kind === 'ok'
+        ? 'bg-green-50 border-green-200 text-green-800'
+        : 'bg-red-50 border-red-300 text-red-700');
+    box.textContent = text;
+    box.classList.remove('hidden');
+}
+
+function qsCreditNoteHide() {
+    document.getElementById('qsCreditCheck').classList.add('hidden');
+}
+
+function qsUpdateSaveGate() {
+    if (qsSaving) return;   // never fight the in-flight save's own disable
+    document.getElementById('qsSaveBtn').disabled = (qsCreditEligible === false);
+}
+
+async function qsCreditPrecheck() {
+    const t = qsLastTotals || { grand: 0, paid: 0 };
+    const balance = Math.max(0, Math.round((t.grand - t.paid) * 100) / 100);
+
+    // Fully paid (1-paisa tolerance) — credit not involved; clear everything.
+    if (balance <= 0.01) {
+        qsCreditEligible = null;
+        qsCreditNoteHide();
+        qsUpdateSaveGate();
+        return;
+    }
+
+    const type = document.querySelector('input[name="qs_customer_type"]:checked').value;
+    const id = type === 'painter' ? qsPainter.id : qsCustomer.id;
+    if (!id) {
+        // Walk-in / unselected — the server would refuse the credit sale.
+        qsCreditEligible = false;
+        qsCreditNoteShow('bad', 'Credit sale-க்கு ஏற்கனவே இருக்கிற customer/painter-ஐ select பண்ணுங்க — walk-in-க்கு credit கிடையாது');
+        qsUpdateSaveGate();
+        return;
+    }
+
+    const seq = ++qsCreditSeq;
+    try {
+        const qsParams = new URLSearchParams({ customer_type: type, amount: String(balance) });
+        if (type === 'painter') qsParams.set('painter_id', id);
+        else qsParams.set('customer_id', id);
+        const res = await fetch(`${API}/credit-check?${qsParams}`, { headers });
+        const data = await res.json();
+        if (seq !== qsCreditSeq) return;   // a newer check superseded this one
+        if (!res.ok || !data.success) throw new Error(data.message || 'Credit check failed');
+        qsCreditEligible = !!data.eligible;
+        if (data.eligible) {
+            qsCreditNoteShow('ok', `Credit OK — available ${formatCurrency(data.available)} / limit ${formatCurrency(data.limit)}`);
+        } else {
+            qsCreditNoteShow('bad', data.reason
+                ? `Credit இல்லை — ${data.reason}`
+                : 'இந்த customer-க்கு credit limit இல்லை — முழு பணம் வாங்கவும் அல்லது admin-ஐ தொடர்பு கொள்ளவும்.');
+        }
+    } catch {
+        if (seq !== qsCreditSeq) return;
+        // Pre-check failure never blocks the UI — the server gate is authoritative.
+        qsCreditEligible = null;
+        qsCreditNoteHide();
+    }
+    qsUpdateSaveGate();
 }
 
 // Build the payments array for the request body. Throws a user-facing error.
@@ -2630,7 +2899,8 @@ async function qsSaveSale() {
             item_name: i.item_name,
             pack_size: i.pack_size || '',
             quantity: Number(i.quantity),
-            unit_price: Number(i.unit_price)
+            unit_price: Number(i.unit_price),
+            description: i.description ? String(i.description) : null
         })),
         discount_amount: totals.discount,
         notes: document.getElementById('qsNotes').value.trim(),
@@ -2638,14 +2908,14 @@ async function qsSaveSale() {
     };
     if (type === 'customer' && qsCustomer.id) body.customer_id = Number(qsCustomer.id);
     if (type === 'painter') body.painter_id = Number(qsPainter.id);
-    // Defaults carry the salesperson server-side; only send an explicit pick
-    // when the cashier has no mapped default.
-    if (!(qsDefaults && qsDefaults.salesperson)) {
-        const sp = document.getElementById('qsSalespersonSel').value;
-        if (sp) body.salesperson_id = sp;
-    }
+    // B1.1 #4: an explicit pick (painter-auto or manual combo) always stamps
+    // salesperson_id onto the invoice; when empty the server default chain
+    // (user → painter → config) applies exactly as before.
+    const sp = document.getElementById('qsSalespersonSel').value;
+    if (sp) body.salesperson_id = sp;
 
     const btn = document.getElementById('qsSaveBtn');
+    qsSaving = true;
     btn.disabled = true;
     const prevLabel = btn.textContent;
     btn.textContent = 'Saving…';   // 3-8s Zoho round trip
@@ -2671,8 +2941,10 @@ async function qsSaveSale() {
     } catch (e) {
         showToast(e.message || 'Save failed', 'error');
     } finally {
+        qsSaving = false;
         btn.disabled = false;
         btn.textContent = prevLabel;
+        qsUpdateSaveGate();   // re-apply the credit gate after the attempt
     }
 }
 
@@ -2713,6 +2985,16 @@ function qsResetPanel() {
     document.getElementById('qsSplitCash').value = '';
     document.getElementById('qsSplitUpi').value = '';
     qsIdemKey = null;
+    // B1.1: reset salesperson (manual picks included) + credit pre-check state.
+    qsSpAuto = false;
+    document.getElementById('qsSalespersonSel').value = '';
+    document.getElementById('qsSalespersonAuto').classList.add('hidden');
+    const qsHasDefaultSp = !!(qsDefaults && qsDefaults.salesperson);
+    document.getElementById('qsSalespersonWarn').classList.toggle('hidden', qsHasDefaultSp);
+    document.getElementById('qsSalespersonPick').classList.toggle('hidden', qsHasDefaultSp);
+    qsCreditEligible = null;
+    qsCreditNoteHide();
+    qsUpdateSaveGate();
     qsSetPayMode('cash', document.querySelector('#qsPayChips .filter-pill[data-mode="cash"]'));
     qsRenderItems();
     qsRecalc();
@@ -2729,6 +3011,9 @@ document.addEventListener('click', (e) => {
     }
     if (!e.target.closest('#qsPainterSearch') && !e.target.closest('#qsPainterSuggestions')) {
         document.getElementById('qsPainterSuggestions')?.classList.add('hidden');
+    }
+    if (!e.target.closest('#qsSalespersonSearch') && !e.target.closest('#qsSalespersonSuggestions')) {
+        document.getElementById('qsSalespersonSuggestions')?.classList.add('hidden');
     }
 });
 

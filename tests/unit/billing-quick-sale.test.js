@@ -14,7 +14,13 @@
  *     billing.invoice.zohoPush.refused audit; flag off ⇒ push never called;
  *   - split payments produce N billing_payments INSERTs + the shared recalc;
  *   - totals in the response match calculateTotals exactly;
- *   - payments without billing.payment permission (non-admin) ⇒ 403.
+ *   - payments without billing.payment permission (non-admin) ⇒ 403;
+ *   - B1.1 credit gate: an unpaid balance is refused 400 CREDIT_REQUIRED
+ *     BEFORE the transaction unless the customer passes the SAME eligibility
+ *     the Zoho push gate applies (real checkCreditBeforeInvoice, mock pool);
+ *     fully-paid sales never touch the credit system;
+ *   - B1.1 description: optional per-item description accepted by the schema
+ *     and persisted through the billing_invoice_items INSERT (NULL when absent).
  *
  * Handler invoked directly via router stack walk (item-master-search pattern);
  * middleware (idempotent/requirePermission/validate) is bypassed — the body is
@@ -61,14 +67,28 @@ function mockRes() {
 /**
  * Fake pool + transaction connection for the quick-sale flow.
  * `failItemInsert` makes the billing_invoice_items INSERT throw (rollback path).
+ *
+ * B1.1 credit-gate probes (all pool-level, pre-transaction):
+ *   `customerContact` — zoho_customers_map WHERE id → zoho_contact_id
+ *                       (default 'ZC-7' so baseBody resolves);
+ *   `painterRow`      — painters WHERE id → { zoho_contact_id, zoho_customer_id };
+ *   `creditRow`       — the checkCreditBeforeInvoice row (default an eligible
+ *                       ₹100,000 limit so pre-B1.1 unpaid-sale locks still hold);
+ *                       null ⇒ "not in credit system" ⇒ ineligible.
  */
-function makeQuickSalePool({ failItemInsert = false } = {}) {
-    const calls = [];    // pool-level queries (generateNumber, audit, error stamp)
+function makeQuickSalePool({
+    failItemInsert = false,
+    customerContact = 'ZC-7',
+    painterRow = null,
+    creditRow = { id: 7, zoho_contact_name: 'Regular', credit_limit: 100000, zoho_outstanding: 0 },
+} = {}) {
+    const calls = [];    // pool-level queries (generateNumber, credit gate, audit, error stamp)
     const txCalls = [];  // connection-level queries inside the transaction
     const counters = { begins: 0, commits: 0, rollbacks: 0, releases: 0, connections: 0 };
     let invoiceInsertParams = null;
     let paymentInsertSeq = 0;
     const paymentAmounts = [];
+    const itemInserts = [];   // B1.1: params of each billing_invoice_items INSERT
 
     const connection = {
         beginTransaction: async () => { counters.begins++; },
@@ -84,6 +104,7 @@ function makeQuickSalePool({ failItemInsert = false } = {}) {
             }
             if (/INSERT INTO billing_invoice_items/.test(s)) {
                 if (failItemInsert) throw new Error('item insert boom');
+                itemInserts.push({ sql: s, params });
                 return [{ insertId: 1 }];
             }
             if (/INSERT INTO billing_payments/.test(s)) {
@@ -108,12 +129,24 @@ function makeQuickSalePool({ failItemInsert = false } = {}) {
     };
 
     return {
-        calls, txCalls, counters,
+        calls, txCalls, counters, itemInserts,
         getConnection: async () => { counters.connections++; return connection; },
         query: async (sql, params) => {
             const s = String(sql);
             calls.push({ sql: s, params });
             if (/SELECT invoice_number FROM billing_invoices/.test(s)) return [[]]; // generateNumber
+            // B1.1 credit gate — contact resolution (read-only)
+            if (/SELECT zoho_contact_id FROM zoho_customers_map WHERE id/.test(s)) {
+                return [customerContact ? [{ zoho_contact_id: customerContact }] : []];
+            }
+            if (/SELECT zoho_contact_id, zoho_customer_id FROM painters WHERE id/.test(s)) {
+                return [painterRow ? [painterRow] : []];
+            }
+            // B1.1 credit gate — the REAL checkCreditBeforeInvoice queries
+            if (/credit_limit, zoho_outstanding/.test(s)) {
+                return [creditRow ? [creditRow] : []];
+            }
+            if (/FROM credit_limit_requests/.test(s)) return [[]];
             if (/INSERT INTO audit_records/i.test(s)) return [{ insertId: 1 }];
             if (/UPDATE billing_invoices SET zoho_push_error/.test(s)) return [{ affectedRows: 1 }];
             return [[]];
@@ -123,7 +156,8 @@ function makeQuickSalePool({ failItemInsert = false } = {}) {
 
 const baseBody = {
     customer_type: 'customer',
-    customer_name: 'Walk-in',
+    customer_id: 7, // mapped customer (B1.1: the credit gate resolves via zoho_customers_map)
+    customer_name: 'Regular Customer',
     items: [
         { zoho_item_id: 'Z1', item_name: 'Apex 1L', quantity: 2, unit_price: 400 },
         { zoho_item_id: 'Z2', item_name: 'Tractor 4L', quantity: 1, unit_price: 200 },
@@ -370,5 +404,218 @@ describe('POST /quick-sale — phase 2 (after commit, never changes the 200)', (
         expect(actions).toContain('billing.invoice.zohoPush.refused');
         // the stamp lands too — the retry cron will pick this invoice up
         expect(pool.calls.some(c => /UPDATE billing_invoices SET zoho_push_error/.test(c.sql))).toBe(true);
+    });
+});
+
+// ═══════════════════════════════════════════
+// B1.1 — create-time credit gate (owner feedback #5)
+// ═══════════════════════════════════════════
+describe('POST /quick-sale — B1.1 credit gate (pre-transaction)', () => {
+    it('unpaid + customer NOT in the credit system ⇒ 400 CREDIT_REQUIRED, no txn, no insert, no audit, no push', async () => {
+        const { pool, res } = await runQuickSale(baseBody, { poolOpts: { creditRow: null } });
+        expect(res.statusCode).toBe(400);
+        expect(res.body.code).toBe('CREDIT_REQUIRED');
+        expect(res.body.success).toBe(false);
+        // owner-specified single Tamil sentence
+        expect(res.body.message).toContain('credit limit இல்லை');
+        expect(res.body.message).toContain('முழு பணம்');
+        expect(pool.counters.connections).toBe(0);
+        expect(pool.txCalls.length).toBe(0);
+        expect(pool.calls.some(c => /INSERT INTO audit_records/i.test(c.sql))).toBe(false);
+        expect(mockPush).not.toHaveBeenCalled();
+    });
+
+    it('unpaid + limit 0 (no limit set) ⇒ 400 with the checkCreditBeforeInvoice reason surfaced', async () => {
+        const { res } = await runQuickSale(baseBody, {
+            poolOpts: { creditRow: { id: 7, zoho_contact_name: 'Regular', credit_limit: 0, zoho_outstanding: 0 } },
+        });
+        expect(res.statusCode).toBe(400);
+        expect(res.body.code).toBe('CREDIT_REQUIRED');
+        expect(res.body.reason).toMatch(/No credit limit set/i);
+        expect(res.body.credit).toEqual({ limit: 0, available: 0 });
+    });
+
+    it('unpaid + available < balance ⇒ 400 (limit exceeded)', async () => {
+        const { res } = await runQuickSale(baseBody, {
+            poolOpts: { creditRow: { id: 7, zoho_contact_name: 'Regular', credit_limit: 500, zoho_outstanding: 0 } },
+        });
+        expect(res.statusCode).toBe(400);
+        expect(res.body.code).toBe('CREDIT_REQUIRED');
+        expect(res.body.reason).toMatch(/exceeded/i);
+        expect(res.body.credit).toEqual({ limit: 500, available: 500 });
+    });
+
+    it('unpaid + eligible credit ⇒ 200 and the sale is recorded (payments:[] credit sale)', async () => {
+        const { pool, res } = await runQuickSale(baseBody); // default pool: ₹100,000 limit
+        expect(res.statusCode).toBe(200);
+        expect(res.body.invoice.payment_status).toBe('unpaid');
+        expect(pool.counters.commits).toBe(1);
+        // the gate ran against the REAL checkCreditBeforeInvoice query
+        expect(pool.calls.some(c => /credit_limit, zoho_outstanding/.test(c.sql))).toBe(true);
+    });
+
+    it('partial payment: the gate evaluates the UNPAID BALANCE, not the grand total', async () => {
+        // grand 1000, paid 600 ⇒ balance 400; limit 500 covers 400 but not 1000.
+        const { pool, res } = await runQuickSale({
+            ...baseBody, payments: [{ amount: 600, payment_method: 'cash' }],
+        }, {
+            poolOpts: { creditRow: { id: 7, zoho_contact_name: 'Regular', credit_limit: 500, zoho_outstanding: 0 } },
+        });
+        expect(res.statusCode).toBe(200);
+        const check = pool.calls.find(c => /credit_limit, zoho_outstanding/.test(c.sql));
+        expect(check).toBeTruthy();
+        expect(res.body.invoice.balance_due).toBe(400);
+    });
+
+    it('fully paid ⇒ 200 and the credit system is NEVER queried', async () => {
+        const { pool, res } = await runQuickSale({
+            ...baseBody, payments: [{ amount: 1000, payment_method: 'cash' }],
+        }, { poolOpts: { creditRow: null } }); // ineligible row proves the gate was skipped
+        expect(res.statusCode).toBe(200);
+        expect(res.body.invoice.payment_status).toBe('paid');
+        expect(pool.calls.some(c => /zoho_customers_map/.test(c.sql))).toBe(false);
+        expect(pool.calls.some(c => /FROM painters/.test(c.sql))).toBe(false);
+    });
+
+    it('walk-in customer (no customer_id) + unpaid ⇒ 400 (no mapping ⇒ not in the credit system)', async () => {
+        const body = { ...baseBody };
+        delete body.customer_id;
+        const { pool, res } = await runQuickSale(body);
+        expect(res.statusCode).toBe(400);
+        expect(res.body.code).toBe('CREDIT_REQUIRED');
+        // without an id there is nothing to resolve — no probe fired
+        expect(pool.calls.some(c => /zoho_customers_map/.test(c.sql))).toBe(false);
+    });
+
+    it('painter (zoho_contact_id mapped) + eligible ⇒ 200 — same gate as customers', async () => {
+        const { pool, res } = await runQuickSale({
+            ...baseBody, customer_type: 'painter', customer_id: null, painter_id: 3, customer_name: 'Painter Guna',
+        }, { poolOpts: { painterRow: { zoho_contact_id: 'ZP-1', zoho_customer_id: null } } });
+        expect(res.statusCode).toBe(200);
+        const probe = pool.calls.find(c => /SELECT zoho_contact_id, zoho_customer_id FROM painters WHERE id/.test(c.sql));
+        expect(probe.params).toEqual([3]);
+        const check = pool.calls.find(c => /credit_limit, zoho_outstanding/.test(c.sql));
+        expect(check.params[0]).toBe('ZP-1');
+    });
+
+    it('painter with ONLY zoho_customer_id still resolves (both-column read, mirrors resolveZohoContact)', async () => {
+        const { pool, res } = await runQuickSale({
+            ...baseBody, customer_type: 'painter', customer_id: null, painter_id: 3, customer_name: 'Painter Guna',
+        }, { poolOpts: { painterRow: { zoho_contact_id: null, zoho_customer_id: 'ZP-2' } } });
+        expect(res.statusCode).toBe(200);
+        const check = pool.calls.find(c => /credit_limit, zoho_outstanding/.test(c.sql));
+        expect(check.params[0]).toBe('ZP-2');
+    });
+
+    it('painter with NO Zoho mapping + unpaid ⇒ 400 CREDIT_REQUIRED', async () => {
+        const { res } = await runQuickSale({
+            ...baseBody, customer_type: 'painter', customer_id: null, painter_id: 3, customer_name: 'Painter Guna',
+        }, { poolOpts: { painterRow: { zoho_contact_id: null, zoho_customer_id: null } } });
+        expect(res.statusCode).toBe(400);
+        expect(res.body.code).toBe('CREDIT_REQUIRED');
+    });
+});
+
+// ═══════════════════════════════════════════
+// B1.1 — per-item description (owner feedback #6)
+// ═══════════════════════════════════════════
+describe('POST /quick-sale — B1.1 item description', () => {
+    it('quickSaleSchema accepts an optional per-item description (and its absence)', () => {
+        const r = quickSaleSchema.safeParse({
+            ...baseBody,
+            items: [
+                { zoho_item_id: 'Z1', item_name: 'Apex 1L', quantity: 1, unit_price: 100, description: 'Asian Paints Apex Exterior 1L White' },
+                { zoho_item_id: 'Z2', item_name: 'Tractor 4L', quantity: 1, unit_price: 100 },
+            ],
+        });
+        expect(r.success).toBe(true);
+        expect(r.data.items[0].description).toBe('Asian Paints Apex Exterior 1L White');
+        expect(r.data.items[1].description).toBeUndefined();
+    });
+
+    it('description persists through the item INSERT; absent ⇒ NULL', async () => {
+        const { pool, res } = await runQuickSale({
+            ...baseBody,
+            items: [
+                { zoho_item_id: 'Z1', item_name: 'Apex 1L', quantity: 2, unit_price: 400, description: 'Asian Paints Apex Exterior 1L White' },
+                { zoho_item_id: 'Z2', item_name: 'Tractor 4L', quantity: 1, unit_price: 200 },
+            ],
+            payments: [{ amount: 1000, payment_method: 'cash' }],
+        });
+        expect(res.statusCode).toBe(200);
+        expect(pool.itemInserts.length).toBe(2);
+        // column list carries description; param order [invoice_id, zoho_item_id,
+        // item_name, pack_size, quantity, unit_price, line_total, description]
+        expect(pool.itemInserts[0].sql).toContain('description');
+        expect(pool.itemInserts[0].params[7]).toBe('Asian Paints Apex Exterior 1L White');
+        expect(pool.itemInserts[1].params[7]).toBeNull();
+    });
+});
+
+// ═══════════════════════════════════════════
+// B1.1 — GET /credit-check (the UI pre-check; same evaluation as the gate)
+// ═══════════════════════════════════════════
+describe('GET /credit-check — B1.1 pre-check endpoint', () => {
+    async function runCreditCheck(query, poolOpts = {}) {
+        const pool = makeQuickSalePool(poolOpts);
+        billing.setPool(pool);
+        const route = findRoute('get', '/credit-check');
+        expect(route).toBeTruthy();
+        const res = mockRes();
+        await lastHandler(route)({ user: { id: 42, role: 'staff', branch_id: 4 }, query }, res);
+        return { pool, res };
+    }
+
+    it('eligible customer ⇒ eligible:true with limit/available', async () => {
+        const { res } = await runCreditCheck({ customer_type: 'customer', customer_id: '7', amount: '500' });
+        expect(res.statusCode).toBe(200);
+        expect(res.body).toMatchObject({ success: true, eligible: true, limit: 100000, available: 100000 });
+    });
+
+    it('mapped contact but no credit row ⇒ ineligible ("not in credit system" is NOT eligible — push-gate semantics)', async () => {
+        const { res } = await runCreditCheck(
+            { customer_type: 'customer', customer_id: '7', amount: '500' },
+            { creditRow: null }
+        );
+        expect(res.body).toMatchObject({ success: true, eligible: false, limit: null, available: null });
+        expect(res.body.reason).toMatch(/not in credit system/i);
+    });
+
+    it('limit 0 ⇒ ineligible with the no-limit reason', async () => {
+        const { res } = await runCreditCheck(
+            { customer_type: 'customer', customer_id: '7', amount: '500' },
+            { creditRow: { id: 7, zoho_contact_name: 'Regular', credit_limit: 0, zoho_outstanding: 0 } }
+        );
+        expect(res.body).toMatchObject({ success: true, eligible: false, limit: 0, available: 0 });
+        expect(res.body.reason).toMatch(/No credit limit set/i);
+    });
+
+    it('over the limit ⇒ ineligible, available reported', async () => {
+        const { res } = await runCreditCheck(
+            { customer_type: 'customer', customer_id: '7', amount: '5000' },
+            { creditRow: { id: 7, zoho_contact_name: 'Regular', credit_limit: 10000, zoho_outstanding: 8000 } }
+        );
+        expect(res.body).toMatchObject({ success: true, eligible: false, limit: 10000, available: 2000 });
+        expect(res.body.reason).toMatch(/exceeded/i);
+    });
+
+    it('unmapped customer id ⇒ ineligible without ever running the credit query', async () => {
+        const { pool, res } = await runCreditCheck(
+            { customer_type: 'customer', customer_id: '7', amount: '500' },
+            { customerContact: null }
+        );
+        expect(res.body).toMatchObject({ success: true, eligible: false });
+        expect(res.body.reason).toMatch(/not in the credit system/i);
+        expect(pool.calls.some(c => /credit_limit, zoho_outstanding/.test(c.sql))).toBe(false);
+    });
+
+    it('painter path resolves via painters (both contact columns)', async () => {
+        const { pool, res } = await runCreditCheck(
+            { customer_type: 'painter', painter_id: '3', amount: '400' },
+            { painterRow: { zoho_contact_id: null, zoho_customer_id: 'ZP-2' } }
+        );
+        expect(res.body).toMatchObject({ success: true, eligible: true });
+        const check = pool.calls.find(c => /credit_limit, zoho_outstanding/.test(c.sql));
+        expect(check.params).toEqual(['ZP-2']);
     });
 });

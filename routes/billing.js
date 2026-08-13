@@ -252,6 +252,60 @@ function deriveZohoSync(summary) {
     return { status: 'not_applicable', detail: null };
 }
 
+/**
+ * B1.1 create-time credit eligibility — the SAME evaluation the Zoho push gate
+ * applies (services/billing-zoho-service.js pushInvoiceToZoho step 4), minus
+ * its side effects: the push path resolves the Zoho contact and CREATES one
+ * when missing; at create time we only READ the existing mapping. A customer/
+ * painter with no existing Zoho contact mapping is exactly what the push gate
+ * ends up treating as "not in the credit system" (a freshly created contact
+ * has no credit limit) ⇒ ineligible. checkCreditBeforeInvoice is reused
+ * verbatim, and — mirroring the push gate's structural check — allowed:true
+ * WITHOUT a credit_limit field ("Customer not in credit system") is NOT
+ * eligible: eligibility requires an actual evaluated limit.
+ * @returns {Promise<{eligible:boolean, limit:(number|null), available:(number|null), reason:(string|null)}>}
+ */
+async function evaluateCreditForSale(customerType, customerId, painterId, amount) {
+    // Resolve the existing Zoho contact id (read-only — never creates one).
+    let zohoContactId = null;
+    try {
+        if (customerType === 'painter' && painterId) {
+            // Same both-column read as resolveZohoContact (zoho_contact_id is
+            // the billing column; painter-sync writes zoho_customer_id).
+            const [rows] = await pool.query(
+                'SELECT zoho_contact_id, zoho_customer_id FROM painters WHERE id = ? LIMIT 1',
+                [painterId]
+            );
+            if (rows.length) zohoContactId = rows[0].zoho_contact_id || rows[0].zoho_customer_id || null;
+        } else if (customerType === 'customer' && customerId) {
+            const [rows] = await pool.query(
+                'SELECT zoho_contact_id FROM zoho_customers_map WHERE id = ? LIMIT 1',
+                [customerId]
+            );
+            if (rows.length) zohoContactId = rows[0].zoho_contact_id || null;
+        }
+    } catch { zohoContactId = null; }
+
+    // Same default + same error handling as the push gate.
+    let credit = { allowed: false, reason: 'Customer is not in the credit system' };
+    if (zohoContactId) {
+        try {
+            const { checkCreditBeforeInvoice } = require('./credit-limits');
+            const result = await checkCreditBeforeInvoice(pool, zohoContactId, amount);
+            if (result) credit = result;
+        } catch (err) {
+            credit = { allowed: false, reason: 'Credit check failed: ' + err.message };
+        }
+    }
+    const eligible = credit.allowed === true && credit.credit_limit != null;
+    return {
+        eligible,
+        limit: credit.credit_limit != null ? Number(credit.credit_limit) : null,
+        available: credit.available != null ? Number(credit.available) : null,
+        reason: credit.reason || null
+    };
+}
+
 // ═══════════════════════════════════════════
 // ZOD SCHEMAS
 // ═══════════════════════════════════════════
@@ -261,7 +315,10 @@ const estimateItemSchema = z.object({
     item_name: z.string().min(1),
     pack_size: z.string().optional().default(''),
     quantity: z.number().positive(),
-    unit_price: z.number().min(0)
+    unit_price: z.number().min(0),
+    // B1.1: printable line description (owner feedback #6). Stored on
+    // billing_invoice_items.description (nullable); estimates simply ignore it.
+    description: z.string().optional().nullable()
 });
 
 const createEstimateSchema = z.object({
@@ -345,6 +402,15 @@ const quickSaleSchema = z.object({
     zoho_location_id: z.string().optional().nullable()
 });
 
+// B1.1: GET /credit-check — the quick-sale UI pre-check (same evaluation the
+// quick-sale create gate and the Zoho push gate apply).
+const creditCheckQuerySchema = z.object({
+    customer_type: z.enum(['customer', 'painter']),
+    customer_id: z.coerce.number().positive().optional(),
+    painter_id: z.coerce.number().positive().optional(),
+    amount: z.coerce.number().min(0).default(0)
+});
+
 // ═══════════════════════════════════════════
 // PRODUCT SEARCH
 // ═══════════════════════════════════════════
@@ -423,6 +489,7 @@ router.get('/products',
                 `SELECT zim.id, zim.zoho_item_id, zim.zoho_item_name AS item_name,
                         zim.zoho_sku AS sku, zim.zoho_rate AS rate, zim.zoho_brand AS brand,
                         zim.zoho_category_name AS category, zim.zoho_unit AS unit,
+                        zim.zoho_description AS description,
                         ps.pack_size,
                         zls.stock_on_hand, zls.available_for_sale AS stock,
                         zls.last_synced_at AS stock_as_of
@@ -1003,9 +1070,9 @@ router.post('/invoices',
                 const lineTotal = item.quantity * item.unit_price;
                 await connection.execute(
                     `INSERT INTO billing_invoice_items
-                     (invoice_id, zoho_item_id, item_name, pack_size, quantity, unit_price, line_total)
-                     VALUES (?, ?, ?, ?, ?, ?, ?)`,
-                    [invoiceId, item.zoho_item_id, item.item_name, item.pack_size, item.quantity, item.unit_price, lineTotal]
+                     (invoice_id, zoho_item_id, item_name, pack_size, quantity, unit_price, line_total, description)
+                     VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+                    [invoiceId, item.zoho_item_id, item.item_name, item.pack_size, item.quantity, item.unit_price, lineTotal, item.description || null]
                 );
             }
 
@@ -1091,6 +1158,27 @@ router.post('/quick-sale',
             });
         }
 
+        // B1.1 credit gate (owner feedback #5): a sale that leaves ANY unpaid
+        // balance (incl. payments:[]) is a credit sale — refuse at CREATE time,
+        // BEFORE the transaction, unless the customer passes the SAME credit
+        // eligibility the Zoho push gate applies (paid OR evaluated limit with
+        // enough available). The push gate stays as-is (second net). Same
+        // 1-paisa tolerance as the push gate's balance_due check.
+        const unpaidBalance = Math.max(0, grandTotal - paymentsTotal);
+        if (unpaidBalance > 0.01) {
+            const credit = await evaluateCreditForSale(
+                data.customer_type, data.customer_id || null, data.painter_id || null, unpaidBalance
+            );
+            if (!credit.eligible) {
+                return res.status(400).json({
+                    success: false, code: 'CREDIT_REQUIRED',
+                    message: 'இந்த customer-க்கு credit limit இல்லை — முழு பணம் வாங்கவும் அல்லது admin-ஐ தொடர்பு கொள்ளவும்.',
+                    reason: credit.reason || null,
+                    credit: { limit: credit.limit, available: credit.available }
+                });
+            }
+        }
+
         // ── Phase 1: the local money record — ONE transaction ──
         let invoiceId, invoiceNumber, settled;
         const insertedPayments = [];
@@ -1133,9 +1221,9 @@ router.post('/quick-sale',
                 const lineTotal = item.quantity * item.unit_price;
                 await connection.execute(
                     `INSERT INTO billing_invoice_items
-                     (invoice_id, zoho_item_id, item_name, pack_size, quantity, unit_price, line_total)
-                     VALUES (?, ?, ?, ?, ?, ?, ?)`,
-                    [invoiceId, item.zoho_item_id, item.item_name, item.pack_size, item.quantity, item.unit_price, lineTotal]
+                     (invoice_id, zoho_item_id, item_name, pack_size, quantity, unit_price, line_total, description)
+                     VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+                    [invoiceId, item.zoho_item_id, item.item_name, item.pack_size, item.quantity, item.unit_price, lineTotal, item.description || null]
                 );
             }
 
@@ -1482,9 +1570,9 @@ router.put('/invoices/:id',
                 const lineTotal = item.quantity * item.unit_price;
                 await connection.execute(
                     `INSERT INTO billing_invoice_items
-                     (invoice_id, zoho_item_id, item_name, pack_size, quantity, unit_price, line_total)
-                     VALUES (?, ?, ?, ?, ?, ?, ?)`,
-                    [id, item.zoho_item_id, item.item_name, item.pack_size, item.quantity, item.unit_price, lineTotal]
+                     (invoice_id, zoho_item_id, item_name, pack_size, quantity, unit_price, line_total, description)
+                     VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+                    [id, item.zoho_item_id, item.item_name, item.pack_size, item.quantity, item.unit_price, lineTotal, item.description || null]
                 );
             }
 
@@ -1851,6 +1939,34 @@ router.get('/my-defaults',
     }
 );
 
+// B1.1: quick-sale credit pre-check (owner feedback #5). Runs the SAME
+// evaluation the quick-sale create gate and the Zoho push gate apply, so the
+// UI can show available credit (or a red note + disabled SAVE) BEFORE the
+// cashier hits save. Read-only — never creates a Zoho contact.
+router.get('/credit-check',
+    requirePermission('billing', 'invoice'),
+    validateQuery(creditCheckQuerySchema),
+    async (req, res) => {
+        try {
+            const { customer_type } = req.query;
+            const customerId = req.query.customer_id ? Number(req.query.customer_id) : null;
+            const painterId = req.query.painter_id ? Number(req.query.painter_id) : null;
+            const amount = Number(req.query.amount) || 0;
+            const result = await evaluateCreditForSale(customer_type, customerId, painterId, amount);
+            res.json({
+                success: true,
+                eligible: result.eligible,
+                limit: result.limit,
+                available: result.available,
+                reason: result.reason
+            });
+        } catch (error) {
+            console.error('Billing credit-check error:', error);
+            res.status(500).json({ success: false, message: 'Failed to check credit' });
+        }
+    }
+);
+
 router.post('/invoices/:id/push-zoho',
     requirePermission('billing', 'zoho_push'),
     idempotent('billing.invoice.zohoPush'),
@@ -1952,5 +2068,6 @@ module.exports = {
     router, setPool, setPointsEngine,
     calculateTotals, paymentExceedsBalance, computePaymentSettlement, deriveZohoSync,
     recalcInvoicePaymentTotals, countLiveInvoicePayments, reverseInvoicePayment,
+    evaluateCreditForSale,
     createEstimateSchema, recordPaymentSchema, listQuerySchema, quickSaleSchema
 };

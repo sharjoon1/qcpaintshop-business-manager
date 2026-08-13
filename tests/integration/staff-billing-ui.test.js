@@ -245,6 +245,95 @@ describe('print templates (B1b)', () => {
     });
 });
 
+// ─────────────────────────────────────────────────────────────────────────────
+// B1.1 — owner feedback after testing the quick-sale
+// ─────────────────────────────────────────────────────────────────────────────
+describe('staff-billing page — B1.1 owner feedback', () => {
+    const RECEIPT_JS = path.join(PUB, 'js', 'pages', 'billing-receipt.js');
+    const INVOICE_JS = path.join(PUB, 'js', 'pages', 'billing-invoice-print.js');
+    let html, receiptJs, invoiceJs;
+
+    beforeAll(() => {
+        html = fs.readFileSync(HTML_PATH, 'utf8');
+        receiptJs = fs.readFileSync(RECEIPT_JS, 'utf8');
+        invoiceJs = fs.readFileSync(INVOICE_JS, 'utf8');
+    });
+
+    test('#1 New Sale layout: customer section comes BEFORE products', () => {
+        const panel = html.indexOf('id="panelQuicksale"');
+        const customer = html.indexOf('name="qs_customer_type"');   // first radio in the customer card
+        const products = html.indexOf('id="qsItemSearch"');
+        expect(panel).toBeGreaterThan(-1);
+        expect(customer).toBeGreaterThan(panel);
+        expect(customer).toBeLessThan(products);
+    });
+
+    test('#2 tabs are distinct segmented buttons — icon + label, filled active state', () => {
+        // every tab carries the shared button class
+        expect((html.match(/qc-tab-btn/g) || []).length).toBeGreaterThanOrEqual(5);
+        // switchTab flips the same classes (icons inside the button survive)
+        expect(html).toContain("'qc-tab-btn tab-active' : 'qc-tab-btn tab-inactive'");
+        // each of the five tab buttons contains an inline SVG icon + a label span
+        const tabBar = html.slice(html.indexOf('<!-- Tab Bar'), html.indexOf('id="panelQuicksale"'));
+        expect((tabBar.match(/<svg /g) || []).length).toBe(5);
+        expect((tabBar.match(/<span>/g) || []).length).toBe(5);
+        // clear active state: filled QC green, no corporate gold underline
+        expect(html).toContain('.qc-tabs .qc-tab-btn.tab-active');
+        expect(html).toContain('.qc-tab-btn.tab-active::after { display: none; }');
+    });
+
+    test('#3 salesperson is a searchable combo; hidden input keeps the salesperson_id contract', () => {
+        expect(html).toContain('id="qsSalespersonSearch"');
+        expect(html).toContain('id="qsSalespersonSuggestions"');
+        expect(html).toContain('<input type="hidden" id="qsSalespersonSel">');
+        expect(html).not.toContain('<select id="qsSalespersonSel"');
+        expect(html).toContain('function qsFilterSalespersons');
+        // an explicit pick always stamps salesperson_id on the quick-sale body
+        expect(html).toContain('body.salesperson_id = sp');
+    });
+
+    test('#4 painter picked as customer ⇒ salesperson auto-set (override allowed)', () => {
+        expect(html).toContain('id="qsSalespersonAuto"');
+        expect(html).toContain('(auto)');
+        // auto-set reads the painter row field the /api/painters SELECT * returns
+        expect(html).toContain('p.zoho_salesperson_id');
+        expect(html).toContain('qsSetSalesperson(qsPainter.zoho_salesperson_id');
+        // override affordance + auto cleared when the painter is cleared
+        expect(html).toContain('qsShowSalespersonPick');
+        expect(html).toContain('function qsClearAutoSalesperson');
+    });
+
+    test('#5 credit pre-check: GET /credit-check wired, note element, SAVE gate', () => {
+        expect(html).toContain('/credit-check?');
+        expect(html).toContain('id="qsCreditCheck"');
+        expect(html).toContain('function qsCreditPrecheck');
+        // ineligible ⇒ SAVE disabled; pre-check failure never blocks (server gate authoritative)
+        expect(html).toContain("disabled = (qsCreditEligible === false)");
+        expect(html).toContain('qsCreditEligible = null');
+    });
+
+    test('#6 picker rows lead with the description; name drops to small text', () => {
+        expect(html).toContain('p.description || p.item_name');
+        expect(html).toContain('description: product.description || product.item_name');
+    });
+
+    test('#6 line items carry an editable description sent to the API', () => {
+        expect(html).toContain("qsUpdateItemText(${idx},'description',this.value)");
+        expect(html).toContain("updateItemFieldText(${idx},'description',this.value)");
+        expect(html).toContain('description: i.description ? String(i.description) : null');
+        // attribute-safe escaping for the prefilled value
+        expect(html).toContain('function escAttr');
+        expect(html).toContain('escAttr(item.description');
+    });
+
+    test('#6 print templates render description ONLY (fallback item_name — never both)', () => {
+        for (const js of [receiptJs, invoiceJs]) {
+            expect(js).toContain("item.description || item.item_name || 'Item'");
+            expect(js).not.toContain("escapeHtml(item.item_name || 'Item')");
+        }
+    });
+});
+
 describe('server wiring (B1b)', () => {
     test('billing-pdf router mounts on /api/billing BEFORE billingRoutes', () => {
         const server = fs.readFileSync(path.join(__dirname, '..', '..', 'server.js'), 'utf8');

@@ -62,6 +62,10 @@ describe('backfillPainter', () => {
         const res = await backfill.backfillPainter(3, '2025-12-01', { pool: makePool(state), rates });
         expect(pointsEngine.addPoints).toHaveBeenCalledTimes(2);
         expect(res.salesperson_points_awarded).toBe(200);
+        // Return-shape lock: consumed by scripts/salesperson-painter-unify.js APPLY reporting.
+        expect(res.painter_id).toBe(3);
+        expect(res.invoices_processed).toBe(1);
+        expect(res.direct_points_awarded).toBe(0);
     });
 
     test('already-processed invoice skipped (idempotent)', async () => {

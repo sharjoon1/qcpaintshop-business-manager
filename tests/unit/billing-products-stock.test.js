@@ -81,6 +81,8 @@ describe('GET /products — stock-aware picker query', () => {
         expect(dataCall.sql).toContain('zls.stock_on_hand');
         expect(dataCall.sql).toContain('zls.available_for_sale AS stock');
         expect(dataCall.sql).toContain('zls.last_synced_at AS stock_as_of');
+        // B1.1 #6: printable item description for the picker + line prefill
+        expect(dataCall.sql).toContain('zim.zoho_description AS description');
         // pre-B1a keys unchanged
         expect(dataCall.sql).toContain('zim.zoho_item_name AS item_name');
         expect(dataCall.sql).toContain('zim.zoho_sku AS sku');
@@ -132,17 +134,18 @@ describe('GET /products — stock-aware picker query', () => {
         expect(dataCall.params).toEqual(['', '%apex%', '%apex%']);
     });
 
-    it('response keys: backward compatible + the new stock/pack keys pass through', async () => {
+    it('response keys: backward compatible + the new stock/pack/description keys pass through', async () => {
         const row = {
             id: 1, zoho_item_id: 'Z1', item_name: 'Apex 1L', sku: 'AP1', rate: 400,
             brand: 'Asian', category: 'Emulsion', unit: 'L',
+            description: 'Asian Paints Apex Exterior Emulsion 1L White',
             pack_size: '1 L', stock_on_hand: 12, stock: 10, stock_as_of: '2026-08-12 05:00:00',
         };
         const { res } = await runProducts({}, staffUser, { branchLoc: 'LOC9', rows: [row] });
         expect(res.body.success).toBe(true);
         expect(res.body.products).toEqual([row]);
         for (const key of ['id', 'zoho_item_id', 'item_name', 'sku', 'rate', 'brand', 'category', 'unit',
-            'pack_size', 'stock_on_hand', 'stock', 'stock_as_of']) {
+            'description', 'pack_size', 'stock_on_hand', 'stock', 'stock_as_of']) {
             expect(res.body.products[0]).toHaveProperty(key);
         }
     });
